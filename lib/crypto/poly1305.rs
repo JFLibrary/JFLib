@@ -136,7 +136,7 @@ impl Poly1305 {
         c = g1 >> 44;
         g1 &= M44;
         let mut g2 = h2.wrapping_add(c).wrapping_sub(1 << 42);
-        let mask = (g2 >> 63).wrapping_sub(1);
+        let mask = crate::ct_mask((g2 >> 63).wrapping_sub(1));
         g0 &= mask;
         g1 &= mask;
         g2 &= mask;

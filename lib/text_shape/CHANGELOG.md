@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Added
+
+- `visual_runs(text)`: the directional runs of a line in visual order (the Unicode bidi algorithm, the direction from the first strong character), and `Engine::shape_run(text, rtl)`: one such run shaped as it is, split into script runs. `jflib-text` lays out lines with right-to-left characters with them while shaping is off; `shape_with_fallback` shapes as before
+
 ## [0.2.1] - 2026-11-16
 
 No changes in this crate. It was released with the others because all of JFLib's crates move together.

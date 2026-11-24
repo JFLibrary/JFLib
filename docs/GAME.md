@@ -334,7 +334,8 @@ anfassen:
   Firefox ohne Fenster): jede Vorhersage stimmte. Spiel 1 nimmt Ereignisse (Abschussmeldungen, Treffermarke),
   Abmelden und Glätten; dabei behoben: der Server antwortete UDP-Clients im LAN nicht (PERMISSIONS), Firefox wartete
   5,7 s auf freie HTTP-Worker. Die Grenze des Lag-Ausgleichs bleibt 300 ms. Offen: ein Lauf mit Fedora als Server,
-  WLAN an beiden Enden, Telefone, Verschlüsselung über UDP (G7d Teil 2), Deltas gegen eine Vorhersage.
+  WLAN an beiden Enden, Telefone, Deltas gegen eine Vorhersage. Die Verschlüsselung über UDP kam am 21.11.2026 mit
+  U3 (TRANSPORT.md „Verschlüsselung“).
 
 **G7f `render3d` für Spiel 1**
 

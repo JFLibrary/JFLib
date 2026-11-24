@@ -16,7 +16,6 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use crate::cargo;
-use crate::deflate;
 use crate::package::{self, App, SIGNER};
 use crate::pkgmeta;
 use crate::sha256::{base64, hex, sha256, unhex};
@@ -77,7 +76,7 @@ impl App<'_> {
         let data = package::read(&deb)?;
         package::write(&out.join("pool").join(&name), &data)?;
         let packages = format!("{}Filename: pool/{name}\nSize: {}\nSHA256: {}\n\n", control, data.len(), hex(&sha256(&data)));
-        let gz = deflate::gzip(packages.as_bytes());
+        let gz = compress::gzip::compress(packages.as_bytes(), 9);
         let (y, m, d, wd) = pkgmeta::civil(pkgmeta::now());
         let secs = pkgmeta::now() % 86400;
         let date = format!("{}, {d:02} {} {y} {:02}:{:02}:{:02} UTC", ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][wd as usize],

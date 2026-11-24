@@ -19,7 +19,7 @@ use alloc::{
     string::String,
     vec::Vec,
 };
-use base::{
+use formats::{
     encoding,
     xml::{self, Node},
 };

@@ -1,5 +1,5 @@
 // record -- the TLS record layer: TLS 1.3 (RFC 8446) and, for public servers, TLS 1.2 (RFC
-// 5246 with AEAD suites only: RFC 5288 AES-GCM, RFC 7905 ChaCha20-Poly1305)
+// 5246 with AEAD suites only: RFC 5288 / 5289 AES-GCM, RFC 7905 ChaCha20-Poly1305)
 //
 //   plaintext record    type | 0x0303 | length | fragment          (handshake before keys,
 //                                                                    alerts, CCS)
@@ -28,9 +28,12 @@ pub const MAX_RECORD: usize = MAX_PLAIN + 256;
 
 /// the cipher suites (TLS 1.3, then TLS 1.2 ECDHE)
 pub const TLS_AES_128_GCM_SHA256: u16 = 0x1301;
+pub const TLS_AES_256_GCM_SHA384: u16 = 0x1302;
 pub const TLS_CHACHA20_POLY1305_SHA256: u16 = 0x1303;
 pub const ECDHE_ECDSA_AES128_GCM: u16 = 0xC02B;
+pub const ECDHE_ECDSA_AES256_GCM: u16 = 0xC02C;
 pub const ECDHE_RSA_AES128_GCM: u16 = 0xC02F;
+pub const ECDHE_RSA_AES256_GCM: u16 = 0xC030;
 pub const ECDHE_RSA_CHACHA20: u16 = 0xCCA8;
 pub const ECDHE_ECDSA_CHACHA20: u16 = 0xCCA9;
 
@@ -39,10 +42,24 @@ pub fn key_iv_len(suite: u16) -> Option<(usize, usize)> {
     match suite {
         TLS_CHACHA20_POLY1305_SHA256 => Some((32, 12)),
         TLS_AES_128_GCM_SHA256 => Some((16, 12)),
+        TLS_AES_256_GCM_SHA384 => Some((32, 12)),
         ECDHE_RSA_CHACHA20 | ECDHE_ECDSA_CHACHA20 => Some((32, 12)),
         ECDHE_ECDSA_AES128_GCM | ECDHE_RSA_AES128_GCM => Some((16, 4)),
+        ECDHE_ECDSA_AES256_GCM | ECDHE_RSA_AES256_GCM => Some((32, 4)),
         _ => None,
     }
+}
+
+/// the hash of a suite's key schedule (TLS 1.3) or PRF (TLS 1.2)
+pub fn suite_hash(suite: u16) -> crypto::HashAlg {
+    match suite {
+        TLS_AES_256_GCM_SHA384 | ECDHE_ECDSA_AES256_GCM | ECDHE_RSA_AES256_GCM => crypto::HashAlg::Sha384,
+        _ => crypto::HashAlg::Sha256,
+    }
+}
+
+fn is_chacha(suite: u16) -> bool {
+    matches!(suite, TLS_CHACHA20_POLY1305_SHA256 | ECDHE_RSA_CHACHA20 | ECDHE_ECDSA_CHACHA20)
 }
 
 enum Aead {
@@ -81,7 +98,7 @@ impl Cipher {
         if key.len() != kl || iv.len() != il {
             return None;
         }
-        let aead = if kl == 32 {
+        let aead = if is_chacha(suite) {
             let mut k = [0u8; 32];
             k.copy_from_slice(key);
             Aead::ChaCha(k)
@@ -164,11 +181,14 @@ impl Cipher {
     }
 
     /// open a protected record body (header given) -> (type, content)
-    pub fn open(&mut self, hdr: &[u8; 5], body: &[u8]) -> Option<(u8, Vec<u8>)> {
+    pub fn open(&mut self, hdr: &[u8; 5], body: &[u8]) -> Result<(u8, Vec<u8>), OpenError> {
         if self.v12 {
             let ex = if self.explicit { 8 } else { 0 };
-            if body.len() < ex + 16 || body.len() > MAX_RECORD {
-                return None;
+            if body.len() < ex + 16 {
+                return Err(OpenError::Mac);
+            }
+            if body.len() > MAX_PLAIN + 2048 {
+                return Err(OpenError::Overflow);
             }
             let mut nonce = self.nonce();
             if self.explicit {
@@ -179,33 +199,49 @@ impl Cipher {
             tag.copy_from_slice(&body[n..]);
             let mut plain = Vec::from(&body[ex..n]);
             let aad = self.aad12(hdr[0], plain.len());
-            if !self.open_raw(&nonce, &aad, &mut plain, &tag) || plain.len() > MAX_PLAIN {
-                return None;
+            if !self.open_raw(&nonce, &aad, &mut plain, &tag) {
+                return Err(OpenError::Mac);
+            }
+            if plain.len() > MAX_PLAIN {
+                return Err(OpenError::Overflow);
             }
             self.seq += 1;
-            return Some((hdr[0], plain));
+            return Ok((hdr[0], plain));
         }
-        if body.len() < 17 || body.len() > MAX_RECORD {
-            return None;
+        if body.len() < 17 {
+            return Err(OpenError::Mac);
+        }
+        // TLSInnerPlaintext (content, type, padding) at most 2^14 + 1 bytes (RFC 8446 5.2)
+        if body.len() > MAX_PLAIN + 1 + 16 {
+            return Err(OpenError::Overflow);
         }
         let n = body.len() - 16;
         let mut tag = [0u8; 16];
         tag.copy_from_slice(&body[n..]);
         let mut plain = Vec::from(&body[..n]);
         if !self.open_raw(&self.nonce(), hdr, &mut plain, &tag) {
-            return None;
+            return Err(OpenError::Mac);
         }
         self.seq += 1;
-        // strip the zero padding; the last non-zero byte is the real type
+        // strip the zero padding; the last non-zero byte is the real type (none: RFC 8446 5.4
+        // wants unexpected_message)
         while plain.last() == Some(&0) {
             plain.pop();
         }
-        let ty = plain.pop()?;
-        if plain.len() > MAX_PLAIN {
-            return None;
-        }
-        Some((ty, plain))
+        let ty = plain.pop().ok_or(OpenError::NoType)?;
+        Ok((ty, plain))
     }
+}
+
+/// why a protected record did not open
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OpenError {
+    /// it does not authenticate (bad_record_mac)
+    Mac,
+    /// more than a record may hold (record_overflow)
+    Overflow,
+    /// only padding, no content type (unexpected_message)
+    NoType,
 }
 
 /// a plaintext record

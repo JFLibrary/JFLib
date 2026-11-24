@@ -6,7 +6,7 @@
 //                                      and Activity Monitor show ("" names the app).
 //   release(held)                      IOPMAssertionRelease of each
 //
-// macOS only (iOS keeps power.rs's None until AP5: UIApplication's idle timer).
+// macOS only (iOS: apple_power_ios.rs, UIApplication's idle timer).
 
 use alloc::string::String;
 

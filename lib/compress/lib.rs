@@ -1,14 +1,36 @@
-// compress -- lossless compression for backup data
+// compress -- lossless compression: DEFLATE, zlib, gzip, Brotli, LZ4 and Zstandard
 //
+//   deflate::compress(data, level) / decompress(data, max_out)   raw DEFLATE (RFC 1951)
+//   zlib::compress / decompress                     zlib streams (RFC 1950)
+//   gzip::compress / decompress                     gzip members (RFC 1952; decompress reads
+//                                                   all members, as gunzip does)
+//   brotli::compress(data, level) / decompress      Brotli streams (RFC 7932; levels 0 to 11,
+//                                                   read by libbrotli and the browsers)
 //   lz4::compress(data) -> Vec<u8>                  LZ4 block (greedy, 64 KiB window)
+//   lz4::compress_hc(data, level)                   LZ4 block, longest matches (as lz4 -9)
 //   lz4::decompress(block, max_out) -> Option<Vec>  bounds-checked; None on any corruption
 //   lz4::frame_compress / frame_decompress          the LZ4 frame format (lz4 / zstd --format=lz4
 //                                                   interoperable), xxHash32 checksums
 //   zstd::compress(data, level) / decompress        Zstandard frames (RFC 8878; the zstd tool
 //                                                   reads ours and we read its)
-//   xxh32(data, seed), xxh64(data, seed)
+//   zstd::Dictionary, compress_with_dict / decompress_with_dict   dictionaries: trained on
+//                                                   samples or raw content, as zstd -D uses them
+//   crc32(crc, data), adler32(adler, data)          the checksums of gzip / PNG / ZIP and zlib
+//   xxh32(data, seed), xxh64(data, seed); Xxh32, Xxh64   the same over data in pieces
+//   stream::{Decode, Encode}                        every format in pieces, with bounded memory:
+//                                                   deflate::, zlib::, gzip::, zstd::Decoder /
+//                                                   Encoder, lz4::FrameDecoder / FrameEncoder,
+//                                                   brotli::Decoder / Encoder; decode(input, out) /
+//                                                   encode(input, out, flush) -> Step; the
+//                                                   pumps stream::decode_all / encode_all
 //   Codec { None, Lz4, Zstd } with id(): the codec byte that formats on disk store per blob;
 //   Codec::pack(data, level) / unpack(data, max_out)
+//
+// Every decoder takes the largest output the caller accepts and treats its input as untrusted:
+// truncated or corrupt data, a wrong checksum or more output than allowed give None (or an
+// Error from the *_into variants), never a panic and never a read or write outside the buffers.
+// The stream decoders write at most the caller's buffer per call and keep no more than their
+// format's window (stream.rs).
 #![no_std]
 #![forbid(unsafe_code)]
 
@@ -16,11 +38,18 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 
+pub mod brotli;
+mod checksum;
+pub mod deflate;
+pub mod gzip;
 pub mod lz4;
+pub mod stream;
 mod xxh;
+pub mod zlib;
 pub mod zstd;
 
-pub use xxh::{xxh32, xxh64};
+pub use checksum::{adler32, crc32};
+pub use xxh::{xxh32, xxh64, Xxh32, Xxh64};
 
 /// the compression of a stored blob (the byte on disk)
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -38,6 +38,7 @@ unwind = ["std", "rt/unwind", "plat/unwind", "ui/unwind"]
 
 [dependencies]
 rt.workspace = true
+formats.workspace = true
 agent_core.workspace = true
 plat.workspace = true
 base.workspace = true
@@ -74,6 +75,7 @@ ui.workspace = true
 doc_view.workspace = true
 datetime.workspace = true
 crypto.workspace = true
+x509.workspace = true
 compress.workspace = true
 shader.workspace = true
 wgsl.workspace = true

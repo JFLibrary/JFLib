@@ -1,4 +1,4 @@
-// sha2 -- SHA-256, SHA-384 and SHA-512 (FIPS 180-4), streaming and one-shot
+// sha2 -- SHA-224, SHA-256, SHA-384 and SHA-512 (FIPS 180-4), streaming and one-shot
 
 use crate::Hash;
 
@@ -14,6 +14,8 @@ const K256: [u32; 64] = [
 ];
 
 const H256: [u32; 8] = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+
+const H224: [u32; 8] = [0xc1059ed8, 0x367cd507, 0x3070dd17, 0xf70e5939, 0xffc00b31, 0x68581511, 0x64f98fa7, 0xbefa4fa4];
 
 const K512: [u64; 80] = [
     0x428a2f98d728ae22, 0x7137449123ef65cd, 0xb5c0fbcfec4d3b2f, 0xe9b5dba58189dbbc,
@@ -172,6 +174,32 @@ impl Sha256 {
     }
 }
 
+/// SHA-224 (SHA-256 with its own initial value, cut to 28 bytes)
+#[derive(Clone)]
+pub struct Sha224(Sha256);
+
+impl Default for Sha224 {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Sha224 {
+    pub const fn new() -> Sha224 {
+        Sha224(Sha256 { h: H224, buf: [0; 64], n: 0, total: 0 })
+    }
+
+    pub fn update(&mut self, data: &[u8]) {
+        self.0.update(data)
+    }
+
+    pub fn finalize(self) -> [u8; 28] {
+        let mut out = [0u8; 28];
+        out.copy_from_slice(&self.0.finalize()[..28]);
+        out
+    }
+}
+
 /// SHA-512
 #[derive(Clone)]
 pub struct Sha512 {
@@ -272,6 +300,20 @@ impl Hash for Sha384 {
     }
 }
 
+impl Hash for Sha224 {
+    const BLOCK: usize = 64;
+    const OUT: usize = 28;
+    fn new() -> Self {
+        Sha224::new()
+    }
+    fn update(&mut self, data: &[u8]) {
+        Sha224::update(self, data)
+    }
+    fn finish_into(self, out: &mut [u8]) {
+        out[..28].copy_from_slice(&self.finalize());
+    }
+}
+
 impl Hash for Sha256 {
     const BLOCK: usize = 64;
     const OUT: usize = 32;
@@ -298,6 +340,13 @@ impl Hash for Sha512 {
     fn finish_into(self, out: &mut [u8]) {
         out[..64].copy_from_slice(&self.finalize());
     }
+}
+
+/// SHA-224 of a byte string
+pub fn sha224(data: &[u8]) -> [u8; 28] {
+    let mut h = Sha224::new();
+    h.update(data);
+    h.finalize()
 }
 
 /// SHA-256 of a byte string

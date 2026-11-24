@@ -190,6 +190,7 @@ static BEZ16: [[f32; 4]; 17] = [
     [0.0, 0.0, 0.0, 1.0],
 ];
 
+// i18n
 static SH_NAMES: [&str; SH_COUNT as usize] = [
     "Linie",
     "Kurve",
@@ -1078,7 +1079,7 @@ fn gal_cell(p: &mut Kritzel, ui: &mut Ui, i: i32) {
     let (user, version) = (i as usize, tc);
     ui.cmd_custom(r[0], r[1], r[2], r[3], Some(f), user, version);
     // semantic record (tests: click #13xx, expect checked)
-    let name = SH_NAMES[i as usize];
+    let name = i18n::t(SH_NAMES[i as usize]);
     let sem = ui.sem(K_BUTTON, id, Some(name), 0);
     if checked {
         sem.state |= SS_CHECKED;
@@ -1105,7 +1106,7 @@ fn style_menu(ui: &mut Ui, id: u32, v: &mut i32, icon: u32, label: &str, none_la
             ui.next_flags(ST_CHECKED);
         }
         ui.next_icon(icon);
-        if ui.menu_item(id + 3, "Einfarbig") & EV_ACT != 0 {
+        if ui.menu_item(id + 3, i18n::t("Einfarbig")) & EV_ACT != 0 {
             *v = 1;
         }
     }
@@ -1130,8 +1131,8 @@ pub(crate) fn shape_ribbon(p: &mut Kritzel, ui: &mut Ui) {
     // outline / fill
     ui.box_begin(0, BOX_V | BOX_CENTER, 2);
     let s = &mut p.shape;
-    style_menu(ui, ID_SH_OUTLINE, &mut s.outline, IC_CIRCLE_RING, "Kontur", "Keine Kontur");
-    style_menu(ui, ID_SH_FILL, &mut s.fill, IC_CIRCLE_FILL, "Füllung", "Keine Füllung");
+    style_menu(ui, ID_SH_OUTLINE, &mut s.outline, IC_CIRCLE_RING, i18n::t("Kontur"), i18n::t("Keine Kontur"));
+    style_menu(ui, ID_SH_FILL, &mut s.fill, IC_CIRCLE_FILL, i18n::t("Füllung"), i18n::t("Keine Füllung"));
     ui.box_end();
 }
 

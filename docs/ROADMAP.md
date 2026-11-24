@@ -12,6 +12,9 @@ Bekannte Grundgrenzen (Entscheidung „kein libc“): kein GPU-Rendering, kein f
 stehen unten mit in der Liste, damit die Liste vollständig ist. (Die Barrierefreiheit läuft
 inzwischen ohne libc über eigene D-Bus- und COM-Anbindungen, siehe Abschnitt 11.)
 
+Abschnitt 13 (seit 2026-11-21) gilt den Crates außerhalb der GUI: was ihnen für eine universelle
+Library fehlt und wo sie noch Sicherheitsfragen offen haben.
+
 ---
 
 ## 1. Berechtigungen und Sicherheit (wie bei Tauri)
@@ -527,7 +530,9 @@ Vorhanden: [`plat/vfs.rs`](../lib/plat/vfs.rs) ([VFS.md](VFS.md)) seit 2026-10-1
 ## 4. Text und Schrift
 
 Vorhanden: [`text/fontdb.rs`](../lib/text/fontdb.rs) (durchsucht die Font-Ordner selbst),
-HarfRust-Shaping, Bidi beim Shaping, IME unter Wayland (text-input-v3), Windows und Android.
+HarfRust-Shaping, Bidi beim Shaping (seit 2026-11-22 auch ohne: Zeilen mit Zeichen von rechts
+nach links, [`text/bidi.rs`](../lib/text/bidi.rs)), IME unter Wayland (text-input-v3), Windows und
+Android.
 Seit 2026-10-17 auch Glyph-Fallback und IME unter X11.
 
 - **P1** · *erledigt* · Glyph-Fallback ([`text/fallback.rs`](../lib/text/fallback.rs)): Fehlt
@@ -752,7 +757,19 @@ Sortierung nach Sprache und Groß- / Kleinschreibung.
   LTR-Inseln (`ltr_begin` / `ltr_end`). Skripte, Agent, Popup-Fenster, WM_NCHITTEST,
   Fenstergriffe und IME sehen physische Koordinaten. Getestet mit `gallery/tests/rtl.uis`.
   Bibliothekstexte gibt es auch auf Arabisch und Hebräisch (`datagallery/tests/lang_ar.uis`).
-  Es fehlen noch: rechtsbündige Eingabe mit Bidi-Cursor für RTL-Text in Textfeldern, der
+  Seit 2026-11-22 stehen die Texte der Steuerelemente (Beschriftungen, Schaltflächen,
+  Checkboxen, Optionsfelder, Überschriften, Listen) in der richtigen Reihenfolge; zuvor standen
+  hebräische und arabische Wörter rückwärts, z. B. „מחיקה“ als „הקיחמ“ (gesehen 2026-11-21 in
+  `datagallery --lang he` und im Setup, U7), weil das Shaping dort aus ist. Eine Zeile mit
+  Zeichen von rechts nach links ordnet [`text/bidi.rs`](../lib/text/bidi.rs) jetzt auch ohne
+  Shaping nach dem Unicode-Bidi-Algorithmus (`Text::set_bidi`, an): RTL-Läufe aus einer
+  TrueType-Ersatzschrift formt HarfRust (arabische Verbindungen, Zeichen), die übrigen stehen
+  Cluster für Cluster von rechts nach links, Klammern gespiegelt. Zeilen ohne solche Zeichen
+  behalten Maße und Pixel. Textfelder zeichnen, setzen den Cursor und markieren in derselben
+  Reihenfolge. Getestet mit `lib/text/tests.rs` (`cargo test --lib`) und Bildern von
+  `datagallery --lang he` / `lang_ar.uis` mit `jfgui_FONT_FALLBACK=1`.
+  Es fehlen noch: rechtsbündige Eingabe für RTL-Text in Textfeldern, Pfeiltasten in visueller
+  Richtung (der Cursor geht logisch), Bidi im Rich-Text- und Code-Editor (Abschnitt 6), der
   native Fensterrahmen (Titelleiste des Systems).
 - **P1** · *erledigt* · Pluralregeln (CLDR) und Platzhalter mit Namen bzw. Index
   ([`ui/i18n_msg.rs`](../lib/ui/i18n_msg.rs)): `i18n::msg` versteht `{name}`, `{0}`, `{}`,
@@ -948,8 +965,9 @@ Fensterrand hinaus.
     Snippet-Einfügen mit Platzhaltern, keine Minikarte der Faltungen.
   * Getestet mit `apps/editortest` (13 Skripte mit `--verify-dirty`, Windows und Linux, und
     `--test model`: 168 Prüfungen der Modelle und Grammatiken).
-  * Offen: kein bidirektionaler Text innerhalb eines Absatzes (wie bei den Textfeldern bleibt
-    die Reihenfolge LTR); Android-IME (Komposition über `android_ime_*`) nicht angebunden –
+  * Offen: kein bidirektionaler Text innerhalb eines Absatzes (die Reihenfolge bleibt logisch:
+    seit 2026-11-22 zeichnen beide Editoren Zeichen von rechts nach links einzeln, damit sie zu
+    Cursor und Auswahl passen; einfache Textfelder ordnen um, Abschnitt 5); Android-IME (Komposition über `android_ime_*`) nicht angebunden –
     auf Android kommt nur getippter Text an; keine Rechtschreibprüfung, kein Kontextmenü, kein
     Ziehen von Text, keine Bilder / Tabellen im Rich-Text; RTF-Export fehlt (nur HTML / Text /
     JSON); Code-Editor ohne Zeilenumbruch, Mehrfach-Cursor und Regex-Suche (Faltung seit SK6);
@@ -1258,8 +1276,9 @@ Fensterrand hinaus.
   ([`base/hashring.rs`](../lib/base/hashring.rs)) und eine LRU-Tabelle nach Anzahl und Gewicht
   ([`base/lru.rs`](../lib/base/lru.rs); Gruppen `hashring`, `lru`), im Einsatz im
   Loadbalancer, KV-Speicher und Cache des Labors von JFNetworker. Dazu typisiertes JSON
-  ([`agent_core/src/jmap.rs`](../lib/agent_core/src/jmap.rs): `record!`, `wire_enum!`, aus
-  BackupCraft in die Library gezogen; `bc_proto` nutzt es mit) und eingerücktes JSON für
+  ([`formats/src/jmap.rs`](../lib/formats/src/jmap.rs), bis U2 in `agent_core`: `record!`,
+  `wire_enum!`, aus BackupCraft in die Library gezogen; `bc_proto` nutzt es mit) und eingerücktes
+  JSON für
   Dateien (`json::stringify_pretty`), getestet mit der coretest-Gruppe `jmap`.
   Seit D2 fasst `Window::hist_between` die Slots eines Zeitraums zu einem Histogramm zusammen
   (die Zeitreihen des Labors von JFNetworker: ein Punkt pro Intervall, Perzentile beliebiger
@@ -1803,7 +1822,7 @@ Fensterrand hinaus.
 - **P3** · *fehlt* · G7b: der Weg des Spielfensters (entscheidet der Nutzer); im Browser zeichnet eine Ansicht nur rund 30 Bilder/s (`web/worker.js` meldet sich bei einem Zeitgeber von 1 ms nicht als beschäftigt); für Spiele `MIN_PRESENT_US` und das Halten von G5e3 abstimmen, ein Begrenzer in `lib/game`; auf dem Mac ist die GPU-Ausgabe der UI aus (Ansichten lesen zurück); Messungen auf Iris Xe, HD 610 und in echten Linux-Fenstern; der Test „passt“ in `gp_split_draw` legt bei dünnen Rahmen jedes Bild neu an; von Hand: die Faktoren der Mausbewegung, der Raumklang der Demo.
 - **P3** · *erledigt* (2026-11-20) · G7g Teil 2 ([GEOM.md](GEOM.md)): Boolesche Operationen auf konvexen Körpern mit exakten Prädikaten, Abschrägen, `modeltool --watch`, Importe nur aus dem Ordner des Skripts, der Bewertungslauf (fünf Objekte nur nach Bildern).
 - **P3** · *fehlt* · G7g: die Wünsche an JFScript (GEOM.md), erst nach dem Ja des Nutzers; Tempo der Booleschen Operationen bei runden Körpern, ebene Teilflächen zusammenführen, Abschrägen nichtkonvexer Körper; der Beobachtungsmodus von Hand und in echten Fenstern unter Linux und macOS.
-- **P3** · *fehlt* · G7d Teil 2: `wss:` mit dem TLS von `netio` prüfen (im Browser mit einem Zertifikat, dem er traut), Messungen zwischen Rechnern und über WLAN, Grenzen abstimmen; Verschlüsselung über UDP (AEAD, entschieden 2026-11-18); Android mit Netz (netchan baut seit G7e für iOS).
+- **P3** · *fehlt* · G7d Teil 2: `wss:` mit dem TLS von `netio` prüfen (im Browser mit einem Zertifikat, dem er traut), Messungen zwischen Rechnern und über WLAN, Grenzen abstimmen; Android mit Netz (netchan baut seit G7e für iOS). Die Verschlüsselung über UDP ist seit U3 (2026-11-21) gebaut, Abschnitt 13.
 - **P3** · *erledigt* (2026-11-20) · G7e Teil 2 ([NETCODE.md](NETCODE.md)): zuverlässige Ereignisse, Abmelden, geglättete Korrekturen, Räume auf dem Worker-Pool (bitgleich), Raumcodes aus dem kryptographischen Zufall, echtes Netz (Server auf dem Mac im WLAN), der Browser als Client; Spiel 1 nimmt sie.
 - **P3** · *fehlt* · G7e (entschieden 2026-11-19: Lag-Ausgleich 300 ms, der volle Stand eines UDP-Clients nach Priorität aufgefüllt, der WebSocket-Abruf als Option `fetch_full`): ein Lauf mit Fedora als Server, WLAN an beiden Enden, Telefone; Deltas gegen eine Vorhersage; ob WebSocket-Clients den Tick mehr Marge behalten und ob ein UDP-Server ohne `net.connect`-Regel Absendern antworten darf (Fragen an den Nutzer).
 - **P3** · *fehlt* · Später: D3D12-Rückfall, GPU-Rasterung der Widgets.
@@ -2478,3 +2497,268 @@ Widget-Verhalten ausführt ([GUIDE.md](GUIDE.md), Abschnitt 19).
   `apps/gallery/tests/inspect_source.uis`, `apps/audiotest/tests/inspect_perm.uis` (Manifest
   ohne `process`: abgelehnt), `apps/plattest/tests/launch.uis`, Windows und Linux, auch mit
   `--verify-dirty`.
+
+## 13. Universelle Library: Crates außerhalb der GUI
+
+Bestandsaufnahme vom 2026-11-21 über die Crates unter `lib/`, ohne `ui`, `plat`, `text` und die
+Renderer (Abschnitte 1 bis 12) und ohne `netio`, `netpkt` und `crypto`, deren
+Sicherheitsüberarbeitung läuft. Bewertet nach dem Bedarf von Apps allgemein, nicht nach dem der
+JF-Apps. Die Prioritäten gelten hier so: **P1** = Sicherheitsrisiko oder Grundbaustein, den fast
+jede App braucht · **P2** = wird von einer universellen Library erwartet · **P3** = Fach-Crate,
+später.
+
+Sicherheit:
+
+- **P1** · *erledigt* (2026-11-21, U3) · `netchan`: Verschlüsselung über UDP. Paketformat Version 2: der Handschlag
+  tauscht flüchtige X25519-Schlüssel (RESPONSE, ACCEPT mit einer Bestätigung der Schlüssel), danach ist jedes DATA und
+  DISCONNECT mit ChaCha20-Poly1305 versiegelt, der Kopf authentisiert, die Nonce die volle Paketnummer
+  ([`netchan/src/seal.rs`](../lib/netchan/src/seal.rs), [TRANSPORT.md](TRANSPORT.md) „Verschlüsselung“). Optional ein
+  statischer Schlüssel des Servers, den der Client kennt (`ClientConfig::server_key`, wie Noise NK): dann kann auch
+  niemand auf dem Weg den Server ersetzen. Vorwärtssicher, Schlüssel werden genullt. Geprüft in `nettest` (Mitlesen,
+  jedes gekippte Byte, Fälschungen, Wiederholungen, der statische Schlüssel, ein Server in der Mitte; Fuzzing der
+  versiegelten Pakete); `gametest --netsum` blieb `4118995e45c0c067`. Kosten: 94 µs Server-Zeit je ACCEPT, die Flut über
+  UDP 199 statt 460 MB/s auf einem i7-1165G7. Die Fuzz-Ziele `packet` und `endpoint` für `tools/net_fuzz` gingen an die
+  Sicherheits-Sitzung.
+- **P1** · *fehlt* · Fuzzing der Datei-Parser. `tools/net_fuzz.py` und `tools/cov_fuzz.py` decken
+  nur zstd, LZ4, X.509, DNS, HTTP, TLS, die IP-Reassembly und `netpkt` ab. Es fehlen DEFLATE,
+  zlib, gzip und Brotli (`compress`), `archive` (ZIP, OPC), `formats::json` (darüber laufen auch
+  Update-Manifeste, `datastore`, glTF und Agent-Anfragen), `formats::xml` (`Reader`, `Lenient`; seit U5 der eine XML-Leser), die
+  Bild-Decoder und die Schriften (bisher nur abgeschnittene und gekippte Kopien in den
+  Python-Prüfungen, [`tools/imgtest_common.py`](../tools/imgtest_common.py),
+  `tools/font_check.py --fuzz`), `doc_io` (RTF und HTML aus der Zwischenablage, die jedes andere
+  Programm füllen kann), `diagram_io`, `dxf`, `gltf`, `img_svg`, `spell` (`.aff`, `.dic`) und
+  `pdf::read` mit seinem Renderer (bisher nur Mutationen in `pdftest` und Läufe mit festem Seed:
+  Struktur, Filter, CMaps, Type-1-, CFF- und TrueType-Programme, CCITT, Funktionen). Mit
+  `panic = "abort"` beendet jeder Panic in einem Parser die ganze App.
+- **P2** · *teilweise* (2026-11-21, U6) · `unsafe` außerhalb von `rt` und `simd` prüfen: `plat` hat rund 3000
+  Stellen mit `unsafe`, `gpu` rund 300. Durchgesehen sind die Wege, auf denen Daten anderer Programme ankommen
+  ([PLAT_INPUTS.md](PLAT_INPUTS.md): Zwischenablage und Drag and Drop unter Windows und Wayland, das Wayland- und das
+  X11-Protokoll, D-Bus, die Agenten-Schnittstelle): überall kopiert ein kleiner `unsafe`-Block begrenzt in einen
+  eigenen Puffer, gelesen wird in sicherem Rust. Behoben: Wayland schloss von den Deskriptoren eines Ereignisses an
+  ein gelöschtes Objekt nur die ersten 8. Alle diese Leser gehen durch `plattest --test wirefuzz` (`plat::fuzz`,
+  fester Seed, in der Suite); die zwei, die nur Windows brauchte, laufen dafür seit U6 auf jedem System. Offen: UI
+  Automation (`win_uia*.rs`, rund 370 Stellen; braucht Windows mit Narrator und NVDA), macOS und iOS, `gpu`; dass
+  `SECURITY.md` PLAT_INPUTS.md nennt (die Datei bearbeitet die Sicherheits-Sitzung).
+- **P2** · *fehlt* · `crypto`, sofern nicht schon Teil der laufenden Überarbeitung: die
+  RSA-Schlüsselerzeugung zeitkonstant machen oder deutlich abgrenzen (heute laut README „meant
+  for simulators and tests“); `tools/ct_check.py` auch für ARM64.
+- **P3** · *erledigt* (2026-11-22, U11) · `spell`: Ein präpariertes Wörterbuch (`config://hunspell`) konnte Prüfung
+  und Vorschläge hängen lassen, gemessen mit `spelltest --test hostile`: 20 000 leere Suffixe, die einander folgen
+  dürfen, brauchten 2–9 s für eine Prüfung und 540 s für einen Vorschlag; Kreuzprodukte aus 3000 × 3000 leeren Affixen
+  7–63 s für einen Vorschlag; die Formen des N-Gramm-Schritts über 120 s; 10 000 BREAK-Muster 0,95 s für eine Prüfung;
+  Wörter mit gleichem Hash luden quadratisch; 23 000 Affixregeln luden 0,56 s (zwei Schleifen über alle Regeln). Jetzt
+  ist die Arbeit gezählt, nicht gemessen, die Antworten hängen weiter nicht von der Maschine ab: Jede Affixregel,
+  COMPOUNDRULE, CHECKCOMPOUNDPATTERN, jedes BREAK-Muster und jede REP-Regel von CHECKCOMPOUNDREP, die versucht wird,
+  kostet eine Einheit, 6 Mio. je Prüfung, 64 Mio. je Suche nach Vorschlägen, 32 Mio. für die Formen des
+  N-Gramm-Schritts (der eine Form erst baut, wenn ihre Länge passt); die Erzeuger der Vorschläge (TRY, KEY, REP, MAP)
+  hören auf, sobald die Arbeit verbraucht ist. Die Wortliste sucht ein Wort höchstens 128 Plätze weit und hält den Rest
+  in einer sortierten Karte daneben; die Regelgruppen und die äußeren Suffixe entstehen in einem Durchgang. Danach:
+  höchstens 0,15 s für eine Prüfung und 1,6 s für einen Vorschlag. 20 echte Wörterbücher (de_DE und de_CH frami,
+  en_US, en_GB, hu, ko, fr, es, it, nl, pl, cs, ru, uk, pt_BR, sv, da, tr, he, ar; je rund 5300 Wörter, bei de 11 300,
+  dazu 400 Vorschläge) geben dieselben Antworten wie vorher; ihr Höchstes: 638 000 Einheiten je Prüfung (da),
+  10,9 Mio. je Suche (hu), 5,3 Mio. für die Formen (hu). Der Längenfilter macht echte Vorschläge schneller: hu 35 →
+  9 s für 400 (der langsamste 953 → 275 ms), ko 43 → 20 s.
+
+Grundbausteine am falschen Ort oder mehrfach:
+
+- **P1** · *erledigt* (2026-11-21, U1) · `compress` hat DEFLATE, zlib, gzip, den Brotli-Decoder,
+  CRC-32 und Adler-32 aus `img_core` und `img_jxl` übernommen
+  ([`compress/deflate/mod.rs`](../lib/compress/deflate/mod.rs), `zlib.rs`, `gzip.rs`,
+  `brotli/mod.rs`), mit `compress`/`decompress(data, max_out)` wie bei LZ4 und zstd; `img_core`
+  und `img_jxl` behalten ihre Aufrufe als dünne Module, `plat::print` braucht keinen
+  `unsafe`-Hook mehr. Byte-gleich mit dem alten Encoder auf allen Stufen; compress hängt weiter
+  an nichts, damit die std-Werkzeuge es nutzen können.
+- **P2** · *teilweise* (2026-11-23, U12 bis U14) · `compress`: Die Streaming-API ist da
+  ([`compress/stream.rs`](../lib/compress/stream.rs)): `Decode::decode(input, out)` und
+  `Encode::encode(input, out, flush)` nehmen die Eingabe in Stücken und schreiben in den Puffer
+  des Aufrufers, für jedes Format (`deflate`, `zlib`, `gzip`, `zstd` als Decoder und Encoder,
+  `lz4::FrameDecoder` / `FrameEncoder`, `brotli::Decoder`), dazu die Pumpen `decode_all` /
+  `encode_all` und `Xxh32` / `Xxh64` in Stücken. Der Speicher ist das Fenster des Formats: 32 KiB
+  bei DEFLATE (dessen Decoder in Schritten liest, die neu anfangen, wenn die Eingabe ausgeht;
+  höchstens 1 KiB wartet), das Fenster des Frames bei zstd (Grenze 128 MiB wie beim zstd-Werkzeug)
+  und Brotli, 64 KiB und ein Block bei LZ4. Die Encoder schreiben bis 256 KiB (DEFLATE, zlib,
+  gzip) dieselben Bytes wie `compress()`, zstd und LZ4 mit bekannter Größe (`with_size`) bei
+  jeder Größe; `Flush::Sync` macht alles bisher lesbar. Geprüft in `coretest --only stream` (534:
+  Stücke von 1 Byte bis zur ganzen Eingabe, Puffer ab 1 Byte, die Bytes von `compress()`, die
+  Sync-Punkte, beschädigte Ströme scheitern genau dort, wo die einmaligen Decoder scheitern) und
+  mit `tools/stream_check.py` gegen `gzip`, Pythons zlib, `zstd` (auch `--long=27`, `-T4`, aus
+  einer Pipe) und die Brotli-Ströme der WOFF2-Schriften des Systems. In Stücken entpackt gzip mit
+  317 statt 213 MB/s (der einmalige Decoder fängt mit größerem Puffer neu an). zstd-Wörterbücher
+  (2026-11-22, U13; [`zstd/dict.rs`](../lib/compress/zstd/dict.rs),
+  [`zstd/train.rs`](../lib/compress/zstd/train.rs)): `Dictionary::train` lernt wie
+  `zstd --train` (fastCover, k und d an einem Viertel der Beispiele gewählt, die Tabellen aus der
+  Kompression der Beispiele), `parse` / `to_bytes` im Format des zstd-Werkzeugs, auch roher
+  Inhalt; `compress_with_dict` / `decompress_with_dict` und die Stream-Typen mit
+  `with_dictionary`. Der Encoder nutzt die Tabellen des Wörterbuchs und des vorigen Blocks wieder
+  (Literale ohne neuen Baum, Repeat_Mode), was auch Frames ohne Wörterbuch bis zu 4 % kleiner
+  macht. Geprüft in `coretest --only compress` (17 neue) und mit `tools/zstd_check.py` in beide
+  Richtungen gegen `zstd --train` / `zstd -D`: 600 JSON-Datensätze werden mit 16 KiB Wörterbuch
+  3,15-mal kleiner (zstds eigenes: 3,22; ohne: 1,2). Ein Brotli-Encoder (2026-11-23, U14;
+  [`brotli/enc.rs`](../lib/compress/brotli/enc.rs), [`brotli/senc.rs`](../lib/compress/brotli/senc.rs)):
+  `brotli::compress(data, level)` auf den Stufen 0 bis 11 und `brotli::Encoder` in Stücken
+  (`with_size` gibt dieselben Bytes, `with_window`, `Flush::Sync`). Bis Stufe 9 Hash-Buckets wie
+  in libbrotli mit Lazy Matching, auf 10 und 11 eine nahezu optimale Zerlegung (11 in zwei Runden);
+  das statische Wörterbuch mit Leerzeichen davor, großem Anfangsbuchstaben, Suffixen und
+  gekürzten Wörtern; 64 Literal-Kontexte (UTF-8 oder signed), zu Clustern zusammengefasst. Am
+  Leitfaden (430 KB) macht Stufe 5 158 KB (libbrotli 163 KB, gzip -9 173 KB), Stufe 11 147 KB
+  (libbrotli 145 KB); libbrotli ist auf den Stufen 0 bis 9 1,5- bis 3-mal so schnell, auf 10 und
+  11 etwa gleich schnell. Geprüft mit
+  `tools/brotli_check.py` gegen libbrotli in beide Richtungen, in Chromium 156 (115 Ströme als
+  `Content-Encoding: br`) und in `coretest --only compress` / `--only stream`. Dazu
+  `lz4::compress_hc` (wie `lz4 -9`). `cargo-jflib` nimmt jetzt `compress` (DEFLATE auf Stufe 9,
+  LZ4 HC für das SquashFS, CRC-32) statt seines eigenen Deflate und LZ4; die Pakete werden dabei
+  0,2 bis 0,3 % kleiner. Offen: Content-Encoding gzip/br im HTTP-Client von `netio` (über die
+  Sicherheits-Sitzung, mit den Stream-Decodern).
+- **P1** · *erledigt* (2026-11-21, U2) · JSON aus `agent_core` gelöst: die neue Blatt-Crate
+  `formats` ([`formats/src/lib.rs`](../lib/formats/src/lib.rs), nur `alloc`) hat `json` und `jmap`
+  aus `agent_core` und `xml` und `encoding` aus `base` übernommen, unverändert; die alten Pfade
+  bleiben als Re-Exporte. `cas`, `datastore`, `gltf` und `update` hängen nicht mehr an
+  `agent_core`, `archive`, `doc_core` und `doc_io` nicht mehr an `base` (`doc_core` damit auch
+  nicht mehr an `plat`). `netio` nutzt noch `agent_core::json` (über die Sicherheits-Sitzung).
+  Der Name `data` ging nicht: `build_rs.py` erkennt Crates an `NAME::`, und die Stile netlab,
+  backupcraft und jfoffice haben ein eigenes Modul `data`.
+- **P2** · *erledigt* (2026-11-21, U5) · Ein XML-Leser statt fünf (die Bestandsaufnahme zählte sechs; `design/xml.rs`
+  in `diagram_core` schreibt nur): [`formats/src/xml/`](../lib/formats/src/xml/mod.rs) hat einen Leser in zwei
+  Arten. `Reader` ist streng (wohlgeformtes XML 1.0 mit Namensräumen, ein Pull-Leser mit Positionen und `skip`, ohne
+  Rekursion; aus dem Leser von `diagram_io` verallgemeinert), `Lenient` nachsichtig (die Regeln des SVG-Lesers:
+  Entitäten der DOCTYPE mit Budget, kaputtes Markup so weit lesbar). `diagram_io` läuft auf `Reader`, `img_svg`, die
+  Theme-Teile von `diagram_core` und `text::fontconf` auf `Lenient`, `xml::parse` als Baum auf `Reader`. Gleich
+  geblieben: alle 543 SVG-Dateien des Repositorys und 45 absichtlich kaputte gerendert byte-gleich, der SVG-Baum
+  auf 208 000 Eingaben (mit Mutationen) gleich bis auf einen behobenen Fehler, alle Ausgaben von diagramiotest
+  (Proben, Zeichnungen, Schablonen, Exporte, Renderings) byte-gleich, fontconf auf den 63 fontconfig-Dateien des
+  Systems gleich. Dabei behoben: `<?>` ließ den Leser von `diagram_io` in Panik geraten. Gefuzzt mit festem Seed in
+  der coretest-Gruppe `xml`; ein Fuzz-Ziel für `tools/net_fuzz` geht an die Sicherheits-Sitzung.
+- **P2** · *erledigt* (2026-11-21, U4; 2026-11-23, U17) · Alte Textkodierungen in `formats::encoding`: `Charset` mit allen
+  Einbyte-Kodierungen des WHATWG-Standards, den DOS-Seiten (IBM437, 737, 775, 850 bis 869) und einem genauen
+  ISO-8859-1; `label` mit allen 228 Labels des Standards, `decode_label`
+  wie das „decode“ des Standards, `Charset::from_code_page`. Eine Tabelle statt zweier:
+  [`tools/gen_encodings.py`](../tools/gen_encodings.py) ersetzt `gen_charsets.py` (spell) und
+  `gen_dxf_codepages.py` (dxf), `--verify` vergleicht mit den Daten des Standards und Nodes `TextDecoder`. Die
+  mehrbytigen Kodierungen Ostasiens (U17, [`formats/src/multibyte.rs`](../lib/formats/src/multibyte.rs),
+  [`decode.rs`](../lib/formats/src/decode.rs)): `MultiByte` mit Shift_JIS (Code-Page 932 mit den Erweiterungen von
+  NEC und IBM), EUC-JP (mit JIS X 0212), ISO-2022-JP, GBK, gb18030 (GB18030-2022, ganz Unicode außer U+E5E5), Big5 (mit
+  HKSCS-2008) und EUC-KR (Code-Page 949, alle Hangul-Silben), lesen und schreiben wie der Standard (`encode` mit
+  `Unmappable`, `encode_html` mit Zeichenreferenzen wie beim Absenden eines Formulars); `Decoder` liest jede
+  Kodierung in Stücken, ein Zeichen darf zwischen zweien geteilt sein; `encoding::from_code_page` für die
+  unterstützten Windows-Nummern (für andere None). Die Tabellen (`cjk.bin`, 300 KB) erzeugt `gen_encodings.py` aus Pythons Codecs und den Stellen,
+  an denen der Standard abweicht. Geprüft mit `tools/encoding_check.py` gegen encoding_rs (die Umsetzung von
+  Firefox, offline aus Cargos Registry gebaut): jeder Unicode-Codepunkt beim Schreiben, jede Zweibytefolge, die
+  Dreibytefolgen von EUC-JP und die 1,6 Millionen Vierbytefolgen von gb18030 beim Lesen, Zufallsströme auf einmal
+  und in Stücken; alle 6443 Vergleiche gleich. Lesen mit 206 bis 267 MB/s (encoding_rs 343 bis 401), Schreiben mit
+  86 bis 147 MB/s (encoding_rs 23 bis 90). Genutzt von `dxf` (ANSI_932, 936, 949, 950 und `\M+NXXXX`, bisher
+  U+FFFD) und vom RTF der Zwischenablage in `doc_io` (`\ansicpg932` und die `\fcharset` Ostasiens, bisher
+  abgelehnt). Offen: [`netpkt/imf.rs`](../lib/netpkt/imf.rs) (Mail) liest außer UTF-8 nur ISO-8859-1 (über die
+  Sicherheits-Sitzung); Johab (Code-Page 1361), das der Standard nicht kennt.
+
+Crates, die einer JF-App folgen:
+
+- **P2** · *teilweise* (2026-11-23, U15 und U16) · `pdf`: Lesen ist da ([`pdf/src/read/`](../lib/pdf/src/read/mod.rs),
+  `pdf::read::Document`). PDF 1.0 bis 2.0 mit klassischen Tabellen, Querverweis- und Objektströmen,
+  inkrementellen Updates und hybriden Dateien; beschädigte, abgeschnittene und Dateien ohne Tabelle
+  werden aus ihren Objekten neu aufgebaut. Verschlüsselung mit dem Standard-Handler (RC4 40 bis
+  128 Bit, AES-128, AES-256, Revisionen 2 bis 6), Benutzer- und Eigentümerpasswort. Die Filter
+  außer den Bildfiltern (Flate auch roh und bis zur Beschädigung, LZW, ASCIIHex, ASCII85,
+  RunLength, PNG- und TIFF-Prädiktoren). Der Text jeder Seite mit der Position jeder Glyphe und
+  als Zeilen in Lesereihenfolge wie `pdftotext -raw` (ToUnicode, Kodierungen und Glyphennamen über
+  die Adobe Glyph List, Type-0-, Type-3- und die 14 Standardschriften mit ihren Breiten,
+  Form-XObjects, Hebräisch und Arabisch in Lesereihenfolge); Information, XMP, Lesezeichen mit
+  benannten Zielen, Links und andere Anmerkungen, Seitenbeschriftungen, die Felder des Formulars
+  mit Werten, Signaturfelder (wie angegeben, nicht geprüft), Anhänge (ZUGFeRD / Factur-X).
+  Geprüft mit `tools/pdf_read_check.py` gegen Poppler: 63 von 63 Dateien gleich (Seiten, Größen,
+  Titel, Verschlüsselung, Anhänge, die Wörter jeder Seite; eine Tabelle, bei der Poppler zwei Zellen
+  zusammenzieht, ist begründet ausgenommen): eigene Proben aller Strukturen, beschädigte Dateien,
+  die Verschlüsselungen von Ghostscript und LibreOffice und eigene in allen Revisionen, Ghostscript,
+  LibreOffice (Writer und Calc), cairo, Manpages über groff, die PDFs des Systems; in
+  `pdftest --only read_*` (411 Prüfungen, auch 1600 Mutationen) und mit 45 000 Mutationen der
+  Dateien ohne Absturz und ohne Zeitüberschreitung. Etwa so schnell wie `pdftotext` (die 97 Seiten
+  der bash-Manpage in 0,14 s) bei einem Drittel des Speichers. Anzeigen ist da (U16,
+  [`pdf/src/read/render/`](../lib/pdf/src/read/render/mod.rs)): `Document::render(seite, &RenderOptions)`
+  zeichnet eine Seite in eine `gfx::Surface`, in jeder Auflösung, auch nur einen Ausschnitt
+  (Kacheln für einen Betrachter), auf Papier jeder Farbe oder durchsichtig. Pfade mit beiden
+  Füllregeln, Striche mit Kappen, Ecken, Gehrung und Strichmustern im Nutzerraum (auch unter einer
+  ungleich skalierenden Matrix), dünne Linien und Rahmen auf ganzen Pixeln wie bei Poppler,
+  Clipping auch durch Text; alle Farbräume (CalGray, CalRGB, Lab, ICCBased über seine
+  Komponentenzahl, Indexed, Separation und DeviceN) und Funktionen aller vier Typen, CMYK wie
+  Druckfarben (das Neugebauer-Modell über den Farben der SWOP-Farben; `img_jpeg` gibt dafür die
+  Rohwerte eines CMYK-JPEG). Text über die Umrisse der eingebetteten Schriften: Type 1 (ein
+  eigener Parser mit eexec, Subrs, Flex und seac), CFF und CID-CFF (seac-Akzente, `text::cff`
+  meldet sie jetzt), TrueType nach den cmap-Regeln von 9.6.6.4, OpenType, Type 3; nicht
+  eingebettete Schriften aus einer `FontSource` (vorgegeben: die Schriften des Systems, für die 14
+  Standardschriften die metrisch gleichen Familien), alle Render-Modi, Glyphen auf Viertelpixeln
+  und je Dokument gecacht. Bilder aller Bittiefen und Farbräume mit Decode, Masken aller Arten,
+  JPEG und CCITT Gruppe 3 und 4 (ein eigener Decoder), verkleinert gemittelt; Shadings aller
+  sieben Typen, Kachelmuster farbig und ungefärbt; Alpha, die 16 Mischmodi, weiche Masken,
+  Transparenzgruppen; Anmerkungen über ihre Erscheinungsbilder; Optional Content. Die Arbeit
+  einer Seite ist begrenzt. Geprüft mit `tools/pdf_render_check.py` gegen Poppler (`pdftoppm`),
+  Pixel für Pixel (eine Verschiebung unter einem Pixel zählt nicht): 62 von 62 Dateien bei 72
+  und bei 150 dpi gleich, der Korpus des Lesens und eigene Seiten für jede Zeichenfunktion,
+  Ghostscript, LibreOffice Draw und pycairo dazu; drei Abweichungen sind begründet ausgenommen
+  (Poppler setzt die Zellen eines gedrehten Kachelmusters neben ihr Raster, an 3000 Punkten
+  nachgerechnet; die Linien der CUPS-Formulare aus 0,1 pt breiten Rechtecken zeichnet Poppler
+  dunkler, als ihre Fläche ist). In `pdftest --only render_*` (524 Prüfungen, ohne Schriften des
+  Systems; unter Wine dieselben Pixel bis auf Seiten mit Ersatzschriften) und mit 55 000
+  Mutationen ohne Absturz und ohne Zeitüberschreitung. Etwa so schnell wie `pdftoppm` (der Korpus
+  bei 150 dpi in 3,4 s, Poppler 3,0 s). Offen: JPEG-2000- und JBIG2-Bilder, Knockout- und nicht
+  isolierte Gruppen (wie isolierte gezeichnet), Überdrucken, ICC-Profile (wie ihre Gerätefarben),
+  Formulare ausfüllen und schreiben, Verschlüsselung, PDF/A und Signaturen beim Schreiben,
+  Signaturen prüfen, die vordefinierten CMaps Ostasiens außer Identity und den Unicode-CMaps.
+- **P2** · *fehlt* · `physics` hat Kollisionen und einen Charakter-Controller nach Quake 3, was
+  Spiel 1 braucht; es fehlen Starrkörper-Dynamik, Gelenke und ein Solver.
+- **P2** · *erledigt* (2026-11-21, U7) · `installer`: Die Seiten sprechen die Sprache des
+  Benutzers (Deutsch, Englisch, Französisch, Spanisch, Italienisch, Niederländisch, Polnisch,
+  Arabisch, Hebräisch; die Namen und Beschreibungen der Stile aus `styles/S/INFO` mit). Die
+  Optionsseite fragt, für wen: für alle Benutzer nach Program Files mit HKLM und den
+  gemeinsamen Verknüpfungen; ohne Administratorrechte startet sich das Setup mit ihnen neu (UAC)
+  und macht danach weiter, der Uninstaller ebenso. `--quiet` installiert und entfernt ohne
+  Fenster (Optionen für alles auf den Seiten, `--log`, Exit-Codes 0 / 1 / 2 / 740,
+  `QuietUninstallString`). Mit einem Stil im Paket entfällt die Stilseite. Geprüft mit
+  `tools/setup_check.py` (Windows oder Wine). Arabisch und Hebräisch stehen seit 2026-11-22 in
+  der richtigen Reihenfolge (Abschnitt 5, RTL-Layout; gesehen mit `setup_check.py --shots` unter
+  Wine). Offen: die Fragen der .deb (debconf) sind deutsch.
+- **P2** · *teilweise* (2026-11-22, U10) · `netchan` außer der Sicherheit: Neben den Paketen ein zuverlässiger,
+  geordneter Teilkanal über UDP und WebSocket ([`netchan/src/reliable.rs`](../lib/netchan/src/reliable.rs),
+  [TRANSPORT.md](TRANSPORT.md) „Zuverlässige Nachrichten“): `send_reliable` nimmt Nachrichten bis 1 MiB, in Stücken von
+  einer Nutzlast (die neue Paketart RELIABLE mit den Folgenummern und Acks von DATA), wiederholt nach `Lost` oder einer
+  Zeitgrenze wie der Probe-Zeitgrenze von QUIC, gesendet mit festem Tempo unter den Grenzen des Servers; der Empfänger
+  setzt zusammen und liefert genau einmal in Reihenfolge, Gegenüber, die das Protokoll brechen, werden getrennt. DATA
+  blieb gleich (`gametest --netsum` blieb `4118995e45c0c067`). Geprüft in `nettest --test reliable` (ein Hauptbuch
+  gegen Verlust, Duplikate, Umordnung, den Umlauf der Nummern, das Tempo, die Grenzen, feindliche Gegenüber) und über
+  echte Sockets (`udp`, `wschan`). Offen: unzuverlässige Nachrichten über einer Nutzlast (der Netcode teilt seine
+  Schnappschüsse selbst), eine Staukontrolle nach dem Netz, NAT-Traversal, Android (steht unter G7d Teil 2).
+- **P2** · *teilweise* (2026-11-22, U8) · `cas` (BackupCraft): Der Speicher ist eine Schnittstelle,
+  `cas::Store` ([`cas/store.rs`](../lib/cas/store.rs)): Objekte nach Art und Name, wie S3, SFTP oder WebDAV sie
+  halten (`get`, `get_range`, `put`, `delete`, `list`, `init`, `lock`). Ein `put` ist atomar und dauerhaft;
+  Chunks und die Reparatur eines verlorenen Index lesen nur Bereiche. Der Ordner ist die erste Umsetzung
+  (`cas::Folder`, auch auf Mounts wie `mem://`), `Repo::create_in` / `open_in` nehmen jede andere. Behoben: Ließ
+  sich der Ordner der Snapshots nicht lesen, nahm gc das für „keine Snapshots“ und löschte jedes Paket; jetzt
+  bricht es ab. Geprüft in `coretest --only cas` (der ganze Ablauf im Ordner und in einem Speicher des Tests,
+  dazu ein Speicher, der Fehler macht), mit BackupCraft `http_smoke.py` und `tools/bc_crash.py`. Offen: Speicher
+  für S3, SFTP und WebDAV in der Bibliothek; weiterhin ein Halter je Repository (mehrere Prozesse, die zugleich
+  sichern, bräuchten geteilte Sperren und einen Index, der nachgeladen wird).
+- **P2** · *teilweise* (2026-11-22, U9) · `datastore`: Indizes und Verschlüsselung auf der Platte sind da.
+  Indizes ([`datastore/index.rs`](../lib/datastore/index.rs)) liegen im RAM neben den Daten, jeder Commit hält sie
+  aktuell: auf einem Feld (`Index::field("owner.id")`, ein Array gibt je Element einen Schlüssel) oder einer
+  Funktion des Datensatzes (`Index::by`), auf Wunsch eindeutig (`unique()`: eine Transaktion, die das bräche, wird
+  vor dem Schreiben abgelehnt, `StoreError::Conflict`); `find`, `find_one`, `range` in beide Richtungen mit
+  Grenze, `count_key`. Schlüssel sind Strings, Wahrheitswerte und ganze Zahlen, genau. Verschlüsselung
+  ([`datastore/seal.rs`](../lib/datastore/seal.rs)): `Store::open_encrypted` und `Journal::open_encrypted` mit einem
+  32-Byte-Schlüssel versiegeln Snapshots, jeden Rahmen des Logs und jede Zeile eines Journals
+  (XChaCha20-Poly1305); eine Schlüssel-ID im Snapshot unterscheidet einen falschen Schlüssel von Schaden
+  (`StoreError::Key`, nie „repariert“). `rekey` verschlüsselt einen Speicher, wechselt den Schlüssel oder
+  entschlüsselt, über einen Snapshot und ohne Zwischenzustand; `Journal::rekey` schreibt die Monate neu und ist
+  nach einer Unterbrechung wiederholbar. Behoben: Unter Windows schlug ein zweites `compact()` ohne Transaktion
+  dazwischen fehl (das Log wurde ein zweites Mal geöffnet). Geprüft in `coretest --only datastore` (95, auch unter
+  Wine; ein Zufallsmodell gegen `filter`), mit BackupCraft `http_smoke.py` und `tools/bc_crash.py`. Offen: weiter
+  alles im RAM und als JSON; Indizes werden nicht gespeichert (nach jedem Öffnen neu angelegt); Löschen und
+  Zurückspielen ganzer Dateien durch jemanden, der den Ordner schreiben kann, findet die Verschlüsselung nicht;
+  nicht auf Android und im Web.
+- **P3** · *teilweise* · `doc_*` (jfWord): DOCX nur im eigenen Profil vollständig, andere
+  Dateien nur als Textstücke; kein ODT, XLSX oder PPTX; RTF und HTML nur für die Zwischenablage.
+- **P3** · *teilweise* · `eapm`: nur EAP-MD5 und EAP-PWD (für den Simulator). WPA-Enterprise
+  braucht EAP-TLS, PEAP-MSCHAPv2 oder EAP-TTLS; für MSCHAPv2 fehlen in `crypto` MD4 und DES.
+- **P3** · *teilweise* · `base` mischt Grundbausteine mit Werkzeugen aus dem Labor von
+  JFNetworker (`cmdtree`, `hashring`, `metrics`). XML und die Kodierungen sind seit U2 in
+  `formats`; `base::xml` und `base::encoding` sind nur noch Re-Exporte.
+
+Geprüft und ohne Eintrag: `diagram_*` (das Visio-Modell als Fach-Crate), `img_pdn`, `gltf` und
+`dxf` (nur Import, kein binäres DXF), `spell` (ohne Morphologie) und `update`.

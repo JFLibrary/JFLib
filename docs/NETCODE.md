@@ -441,8 +441,11 @@ Requisiten, 100 nicht am Platz der Karte, 10 fahren; die UDP-Clients holen ihren
 (vier über UDP, zwei über WebSocket), die schießen, 10 s raues Wetter, dann 5 s klar, Start 600 Ticks vor dem Umlauf von u32.
 Gefaltet werden jede Nachricht des Servers (Verbindung und Bytes), der Zustand jeder Figur des Servers in jedem Tick, jede erste
 Vorhersage jedes Clients, die Zahl der Abweichungen und ihre Fehler, die interpolierten anderen jeder Sekunde, Schüsse, Treffer,
-Tode. Die Sitzung läuft über netchans Kerne auf der simulierten Leitung: Die Prüfsumme umfasst also auch den Handschlag (HMAC),
-die Folgenummern und die Acks.
+Tode. Die Sitzung läuft über netchans Kerne auf der simulierten Leitung: Die Prüfsumme umfasst also auch den Handschlag (HMAC,
+seit U3 auch X25519 und die Siegel), die Folgenummern und die Acks. Mit dem Siegel über UDP (21.11.2026) blieb sie unter Linux
+(Ubuntu 26.04, Entwicklung) `4118995e45c0c067` mit 177 246 Werten: Der Netcode sieht dieselben Nachrichten in derselben
+Folge; auf Windows, macOS und in Node ist sie mit dem Siegel nicht neu gerechnet. Mit dem zuverlässigen Teilkanal (U10,
+22.11.2026) blieb sie unter Linux ebenso: Der Netcode nutzt ihn nicht, DATA blieb byte-gleich.
 
 | Ziel | Build | `--netsum` | `--checksum` (der Kern, G7b) |
 | --- | --- | --- | --- |
@@ -644,7 +647,8 @@ nehmen dem einen Thread der Schleife die Arbeit ab, wenn es viele werden. `gamet
 
 ## Was nicht gebaut ist
 
-- Verschlüsselung über UDP (später, Entscheidung vom 18.11.2026); das Ticket für FETCH ist nur so geheim wie der Verkehr.
+- Ein geheimes Ticket für FETCH auch über einen WebSocket ohne `wss://`: Über UDP kommt es seit U3 (21.11.2026) versiegelt
+  in WELCOME, über einen WebSocket ohne TLS geht FETCH im Klartext.
 - Extrapolation der anderen, wenn Schnappschüsse fehlen (sie halten).
 - Geschosse mit Flugzeit, Treffer auf Teile der Figur (Kopf: das Spiel), Figuren, die einander stoßen oder blockieren (die
   Vorhersage kennt die anderen nicht), Requisiten, die die Figuren aufhalten.
@@ -659,7 +663,9 @@ nehmen dem einen Thread der Schleife die Arbeit ab, wenn es viele werden. `gamet
 
 - **Fedora als Server, Clients auf dem Windows-Rechner und dem Mac** (der Rechner war am 20.11.2026 nicht erreichbar),
   WLAN beider Enden, ein Mobilfunk-Hotspot.
-- **Die Verschlüsselung über UDP** (netchan, entschieden: ChaCha20-Poly1305 aus `crypto`).
+- **Die Verschlüsselung über UDP**: seit U3 (21.11.2026) gebaut, ChaCha20-Poly1305 mit flüchtigen X25519-Schlüsseln und
+  einem optionalen statischen Schlüssel des Servers (TRANSPORT.md „Verschlüsselung“). Spiel 1 nennt seinen statischen
+  Schlüssel noch nicht (`ClientConfig::server_key`).
 - **Deltas gegen eine Vorhersage**.
 - **Die Grenze des Lag-Ausgleichs**: 300 ms (entschieden am 19.11.2026; ob sie auf 400 ms geht, ist eine Frage an den Nutzer
   aus GAME1.md).

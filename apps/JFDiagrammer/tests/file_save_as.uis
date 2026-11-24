@@ -28,5 +28,5 @@ expect text:"Zuletzt verwendete Ordner" exists
 click button:"build"
 expect dialog:"Speichern unter" exists
 expect #28940 text "jd15-ordner.vsdx"
-expect text:"win" exists
+expect text:"cargo" exists
 key esc

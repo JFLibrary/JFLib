@@ -11,13 +11,13 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [ui](#ui) -- the immediate-mode UI: runtime, layout, widgets, windows, style contract
   <br>[App, AppDesc, Ui, run, async tasks](#app-appdesc-ui-run-async-tasks) · [Layout](#layout) · [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics) · [Keyboard: Tab order, focus groups, panes and windows (F6), splitters (F8)](#keyboard-tab-order-focus-groups-panes-and-windows-f6-splitters-f8) · [Widgets](#widgets) · [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips) · [Text boxes and the clipboard](#text-boxes-and-the-clipboard) · [Rich-text and code editors](#rich-text-and-code-editors) · [Lists, scrolling, tabs, expanders](#lists-scrolling-tabs-expanders) · [Data views: grid, tree, badges, meters](#data-views-grid-tree-badges-meters) · [Shell parts: navigation, command bar, splitter, breadcrumb, wizard steps](#shell-parts-navigation-command-bar-splitter-breadcrumb-wizard-steps) · [Docking: panels at the sides, tab groups, floating tool windows](#docking-panels-at-the-sides-tab-groups-floating-tool-windows) · [Charts](#charts) · [Toasts, spinners, progress](#toasts-spinners-progress) · [Date and time input](#date-and-time-input) · [Languages](#languages) · [Vector icons](#vector-icons) · [Values and colours](#values-and-colours) · [Windows](#windows) · [Chrome: title bar, dialogs, info and status bars](#chrome-title-bar-dialogs-info-and-status-bars) · [File dialog](#file-dialog) · [Drawing commands](#drawing-commands) · [Scripts and the widget dump](#scripts-and-the-widget-dump) · [Theme](#theme) · [Cursors, drag and drop, clipboard images, dirty regions](#cursors-drag-and-drop-clipboard-images-dirty-regions) · [Style contract](#style-contract) · [Stock painters of the data and shell parts](#stock-painters-of-the-data-and-shell-parts) · [Constants](#constants) · [Key codes](#key-codes) · [other](#other-modules)
 - [agent_core](#agent_core) -- transport-independent actions, schema validation, JSON-RPC, MCP and tasks
-  <br>[src/action.rs](#agent_coresrcactionrs) · [src/jmap.rs](#agent_coresrcjmaprs) · [src/json.rs](#agent_coresrcjsonrs) · [src/rpc.rs](#agent_coresrcrpcrs) · [src/schema.rs](#agent_coresrcschemars) · [src/task.rs](#agent_coresrctaskrs)
+  <br>[lib.rs](#agent_core-crate-root) · [src/action.rs](#agent_coresrcactionrs) · [src/rpc.rs](#agent_coresrcrpcrs) · [src/schema.rs](#agent_coresrcschemars) · [src/task.rs](#agent_coresrctaskrs)
 - [agent_io](#agent_io) -- explicitly enabled stdio and current-user native agent transports
   <br>[lib.rs](#agent_io-crate-root) · [src/ipc.rs](#agent_iosrcipcrs)
 - [gfx](#gfx) -- surfaces, the draw context, blend kernels, paths, strokes, masks, gradients
   <br>[lib.rs](#gfx-crate-root) · [blend.rs](#gfxblendrs) · [blendmode.rs](#gfxblendmoders) · [dash.rs](#gfxdashrs) · [flood.rs](#gfxfloodrs) · [gradient.rs](#gfxgradientrs) · [path.rs](#gfxpathrs) · [panel.rs](#gfxpanelrs) · [pathdata.rs](#gfxpathdatars) · [raster.rs](#gfxrasterrs) · [shapes.rs](#gfxshapesrs) · [straight.rs](#gfxstraightrs) · [stroke.rs](#gfxstrokers) · [tmask.rs](#gfxtmaskrs) · [xform.rs](#gfxxformrs)
 - [text](#text) -- fonts (SGF1, TrueType, CFF, COLR), glyph cache, text runs
-  <br>[lib.rs](#text-crate-root) · [cff.rs](#textcffrs) · [colr.rs](#textcolrrs) · [fallback.rs](#textfallbackrs) · [font.rs](#textfontrs) · [fontconf.rs](#textfontconfrs) · [fontdb.rs](#textfontdbrs) · [glyphcache.rs](#textglyphcachers) · [lcd.rs](#textlcdrs) · [outline.rs](#textoutliners) · [record.rs](#textrecordrs) · [rendering.rs](#textrenderingrs) · [registry.rs](#textregistryrs) · [segment.rs](#textsegmentrs) · [ttf.rs](#textttfrs) · [shaping.rs](#textshapingrs) · [var.rs](#textvarrs)
+  <br>[lib.rs](#text-crate-root) · [bidi.rs](#textbidirs) · [cff.rs](#textcffrs) · [colr.rs](#textcolrrs) · [fallback.rs](#textfallbackrs) · [font.rs](#textfontrs) · [fontconf.rs](#textfontconfrs) · [fontdb.rs](#textfontdbrs) · [glyphcache.rs](#textglyphcachers) · [lcd.rs](#textlcdrs) · [outline.rs](#textoutliners) · [record.rs](#textrecordrs) · [rendering.rs](#textrenderingrs) · [registry.rs](#textregistryrs) · [segment.rs](#textsegmentrs) · [ttf.rs](#textttfrs) · [shaping.rs](#textshapingrs) · [var.rs](#textvarrs)
 - [spell](#spell) -- spell checking: Hunspell dictionaries, the system's checker, a personal word list
   <br>[lib.rs](#spell-crate-root) · [hyphen.rs](#spellhyphenrs) · [speller.rs](#spellspellerrs) · [token.rs](#spelltokenrs)
 - [img_core](#img_core) -- image I/O dispatch, records, metadata, colour, resampling, image operations
@@ -73,25 +73,29 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: windows, input, files, threads, network, processes, desktop services
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [web_net.rs](#platweb_netrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [pid.rs](#platpidrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_plock.rs (Windows)](#platwin_plockrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_pad.rs (Windows)](#platwin_padrs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_pad.rs (Linux)](#platlinux_padrs-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_ios_pad.rs (Apple)](#platapple_ios_padrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_pad.rs (Apple)](#platapple_mac_padrs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [android_thread.rs](#platandroid_threadrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [keycode.rs](#platkeycoders) · [plock.rs](#platplockrs) · [pad.rs](#platpadrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [web_net.rs](#platweb_netrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [pid.rs](#platpidrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [apple_power_ios.rs](#platapple_power_iosrs) · [share.rs](#platsharers) · [win_share.rs (Windows)](#platwin_sharers-windows) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_plock.rs (Windows)](#platwin_plockrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_pad.rs (Windows)](#platwin_padrs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_pad.rs (Linux)](#platlinux_padrs-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_share.rs (Apple)](#platapple_ios_sharers-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_ios_pad.rs (Apple)](#platapple_ios_padrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_pad.rs (Apple)](#platapple_mac_padrs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_share.rs (Apple)](#platapple_mac_sharers-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [android_thread.rs](#platandroid_threadrs) · [clipdrop.rs](#platclipdroprs) · [fuzz.rs](#platfuzzrs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [keycode.rs](#platkeycoders) · [plock.rs](#platplockrs) · [pad.rs](#platpadrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
-  <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
+  <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
+- [formats](#formats) -- bounded JSON with exact numbers, typed JSON records, an XML subset, the text encodings of the web
+  <br>[src/charsets.rs](#formatssrccharsetsrs) · [src/decode.rs](#formatssrcdecoders) · [src/encoding.rs](#formatssrcencodingrs) · [src/jmap.rs](#formatssrcjmaprs) · [src/json.rs](#formatssrcjsonrs) · [src/multibyte.rs](#formatssrcmultibyters) · [src/xml/mod.rs](#formatssrcxmlmodrs) · [src/xml/lenient.rs](#formatssrcxmllenientrs) · [src/xml/reader.rs](#formatssrcxmlreaderrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
   <br>[lib.rs](#datetime-crate-root) · [cron.rs](#datetimecronrs) · [tz.rs](#datetimetzrs)
 - [crypto](#crypto) -- hashes, MACs, KDFs, Argon2id, AEAD, X25519, Ed25519, sealed boxes (no randomness inside)
-  <br>[lib.rs](#crypto-crate-root) · [aead.rs](#cryptoaeadrs) · [aes.rs](#cryptoaesrs) · [argon2.rs](#cryptoargon2rs) · [b64.rs](#cryptob64rs) · [blake2b.rs](#cryptoblake2brs) · [blake3.rs](#cryptoblake3rs) · [bn.rs](#cryptobnrs) · [chacha.rs](#cryptochachars) · [ecdsa.rs](#cryptoecdsars) · [ed25519.rs](#cryptoed25519rs) · [gcm.rs](#cryptogcmrs) · [hmac.rs](#cryptohmacrs) · [p256.rs](#cryptop256rs) · [poly1305.rs](#cryptopoly1305rs) · [rsa.rs](#cryptorsars) · [sealbox.rs](#cryptosealboxrs) · [sha2.rs](#cryptosha2rs) · [x25519.rs](#cryptox25519rs) · [sha1.rs](#cryptosha1rs) · [keywrap.rs](#cryptokeywraprs) · [cmac.rs](#cryptocmacrs) · [md5.rs](#cryptomd5rs) · [eappwd.rs](#cryptoeappwdrs)
-- [compress](#compress) -- LZ4 block and frame, Zstandard, xxHash32 and xxHash64, codec ids
-  <br>[lib.rs](#compress-crate-root) · [lz4.rs](#compresslz4rs) · [xxh.rs](#compressxxhrs) · [zstd/mod.rs](#compresszstdmodrs) · [zstd/dec.rs](#compresszstddecrs) · [zstd/enc.rs](#compresszstdencrs)
-- [datastore](#datastore) -- an embedded journal database: JSON collections, transactions, snapshots, crash recovery
-  <br>[lib.rs](#datastore-crate-root) · [journal.rs](#datastorejournalrs)
+  <br>[lib.rs](#crypto-crate-root) · [aead.rs](#cryptoaeadrs) · [aes.rs](#cryptoaesrs) · [argon2.rs](#cryptoargon2rs) · [b64.rs](#cryptob64rs) · [blake2b.rs](#cryptoblake2brs) · [blake3.rs](#cryptoblake3rs) · [bn.rs](#cryptobnrs) · [chacha.rs](#cryptochachars) · [ecdsa.rs](#cryptoecdsars) · [ed25519.rs](#cryptoed25519rs) · [gcm.rs](#cryptogcmrs) · [hmac.rs](#cryptohmacrs) · [p256.rs](#cryptop256rs) · [p384.rs](#cryptop384rs) · [poly1305.rs](#cryptopoly1305rs) · [rsa.rs](#cryptorsars) · [sealbox.rs](#cryptosealboxrs) · [sha2.rs](#cryptosha2rs) · [sha3.rs](#cryptosha3rs) · [x25519.rs](#cryptox25519rs) · [sha1.rs](#cryptosha1rs) · [keywrap.rs](#cryptokeywraprs) · [cmac.rs](#cryptocmacrs) · [md5.rs](#cryptomd5rs) · [mlkem.rs](#cryptomlkemrs) · [eappwd.rs](#cryptoeappwdrs)
+- [x509](#x509) -- X.509 certificates: strict parsing, path validation with name constraints, a private Ed25519 CA's builder, the DER reader and writer (netio::x509 and netpkt::x509 are this crate)
+  <br>[lib.rs](#x509-crate-root) · [der.rs](#x509derrs) · [ip.rs](#x509iprs) · [key.rs](#x509keyrs)
+- [compress](#compress) -- DEFLATE, zlib, gzip, Brotli, LZ4, Zstandard, CRC-32, Adler-32 and xxHash, codec ids
+  <br>[lib.rs](#compress-crate-root) · [brotli/mod.rs](#compressbrotlimodrs) · [brotli/enc.rs](#compressbrotliencrs) · [brotli/sdec.rs](#compressbrotlisdecrs) · [brotli/senc.rs](#compressbrotlisencrs) · [checksum.rs](#compresschecksumrs) · [deflate/mod.rs](#compressdeflatemodrs) · [deflate/dec.rs](#compressdeflatedecrs) · [deflate/enc.rs](#compressdeflateencrs) · [deflate/sdec.rs](#compressdeflatesdecrs) · [gzip.rs](#compressgziprs) · [lz4.rs](#compresslz4rs) · [stream.rs](#compressstreamrs) · [xxh.rs](#compressxxhrs) · [zlib.rs](#compresszlibrs) · [zstd/mod.rs](#compresszstdmodrs) · [zstd/dec.rs](#compresszstddecrs) · [zstd/dict.rs](#compresszstddictrs) · [zstd/enc.rs](#compresszstdencrs) · [zstd/sdec.rs](#compresszstdsdecrs) · [zstd/senc.rs](#compresszstdsencrs)
+- [datastore](#datastore) -- an embedded journal database: JSON collections, transactions, snapshots, crash recovery, secondary indexes, encryption at rest
+  <br>[lib.rs](#datastore-crate-root) · [index.rs](#datastoreindexrs) · [journal.rs](#datastorejournalrs)
 - [netio](#netio) -- HTTP/1.1 server and client, TLS 1.3 subset, X.509 of a private CA, SSH-2, DNS
-  <br>[lib.rs](#netio-crate-root) · [client.rs](#netioclientrs) · [der.rs](#netioderrs) · [dns.rs](#netiodnsrs) · [http.rs](#netiohttprs) · [pem.rs](#netiopemrs) · [roots.rs](#netiorootsrs) · [server.rs](#netioserverrs) · [smtp.rs](#netiosmtprs) · [ssh.rs](#netiosshrs) · [tls/mod.rs](#netiotlsmodrs) · [tls/conn.rs](#netiotlsconnrs) · [tls/keysched.rs](#netiotlskeyschedrs) · [tls/record.rs](#netiotlsrecordrs) · [trust.rs](#netiotrustrs) · [url.rs](#netiourlrs) · [ws.rs](#netiowsrs) · [x509.rs](#netiox509rs)
+  <br>[lib.rs](#netio-crate-root) · [client.rs](#netioclientrs) · [dns.rs](#netiodnsrs) · [http.rs](#netiohttprs) · [pem.rs](#netiopemrs) · [roots.rs](#netiorootsrs) · [server.rs](#netioserverrs) · [smtp.rs](#netiosmtprs) · [ssh.rs](#netiosshrs) · [tls/mod.rs](#netiotlsmodrs) · [tls/conn.rs](#netiotlsconnrs) · [tls/keysched.rs](#netiotlskeyschedrs) · [tls/kx.rs](#netiotlskxrs) · [tls/record.rs](#netiotlsrecordrs) · [tls/session.rs](#netiotlssessionrs) · [trust.rs](#netiotrustrs) · [url.rs](#netiourlrs) · [ws.rs](#netiowsrs)
 - [netpkt](#netpkt) -- network packets byte for byte: addresses, checksums, Ethernet to TCP codecs, DHCP, DNS, NTP, syslog, SNMP, SSH, TLS 1.3, EAP and IMAP without I/O, X.509, cookies, URI references, a dissector, pcapng
   <br>[lib.rs](#netpkt-crate-root) · [addr.rs](#netpktaddrrs) · [arp.rs](#netpktarprs) · [checksum.rs](#netpktchecksumrs) · [decode.rs](#netpktdecoders) · [dhcp.rs](#netpktdhcprs) · [dns.rs](#netpktdnsrs) · [eth.rs](#netpktethrs) · [icmp.rs](#netpkticmprs) · [ipv4.rs](#netpktipv4rs) · [ipv6.rs](#netpktipv6rs) · [ntp.rs](#netpktntprs) · [pcapng.rs](#netpktpcapngrs) · [pkt.rs](#netpktpktrs) · [syslog.rs](#netpktsyslogrs) · [tcp.rs](#netpkttcprs) · [udp.rs](#netpktudprs) · [http.rs](#netpkthttprs) · [stp.rs](#netpktstprs) · [rip.rs](#netpktriprs) · [nat.rs](#netpktnatrs) · [icmpv6.rs](#netpkticmpv6rs) · [ospf.rs](#netpktospfrs) · [addrsel.rs](#netpktaddrselrs) · [eapol.rs](#netpkteapolrs) · [bgp.rs](#netpktbgprs) · [tftp.rs](#netpkttftprs) · [ftp.rs](#netpktftprs) · [smtp.rs](#netpktsmtprs) · [pop3.rs](#netpktpop3rs) · [imf.rs](#netpktimfrs) · [ber.rs](#netpktberrs) · [snmp.rs](#netpktsnmprs) · [mib.rs](#netpktmibrs) · [telnet.rs](#netpkttelnetrs) · [radius.rs](#netpktradiusrs) · [uri.rs](#netpkturirs) · [ssh.rs](#netpktsshrs) · [snmpv3.rs](#netpktsnmpv3rs) · [eap.rs](#netpkteaprs) · [imap.rs](#netpktimaprs) · [cookie.rs](#netpktcookiers) · [x509.rs](#netpktx509rs) · [tls.rs](#netpkttlsrs)
 - [eapm](#eapm) -- EAP-MD5 and EAP-PWD as peer and server state machines without I/O
   <br>[lib.rs](#eapm-crate-root)
 - [cas](#cas) -- content-addressed backup repositories: chunking, packs, signed encrypted snapshots, GC
-  <br>[lib.rs](#cas-crate-root) · [chunker.rs](#caschunkerrs) · [pack.rs](#caspackrs) · [snapshot.rs](#cassnapshotrs)
+  <br>[lib.rs](#cas-crate-root) · [chunker.rs](#caschunkerrs) · [pack.rs](#caspackrs) · [snapshot.rs](#cassnapshotrs) · [store.rs](#casstorers)
 - [update](#update) -- signed app updates: check, download, apply at the next start, health marker, rollback
   <br>[lib.rs](#update-crate-root) · [appimage.rs](#updateappimagers) · [apply.rs](#updateapplyrs) · [fetch.rs](#updatefetchrs) · [manifest.rs](#updatemanifestrs)
 - [archive](#archive) -- bounded ZIP32 containers (stored and DEFLATE)
@@ -110,8 +114,8 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
   <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/data.rs](#diagram_iosrcdatars) · [src/props.rs](#diagram_iosrcpropsrs) · [src/stencil.rs](#diagram_iosrcstencilrs) · [src/template.rs](#diagram_iosrctemplaters) · [src/textdraw.rs](#diagram_iosrctextdrawrs) · [src/vdx/mod.rs](#diagram_iosrcvdxmodrs) · [src/vss/mod.rs](#diagram_iosrcvssmodrs) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/windows.rs](#diagram_iosrcwindowsrs) · [src/xml.rs](#diagram_iosrcxmlrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
   <br>[lib.rs](#rt-crate-root) · [boot.rs](#rtbootrs) · [cpu.rs](#rtcpurs) · [crash.rs](#rtcrashrs) · [fx.rs](#rtfxrs) · [kernel.rs](#rtkernelrs) · [sync.rs](#rtsyncrs) · [x87.rs](#rtx87rs) · [portable/fx.rs](#rtportablefxrs) · [portable/math.rs](#rtportablemathrs) · [hosted.rs](#rthostedrs)
-- [pdf](#pdf) -- vector PDF writer with embedded font subsets, links and outlines
-  <br>[lib.rs](#pdf-crate-root) · [src/canvas.rs](#pdfsrccanvasrs) · [src/font.rs](#pdfsrcfontrs) · [src/geom.rs](#pdfsrcgeomrs) · [src/image.rs](#pdfsrcimagers) · [src/shading.rs](#pdfsrcshadingrs)
+- [pdf](#pdf) -- PDF writer (vector pages, font subsets, links, outlines) and reader (encryption, text, outlines, forms, attachments, drawing pages)
+  <br>[lib.rs](#pdf-crate-root) · [src/canvas.rs](#pdfsrccanvasrs) · [src/font.rs](#pdfsrcfontrs) · [src/geom.rs](#pdfsrcgeomrs) · [src/image.rs](#pdfsrcimagers) · [src/read/mod.rs](#pdfsrcreadmodrs) · [src/read/content.rs](#pdfsrcreadcontentrs) · [src/read/nav.rs](#pdfsrcreadnavrs) · [src/read/object.rs](#pdfsrcreadobjectrs) · [src/read/render/mod.rs](#pdfsrcreadrendermodrs) · [src/read/render/shade.rs](#pdfsrcreadrendershaders) · [src/read/text.rs](#pdfsrcreadtextrs) · [src/shading.rs](#pdfsrcshadingrs)
 - [diagram_view](#diagram_view) -- draws diagram pages (the display list of diagram_core) on render2d and gfx
   <br>[src/export/mod.rs](#diagram_viewsrcexportmodrs) · [src/export/pdf.rs](#diagram_viewsrcexportpdfrs) · [src/export/raster.rs](#diagram_viewsrcexportrasterrs) · [src/export/svg.rs](#diagram_viewsrcexportsvgrs) · [src/fonts.rs](#diagram_viewsrcfontsrs) · [src/image.rs](#diagram_viewsrcimagers) · [src/measure.rs](#diagram_viewsrcmeasurers) · [src/view.rs](#diagram_viewsrcviewrs)
 - [dxf](#dxf) -- DXF import (ASCII): tables, blocks and entities of model space, without a GPU
@@ -125,7 +129,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [geom](#geom) -- Deterministic modelling kernel: meshes from primitives, profiles and operations, with checks
   <br>[lib.rs](#geom-crate-root) · [src/build.rs](#geomsrcbuildrs) · [src/check.rs](#geomsrccheckrs) · [src/csg.rs](#geomsrccsgrs) · [src/exact.rs](#geomsrcexactrs) · [src/math.rs](#geomsrcmathrs) · [src/mesh.rs](#geomsrcmeshrs) · [src/normals.rs](#geomsrcnormalsrs) · [src/poly.rs](#geomsrcpolyrs)
 - [netchan](#netchan) -- Message channels for games: UDP with sequence numbers and acks, WebSocket, the browser's network
-  <br>[lib.rs](#netchan-crate-root) · [src/client.rs](#netchansrcclientrs) · [src/conn.rs](#netchansrcconnrs) · [src/endpoint.rs](#netchansrcendpointrs) · [src/packet.rs](#netchansrcpacketrs) · [src/server.rs](#netchansrcserverrs) · [src/ws.rs](#netchansrcwsrs)
+  <br>[lib.rs](#netchan-crate-root) · [src/client.rs](#netchansrcclientrs) · [src/conn.rs](#netchansrcconnrs) · [src/endpoint.rs](#netchansrcendpointrs) · [src/packet.rs](#netchansrcpacketrs) · [src/reliable.rs](#netchansrcreliablers) · [src/seal.rs](#netchansrcsealrs) · [src/server.rs](#netchansrcserverrs) · [src/ws.rs](#netchansrcwsrs)
 - [sheet_io](#sheet_io) -- XLSX and CSV import: workbooks and delimited text as typed tables
   <br>[lib.rs](#sheet_io-crate-root) · [src/csv.rs](#sheet_iosrccsvrs) · [src/xlsx.rs](#sheet_iosrcxlsxrs)
 
@@ -12265,12 +12269,28 @@ The card is one Tab stop; a button of its own (remove from a list) goes beside i
 *transport-independent actions, schema validation, JSON-RPC, MCP and tasks* -- crate root [`lib/agent_core/src/lib.rs`](../lib/agent_core/src/lib.rs)
 
 ```text
-Transport-independent action contracts and bounded JSON. New shared implementation;
-no corresponding module exists in the frozen assembly reference.
+Transport-independent action contracts. New shared implementation; no corresponding module
+exists in the frozen assembly reference.
 
-  json   strict bounded JSON: Value, parse, stringify, stringify_pretty
-  jmap   typed mapping of records and string enums (Field, Json, record!, wire_enum!)
+  action   semantic action dispatch: Dispatcher, ActionSpec, ActionContext, ActionResult /
+           ActionError, batches, pages
+  schema   statically registered input / output schemas (a JSON Schema subset), validation
+  rpc      versioned newline JSON-RPC (Protocol, RpcSession) with MCP adapters; no I/O
+  task     bounded cooperative tasks for long operations
+
+  json, jmap, record!, wire_enum!   re-exports of formats::{json, jmap} (they lived here until
+           0.3.0; new code names formats)
 ```
+
+### `agent_core` crate root
+
+Re-exports: `json::Value`
+
+Re-exports: `formats::json`
+
+Re-exports: `formats::jmap`
+
+Re-exports: `formats::{record, wire_enum}`
 
 ### `agent_core/src/action.rs`
 
@@ -12492,151 +12512,6 @@ New library code, independent of native windows, document types and language mod
 
 - **`fn validate_registry(actions: &[ActionSpec]) -> Result<(), ActionError>`**
   Validate stable identifiers and prevent ambiguous name/command registrations.
-
-### `agent_core/src/jmap.rs`
-
-Source: [`lib/agent_core/src/jmap.rs`](../lib/agent_core/src/jmap.rs)
-
-```text
-jmap -- typed JSON mapping for records and string enums over json::Value: the Field trait
-for member values, the Json trait for records, and the record! / wire_enum! macros that
-declare a type and its mapping in one place.  Missing or mistyped members read as their
-default; unknown members are ignored, so old and new programs read each other's data
-(protocols, project files, settings).
-
-  record! { pub struct P { pub a: String, pub n: u32, pub items: Vec<Item> } }
-  wire_enum! { pub enum Kind { Pc = "pc", Router = "router" } }   // Default = first variant
-  p.to_json() / P::from_json(&v) / Field::put / Field::take
-  list(&[T]) / from_list(&v) / str_of / u64_of / obj([...]) / empty_object()
-
-Field is implemented for String, bool, the integer types, Value (kept as is), Vec<T>,
-Option<T> (null = None) and BTreeMap<String, T> (an object).  Floating point has no exact
-JSON token here: store fixed-point integers instead.
-```
-
-- **`trait Field: Sized + Default`**
-  a value that maps to one JSON member
-  - `fn put(&self) -> Value`
-  - `fn take(v: Option<&Value>) -> Self`
-
-- **`trait Json: Sized`**
-  a record (a JSON object)
-  - `fn to_json(&self) -> Value`
-  - `fn from_json(v: &Value) -> Option<Self>`
-
-- **`fn empty_object() -> Value`**
-  an empty JSON object (used by record!)
-
-- **`record!(...)`**
-  declare a record: the struct (Clone, Debug, Default, PartialEq) and its Json / Field
-  mapping; the JSON member names are the field names
-
-- **`wire_enum!(...)`**
-  declare an enum carried as a string: Default is the first variant, ALL, as_str / parse,
-  Field
-
-- **`fn list<T: Json>(items: &[T]) -> Value`**
-  a list of records as a JSON array
-
-- **`fn from_list<T: Json>(v: &Value) -> Vec<T>`**
-  the records of a JSON array (or of the array under `items` of an object)
-
-- **`fn str_of<'a>(v: &'a Value, k: &str) -> &'a str`**
-  a string member of an object ("" when missing)
-
-- **`fn u64_of(v: &Value, k: &str) -> u64`**
-  an unsigned member of an object (0 when missing)
-
-- **`fn obj<const N: usize>(fields: [(&str, Value); N]) -> Value`**
-  an object built from (name, value) pairs
-
-### `agent_core/src/json.rs`
-
-Source: [`lib/agent_core/src/json.rs`](../lib/agent_core/src/json.rs)
-
-```text
-Strict, bounded UTF-8 JSON for local and browser control channels. New shared code.
-```
-
-- **`struct Number(String)`**
-  Exact JSON number token; construction validates the JSON number grammar.
-
-**`impl Number`**
-
-- **`fn parse(text: &str) -> Option<Self>`**
-  Parse one complete JSON number without rounding it through floating point.
-- **`fn as_str(&self) -> &str`**
-  Original validated JSON representation.
-- **`fn as_i64(&self) -> Option<i64>`**
-  Read an exactly integral JSON number without precision loss, including exponents.
-- **`fn as_u64(&self) -> Option<u64>`**
-  Read an exactly integral, nonnegative JSON number without precision loss.
-
-- **`enum Value`**
-  Owned JSON data. Objects retain member order and parsed objects have unique keys.
-  - `Null` -- JSON null.
-  - `Bool(bool)` -- JSON boolean.
-  - `Number(Number)` -- Exact JSON number.
-  - `String(String)` -- Unicode string.
-  - `Array(Vec<Value>)` -- Ordered values.
-  - `Object(Vec<(String, Value)>)` -- Ordered name/value members.
-
-**`impl Value`**
-
-- **`fn string(value: impl Into<String>) -> Self`**
-  Make a JSON string.
-- **`fn u64(value: u64) -> Self`**
-  Make an unsigned number without converting to floating point.
-- **`fn i64(value: i64) -> Self`**
-  Make a signed number without converting to floating point.
-- **`fn object<const N: usize>(fields: [(&str, Value); N]) -> Self`**
-  Make an object, with later duplicate names replacing earlier values.
-- **`fn insert(&mut self, key: &str, value: Value) -> bool`**
-  Insert or replace an object member; false when this value is not an object.
-- **`fn get(&self, key: &str) -> Option<&Value>`**
-  Look up an object member.
-- **`fn as_object(&self) -> Option<&[(String, Value)]>`**
-  Borrow an object member list.
-- **`fn as_array(&self) -> Option<&[Value]>`**
-  Borrow an array.
-- **`fn as_str(&self) -> Option<&str>`**
-  Borrow a string.
-- **`fn as_bool(&self) -> Option<bool>`**
-  Read a boolean.
-- **`fn as_u64(&self) -> Option<u64>`**
-  Read an unsigned integer token.
-- **`fn as_i64(&self) -> Option<i64>`**
-  Read a signed integer token.
-
-- **`struct Limits`**
-  Bounds applied before and during decoding or encoding.
-  - `bytes: usize` -- Maximum encoded byte count.
-  - `depth: usize` -- Maximum nested arrays/objects; the root value starts at depth zero.
-  - `values: usize` -- Maximum total values, including the root.
-  - `string_bytes: usize` -- Maximum decoded bytes in any string, including member names.
-  - `members: usize` -- Maximum members/elements in any container.
-
-- **`struct Error`**
-  Parse or serialization failure with the byte offset where it was found.
-  - `offset: usize` -- Zero-based byte offset (zero for serialization limits).
-  - `kind: &'static str` -- Stable machine-readable failure category.
-
-- **`fn parse(bytes: &[u8]) -> Result<Value, Error>`**
-  Parse a complete UTF-8 JSON value using default limits.
-
-- **`fn parse_with_limits(bytes: &[u8], limits: Limits) -> Result<Value, Error>`**
-  Parse a complete UTF-8 JSON value. Duplicate object keys and lone surrogates are errors.
-
-- **`fn stringify(value: &Value) -> Result<String, Error>`**
-  Encode JSON without literal newlines, enforcing the default bounds.
-
-- **`fn stringify_with_limits(value: &Value, limits: Limits) -> Result<String, Error>`**
-  Encode bounded JSON. Invalid duplicate keys in manually built objects are rejected.
-
-- **`fn stringify_pretty(value: &Value, limits: Limits, indent: usize) -> Result<String, Error>`**
-  Encode bounded JSON for people to read: every array element and object member on its own
-  line, indented by `indent` spaces per level, "name": value; empty containers stay "[]" / "{}".
-  The output ends without a newline.
 
 ### `agent_core/src/rpc.rs`
 
@@ -13792,6 +13667,10 @@ colour glyphs), the glyph cache and text runs                        [src/text/*
                                  on opaque targets (lcd.rs); NONE (default): greyscale
   set_fallback_fonts / set_system_fallback / fallback_for   characters the font lacks come
                                  from other fonts (fallback.rs; also when shaping)
+  set_bidi(on) / has_rtl(s)      (default on) lines with right-to-left characters in their
+                                 visual order, Hebrew and Arabic shaped by their fallback
+                                 font, also while set_shaping is off (bidi.rs); other lines
+                                 keep their metrics
   record_n / record_icon / glyphs   glyphs placed now, blended later from the glyph cache by
                                  any thread (record.rs: GlyphRec, GlyphView)
   var_axes / var_instances / var_values / vary / vary_named   variable fonts: their axes,
@@ -13863,6 +13742,42 @@ FONT_ICON: u32 = 3
 - **`fn icon_draw(&mut self, dc: &mut Dc, sf: &mut Surface, cp: u32, x: i32, y: i32, size_fx: i32)`**
   icon_draw(cp, x, y, size_fx): the icon's em box has its top-left corner at x, y
 
+### `text/bidi.rs`
+
+Source: [`lib/text/bidi.rs`](../lib/text/bidi.rs)
+
+```text
+bidi -- lines with right-to-left characters in their visual order, also without set_shaping
+
+  has_rtl(s)                       s has right-to-left characters (what set_bidi lays out)
+  set_bidi(on) -> previous         (default on) a line with right-to-left characters (Hebrew,
+                                   Arabic, Syriac, Thaana, N'Ko, ... or the marks RLM, RLE,
+                                   RLO, RLI) is laid out by the Unicode bidi algorithm while
+                                   shaping is off; off: every line in logical order (text
+                                   that is in visual order already)
+
+The line's directional runs come in visual order (text_shape::visual_runs; the line's
+direction is that of its first strong character).  A right-to-left run's characters from a
+TrueType / OpenType font (the fallback font of Hebrew or Arabic, usually) are shaped with
+it (HarfRust: Arabic joining, marks, ligatures, mirrored brackets); the others are drawn
+one grapheme cluster after the other as run draws them, right to left, brackets mirrored.
+Left-to-right runs are drawn as run draws them.  Draw, measure, caret_x, hit and
+selection_spans all read the same layout (shaping.rs: the line laid out last, with the 128
+bidi lines before it).  Lines without right-to-left characters keep run's metrics and
+pixels.
+```
+
+- **`fn has_rtl(s: &[u8]) -> bool`**
+  Whether s has right-to-left characters (Hebrew, Arabic, ... or the marks RLM, RLE, RLO,
+  RLI): a line with them is laid out in its visual order (set_bidi). Views that place their
+  carets by logical prefixes draw such text cluster by cluster to keep the logical order.
+
+**`impl Text`**
+
+- **`fn set_bidi(&mut self, on: bool) -> bool`**
+  Lay out lines with right-to-left characters in their visual order while shaping is off
+  (default on). Returns the previous state.
+
 ### `text/cff.rs`
 
 Source: [`lib/text/cff.rs`](../lib/text/cff.rs)
@@ -13882,13 +13797,18 @@ outlines                                                               [src/text
        buffer (OLT_ON / OLT_CUBIC, font units)
   outline_var(table, glyph, coords, ol)   the same at a CFF2 instance's normalized
        coordinates (F2Dot14 per axis, avar applied: var.rs normalize; empty = the default)
+  outline_seac(table, glyph, ol) -> (ok, seac)   outline, and the accent of an endchar with
+       four arguments (adx, ady, bchar, achar: the base and the accent by StandardEncoding
+       code, the accent moved by adx, ady before the FontMatrix), for a caller that has the
+       glyph names (a font of a PDF file: the CFF charset)
+  matrix() -> the FontMatrix scaled to the units of the outline (None: none or 1/upem)
 
 Type 2 operators: all path operators (r/h/v moveto, lineto, rrcurveto, hh/vv/hv/vh curveto,
 rcurveline, rlinecurve, flex, hflex, hflex1, flex1), hint operators (stems are counted for
 hintmask / cntrmask and skipped), callsubr / callgsubr (bias 107 / 1131 / 32768, nesting
-<= 10), return, endchar (a seac accent is ignored), the arithmetic / storage operators
-(abs add sub div neg eq drop put get ifelse random mul sqrt dup exch index roll and or
-not).  Argument stack 48, transient array 32, at most 200000 operators per glyph, at most
+<= 10), return, endchar (a seac accent is not drawn: outline_seac reports it), the
+arithmetic / storage operators (abs add sub div neg eq drop put get ifelse random mul sqrt
+dup exch index roll and or not).  Argument stack 48, transient array 32, at most 200000 operators per glyph, at most
 256 font DICTs, a Private DICT read to at most 64 KiB.  The
 width argument is dropped (advances come from hmtx).  Like the assembly, the transient
 array and the random generator are process-wide.
@@ -13920,6 +13840,11 @@ variation data, a vsindex after a blend is an error.  Advances come from hmtx + 
 - **`fn outline_var(&self, t: Tb, glyph: u32, coords: &[i16], ol: &mut Outline) -> bool`**
   outline at a CFF2 instance's normalized coordinates (empty: the default instance; CFF
   ignores them)
+- **`fn outline_seac(&self, t: Tb, glyph: u32, ol: &mut Outline) -> (bool, Option<[f32; 4]>)`**
+  outline, and the accent of a seac endchar: (adx, ady, bchar, achar)
+- **`fn matrix(&self) -> Option<[f32; 6]>`**
+  the FontMatrix in the units of the outline (applied to it already): None when the font
+  has none or it is 1/unitsPerEm
 
 ### `text/colr.rs`
 
@@ -15057,9 +14982,11 @@ TFF_MACCMAP: u32 = 32
 
 - **`fn open(data: Vec<u8>, face: u32, ol: &mut Outline, serial: u64) -> Result<Box<TtFont>, i32>`**
   ttf_open(data, face): the context, or ERR_\*
-- **`fn glyph(&self, cp: u32) -> u32`**
+- **`fn cff(&self) -> Option<&Cff>`**
   glyph for cp (0 = .notdef).  Symbol fonts ((3,0) cmap) map like GDI: U+0000..U+00FF
   and the Windows-1252 characters to U+F000 + their code page byte  [ttf_glyph]
+  the CFF or CFF2 outlines of an OpenType font (None: TrueType outlines)
+- **`fn glyph(&self, cp: u32) -> u32`**
 - **`fn has(&self, cp: u32) -> bool`**
 - **`fn adv(&self, g: u32) -> i32`**
   advance (hmtx; the last long metric repeats)  [ttf_adv]
@@ -15197,7 +15124,14 @@ case form it made and rejects "Cd-rom").  Not supported: COMPOUNDSYLLABLE, COMPO
 COMPOUNDMORESUFFIXES, COMPLEXPREFIXES (two prefixes), a prefix together with two suffixes,
 morphology (AM, the fields of the .dic), PHONE suggestions, OCONV, the replacements of
 CHECKCOMPOUNDPATTERN (simplified compounds), the Turkish / Azeri casing of LANG; no clock
-limits (Hunspell's results depend on the machine's speed, these never do).
+limits (Hunspell's results depend on the machine's speed, these never do).  The work is
+bounded by counts instead, also for a crafted dictionary (config://hunspell is the user's to
+fill): a check tries at most 6 million rules and patterns of the .aff (check.rs, CHECK_WORK),
+a search for suggestions 64 million, its n-gram step 32 million (suggest.rs); the word list
+keeps every lookup short, also for words whose hashes collide (dic.rs), and the .aff loads
+in one pass over its rules (aff.rs).  Real dictionaries use a sixth of that or less (20 of
+them measured, docs/ROADMAP.md section 13, U11); a crafted one takes at most about 0.15 s for
+a check and 1.6 s for a suggestion instead of seconds and minutes.
 
 Personal word list: one word per line (a first line with a number is skipped), UTF-8.  A
 word added in lower case is also accepted Capitalised and in UPPER case; "Paris" only so.
@@ -15783,6 +15717,9 @@ JDF_NO_ORIENT: u32 = 2  // keep the stored orientation
 JDF_RGB: u32 = 4  // 3 components are R, G, B (TIFF Photometric 2)
 JDF_YCC: u32 = 8  // 3 components are YCbCr (Photometric 6)
 JDF_CMYK: u32 = 16  // 4 components are plain CMYK (Photometric 5)
+/// 4 components: the samples as stored (C, M, Y, K; a YCCK image's CMY after the YCC step) in the
+/// bytes R, G, B and A instead of RGB, for a caller with its own CMYK conversion (a PDF page)
+JDF_RAW_CMYK: u32 = 32
 PNG_IOM: u32 = IOM_BITDEPTH | IOM_DITHER | IOM_ATHRESH | IOM_EFFORT | IO ...
 JPEG_IOM: u32 = IOM_QUALITY | IOM_CHROMA | IOM_ICC | IOM_EXIF | IOM_XMP
 BMP_IOM: u32 = IOM_BITDEPTH | IOM_DITHER
@@ -15870,29 +15807,26 @@ zero padding bytes consumed than bits are left.  Values of n: 1..56 (get / peek 
 Source: [`lib/img_core/checksum.rs`](../lib/img_core/checksum.rs)
 
 ```text
-checksum -- CRC-32 (zlib / PNG polynomial) and Adler-32  [src/img/checksum.s]
+checksum -- CRC-32 (zlib / PNG polynomial) and Adler-32
+
+Both live in jflib-compress since 0.3 (compress::crc32, compress::adler32); img_core keeps
+the names of before.
 
   crc32(crc, data) -> u32        start with crc = 0 (like zlib's crc32())
   adler32(adler, data) -> u32    start with adler = 1
-
-CRC: table driven (slice-by-8 here, slice-by-4 in the assembly: the same values).
-Adler-32: blocks of at most 5552 bytes summed exactly in 64 bit, both sums reduced mod
-65521 after every block (as the assembly's SSE2 loop); a call with no data returns the
-start value unchanged.
 ```
 
-- **`fn crc32(crc: u32, data: &[u8]) -> u32`**
-  CRC-32 (zlib / PNG) of data, continuing crc (start with 0)  [crc32]
-
-- **`fn adler32(adler: u32, data: &[u8]) -> u32`**
-  Adler-32 (zlib) of data, continuing adler (start with 1)  [adler32]
+Re-exports: `compress::{adler32, crc32}`
 
 ### `img_core/deflate.rs`
 
 Source: [`lib/img_core/deflate.rs`](../lib/img_core/deflate.rs)
 
 ```text
-deflate -- DEFLATE (RFC 1951) / zlib (RFC 1950) compression  [src/img/deflate.s]
+deflate -- DEFLATE (RFC 1951) / zlib (RFC 1950) compression with img_core's error codes
+
+The encoder lives in jflib-compress since 0.3 (compress::deflate, compress::zlib); these are
+the calls of before, with the same bytes.  New code calls compress directly.
 
   zlib_deflate(src, level) -> Vec          zlib stream (level 0..9, < 0 = 6, > 9 = 9)
   deflate_raw(src, level) -> Vec           raw RFC 1951 data
@@ -15907,26 +15841,9 @@ deflate -- DEFLATE (RFC 1951) / zlib (RFC 1950) compression  [src/img/deflate.s]
                                            a state); overflow when the stream + 8 bytes do
                                            not fit (dst contents undefined then)
   deflate_bound(len) -> len + len / 512 + 128   a cap with which *_to never overflow
-
-The algorithm and every table of the assembly: 3-byte multiplicative hash, head / prev
-chains over "global" positions (input offset + base; every input starts GEN_GAP after
-the previous one, so a reused state matches a fresh one), zlib's levels (greedy 1..3, lazy
-4..9, chain depth / nice / lazy limits), TOO_FAR, 16K-symbol blocks written as the
-cheapest of stored / fixed / dynamic by exact bit count, two-queue Huffman lengths with
-miniz's Kraft repair, RLE-coded code lengths.  Inputs of 4 GiB - 64 KiB and more are
-stored.  The output limit: a block that would end past cap - 8 stops the compressor
-(ERR_OVERFLOW).  Speed (perf-inflate): the LZ77 loops keep their state in locals and
-load the next position's hash head before the current chain walk (the walk is a chain of
-dependent loads; the early load overlaps it) -- the same candidates in the same order.
 ```
 
-- **`struct DeflateState`**
-  a compressor state (DS_\*); reusable, one thread at a time
-
-**`impl DeflateState`**
-
-- **`fn new() -> Box<DeflateState>`**
-  a zeroed state  [deflate_state_new]
+Re-exports: `compress::deflate::DeflateState`
 
 - **`fn deflate_bound(len: usize) -> usize`**
   output capacity with which the \*\_to functions never report ERR_OVERFLOW  [deflate_bound]
@@ -16068,7 +15985,10 @@ TIFR_MAXDEPTH: u32 = 3  // sub-IFD nesting callers must respect
 Source: [`lib/img_core/gzip.rs`](../lib/img_core/gzip.rs)
 
 ```text
-gzip -- gzip (RFC 1952) members on top of inflate_raw / deflate_raw  [src/img/gzip.s]
+gzip -- gzip (RFC 1952) members with img_core's error codes
+
+gzip lives in jflib-compress since 0.3 (compress::gzip); these are the calls of before, with
+the same bytes and codes.  New code calls compress directly.
 
   gzip_decode(src, dst) -> Ok((bytes, consumed)) / Err(ERR_*)   ONE member; consumed =
                                    the member length incl. the trailer
@@ -16079,10 +15999,6 @@ gzip -- gzip (RFC 1952) members on top of inflate_raw / deflate_raw  [src/img/gz
   gzip_encode_to(st, src, level, dst) -> Ok(bytes) / Err(ERR_OVERFLOW)   into dst
                                    (deflate_bound(len) always suffices)
   gzip_isize(src) -> Ok(ISIZE) / Err(ERR_TRUNC)   the last 4 bytes of a single member
-
-Decoding: ID1 ID2, CM 8, FLG (reserved bits 5..7 must be 0), MTIME, XFL, OS, then FEXTRA,
-FNAME, FCOMMENT, FHCRC (low 16 bits of the CRC-32 of the header bytes), the deflate data,
-CRC32 and ISIZE.  Errors: ERR_TRUNC, ERR_HDR, ERR_CHECKSUM and the inflate errors.
 ```
 
 - **`fn gzip_decode(src: &[u8], dst: &mut [u8]) -> Result<(usize, usize), i32>`**
@@ -16262,7 +16178,11 @@ ICC_MON_PRIMARY: i32 = -1  // plat::monitor_icc: the primary monitor
 Source: [`lib/img_core/inflate.rs`](../lib/img_core/inflate.rs)
 
 ```text
-inflate -- DEFLATE (RFC 1951) and zlib (RFC 1950) decompression  [src/img/inflate.s]
+inflate -- DEFLATE (RFC 1951) and zlib (RFC 1950) decompression with img_core's error codes
+
+The decoder lives in jflib-compress since 0.3 (compress::deflate, compress::zlib); these are
+the calls of before, for the codecs and for code written against them.  New code calls
+compress directly.
 
   zlib_inflate(src, dst) -> Ok(bytes written) / Err(ERR_*)
   inflate_raw(src, dst) -> Ok(bytes) / Err(ERR_*)
@@ -16272,50 +16192,12 @@ inflate -- DEFLATE (RFC 1951) and zlib (RFC 1950) decompression  [src/img/inflat
                                     never affects later calls)
   zlib_inflate_st(st, src, dst) / inflate_raw_st(st, src, dst)   the same with a state
                                     (None = a temporary one, like the classic calls)
-  rev16(x)                        16-bit bit reversal (shared with deflate)
-  LBASE / LEXT / DBASE / DEXT / CLORDER   the code tables (shared with deflate)
 
-The output buffer has a fixed capacity: every write is bounds-checked (ERR_OVERFLOW),
-every back reference is checked against the bytes produced so far (ERR_DIST), reading
-past the end of the input gives ERR_TRUNC.  zlib header errors: ERR_HDR; a wrong
-Adler-32: ERR_CHECKSUM.
-
-The bit buffer behaves exactly as the assembly's (the error codes of corrupt input depend
-on it): refilled 8 bytes at a time while 8 input bytes remain (the count becomes
-56 + count % 8), byte by byte near the end with zero bytes counted as padding (more than
-PAD_MAX of them = ERR_TRUNC); Huffman tables as stb_image (10-bit fast table, canonical
-slow path); a code table's sorted-index arrays keep entries of an earlier build (the
-slow path checks the length, as the assembly).
-
-Speed (perf-inflate): the symbol loop runs in codes_fast while 8 input bytes remain at
-every refill and a whole match fits the output: no slow refill, no overflow checks, no
-call on the literal path (the state stays in registers), u32 fast tables (lx / dx) with
-the length / distance base and extra-bit count folded in (one load and two shifts per
-code), wide match moves.  It hands over to the careful loop before the symbol where a
-condition fails; both follow the assembly's loop step by step.
+Errors: ERR_OVERFLOW (the output does not fit), ERR_DIST, ERR_TRUNC, ERR_HDR (zlib header),
+ERR_CHECKSUM (Adler-32), ERR_BLOCK, ERR_CODE -- the same codes for the same input as before.
 ```
 
-- **`static LBASE: [u16; 32]`**
-
-- **`static DBASE: [u16; 32]`**
-
-- **`static LEXT: [u8; 32]`**
-
-- **`static DEXT: [u8; 32]`**
-
-- **`static CLORDER: [u8; 19]`**
-
-- **`const fn rev16(x: u32) -> u32`**
-  16-bit bit reversal  [zl_rev16]
-
-- **`struct InflateState`**
-  a reusable decoder state (IS_\*); only `pad` is reset per call, the fixed tables are built
-  once per state, every other table is rebuilt before it is read
-
-**`impl InflateState`**
-
-- **`fn new() -> Box<InflateState>`**
-  a zeroed state  [inflate_state_new]
+Re-exports: `compress::deflate::InflateState`
 
 - **`fn zlib_inflate(src: &[u8], dst: &mut [u8]) -> Result<usize, i32>`**
   zlib stream src -> dst  [zlib_inflate]
@@ -17311,7 +17193,7 @@ IMGOPT glue).
 
 ### `img_jpeg` API
 
-Re-exports: `img_core::{JDF_CMYK, JDF_NO_ORIENT, JDF_RGB, JDF_STRAIGHT, JDF_YCC, JPEG_IOM}`
+Re-exports: `img_core::{JDF_CMYK, JDF_NO_ORIENT, JDF_RAW_CMYK, JDF_RGB, JDF_STRAIGHT, JDF_YCC, JPEG_IOM}`
 
 - **`fn decode(data: &[u8]) -> Result<Surface, i32>`**
   jpeg_decode: decode a JPEG file into a new FMT_PARGB surface
@@ -18129,8 +18011,8 @@ Modules (one per assembly file): bits (jxl_bits.s), hdr (jxl_hdr.s), icc (jxl_ic
 (jxl_rnd.s), epf (jxl_epf.s), blend (jxl_blend.s), noise (jxl_noise.s), tab (jxl_tab.s,
 generated by tools/gen_jxl.py); the writer: ewr (jxl_ewr.s), enc (jxl_enc.s), venc
 (jxl_venc.s).  jxl-plus (no asm): emath (libjxl's fast math), jpeg (JPEG reconstruction) with
-brotli (RFC 7932 decoder; brotli_tab.rs / brotli_dict.bin generated by
-tools/gen_brotli_dict.py), par (the pool helpers).  jxl-tools (no asm): spline (decoder:
+brotli (the call of compress::brotli, the RFC 7932 decoder that lived here until 0.2),
+par (the pool helpers).  jxl-tools (no asm): spline (decoder:
 splines).  jxl-module: writer (the new writer's options, samples and hook).  The new writer
 itself (libjxl 0.11.1's encoder: enew, evdct, emod, ema, eans, efrm, eicc, etx, dctk, eaq,
 eacs, ecfl, epatch, edots, espline, enoise, efeat, ebutter, ebq) is the crate img_jxl_enc
@@ -18277,8 +18159,7 @@ The codec's building blocks (public for the codec test app `codectest`; see thei
 |---|---|
 | [`img_jxl::bits`](../lib/img_jxl/bits.rs) | JPEG XL bit reader and field coding (fields.cc; model: tools/jxl_ref.py Bits) |
 | [`img_jxl::blend`](../lib/img_jxl/blend.rs) | JPEG XL reference frames, frame blending and patches (blending.cc, stage_blending.cc, dec_patch_dictionary.cc; model: tools/jxl_ref.py perform_blending, ... |
-| [`img_jxl::brotli`](../lib/img_jxl/brotli.rs) | Brotli decompression (RFC 7932) of the JPEG reconstruction data (jbrd box) of JPEG transcodes |
-| [`img_jxl::brotli_tab`](../lib/img_jxl/brotli_tab.rs) | Brotli static dictionary layout and the 121 word transforms (RFC 7932 appendices A and B); generated by tools/gen_brotli_dict.py, do not edit |
+| [`img_jxl::brotli`](../lib/img_jxl/brotli.rs) | Brotli decompression (RFC 7932) of the JPEG reconstruction data (jbrd box) of JPEG transcodes, with img_core's error codes |
 | [`img_jxl::dct`](../lib/img_jxl/dct.rs) | JPEG XL VarDCT transforms (dct-inl.h IDCT1DImpl / DCT1DImpl, dec_transforms-inl.h TransformToPixels / LowestFrequenciesFromDC; model: tools/jxl_ref.py ... |
 | [`img_jxl::dec`](../lib/img_jxl/dec.rs) | JPEG XL frame decoding driver (dec_frame.cc, dec_modular.cc; model: tools/jxl_ref.py Frame.decode, decode_global_modular, decode_group, pass_bracket) |
 | [`img_jxl::emath`](../lib/img_jxl/emath.rs) | float helpers of the new encoder (libjxl base/fast_math-inl.h, rational_polynomial-inl.h) |
@@ -28732,8 +28613,10 @@ net -- TCP, UDP and Unix domain sockets (IPv4 and IPv6) with timeouts
             (bind removes only a socket file nobody listens on; the drop only its own)
             -> UnixStream (the stream calls of TcpStream; addresses and nodelay do not apply)
             Linux, and Windows 10 1803 and later (AF_UNIX)
-  resolve(host, port): numeric addresses, "localhost"; Windows also the system resolver
-            (GetAddrInfoW).  Linux names go through netio::dns (no libc here).
+  resolve(host, port): numeric addresses, "localhost" and names under .localhost (the loopback
+            addresses, RFC 6761; with a final dot as well); Windows, macOS and iOS also the
+            system resolver (GetAddrInfoW, getaddrinfo).  Linux: other names NotFound, since
+            there is no libc here: netio::dns resolves them (/etc/hosts, the name servers).
   NetError: the kinds callers act on, with the OS code
 
 (G7d) Everywhere: the addresses, NetError and host_port.  The sockets, names and interfaces are
@@ -28896,8 +28779,12 @@ one thread may read while another writes (Arc<TcpStream>).
   connect to a socket file within `timeout_ms` (0: block)
 
 - **`fn resolve(host: &str, port: u16) -> NetResult<Vec<SocketAddr>>`**
-  the addresses of a host: numeric forms and "localhost" everywhere; on Windows, macOS and iOS
-  other names through the system resolver (Linux: netio::dns)
+  the addresses of a host: numeric forms, "localhost" and names under .localhost, with a final
+  dot as well (both loopback addresses, RFC 6761 6.3, as netio::dns answers them) everywhere;
+  on Windows, macOS and iOS other names through the system resolver, on Linux NotFound for them
+  (no libc here: netio::dns::resolve reads /etc/hosts and asks the name servers).  The
+  addresses of a name are registered with the app's rules (policy::net_resolved), so a rule
+  for the name (app.localhost:8080) covers connections to them
 
 - **`fn hostname() -> String`**
   the host name of this computer
@@ -29543,6 +29430,8 @@ CAP_WINDOWING: u64 = 1 << 10
 CAP_THREADS: u64 = 1 << 11
 /// Install operating-system shortcuts or integrations.
 CAP_SHELL_INTEGRATION: u64 = 1 << 12
+/// Hand a text, a link or files to another app through the system's share sheet (share.rs).
+CAP_SHARE: u64 = 1 << 13
 ```
 
 - **`struct Capabilities`**
@@ -30840,7 +30729,9 @@ notice.  logind's Inhibit is not used: it answers with a file descriptor, which 
 D-Bus client does not receive.  Browser and Android (web_power.rs): the Screen Wake Lock
 (INHIBIT_IDLE only; taken again when the tab is visible again), FLAG_KEEP_SCREEN_ON and a
 partial WakeLock (INHIBIT_SUSPEND).  macOS (apple_power.rs): IOKit power assertions
-(PreventUserIdleSystemSleep, with INHIBIT_IDLE also PreventUserIdleDisplaySleep); iOS: None.
+(PreventUserIdleSystemSleep, with INHIBIT_IDLE also PreventUserIdleDisplaySleep).  iOS
+(apple_power_ios.rs): INHIBIT_IDLE turns UIApplication's idle timer off (no auto-lock while
+the app is in front); INHIBIT_SUSPEND alone is None (iOS has no sleep but the screen's lock).
 ```
 
 ```rust
@@ -30865,6 +30756,140 @@ INHIBIT_IDLE: u32 = 2
 
 - **`fn inhibited() -> u32`**
   the INHIBIT_\* bits the live guards of this process hold
+
+### `plat/apple_power_ios.rs`
+
+Source: [`lib/plat/apple_power_ios.rs`](../lib/plat/apple_power_ios.rs)
+
+```text
+apple_power_ios -- (power.rs) keep an iPhone or iPad awake: UIApplication's idle timer
+
+  hold(reason, what) -> Some(Held)   INHIBIT_IDLE: idleTimerDisabled while a guard of this
+                                     process holds it (the screen stays on, no auto-lock; iOS
+                                     honours it while the app is in front).  INHIBIT_SUSPEND
+                                     alone -> None: iOS has no sleep of its own besides the
+                                     screen's lock, and an app in the background runs only
+                                     seconds; the reason is not shown anywhere
+  release(held)                      the last guard turns the timer on again
+  ios_idle_timer_off() -> bool       (tests) idleTimerDisabled as UIKit has it now
+
+The property belongs to the main thread: set there at once, from another thread through the
+main queue.  Each setting applies the count of that moment, so settings that arrive out of
+order still end in the right state.  Without an app (no UIApplication) nothing happens and
+hold still answers: the request is noted for an app that starts later in the process.
+```
+
+- **`fn ios_idle_timer_off() -> bool`**
+  (tests) UIApplication's idleTimerDisabled now (false outside an app)
+
+### `plat/share.rs`
+
+Source: [`lib/plat/share.rs`](../lib/plat/share.rs)
+
+```text
+share -- the system's share sheet: hand a text, a link or files to another app (mail, messages,
+AirDrop, Nearby Share, a chat ...)
+
+  share(&Share) -> i32          SHARE_PENDING: the sheet is open, its answer comes through
+                                share_poll (and wakes the UI); SHARE_NONE: not here -- no sheet on
+                                this system (Linux), no window, nothing to share, a file the app
+                                may not read or that is not there, one sheet open already
+  share_poll() -> Option<i32>   None while it is open (or none was), then once: SHARE_DONE (a
+                                target took the items), SHARE_CANCELLED (closed without one) or
+                                SHARE_FAILED (the target or the system refused)
+  share_open() -> bool          a sheet is open (its answer not taken yet)
+  CAP_SHARE                     capabilities(): this system has a share sheet
+
+Share { title, text, url, files, anchor }: `title` the subject (a mail's subject line, Windows'
+title of the data; may be empty), `text` plain text, `url` a link (http, https, mailto ...),
+`files` paths of the file system (the browser: of its virtual files) -- at least one of text, url,
+files.  `anchor` [x, y, w, h] in the window's pixels: what the sheet points at where it is a
+popover (macOS, an iPad); empty: the window's middle (macOS, iPad) / its usual place.
+
+What "done" means differs (it says nothing about delivery): iOS and macOS a service was chosen
+and took the items; Windows the target app took them (TargetApplicationChosen); the browser
+navigator.share resolved; Android a target was chosen (the chooser's callback, API 22+).
+
+Windows (win_share.rs): DataTransferManager of the active window through
+IDataTransferManagerInterop (Windows 10), the data package filled in DataRequested (text, a web
+link, storage items of the files).  macOS (apple_mac_share.rs): NSSharingServicePicker at the
+anchor in the key window.  iOS (apple_ios_share.rs): UIActivityViewController over the scene's
+window, on an iPad a popover at the anchor.  Browser and Android (web_share.rs): the host --
+navigator.share (files as File objects; the browser asks for the user's gesture: call it while
+handling input) / Intent.ACTION_SEND(_MULTIPLE) in a chooser (files through the host's provider,
+readable by the target only).  Linux: none.
+```
+
+```rust
+/// the sheet is open; the answer comes through share_poll
+SHARE_PENDING: i32 = 2
+/// a target took the items
+SHARE_DONE: i32 = 1
+/// closed without a target
+SHARE_CANCELLED: i32 = 0
+/// not here: no sheet, no window, nothing to share, a file not readable, one open already
+SHARE_NONE: i32 = -1
+/// the target or the system refused
+SHARE_FAILED: i32 = -2
+```
+
+- **`struct Share`**
+  what to share (see the module comment)
+  - `title: String`
+  - `text: String`
+  - `url: String`
+  - `files: Vec<String>`
+  - `anchor: [i32; 4]` -- [x, y, w, h] in the window's pixels (all 0: none)
+
+**`impl Share`**
+
+- **`fn text(text: &str) -> Share`**
+  a text to share
+- **`fn url(url: &str) -> Share`**
+  a link to share
+- **`fn files(files: &[&str]) -> Share`**
+  files to share
+- **`fn is_empty(&self) -> bool`**
+  nothing to share
+
+- **`fn share(s: &Share) -> i32`**
+  open the system's share sheet with these items -> SHARE_PENDING / SHARE_NONE
+
+- **`fn share_poll() -> Option<i32>`**
+  the open sheet's answer: None while open (or none was), then once SHARE_DONE /
+  SHARE_CANCELLED / SHARE_FAILED
+
+- **`fn share_open() -> bool`**
+  a sheet is open (its answer not taken yet)
+
+### `plat/win_share.rs` (Windows)
+
+Source: [`lib/plat/win_share.rs`](../lib/plat/win_share.rs)
+
+```text
+win_share -- (share.rs) Windows' share sheet: the DataTransferManager of a window through
+IDataTransferManagerInterop (Windows 10), raw COM as win_winrt.rs
+
+  share(&Share) -> SHARE_PENDING / SHARE_NONE   the active window of the UI thread (else the main
+                               window): DataRequested is registered, ShowShareUIForWindow opens
+                               the sheet; the files become StorageFiles first (on an MTA thread,
+                               GetFileFromPathAsync, at most 5 s each)
+  available() -> bool          the interop factory exists (Windows 10 and later)
+  win_share_dismiss()          (tests) the sheet in front gets Esc, the app's window comes back
+
+DataRequested (on the UI thread, while the sheet opens) fills the request's DataPackage: the title
+(the sheet requires one: the title, else the app's id), the text (SetText), the link (SetWebLink
+through Windows.Foundation.Uri), the files (SetStorageItems with an IIterable of our own), and
+registers ShareCompleted (IDataPackage3: SHARE_DONE) and ShareCanceled (IDataPackage4, Windows 10
+2004: SHARE_CANCELLED).  The handlers are small COM objects of ours (IUnknown + Invoke, agile).
+A failure inside DataRequested answers SHARE_FAILED (the sheet then says it cannot share).
+```
+
+- **`fn win_share_dismiss() -> bool`**
+  (tests, any thread) the open sheet closed as the user's Esc would: the sheet is the foreground
+  window of another process with the class Windows.UI.Core.CoreWindow (ShellExperienceHost's
+  "Share"); it gets Esc (a posted key, no real input), then the window the sheet came from is put
+  in front again -> false when no such sheet was in front
 
 ### `plat/sensors.rs`
 
@@ -34509,11 +34534,13 @@ Source: [`lib/plat/win_inst.rs`](../lib/plat/win_inst.rs)
 ```text
 win_inst -- the Windows calls of the setup (apps/installer): the own exe path, known
 folders, .lnk shortcuts through COM IShellLinkW, the HKCU registry key of the "installed
-apps" entry, starting a command line             (r12-inst)  [apps/installer/src/shell.s]
+apps" entry (HKLM for a setup for all users), starting a command line
+                                                 (r12-inst)  [apps/installer/src/shell.s]
 
   exe_path() -> Some(path)        GetModuleFileNameW of the running exe as UTF-8 (None when
                                   it does not fit PATH_CAP wide chars)  [self_path]
-  known_folder(which) -> Some(p)  0 = desktop, 1 = start menu "Programs" (SHGetKnownFolderPath,
+  known_folder(which) -> Some(p)  0 = desktop, 1 = start menu "Programs", 2 / 3 = the same of
+                                  all users, 4 = "C:\Program Files" (SHGetKnownFolderPath,
                                   dirs.rs)
   shell_link(lnk, target, dir, desc) -> bool   a shortcut file lnk -> target (working
                                   folder dir, icon 0 of the target, comment desc)  [sh_link]
@@ -34537,10 +34564,16 @@ apps" entry, starting a command line             (r12-inst)  [apps/installer/src
                                   key below Software\Classes or a browser's below
                                   Software\Clients\StartMenuInternet; other names are refused)
   reg_delete_value(subkey, name) -> bool   RegDeleteKeyValueW (name "" = the default value)
+  reg_create_in / reg_delete_in / reg_delete_tree_in / reg_delete_value_in(Root, ..)   the
+                                  same in HKCU (Root::User) or HKLM (Root::Machine: a setup
+                                  for all users, with administrator rights)
   assoc_changed()                 SHChangeNotify(SHCNE_ASSOCCHANGED): Explorer re-reads the
                                   file types and URL schemes
   run_cmdline(cmdline, dir, hidden) -> bool    CreateProcessW (dir None = the current one,
-                                  hidden = CREATE_NO_WINDOW)  [sh_run]
+                                  hidden = CREATE_NO_WINDOW; the whole line, up to 32767
+                                  wide chars; outside this process's job when it lets go)
+                                  [sh_run]
+  run_cmdline_wait(cmdline, dir, hidden) -> Some(exit code)   the same, waited for
 
 ole32 / shell32 / advapi32 are loaded with LoadLibraryA on the first use (inst_load, as the
 asm's sh_load): only kernel32 / user32 / gdi32 are linked.  Paths are converted with the
@@ -34558,8 +34591,9 @@ PATH_CAP: usize = 520
   the running exe's path, UTF-8  [self_path]
 
 - **`fn known_folder(which: u32) -> Option<String>`**
-  0 = the desktop, 1 = the start menu's "Programs" folder (dirs.rs; backslashes, at most
-  PATH_CAP - 1 bytes)  [sh_folder, real mode]
+  0 = the desktop, 1 = the start menu's "Programs" folder, 2 = the desktop of all users, 3 =
+  the start menu's "Programs" of all users, 4 = the programs folder ("C:\\Program Files") (dirs.rs;
+  backslashes, at most PATH_CAP - 1 bytes; None for another number)  [sh_folder, real mode]
 
 - **`fn shell_link(lnk: &str, target: &str, dir: &str, desc: &str) -> bool`**
   a shortcut lnk -> target (working folder dir, icon 0 of the target, comment desc)  [sh_link]
@@ -34584,8 +34618,19 @@ PATH_CAP: usize = 520
 - **`struct RegKey(isize)`**
   an open registry key (closed when dropped)
 
+- **`enum Root`**
+  the part of the registry an installation writes to: the current user's (HKEY_CURRENT_USER,
+  a setup for one user) or the computer's (HKEY_LOCAL_MACHINE, a setup for all users; writing
+  there needs administrator rights)
+  - `User`
+  - `Machine`
+
 - **`fn reg_create(subkey: &str) -> Option<RegKey>`**
   HKCU\\subkey opened for writing, created when missing  [sh_reg_begin, real mode]
+
+- **`fn reg_create_in(root: Root, subkey: &str) -> Option<RegKey>`**
+  root\\subkey opened for writing, created when missing (Root::Machine: None without
+  administrator rights)
 
 **`impl RegKey`**
 
@@ -34597,6 +34642,9 @@ PATH_CAP: usize = 520
 - **`fn reg_delete(subkey: &str) -> bool`**
   RegDeleteKeyW(HKCU, subkey)  [sh_reg_delete, real mode]
 
+- **`fn reg_delete_in(root: Root, subkey: &str) -> bool`**
+  RegDeleteKeyW(root, subkey): a key without keys below it
+
 - **`fn reg_delete_tree(subkey: &str) -> bool`**
   HKCU\\subkey with all its keys and values  (RegDeleteTreeW, then RegDeleteKeyW).  Only a
   key below Software\\Classes (a ProgID, a URL scheme: what file types and schemes add) or
@@ -34604,15 +34652,27 @@ PATH_CAP: usize = 520
   refused: an empty one would clear HKCU itself, "Software" every program's settings, and
   such a name is what a damaged or cut list of an uninstaller holds
 
+- **`fn reg_delete_tree_in(root: Root, subkey: &str) -> bool`**
+  reg_delete_tree in root: the same names only (Root::Machine: what a setup for all users
+  added, below HKLM)
+
 - **`fn reg_delete_value(subkey: &str, name: &str) -> bool`**
   one value of HKCU\\subkey ("" = its default value)  (RegDeleteKeyValueW)
+
+- **`fn reg_delete_value_in(root: Root, subkey: &str, name: &str) -> bool`**
+  one value of root\\subkey ("" = its default value)
 
 - **`fn assoc_changed()`**
   tell the shell that file types or URL schemes changed (SHCNE_ASSOCCHANGED, SHCNF_IDLIST)
 
 - **`fn run_cmdline(cmdline: &str, dir: Option<&str>, hidden: bool) -> bool`**
-  start a command line (UTF-8, PATH_CAP wide chars) in dir (None = the current folder);
-  hidden = CREATE_NO_WINDOW  [sh_run]
+  start a command line (UTF-8, at most 32767 wide chars: CreateProcessW's limit; an older
+  version cut it at PATH_CAP) in dir (None = the current folder); hidden = CREATE_NO_WINDOW.
+  It outlives a job of this process that lets it go (a tool that ends its children with
+  itself)  [sh_run]
+
+- **`fn run_cmdline_wait(cmdline: &str, dir: Option<&str>, hidden: bool) -> Option<u32>`**
+  run_cmdline and wait for the process -> its exit code (None: it did not start)
 
 ### `plat/win_screen.rs` (Windows)
 
@@ -36455,6 +36515,13 @@ the system's file picker (UIDocumentPickerViewController), notifications (UNUser
                                one at a time ((0, 0) while one is open), (-1, 0) without a window
   file_dialog_poll()           None while it is open, then once (1, 0, path) / (0, 0, "") -- the
                                path a security-scoped URL's, its access started for the session
+  bookmarks_restore()          (the host's launch) the files and folders chosen in earlier runs
+                               readable again: each choice leaves a bookmark in the app's
+                               container ($HOME/Library/jfgui/bookmarks, newest first, at most
+                               BM_MAX, a path once); the launch resolves them and starts their
+                               access, so the same path opens again (a recent file, a saved
+                               setting).  A file moved meanwhile is kept under its new path (the
+                               old one no longer opens); one gone is dropped
   notes::*                     (tray.rs) notifications: no symbol of a notification area on iOS;
                                notify asks the user once (alert, sound) and hands the note to the
                                centre when allowed -- refused, it goes away at once (NoteClosed); one
@@ -36484,6 +36551,47 @@ pasteboard has does not.
 
 - **`fn file_dialog_poll() -> Option<(i32, u32, String)>`**
   the picker's answer (see the module header)
+
+- **`fn ios_bookmark_add(path: &str) -> bool`**
+  (tests) a path kept as if the picker had chosen it -> its bookmark made and kept in front
+
+- **`fn ios_bookmark_paths() -> Vec<String>`**
+  (tests) the kept paths, newest first
+
+- **`fn ios_bookmarks_restore()`**
+  (tests) what the host's launch does: every kept bookmark resolved, the list renewed
+
+- **`fn ios_bookmarks_clear()`**
+  (tests) none kept
+
+### `plat/apple_ios_share.rs` (Apple)
+
+Source: [`lib/plat/apple_ios_share.rs`](../lib/plat/apple_ios_share.rs)
+
+```text
+apple_ios_share -- (share.rs) iOS's share sheet: UIActivityViewController over the scene's window
+
+  share(&Share) -> SHARE_PENDING / SHARE_NONE   the sheet, presented by the topmost controller (as
+                               the file picker); on an iPad a popover at the anchor (points = px over
+                               the canvas's scale), without one in the view's middle and without an
+                               arrow.  SHARE_NONE without UIKit's host or off the main thread.
+  available() -> bool          (any thread) UIKit's host runs the app
+  ios_share_shown() / ios_share_dismiss()   (tests) the sheet on screen, closed again
+
+Items: the text (NSString), the link (NSURL), the files (file URLs).  A title goes in as the
+subject (Mail's subject line) through an item source (JFShareItem) wrapping the first item.  The
+completion handler (a global block: one sheet at a time) answers SHARE_DONE when an activity
+completed, SHARE_FAILED with an error, SHARE_CANCELLED otherwise (the sheet or the activity closed).
+```
+
+- **`fn ios_share_shown() -> Option<String>`**
+  (tests, any thread) the class of the controller presented over the window now (the share sheet:
+  "UIActivityViewController"), None when nothing is presented or without the host
+
+- **`fn ios_share_dismiss() -> bool`**
+  (tests, any thread) the presented sheet closed as its Close button does: the controller's
+  completion handler with nothing chosen (UIKit calls it for the user's Close, not for a
+  dismissal by code), then the dismissal -> false when none
 
 ### `plat/apple_ios_a11y.rs` (Apple)
 
@@ -36635,6 +36743,13 @@ trackpad's pinch into Ctrl + wheel (as macOS).  None of them takes or delays a f
   - `shown: (i32, i32)` -- the size of the last picture shown (px)
   - `keyboard: bool` -- the on-screen keyboard is asked for (JFView first responder)
   - `last_wheel: (u8, u8, u32)` -- the last E_WHEEL the wheel or the pinch sent: btn, mods, data
+  - `gpu: Option<IosGpuLayer>` -- the GPU's layer (apple_ios_gpu.rs): made, shown, its drawable's size (px) and frame (points)
+
+- **`struct IosGpuLayer`**
+  the GPU's layer as the host has it (IosPadView::gpu)
+  - `shown: bool`
+  - `drawable: (f64, f64)`
+  - `frame: (f64, f64)`
 
 - **`fn ios_pad_view() -> Option<IosPadView>`**
   (tests, any thread) the host's sizes now; None without UIKit's host
@@ -36646,6 +36761,16 @@ trackpad's pinch into Ctrl + wheel (as macOS).  None of them takes or delays a f
 - **`fn ios_pad_rotate(landscape: bool) -> bool`**
   (tests, any thread) the scene turned to landscape (true) or portrait, as the user turning the
   iPad would (requestGeometryUpdateWithPreferences:) -> false without the host
+
+- **`fn ios_text_size(category: Option<&str>) -> bool`**
+  (tests, any thread) the text size of the system as the user would set it (Settings, Display &
+  Text Size): the window's trait override of preferredContentSizeCategory ("XXL": the size after
+  the default "Large"; None: the override gone, the system's again) -> false without the host or
+  before iOS 17 (no trait overrides)
+
+- **`fn ios_dark(dark: Option<bool>) -> bool`**
+  (tests, any thread) dark (Some(true)) or light for the window, as the user's setting would be
+  (overrideUserInterfaceStyle); None: the system's again -> false without the host
 
 - **`fn ios_pad_keyboard(show: bool) -> bool`**
   (tests, any thread) the on-screen keyboard as a tap into a text box brings it (JFView first
@@ -37117,6 +37242,33 @@ as all of AppKit; lib/gpu may use the layer on its own thread (nextDrawable, dra
 - **`fn gpu_test_presented() -> Vec<(u64, u64)>`**
   (bench: Wayland's presentation feedback) nothing here
 
+### `plat/apple_mac_share.rs` (Apple)
+
+Source: [`lib/plat/apple_mac_share.rs`](../lib/plat/apple_mac_share.rs)
+
+```text
+apple_mac_share -- (share.rs) macOS's share sheet: NSSharingServicePicker at the anchor in the key
+window (the main window when none is key)
+
+  share(&Share) -> SHARE_PENDING / SHARE_NONE   the picker shown relative to the anchor (points =
+                               px over the window's backingScaleFactor; our views are flipped, so
+                               y counts from the top), without one in the content view's middle
+  available() -> bool          true (AppKit has the picker since 10.8)
+  mac_share_shown() / mac_share_close()   (tests) the picker's window on screen, closed again
+
+Items: the text (NSString), the link (NSURL), the files (file URLs).  The picker's delegate answers:
+a service chosen -> SHARE_DONE (the service gets the title as its subject, Mail's subject line);
+none (the picker closed) -> SHARE_CANCELLED.  Whether the service then delivers is its own
+business (Android's chooser says as little).
+```
+
+- **`fn mac_share_shown() -> bool`**
+  (tests) the picker waits for the user (its answer not given yet)
+
+- **`fn mac_share_close() -> bool`**
+  (tests, any thread) the open picker closed without a service, as the user's click outside it would
+  (NSSharingServicePicker close, macOS 13; before that the delegate's answer is sent directly)
+
 ### `plat/apple_mac_a11y.rs` (Apple)
 
 Source: [`lib/plat/apple_mac_a11y.rs`](../lib/plat/apple_mac_a11y.rs)
@@ -37295,6 +37447,10 @@ REQUEST_FILE_DIALOG: u32 = 12
 /// 2 delete), app, service, account and for set the value, each as u32 length + bytes; the
 /// host encrypts and stores it in order and completes with 2, or an error
 REQUEST_SECRET: u32 = 13
+/// (browser, Android) the share sheet (share.rs, web_share.rs): the title, the text, the link (u32
+/// length + UTF-8 each), u32 count, per file its name and its bytes (u32 length + bytes each); the
+/// host completes with 2 (shared), -4 (closed without a target), anything else (failed)
+REQUEST_SHARE: u32 = 34
 /// (browser) read a file of the user's own (/handles/..) again: the path (UTF-8); the host asks
 /// for the permission the handle needs (from the user's gesture), imports the file and
 /// completes with 2
@@ -38494,6 +38650,40 @@ list keeps raw bytes (a decoded URI need not be UTF-8); drop_take converts lossi
 
 - **`fn clipimg_split(data: &[u8]) -> Option<(&[u8], &[u8])>`**
   (PNG, BMP) of CLIPIMG bytes (an absent part is empty; None: malformed)
+
+### `plat/fuzz.rs`
+
+Source: [`lib/plat/fuzz.rs`](../lib/plat/fuzz.rs)
+
+```text
+fuzz -- the decoders of other programs' data, callable with any bytes: the entry points of
+plattest --test wirefuzz.  Not API (hidden): what they decode is reached through plat's own
+functions; these exist so a corpus of random and mutated bytes can reach every decoder
+without a compositor, a bus or another program.
+
+  clip_wide_text(b)   CF_UNICODETEXT of another program (Windows' clipboard)
+  hdrop(b)            a DROPFILES block (Windows' drops) -> the paths
+  dbus(b)             one D-Bus message (Linux: any client of the session bus can send one)
+  wl_args(msg)        one Wayland event under every event signature (Linux)
+
+clip_html_decode, clip_dib_to_bmp, clip_bmp_fix, clipimg_split and drop_uri_list, the other
+decoders of clipboard and drop data, are plat's API already.  docs/PLAT_INPUTS.md lists every
+way other programs' data comes in.
+```
+
+- **`fn clip_wide_text(b: &[u8]) -> Option<Vec<u8>>`**
+  CF_UNICODETEXT bytes -> UTF-8 (as Windows' clip_get(CLIP_TEXT))
+
+- **`fn hdrop(b: &[u8]) -> Vec<String>`**
+  a DROPFILES block -> its paths (at most 4096, as a drop takes)
+
+- **`fn dbus(b: &[u8]) -> Result<Option<usize>, usize>`** *(Linux)*
+  one D-Bus message from the start of b -> Ok(Some(its length)) / Ok(None) incomplete /
+  Err(bytes to skip, or 0: the connection must close)
+
+- **`fn wl_args(msg: &[u8]) -> usize`** *(Linux)*
+  one Wayland event message (header and body) -> how many of the protocol's event
+  signatures take it
 
 ### `plat/dnd.rs`
 
@@ -40086,11 +40276,10 @@ job as a one-page PDF  [src/plat/print.s, src/img/pdfwrite.s; docs/modules/PRINT
        jfgui_PRINT_PRINTER; elsewhere our PDF into FILE); else ERR_UNSUPPORTED
 
 Deviation (plat-shared): plat must not depend on the image crates, so pdfwrite.s is ported
-here and the one thing it took from img -- zlib_deflate -- comes through a hook.  An app
-sets it to img_core::deflate::zlib_deflate (then the PDF is byte-identical to the
-assembly's); without a hook the streams are zlib "stored" blocks (a valid, uncompressed
-PDF).  The source is a PrintSrc (rows of B, G, R, A bytes; the gfx::Surface fields)
-instead of a SURFACE pointer.
+here.  The one thing it took from img -- zlib_deflate -- is compress::zlib since 0.3, the
+same encoder, so the PDF is byte-identical to the assembly's.  set_print_deflate, the hook
+of before, still replaces it (deprecated).  The source is a PrintSrc (rows of B, G, R, A
+bytes; the gfx::Surface fields) instead of a SURFACE pointer.
 ```
 
 *results (the ERR_\* of jfgui.inc / plugin.inc that plat returns)*
@@ -40232,10 +40421,12 @@ PRW_OPAQUE: u32 = 8  // alpha ignored (XRGB)
   the job laid out on page as a one-page PDF (job.page_w / page_h set)  [print_pdf]
 
 - **`type DeflateFn = fn(&[u8], i32) -> Vec<u8>`**
-  a zlib compressor: (data, level) -> zlib stream (img_core::deflate::zlib_deflate)
+  a zlib compressor: (data, level) -> zlib stream
 
 - **`fn set_print_deflate(f: Option<DeflateFn>)`**
-  the compressor of the PDF streams (None: zlib stored blocks, no compression)
+  another compressor of the PDF streams (None: compress::zlib, the default).  Not needed any
+  more: without a hook the streams are compressed with compress::zlib, the encoder the hook
+  was set to until 0.2.
 
 - **`fn pdf_write_image(src: &PrintSrc, opt: &PdfOpt) -> Result<Vec<u8>, i32>`**
   one image on one PDF 1.4 page: objects 1 Catalog, 2 Pages, 3 Page, 4 Contents, 5 Image
@@ -40473,12 +40664,18 @@ base -- portable basics above the runtime and the platform     [src/core/str.s, 
   lru:  Lru -- a map that forgets the least recently used entries (count and weight limits)
   pattern: glob / has_glob -- shell wildcards; Regex -- POSIX basic and extended regular
         expressions without back-references (a Pike VM: no exponential cases)
+  xml, encoding: re-exports of formats::{xml, encoding} (here until 0.3.0; new code names
+        formats)
 
 Strings and formatting are Rust's own (str, String, format!); the thread pool, cpu
 features and files are in plat (they need unsafe).
 ```
 
 ### `base` crate root
+
+Re-exports: `formats::encoding`
+
+Re-exports: `formats::xml`
 
 - **`fn utf8_decode(s: &[u8], i: usize) -> (u32, usize)`**
   UTF-8 decoding: (codepoint, index after it); an invalid / overlong / surrogate / too large
@@ -40580,88 +40777,6 @@ a value are dropped (reading drops them too): get after set gives what a reload 
   the shortest text that reads back to the same double  [ini_set_f64]
 - **`fn remove(&mut self, sec: &str, key: &str) -> bool`**
   false: not there  [ini_remove]
-
-### `base/encoding.rs`
-
-Source: [`lib/base/encoding.rs`](../lib/base/encoding.rs)
-
-```text
-Strict Unicode interchange codecs. New native library functionality (no legacy counterpart).
-```
-
-- **`enum Encoding`**
-  Explicit text encodings; unmarked input is interpreted as UTF-8.
-  - `Utf8`
-  - `Utf8Bom`
-  - `Utf16Le`
-  - `Utf16Be`
-
-- **`enum Error`**
-  Invalid Unicode, unsupported UTF-32, or a caller-specified byte limit.
-  - `Invalid`
-  - `Unsupported`
-  - `Limit`
-
-- **`fn decode(bytes: &[u8], limit: usize) -> Result<(String, Encoding), Error>`**
-  Decode without replacement characters or guessed legacy code pages.
-
-- **`fn encode(text: &str, enc: Encoding) -> Vec<u8>`**
-  Encode Unicode; UTF-16 output always includes its byte-order mark.
-
-### `base/xml.rs`
-
-Source: [`lib/base/xml.rs`](../lib/base/xml.rs)
-
-```text
-Bounded, namespace-aware XML subset for interchange. No DTD, entities, I/O or XInclude.
-New native functionality; deliberately rejects constructs it cannot represent losslessly.
-```
-
-- **`struct Name`**
-  Expanded XML name (prefixes are not identities).
-  - `ns: String`
-  - `local: String`
-
-- **`struct Node`**
-  Element-only or text-only node; mixed content is rejected by this subset reader.
-  - `name: Name`
-  - `attrs: Vec<(Name, String)>`
-  - `text: String`
-  - `children: Vec<Node>`
-
-**`impl Node`**
-
-- **`fn is(&self, ns: &str, local: &str) -> bool`**
-  Test an expanded name.
-- **`fn attr(&self, ns: &str, local: &str) -> Option<&str>`**
-  Attribute lookup; the default namespace never applies to unprefixed attributes.
-
-- **`enum Error`**
-  Syntax error, resource limit, or an intentionally unsupported XML construct.
-  - `Syntax`
-  - `Limit`
-  - `Unsupported`
-
-- **`struct Limits`**
-  What one parse may take: the text's bytes, its elements, their nesting. The default
-  (4 MiB, 30000 elements, 48 levels) is `parse`'s; a reader whose own model bounds its
-  documents otherwise names what that model can expand to (`parse_with`).
-  - `bytes: usize`
-  - `nodes: usize`
-  - `depth: usize`
-
-- **`fn valid_char(c: char) -> bool`**
-  XML 1.0 character validity (also used before emitting document text).
-
-- **`fn escape(s: &str) -> Result<String, Error>`**
-  Escape text/attribute content, including CR so it survives XML newline normalization.
-
-- **`fn parse(s: &str) -> Result<Node, Error>`**
-  Parse a bounded XML subset. DTDs, processing instructions, comments, CDATA and mixed
-  content are explicitly rejected. No resources are ever resolved or fetched.
-
-- **`fn parse_with(s: &str, lim: Limits) -> Result<Node, Error>`**
-  `parse` within other limits than the default ones.
 
 ### `base/num.rs`
 
@@ -41479,6 +41594,686 @@ forms.
 - **`fn find_at(&self, s: &str, from: usize) -> Option<(usize, usize)>`**
   as find, starting the search at byte `from` (the edges still see the text before it)
 
+## formats
+
+*bounded JSON with exact numbers, typed JSON records, an XML subset, the text encodings of the web* -- crate root [`lib/formats/src/lib.rs`](../lib/formats/src/lib.rs)
+
+```text
+formats -- data formats as text: JSON, typed JSON records, an XML subset, Unicode encodings
+
+  json   strict bounded JSON (RFC 8259; duplicate member names and lone surrogates are
+         errors): Value, Number (the exact token, no rounding through f64), parse /
+         parse_with_limits, stringify / stringify_with_limits / stringify_pretty, Limits,
+         Error { offset, kind }
+  jmap   typed mapping of records and string enums over json::Value: Field, Json,
+         record! / wire_enum!, list / from_list, str_of / u64_of / obj / empty_object
+  xml    Reader: the strict pull reader (well-formed XML 1.0 with namespaces, events, offsets,
+         skip; DOCTYPE refused); Lenient: the forgiving reader of files from editors (tokens,
+         a DOCTYPE's entities within a budget); parse / parse_with(Limits) -> Node: a bounded
+         tree of the strict subset (Unsupported for comments, CDATA, processing instructions
+         and mixed content); escape, valid_char
+  encoding  decode(bytes, limit) -> (String, Encoding) / encode(text, Encoding): UTF-8 with
+         and without BOM, UTF-16 LE / BE, strict and without guessing; Charset: the single-byte
+         sets of the web (WHATWG: windows-1252, ISO-8859-x, KOI8 ...) and of old files (the DOS
+         code pages); MultiByte: Shift_JIS, EUC-JP, ISO-2022-JP, GBK, gb18030, Big5, EUC-KR;
+         Decoder for input in pieces; label / decode_label / from_code_page: the WHATWG Encoding
+         Standard's labels and decode, Windows code page numbers
+
+Every reader takes untrusted input: it checks the size before it reads and the nesting, the
+values or the elements while it reads, and reports a malformed or too large input as an error,
+never a panic.  Only alloc; no I/O.
+
+The encodings' tables and the WHATWG labels are generated (charsets.rs, cjk.rs and cjk.bin,
+tools/gen_encodings.py).
+
+json and jmap came from agent_core, xml and encoding from base (0.3.0); agent_core::{json,
+jmap, record!, wire_enum!} and base::{xml, encoding} remain as re-exports of these modules.
+```
+
+### `formats/src/charsets.rs`
+
+Source: [`lib/formats/src/charsets.rs`](../lib/formats/src/charsets.rs)
+
+```text
+charsets -- the single-byte character sets of formats::encoding (generated by tools/gen_encodings.py,
+do not edit): the WHATWG Encoding Standard's single-byte encodings and labels, the DOS code pages of old
+files.  Tables: bytes 0x80..0xFF -> Unicode, 0 unassigned (below 0x80 every set is ASCII).  The labels and
+the standard's tables: Copyright © WHATWG (Apple, Google, Mozilla, Microsoft), BSD 3-Clause License
+(licenses/WHATWG-LICENSE.txt).
+```
+
+- **`enum Charset`**
+  a single-byte character set: the bytes below 0x80 are ASCII, the others come from its table.
+  The single-byte encodings of the WHATWG Encoding Standard (what browsers, HTML and mail use; `whatwg()`)
+  and the DOS code pages of old files (by `from_code_page` or by name here; no web label names them)
+  - `Ibm866` -- IBM866: DOS Cyrillic
+  - `Iso8859_2` -- ISO-8859-2: Latin 2, Central European
+  - `Iso8859_3` -- ISO-8859-3: Latin 3, South European
+  - `Iso8859_4` -- ISO-8859-4: Latin 4, North European
+  - `Iso8859_5` -- ISO-8859-5: Cyrillic
+  - `Iso8859_6` -- ISO-8859-6: Arabic
+  - `Iso8859_7` -- ISO-8859-7: Greek
+  - `Iso8859_8` -- ISO-8859-8: Hebrew, visual order
+  - `Iso8859_8I` -- ISO-8859-8-I: Hebrew, logical order (the same bytes as ISO-8859-8)
+  - `Iso8859_10` -- ISO-8859-10: Latin 6, Nordic
+  - `Iso8859_13` -- ISO-8859-13: Latin 7, Baltic
+  - `Iso8859_14` -- ISO-8859-14: Latin 8, Celtic
+  - `Iso8859_15` -- ISO-8859-15: Latin 9, Latin 1 with the euro sign
+  - `Iso8859_16` -- ISO-8859-16: Latin 10, South-Eastern European
+  - `Koi8R` -- KOI8-R: Russian
+  - `Koi8U` -- KOI8-U: Ukrainian and Belarusian (WHATWG's KOI8-RU)
+  - `Macintosh` -- macintosh: Mac OS Roman
+  - `Windows874` -- windows-874: Thai (also TIS-620 and ISO-8859-11)
+  - `Windows1250` -- windows-1250: Windows Central European
+  - `Windows1251` -- windows-1251: Windows Cyrillic
+  - `Windows1252` -- windows-1252: Windows Western (also ISO-8859-1 and ASCII on the web)
+  - `Windows1253` -- windows-1253: Windows Greek
+  - `Windows1254` -- windows-1254: Windows Turkish (also ISO-8859-9)
+  - `Windows1255` -- windows-1255: Windows Hebrew
+  - `Windows1256` -- windows-1256: Windows Arabic
+  - `Windows1257` -- windows-1257: Windows Baltic
+  - `Windows1258` -- windows-1258: Windows Vietnamese
+  - `XMacCyrillic` -- x-mac-cyrillic: Mac OS Cyrillic
+  - `XUserDefined` -- x-user-defined: bytes 0x80..0xFF as U+F780..U+F7FF (WHATWG)
+  - `Latin1` -- ISO-8859-1: ISO-8859-1 exactly: each byte is its code point (the web reads the label as windows-1252) (not WHATWG)
+  - `Ibm437` -- IBM437: DOS United States (also ZIP names without the UTF-8 flag) (not WHATWG)
+  - `Ibm737` -- IBM737: DOS Greek (not WHATWG)
+  - `Ibm775` -- IBM775: DOS Baltic (not WHATWG)
+  - `Ibm850` -- IBM850: DOS Western European (not WHATWG)
+  - `Ibm852` -- IBM852: DOS Central European (not WHATWG)
+  - `Ibm855` -- IBM855: DOS Cyrillic (IBM) (not WHATWG)
+  - `Ibm857` -- IBM857: DOS Turkish (not WHATWG)
+  - `Ibm858` -- IBM00858: DOS Western European with the euro sign (not WHATWG)
+  - `Ibm860` -- IBM860: DOS Portuguese (not WHATWG)
+  - `Ibm861` -- IBM861: DOS Icelandic (not WHATWG)
+  - `Ibm862` -- IBM862: DOS Hebrew (not WHATWG)
+  - `Ibm863` -- IBM863: DOS Canadian French (not WHATWG)
+  - `Ibm864` -- IBM864: DOS Arabic (not WHATWG)
+  - `Ibm865` -- IBM865: DOS Nordic (not WHATWG)
+  - `Ibm869` -- IBM869: DOS Greek 2 (not WHATWG)
+
+**`impl Charset`**
+
+- **`const ALL: &'static [Charset] = &[ Charset::Ibm866, Charset::Iso8859_2, Charset::Iso8859_ ...`**
+  every character set, in declaration order
+- **`const fn name(self) -> &'static str`**
+  its name: the WHATWG Encoding Standard's, else IANA's ("IBM437", "ISO-8859-1")
+- **`const fn whatwg(self) -> bool`**
+  whether it is one of the WHATWG Encoding Standard's encodings (the others have no web label)
+- **`const fn code_page(self) -> Option<u16>`**
+  its Windows code page number (None: ISO-8859-10, -14 and -16 and x-user-defined have none)
+- **`const fn from_code_page(cp: u16) -> Option<Charset>`**
+  the character set of a Windows code page number: 437 to 869 (DOS), 874, 1250 to 1258, 10000 and 10007
+  (Mac), 20866 and 21866 (KOI8), 28591 to 28605 (ISO-8859; 28599, ISO-8859-9, is windows-1254 as on the
+  web), 38598
+
+### `formats/src/decode.rs`
+
+Source: [`lib/formats/src/decode.rs`](../lib/formats/src/decode.rs)
+
+```text
+decode -- formats::encoding's Decoder: the decoders of the WHATWG Encoding Standard for input in pieces,
+UTF-8, UTF-16, the single-byte sets, the replacement encoding and the multi-byte encodings, each the
+standard's algorithm byte by byte (with a fast path for ASCII where no sequence is open).
+
+The standard lets a decoder "restore" bytes it has read: they are read again, before the rest of the input.
+They wait in a small queue here, so a sequence may end in one piece of input and be read again from the next.
+```
+
+- **`struct Decoder`**
+  A decoder for input in pieces: `decode(piece, last, out)` appends the text of each piece to `out`; a
+  sequence cut between two pieces is finished by the next one.  The output is the same as decoding the whole
+  input at once with `decode_label` (without its byte-order mark rule; see `Decoder::sniffing`).  Shift_JIS's
+  "あ" in two pieces, 0x82 and then 0xA0 with `last`, gives "あ".
+
+**`impl Decoder`**
+
+- **`fn new(label: Label) -> Decoder`**
+  A decoder of the encoding a label names (`encoding::label`).
+- **`fn sniffing(label: Label) -> Decoder`**
+  A decoder with the standard's byte-order mark rule (its "decode"): a UTF-8, UTF-16LE or UTF-16BE
+  byte-order mark at the start wins over the label and is dropped.
+- **`fn label(&self) -> Label`**
+  The encoding decoded: the label's, or the byte-order mark's once one was found.
+- **`fn malformed(&self) -> bool`**
+  Whether some input was malformed (a U+FFFD in the output came from an error, not from the input).
+- **`fn decode(&mut self, input: &[u8], last: bool, out: &mut String)`**
+  Append the text of `input` to `out`.  `last`: no more input follows; an open sequence becomes U+FFFD,
+  and a following call starts a new input in the encoding `label` names (a byte-order mark is not looked
+  for again).  The output grows by at most three bytes per input byte, and by six for what an earlier
+  piece left open.
+
+### `formats/src/encoding.rs`
+
+Source: [`lib/formats/src/encoding.rs`](../lib/formats/src/encoding.rs)
+
+```text
+encoding -- text encodings: strict Unicode interchange, every encoding of the WHATWG Encoding Standard
+(the single-byte character sets of the web, the multi-byte encodings of Chinese, Japanese and Korean) and
+the DOS code pages of old files.  New native library functionality.
+
+  decode(bytes, limit) -> (String, Encoding)   strict UTF-8 / UTF-16 by the byte-order mark, no guessing
+  encode(text, Encoding) -> bytes
+  Charset: the WHATWG single-byte encodings (windows-1252, ISO-8859-x, KOI8, macintosh, IBM866 ...) and
+           the DOS code pages (IBM437 ... 869), an exact ISO-8859-1; from_label (WHATWG), from_code_page
+           (Windows numbers), name, code_page, decode (U+FFFD for unassigned bytes), decode_char,
+           encode (Unmappable), encode_char
+  MultiByte: Shift_JIS, EUC-JP, ISO-2022-JP, GBK, gb18030, Big5, EUC-KR; from_label, from_code_page,
+           name, code_page, decode, encode (Unmappable), encode_html (character references)
+  Decoder: the standard's decoders for input in pieces (new / sniffing, decode(piece, last, out),
+           malformed)
+  label(name) -> Label      what a WHATWG label names: UTF-8, UTF-16, a Charset, a MultiByte or the
+                            replacement encoding; from_code_page(n) -> Label: the same for a Windows number
+  decode_label(label, bytes, limit) -> String   the standard's decode: a byte-order mark wins over the
+                            label, then the label's encoding, errors become U+FFFD
+
+The tables and labels are generated (charsets.rs, cjk.rs and cjk.bin, tools/gen_encodings.py): Python's
+codecs, made the standard's indexes where they differ (checked against the standard's data with --verify).
+```
+
+- **`enum Encoding`**
+  Explicit text encodings; unmarked input is interpreted as UTF-8.
+  - `Utf8`
+  - `Utf8Bom`
+  - `Utf16Le`
+  - `Utf16Be`
+
+- **`enum Error`**
+  Invalid Unicode, an encoding this crate does not decode (UTF-32, an unknown label), a caller-specified
+  byte limit, or a character the encoding cannot encode.
+  - `Invalid`
+  - `Unsupported`
+  - `Limit`
+  - `Unmappable(char)`
+
+- **`fn decode(bytes: &[u8], limit: usize) -> Result<(String, Encoding), Error>`**
+  Decode without replacement characters or guessed legacy code pages.
+
+- **`fn encode(text: &str, enc: Encoding) -> Vec<u8>`**
+  Encode Unicode; UTF-16 output always includes its byte-order mark.
+
+- **`enum Label`**
+  What a label of the WHATWG Encoding Standard names (`label`).
+  - `Utf8` -- UTF-8
+  - `Utf16Le` -- UTF-16 little-endian (also the label "utf-16")
+  - `Utf16Be` -- UTF-16 big-endian
+  - `Single(Charset)` -- a single-byte character set of this crate
+  - `Multi(MultiByte)` -- a multi-byte encoding: Shift_JIS, EUC-JP, ISO-2022-JP, GBK, gb18030, Big5, EUC-KR
+  - `Replacement` -- the standard's replacement encoding (ISO-2022-KR, HZ and other labels it closes): any input
+    is one U+FFFD
+
+**`impl Label`**
+
+- **`const fn name(self) -> &'static str`**
+  Its name in the WHATWG Encoding Standard ("UTF-8", "UTF-16LE", "windows-1252", "Shift_JIS",
+  "replacement" ...; a character set without a web label by its IANA name, "IBM437").
+
+- **`fn from_code_page(cp: u16) -> Option<Label>`**
+  The encoding of a Windows code page number: 65001 (UTF-8), 1200 and 1201 (UTF-16), the single-byte
+  sets (`Charset::from_code_page`) and the multi-byte encodings (`MultiByte::from_code_page`); None for the
+  others.  What RTF's
+  `\ansicpg`, DXF's $DWGCODEPAGE or a DBF's language driver name.
+
+- **`fn label(name: &str) -> Option<Label>`**
+  The encoding a label names, as the WHATWG Encoding Standard reads it ("get an encoding"): leading
+  and trailing ASCII white space ignored, ASCII case ignored, the standard's labels only ("latin1",
+  "iso-8859-1" and "ascii" are windows-1252, "utf-16" is UTF-16LE).  None: no label of the standard.
+
+- **`fn decode_label(label: &str, bytes: &[u8], limit: usize) -> Result<String, Error>`**
+  Decode as the WHATWG Encoding Standard's "decode": a UTF-8 or UTF-16 byte-order mark wins over the
+  label (and is dropped), else the label's encoding; malformed input becomes U+FFFD, never an error.
+  Limit: more than `limit` bytes in or out; Unsupported: no label of the standard (and no byte-order mark).
+
+**`impl Charset`**
+
+- **`fn from_label(name: &str) -> Option<Charset>`**
+  The character set a WHATWG label names (`label`, single-byte sets only): "windows-1252",
+  "latin1", "koi8-r", "cp1251", "iso8859-2" ...  The DOS code pages and the exact ISO-8859-1
+  have no web label: `from_code_page` or the variant.
+- **`fn decode(self, bytes: &[u8]) -> String`**
+  The text of these bytes; an unassigned byte becomes U+FFFD.
+- **`fn decode_char(self, b: u8) -> Option<char>`**
+  The character of one byte (None: unassigned in this set).
+- **`fn encode_char(self, c: char) -> Option<u8>`**
+  The byte of one character (None: not in this set; the first byte where a set has two).
+- **`fn encode(self, text: &str) -> Result<Vec<u8>, Error>`**
+  The bytes of a text; Unmappable: the first character this set does not have.
+
+### `formats/src/jmap.rs`
+
+Source: [`lib/formats/src/jmap.rs`](../lib/formats/src/jmap.rs)
+
+```text
+jmap -- typed JSON mapping for records and string enums over json::Value: the Field trait
+for member values, the Json trait for records, and the record! / wire_enum! macros that
+declare a type and its mapping in one place.  Missing or mistyped members read as their
+default; unknown members are ignored, so old and new programs read each other's data
+(protocols, project files, settings).
+
+  record! { pub struct P { pub a: String, pub n: u32, pub items: Vec<Item> } }
+  wire_enum! { pub enum Kind { Pc = "pc", Router = "router" } }   // Default = first variant
+  p.to_json() / P::from_json(&v) / Field::put / Field::take
+  list(&[T]) / from_list(&v) / str_of / u64_of / obj([...]) / empty_object()
+
+Field is implemented for String, bool, the integer types, Value (kept as is), Vec<T>,
+Option<T> (null = None) and BTreeMap<String, T> (an object).  Floating point has no exact
+JSON token here: store fixed-point integers instead.
+```
+
+- **`trait Field: Sized + Default`**
+  a value that maps to one JSON member
+  - `fn put(&self) -> Value`
+  - `fn take(v: Option<&Value>) -> Self`
+
+- **`trait Json: Sized`**
+  a record (a JSON object)
+  - `fn to_json(&self) -> Value`
+  - `fn from_json(v: &Value) -> Option<Self>`
+
+- **`fn empty_object() -> Value`**
+  an empty JSON object (used by record!)
+
+- **`record!(...)`**
+  declare a record: the struct (Clone, Debug, Default, PartialEq) and its Json / Field
+  mapping; the JSON member names are the field names
+
+- **`wire_enum!(...)`**
+  declare an enum carried as a string: Default is the first variant, ALL, as_str / parse,
+  Field
+
+- **`fn list<T: Json>(items: &[T]) -> Value`**
+  a list of records as a JSON array
+
+- **`fn from_list<T: Json>(v: &Value) -> Vec<T>`**
+  the records of a JSON array (or of the array under `items` of an object)
+
+- **`fn str_of<'a>(v: &'a Value, k: &str) -> &'a str`**
+  a string member of an object ("" when missing)
+
+- **`fn u64_of(v: &Value, k: &str) -> u64`**
+  an unsigned member of an object (0 when missing)
+
+- **`fn obj<const N: usize>(fields: [(&str, Value); N]) -> Value`**
+  an object built from (name, value) pairs
+
+### `formats/src/json.rs`
+
+Source: [`lib/formats/src/json.rs`](../lib/formats/src/json.rs)
+
+```text
+Strict, bounded UTF-8 JSON (RFC 8259): settings and project files, manifests, protocols,
+the agent interface's control channels. New shared code (agent_core::json until 0.3.0).
+```
+
+- **`struct Number(String)`**
+  Exact JSON number token; construction validates the JSON number grammar.
+
+**`impl Number`**
+
+- **`fn parse(text: &str) -> Option<Self>`**
+  Parse one complete JSON number without rounding it through floating point.
+- **`fn as_str(&self) -> &str`**
+  Original validated JSON representation.
+- **`fn as_i64(&self) -> Option<i64>`**
+  Read an exactly integral JSON number without precision loss, including exponents.
+- **`fn as_u64(&self) -> Option<u64>`**
+  Read an exactly integral, nonnegative JSON number without precision loss.
+
+- **`enum Value`**
+  Owned JSON data. Objects retain member order and parsed objects have unique keys.
+  - `Null` -- JSON null.
+  - `Bool(bool)` -- JSON boolean.
+  - `Number(Number)` -- Exact JSON number.
+  - `String(String)` -- Unicode string.
+  - `Array(Vec<Value>)` -- Ordered values.
+  - `Object(Vec<(String, Value)>)` -- Ordered name/value members.
+
+**`impl Value`**
+
+- **`fn string(value: impl Into<String>) -> Self`**
+  Make a JSON string.
+- **`fn u64(value: u64) -> Self`**
+  Make an unsigned number without converting to floating point.
+- **`fn i64(value: i64) -> Self`**
+  Make a signed number without converting to floating point.
+- **`fn object<const N: usize>(fields: [(&str, Value); N]) -> Self`**
+  Make an object, with later duplicate names replacing earlier values.
+- **`fn insert(&mut self, key: &str, value: Value) -> bool`**
+  Insert or replace an object member; false when this value is not an object.
+- **`fn get(&self, key: &str) -> Option<&Value>`**
+  Look up an object member.
+- **`fn as_object(&self) -> Option<&[(String, Value)]>`**
+  Borrow an object member list.
+- **`fn as_array(&self) -> Option<&[Value]>`**
+  Borrow an array.
+- **`fn as_str(&self) -> Option<&str>`**
+  Borrow a string.
+- **`fn as_bool(&self) -> Option<bool>`**
+  Read a boolean.
+- **`fn as_u64(&self) -> Option<u64>`**
+  Read an unsigned integer token.
+- **`fn as_i64(&self) -> Option<i64>`**
+  Read a signed integer token.
+
+- **`struct Limits`**
+  Bounds applied before and during decoding or encoding.
+  - `bytes: usize` -- Maximum encoded byte count.
+  - `depth: usize` -- Maximum nested arrays/objects; the root value starts at depth zero.
+  - `values: usize` -- Maximum total values, including the root.
+  - `string_bytes: usize` -- Maximum decoded bytes in any string, including member names.
+  - `members: usize` -- Maximum members/elements in any container.
+
+- **`struct Error`**
+  Parse or serialization failure with the byte offset where it was found.
+  - `offset: usize` -- Zero-based byte offset (zero for serialization limits).
+  - `kind: &'static str` -- Stable machine-readable failure category.
+
+- **`fn parse(bytes: &[u8]) -> Result<Value, Error>`**
+  Parse a complete UTF-8 JSON value using default limits.
+
+- **`fn parse_with_limits(bytes: &[u8], limits: Limits) -> Result<Value, Error>`**
+  Parse a complete UTF-8 JSON value. Duplicate object keys and lone surrogates are errors.
+
+- **`fn stringify(value: &Value) -> Result<String, Error>`**
+  Encode JSON without literal newlines, enforcing the default bounds.
+
+- **`fn stringify_with_limits(value: &Value, limits: Limits) -> Result<String, Error>`**
+  Encode bounded JSON. Invalid duplicate keys in manually built objects are rejected.
+
+- **`fn stringify_pretty(value: &Value, limits: Limits, indent: usize) -> Result<String, Error>`**
+  Encode bounded JSON for people to read: every array element and object member on its own
+  line, indented by `indent` spaces per level, "name": value; empty containers stay "[]" / "{}".
+  The output ends without a newline.
+
+### `formats/src/multibyte.rs`
+
+Source: [`lib/formats/src/multibyte.rs`](../lib/formats/src/multibyte.rs)
+
+```text
+multibyte -- the multi-byte encodings of the WHATWG Encoding Standard for formats::encoding: Shift_JIS,
+EUC-JP, ISO-2022-JP, GBK, gb18030, Big5 and EUC-KR.  The encoders here, the decoders in decode.rs, both as
+the standard writes them step by step; the indexes are generated (cjk.rs, cjk.bin).
+
+A pointer is a character's place in an index (row × columns + column); the decoders compute it from the
+bytes and look the code point up, the encoders search the pointers sorted by code point (*_ORDER) and
+compute the bytes from it.
+```
+
+- **`enum MultiByte`**
+  A multi-byte encoding of the WHATWG Encoding Standard: the legacy encodings of Chinese, Japanese and
+  Korean text that browsers, mail and old files still use.  Each is the standard's: the Windows variants
+  where the web uses them (Shift_JIS is Windows' code page 932, EUC-KR its 949, GBK its 936).
+  - `ShiftJis` -- Shift_JIS: Japanese as Windows writes it (code page 932, windows-31j: JIS X 0208 with the NEC and
+    IBM extensions, half-width katakana, the user-defined rows as the Private Use Area)
+  - `EucJp` -- EUC-JP: Japanese on Unix (JIS X 0208, JIS X 0212 after 0x8F, half-width katakana after 0x8E)
+  - `Iso2022Jp` -- ISO-2022-JP: Japanese in mail and news, 7 bits with escape sequences (ASCII, JIS X 0201 Roman and
+    katakana, JIS X 0208)
+  - `Gbk` -- GBK: simplified Chinese (code page 936; also what the labels gb2312 and chinese name).  It reads
+    gb18030; it writes only its two-byte characters and the euro sign as 0x80.
+  - `Gb18030` -- gb18030: simplified Chinese with all of Unicode but U+E5E5, which it does not write (GB18030-2022;
+    code page 54936)
+  - `Big5` -- Big5: traditional Chinese with the Hong Kong Supplementary Character Set (HKSCS-2008; code page 950)
+  - `EucKr` -- EUC-KR: Korean as Windows writes it (code page 949, the Unified Hangul Code: all 11 172 syllables)
+
+**`impl MultiByte`**
+
+- **`const ALL: &'static [MultiByte] = &[MultiByte::ShiftJis, MultiByte::EucJp, MultiByte::Iso20 ...`**
+  every multi-byte encoding, in declaration order
+- **`const fn name(self) -> &'static str`**
+  its name in the WHATWG Encoding Standard ("Shift_JIS", "EUC-JP", "ISO-2022-JP", "GBK", "gb18030",
+  "Big5", "EUC-KR")
+- **`const fn code_page(self) -> u16`**
+  its Windows code page number: 932, 20932, 50220, 936, 54936, 950, 949
+- **`const fn from_code_page(cp: u16) -> Option<MultiByte>`**
+  the encoding of a Windows code page number: 932, 936, 949, 950, 20932 and 51932 (EUC-JP), 50220 and
+  50221 (ISO-2022-JP), 51949 (EUC-KR), 54936.  None for the others: Johab (1361) is none of the standard's,
+  and 50222 writes half-width katakana between SO and SI, which the standard's ISO-2022-JP does not read.
+- **`fn from_label(name: &str) -> Option<MultiByte>`**
+  the encoding a WHATWG label names ("shift_jis", "sjis", "windows-31j", "gb2312", "big5-hkscs",
+  "ks_c_5601-1987" ...; `encoding::label`), multi-byte encodings only
+- **`fn decode(self, bytes: &[u8]) -> String`**
+  The text of these bytes, as the standard decodes them: malformed or unassigned sequences become
+  U+FFFD, ASCII bytes after a broken lead byte are kept.  For input in pieces: `Decoder`.
+- **`fn encode(self, text: &str) -> Result<Vec<u8>, Error>`**
+  The bytes of a text; Unmappable: the first character this encoding does not have (ISO-2022-JP ends
+  in ASCII, with ESC ( B where needed).
+- **`fn encode_html(self, text: &str) -> Vec<u8>`**
+  The bytes of a text, a character this encoding does not have as a decimal character reference
+  ("&#128512;"), as browsers submit forms (the standard's "html" error mode).
+
+### `formats/src/xml/mod.rs`
+
+Source: [`lib/formats/src/xml/mod.rs`](../lib/formats/src/xml/mod.rs)
+
+```text
+xml -- XML for JFLib, one reader in two kinds, and a bounded tree on top. New native functionality;
+no DTD, no I/O, no XInclude, nothing is ever fetched.
+
+  Reader (reader.rs)     the strict pull reader: well-formed XML 1.0 with namespaces; events,
+                         positions, the raw text of an element (skip); DOCTYPE refused
+  Lenient (lenient.rs)   the forgiving reader of files from editors (SVG, fontconfig, theme parts):
+                         tokens, nothing is an error, a DOCTYPE's internal entities with a budget
+  parse(text) -> Node    a tree of the strict subset for interchange formats: element-only or
+                         text-only nodes, names expanded to their namespaces; comments, processing
+                         instructions, CDATA and mixed content refused (Unsupported); bounded
+                         (Limits: bytes, elements, nesting; the names it keeps)
+  escape(text), valid_char(c)   for writers
+
+Every reader of the library is one of these two (img_svg, diagram_io, diagram_core's theme parts,
+text's fontconfig files): one place to fuzz, one set of limits per caller.
+```
+
+- **`struct Name`**
+  Expanded XML name (prefixes are not identities).
+  - `ns: String`
+  - `local: String`
+
+- **`struct Node`**
+  Element-only or text-only node; mixed content is rejected by this subset reader.
+  - `name: Name`
+  - `attrs: Vec<(Name, String)>`
+  - `text: String`
+  - `children: Vec<Node>`
+
+**`impl Node`**
+
+- **`fn is(&self, ns: &str, local: &str) -> bool`**
+  Test an expanded name.
+- **`fn attr(&self, ns: &str, local: &str) -> Option<&str>`**
+  Attribute lookup; the default namespace never applies to unprefixed attributes.
+
+- **`enum Error`**
+  Syntax error, resource limit, or an intentionally unsupported XML construct.
+  - `Syntax` -- not well-formed (or, for the tree, a name it cannot keep)
+  - `Limit` -- a limit of the tree: bytes, elements, nesting, attributes, the names it keeps
+  - `Unsupported` -- a construct the reader does not take: a DOCTYPE or other declaration, an encoding other
+    than UTF-8 and UTF-16, XML other than 1.0; for the tree also comments, processing
+    instructions, CDATA and mixed content
+  - `Depth` -- (Reader) more open elements than its depth
+  - `Attributes` -- (Reader) more attributes on one element than allowed, or more than 64 namespace bindings
+    in scope
+
+- **`struct Limits`**
+  What one parse may take: the text's bytes, its elements, their nesting. The default
+  (4 MiB, 30000 elements, 48 levels) is `parse`'s; a reader whose own model bounds its
+  documents otherwise names what that model can expand to (`parse_with`).
+  - `bytes: usize`
+  - `nodes: usize`
+  - `depth: usize`
+
+- **`fn valid_char(c: char) -> bool`**
+  XML 1.0 character validity (also used before emitting document text).
+
+- **`fn escape(s: &str) -> Result<String, Error>`**
+  Escape text/attribute content, including CR so it survives XML newline normalization.
+
+- **`fn parse(s: &str) -> Result<Node, Error>`**
+  Parse a bounded XML subset into a tree. DTDs, processing instructions, comments, CDATA and
+  mixed content are explicitly rejected (Unsupported). No resources are ever resolved or fetched.
+
+- **`fn parse_with(s: &str, lim: Limits) -> Result<Node, Error>`**
+  `parse` within other limits than the default ones. The tree is built from the strict Reader
+  without recursion; a limit of the reader (nesting, attributes, bindings) is Limit here.
+
+### `formats/src/xml/lenient.rs`
+
+Source: [`lib/formats/src/xml/lenient.rs`](../lib/formats/src/xml/lenient.rs)
+
+```text
+lenient -- the forgiving reader of formats::xml: what a browser or an editor would still show
+
+  Lenient::new(text) / with_limits(text, attrs, entities, expand)
+  l.next() -> Token          Start { name, attrs (raw values), empty }, End { name }, Text (raw), CData, Eof
+  l.decode(raw, &mut out)    a raw text or attribute value with its references replaced
+  l.truncated()              the input ended inside a tag, or the entities' budget was spent
+
+For files from editors, which are often sloppy (SVG, fontconfig, theme parts): nothing is an error.
+Tokens: a start tag (its name as written, at most `attrs` attributes: a repeated one counts, the first
+stays; a value in ' or ", unquoted to the next blank or '>', none for a bare name; a stray quote, '=' or
+'/' is skipped; '<' ends a broken tag), an end tag (its name; the rest up to '>' is skipped), text up to
+the next '<' (a lone '<' that starts no tag is text), CDATA as written.  Skipped: the XML declaration and
+processing instructions, comments, every `<!...>` declaration; a DOCTYPE's internal subset gives the
+entities: its `<!ENTITY name "value">` declarations (general ones; parameter and external entities are
+skipped; the first declaration of a name stays; at most `entities`, values of at most 64 KiB, with
+character references and the five predefined entities replaced, other references kept as written so no
+entity grows exponentially).  An unterminated construct ends the document there.
+
+References (decode): the five predefined entities, character references (decimal, x or X; a number that
+is no character, or 0, gives U+FFFD), the DOCTYPE's entities while `expand` bytes of their values have
+not been used up (beyond: the reference is dropped and truncated() set); an unknown entity stays as
+written, and so does an '&' that has no ';' within 63 bytes before the next '&'.  Nesting, a second
+root, mismatched end tags and limits on elements are the caller's: it builds the tree it needs.
+```
+
+```rust
+/// the default limit of attributes per start tag
+ATTRS: usize = 512
+/// the default limit of entity declarations in a DOCTYPE
+ENTITIES: usize = 256
+/// the default budget of bytes that entity references may produce in all
+EXPAND: usize = 32 << 20
+```
+
+- **`enum Token<'a>`**
+  what the lenient reader found next
+  - `Start { name: &'a str, attrs: Vec<(&'a str, &'a str)>, empty: bool }` -- a start tag: its name as written and its attributes with their raw values ("" for none)
+  - `End { name: &'a str }` -- an end tag
+  - `Text(&'a str)` -- character data as written (decode replaces the references)
+  - `CData(&'a str)` -- a CDATA section's content as written
+  - `Eof` -- the end of the text
+
+- **`struct Lenient<'a>`**
+  the forgiving reader (see the top of this file)
+
+**`impl<'a> Lenient<'a>`**
+
+- **`fn new(s: &'a str) -> Self`**
+  a reader of `s` with the default limits (ATTRS, ENTITIES, EXPAND)
+- **`fn with_limits(s: &'a str, attrs: usize, entities: usize, expand: usize) -> Self`**
+  a reader with at most `attrs` attributes per start tag, `entities` entity declarations and `expand`
+  bytes of entity values in all
+- **`fn truncated(&self) -> bool`**
+  whether the input ended inside a tag or the entities' budget was spent
+- **`fn pos(&self) -> usize`**
+  the offset the reader is at
+- **`fn decode(&mut self, raw: &str, out: &mut String)`**
+  a raw text or attribute value (from a token) with its references replaced, appended to `out`
+- **`fn next(&mut self) -> Token<'a>`**
+  the next token (Eof at the end, and from then on)
+
+### `formats/src/xml/reader.rs`
+
+Source: [`lib/formats/src/xml/reader.rs`](../lib/formats/src/xml/reader.rs)
+
+```text
+reader -- the strict pull reader of formats::xml: well-formed XML 1.0 with namespaces, without a DTD
+
+  Reader::new(text, depth, attrs)   at most `depth` open elements and `attrs` attributes per element
+  r.next() -> Event                 Start, End, Text, CData, Comment, Pi, Eof; an empty element <a/> gives
+                                    Start (empty: true) and then End
+  r.skip(at) -> &str                the rest of the element whose start tag began at `at`, as written
+  r.pos() / r.src()
+
+Read: elements, attributes in ' or ", the five predefined entities and character references, CDATA,
+comments and processing instructions (as events), the XML declaration (version 1.0; encoding UTF-8 or
+UTF-16, the text is decoded already; standalone; in this order, values as written), a leading U+FEFF, and
+namespaces: every name comes with the URI its prefix is bound to (Namespaces in XML 1.0; xmlns attributes
+are in NS_XMLNS).  Refused: a DOCTYPE and every other declaration (Unsupported: no entities, nothing
+external), an undefined entity, a character XML does not allow, mismatched or unclosed tags, text or a
+second element outside the root, an unbound prefix, a name that is no QName, a duplicate attribute (also
+two prefixes of one namespace), more nesting than `depth` (Depth), more attributes on one element than
+`attrs` or more than 64 namespace bindings in scope (Attributes).  Line ends are normalised as XML says:
+CR LF and CR become LF in text; in attribute values a literal tab, line end or CR becomes a space
+(character references stay).  Nothing recurses: the stack is the reader's own Vec, bounded by `depth`.
+Text is borrowed from the input unless a reference or a CR had to be replaced.
+```
+
+```rust
+/// the namespace of the xml prefix (xml:lang, xml:space)
+NS_XML: &str = "http://www.w3.org/XML/1998/namespace"
+/// the namespace of namespace declarations (xmlns, xmlns:p)
+NS_XMLNS: &str = "http://www.w3.org/2000/xmlns/"
+```
+
+- **`struct Attr<'a>`**
+  one attribute of a start tag
+  - `qname: &'a str` -- the name as written (with its prefix)
+  - `local: &'a str` -- the name without prefix (for a declaration: the prefix it binds, "" for xmlns)
+  - `ns: Cow<'a, str>` -- the namespace URI ("" for an unprefixed attribute; NS_XMLNS for a declaration)
+  - `value: Cow<'a, str>` -- the value with references replaced and white space normalised
+
+- **`struct Start<'a>`**
+  a start tag
+  - `qname: &'a str` -- the name as written (with its prefix)
+  - `local: &'a str` -- the name without prefix
+  - `ns: Cow<'a, str>` -- the namespace URI ("" for none)
+  - `attrs: Vec<Attr<'a>>` -- the attributes in their order, namespace declarations included
+  - `empty: bool` -- &lt;a/>: an End follows right away
+  - `at: usize` -- the offset of '&lt;'
+  - `end: usize` -- the offset after '>'
+
+**`impl Start<'_>`**
+
+- **`fn is(&self, ns: &str, local: &str) -> bool`**
+  whether this is the element `local` of the namespace `ns`
+- **`fn attr(&self, ns: &str, local: &str) -> Option<&str>`**
+  the value of the attribute `local` of the namespace `ns` ("" for an unprefixed one)
+
+- **`enum Event<'a>`**
+  what the reader found next
+  - `Start(Start<'a>)` -- a start tag
+  - `End { end: usize }` -- an end tag: the offset after its '>' (the start tag's end for an empty element)
+  - `Text(Cow<'a, str>)` -- character data with references replaced
+  - `CData(Cow<'a, str>)` -- a CDATA section's content (line ends normalised)
+  - `Comment(&'a str)` -- a comment's content
+  - `Pi { target: &'a str, data: &'a str }` -- a processing instruction
+  - `Eof` -- the end of a well-formed document
+
+- **`struct ReadError`**
+  an error and the byte offset it was found at
+  - `error: Error`
+  - `at: usize`
+
+- **`struct Reader<'a>`**
+  the strict pull reader (see the top of this file)
+
+**`impl<'a> Reader<'a>`**
+
+- **`fn new(s: &'a str, depth: usize, attrs: usize) -> Self`**
+  a reader of `s` with at most `depth` open elements and `attrs` attributes per element; a leading
+  U+FEFF is skipped
+- **`fn pos(&self) -> usize`**
+  the offset the reader is at
+- **`fn src(&self) -> &'a str`**
+  the source text
+- **`fn depth(&self) -> usize`**
+  the elements open now
+- **`fn next(&mut self) -> Result<Event<'a>, ReadError>`**
+  the next event; after an error the reader is not meant to go on
+- **`fn skip(&mut self, at: usize) -> Result<&'a str, ReadError>`**
+  the rest of the element whose start tag began at `at` (just returned by next), as the file
+  wrote it
+
 ## datetime
 
 *timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules* -- crate root [`lib/datetime/lib.rs`](../lib/datetime/lib.rs)
@@ -41729,7 +42524,9 @@ times before that change use today's rule.
 ```text
 crypto -- the primitives BackupCraft (and anything else) builds on, in plain Rust
 
-  sha2      Sha256 / Sha384 / Sha512, sha256 / sha384 / sha512(data)         (FIPS 180-4)
+  sha2      Sha224 / Sha256 / Sha384 / Sha512, sha224 .. sha512(data)       (FIPS 180-4)
+  sha3      Sha3_224 .. Sha3_512, sha3_224 .. sha3_512(data); Shake128 / Shake256 with any
+            output length, shake128 / shake256(data, out)                  (FIPS 202)
   hmac      Hmac<H>, hmac_sha256 / hmac_sha512, hkdf_sha256 / hkdf_sha512,
             pbkdf2_sha256 (import of foreign key files only)                (RFC 2104/5869/8018)
   blake2b   Blake2b (keyed, 1..64 byte digests)                             (RFC 7693)
@@ -41741,13 +42538,16 @@ crypto -- the primitives BackupCraft (and anything else) builds on, in plain Rus
   x25519    Diffie-Hellman over Curve25519                                  (RFC 7748)
   ed25519   signatures, strict verification                                 (RFC 8032)
   sealbox   anonymous public-key encryption: X25519 + HKDF-SHA256 + XChaCha20-Poly1305
-  aes, gcm  AES-128/256 (bitsliced, constant time; both directions), AES-GCM seal / open
+  aes, gcm  AES-128/192/256 (bitsliced, constant time; both directions), AES-GCM seal / open
             (FIPS 197, SP 800-38D)
   bn        big integers modulo odd numbers (public values: variable time; pow_ct for a
             secret exponent)
-  rsa       RSA PKCS #1 v1.5 and PSS verification                            (RFC 8017)
-  ecdsa     ECDSA verification on P-256 / P-384                              (FIPS 186-4)
+  rsa       RSA PKCS #1 v1.5 and PSS verification (MGF1 of the same hash)     (RFC 8017)
+  ecdsa     ECDSA on P-256 / P-384: verification; signing in constant time with
+            deterministic nonces (RFC 6979), hedged by optional random bytes; keys; r || s
+            (IEEE P1363) and DER                                    (FIPS 186-5, RFC 6979)
   p256      Diffie-Hellman on P-256 in constant time (complete formulas)      (SEC 1)
+  p384      Diffie-Hellman on P-384 in constant time (complete formulas)      (SEC 1)
   b64       Base64 (standard and URL alphabet, with or without padding)
   ct_eq / zeroize / hex
   sha1      Sha1, sha1(data); with hmac_sha1, pbkdf2 (any Hash) and pbkdf2_sha1 in hmac:
@@ -41756,13 +42556,17 @@ crypto -- the primitives BackupCraft (and anything else) builds on, in plain Rus
   cmac      cmac_aes: AES-CMAC                                              (RFC 4493)
   md5       Md5, md5(data), md5_parts(parts); with hmac_md5 in hmac: only for protocols
             defined with MD5 (RADIUS); broken for collisions                 (RFC 1321, 2104)
-  rsa also  PrivateKey: generate from the caller's bytes, PKCS #1 v1.5 signing (RFC 8017)
+  rsa also  PrivateKey: generate from the caller's bytes, PKCS #1 v1.5 and PSS signing
+            (RFC 8017)
   eappwd    the sums of EAP-PWD on P-256: pwe, commit, shared, confirm, keys  (RFC 5931)
+  mlkem     ML-KEM-512 / 768 / 1024: keygen from a 64-byte seed, encaps, decaps with implicit
+            rejection, in constant time                                    (FIPS 203)
 
 No randomness here: callers pass random bytes in (plat::fill_random on Windows, Linux, Apple
 and Android; in the browser the page's crypto.getRandomValues), so everything is
 deterministic and testable.  Secret-dependent work avoids branches and table lookups
-(field arithmetic with 51-bit limbs, masked conditional swaps and selects).
+(field arithmetic with 51-bit limbs, masked conditional swaps and selects); every mask made
+from secret data passes ct_mask, so the optimizer cannot turn a select back into a branch.
 ```
 
 ### `crypto` crate root
@@ -41770,7 +42574,7 @@ deterministic and testable.  Secret-dependent work avoids branches and table loo
 - **`trait Hash: Clone`**
   a hash function for Hmac / HKDF / PBKDF2
   - `const BLOCK: usize`
-    block size in bytes (at most 128)
+    block size in bytes (at most 168)
   - `const OUT: usize`
     digest size in bytes (at most 64)
   - `fn new() -> Self`
@@ -41783,11 +42587,18 @@ deterministic and testable.  Secret-dependent work avoids branches and table loo
   - `Sha256`
   - `Sha384`
   - `Sha512`
+  - `Sha224`
+  - `Sha3_224`
+  - `Sha3_256`
+  - `Sha3_384`
+  - `Sha3_512`
 
 **`impl HashAlg`**
 
 - **`fn len(self) -> usize`**
 - **`fn digest(self, data: &[u8]) -> Vec<u8>`**
+- **`fn hmac(self, key: &[u8], data: &[u8]) -> Vec<u8>`**
+  HMAC with this hash (RFC 2104): the full tag
 
 - **`fn ct_eq(a: &[u8], b: &[u8]) -> bool`**
   equality of two byte strings in time that depends only on their lengths
@@ -41796,10 +42607,11 @@ deterministic and testable.  Secret-dependent work avoids branches and table loo
   overwrite a secret (the write is kept even though nothing reads the buffer afterwards)
 
 - **`fn hex(data: &[u8]) -> String`**
-  lower-case hex
+  lower-case hex (without a table: keys are printed this way too)
 
 - **`fn unhex(s: &str) -> Option<Vec<u8>>`**
-  the bytes of a hex string (upper or lower case; None on odd length or other characters)
+  the bytes of a hex string (upper or lower case; None on odd length or other characters).
+  Every character is looked at before the answer, without a branch on it
 
 ### `crypto/aead.rs`
 
@@ -41850,9 +42662,9 @@ TAG_LEN: usize = 16
 Source: [`lib/crypto/aes.rs`](../lib/crypto/aes.rs)
 
 ```text
-aes -- AES-128 / AES-256 (FIPS 197) in constant time
+aes -- AES-128 / AES-192 / AES-256 (FIPS 197) in constant time
 
-  Aes::new(key) (16 or 32 bytes)    aes.encrypt4(&mut [[u8; 16]; 4])    aes.encrypt(&mut block)
+  Aes::new(key) (16, 24 or 32 bytes)    aes.encrypt4(&mut [[u8; 16]; 4])    aes.encrypt(&mut block)
                                     aes.decrypt4(&mut [[u8; 16]; 4])    aes.decrypt(&mut block)
 
 Bitsliced: four blocks at a time in eight 64-bit words, word i holding bit i of all 64 bytes
@@ -41869,7 +42681,7 @@ before the same inversion; InvMixColumns is MixColumns after a_r ^= 4 (a_r ^ a_(
 **`impl Aes`**
 
 - **`fn new(key: &[u8]) -> Option<Aes>`**
-  a 16-byte (AES-128) or 32-byte (AES-256) key
+  a 16-byte (AES-128), 24-byte (AES-192) or 32-byte (AES-256) key
 - **`fn encrypt4(&self, blocks: &mut [[u8; 16]; 4])`**
   encrypt four blocks in place
 - **`fn encrypt(&self, block: &mut [u8; 16])`**
@@ -42112,13 +42924,26 @@ counter), HChaCha20 and XChaCha20 (192-bit nonce; draft-irtf-cfrg-xchacha)
 Source: [`lib/crypto/ecdsa.rs`](../lib/crypto/ecdsa.rs)
 
 ```text
-ecdsa -- ECDSA verification on NIST P-256 and P-384 (FIPS 186-4, SEC 1)
+ecdsa -- ECDSA on NIST P-256 and P-384 (FIPS 186-5, SEC 1, RFC 6979)
 
   verify(curve, public_key, digest, r, s)   public key uncompressed (04 || x || y), checked
                                             to lie on the curve; r, s big-endian integers
+  verify_p1363(curve, public_key, digest, sig)   sig = r || s, each curve.bytes() long (IEEE
+                                            P1363: JOSE, COSE, WebCrypto)
+  sign(curve, secret, hash, digest, extra) -> Option<r || s>   deterministic nonces (RFC 6979
+                                            with `hash`, the digest's hash); `extra`, when not
+                                            empty, goes into the nonce as RFC 6979 3.6's
+                                            additional data: 32 random bytes there hedge against
+                                            faults and a poor random source alike
+  public_key(curve, secret) -> Option<04 || x || y>    secret_from(curve, random) -> Option<secret>
+  der_from_p1363(sig) / p1363_from_der(curve, der)     r || s <-> the DER Ecdsa-Sig-Value
+                                            (strict: minimal lengths and integers, nothing after)
 
-Jacobian coordinates in the Montgomery domain (a = -3 formulas), u1 G + u2 Q by Shamir's
-trick.  Public data only: variable time.
+Verification: Jacobian coordinates in the Montgomery domain (a = -3 formulas), u1 G + u2 Q by
+Shamir's trick; public data only, variable time.  Signing: nist.rs in constant time (complete
+formulas, windows read in full, inverses as powers to n - 2); a nonce outside [1, n - 1], or
+an r or s of 0, draws the next one as RFC 6979 says (about 2^-32 on P-256, which shows only that
+a nonce was refused, nothing of the one taken).
 ```
 
 - **`enum Curve`**
@@ -42132,6 +42957,29 @@ trick.  Public data only: variable time.
 
 - **`fn verify(curve: Curve, public_key: &[u8], digest: &[u8], r: &[u8], s: &[u8]) -> bool`**
   verify an ECDSA signature over `digest` (the hash of the message, any length)
+
+- **`fn verify_p1363(curve: Curve, public_key: &[u8], digest: &[u8], sig: &[u8]) -> bool`**
+  verify an r || s signature (IEEE P1363: each half curve.bytes() long)
+
+- **`fn der_from_p1363(sig: &[u8]) -> Option<Vec<u8>>`**
+  the DER Ecdsa-Sig-Value (SEQUENCE { r INTEGER, s INTEGER }) of an r || s signature; None
+  for an empty or odd length, or halves over 125 bytes
+
+- **`fn p1363_from_der(curve: Curve, der: &[u8]) -> Option<Vec<u8>>`**
+  r || s (each curve.bytes() long) from a DER Ecdsa-Sig-Value; None unless it is strict DER: one
+  SEQUENCE of two minimal, non-negative INTEGERs no longer than the curve's size, nothing after
+
+- **`fn secret_from(curve: Curve, random: &[u8]) -> Option<Vec<u8>>`**
+  a secret key in [1, n - 1] from curve.bytes() random bytes (None: draw again, or another
+  length); only the answer is a branch
+
+- **`fn public_key(curve: Curve, secret: &[u8]) -> Option<Vec<u8>>`**
+  the public key (04 || x || y) of a secret key; None when the secret is not in [1, n - 1]
+
+- **`fn sign(curve: Curve, secret: &[u8], hash: HashAlg, digest: &[u8], extra: &[u8]) -> Option<Vec<u8>>`**
+  sign a digest (`hash`'s output, which RFC 6979 also derives the nonce with): r || s, each
+  curve.bytes() long.  None when the secret is not in [1, n - 1] or the digest is not
+  hash.len() bytes.  The same secret, digest and extra give the same signature
 
 ### `crypto/ed25519.rs`
 
@@ -42174,7 +43022,7 @@ Source: [`lib/crypto/gcm.rs`](../lib/crypto/gcm.rs)
 ```text
 gcm -- AES-GCM (NIST SP 800-38D) with 12-byte nonces and 16-byte tags, in constant time
 
-  AesGcm::new(key)                          16 (AES-128-GCM) or 32 bytes (AES-256-GCM)
+  AesGcm::new(key)                          16, 24 or 32 bytes (AES-128/192/256-GCM)
   seal_in_place(nonce, aad, data) -> tag    open_in_place(nonce, aad, data, tag) -> bool
 
 GHASH runs on the bit-reversed form of the blocks, where multiplication in GF(2^128) is a
@@ -42264,7 +43112,7 @@ points are x || y (64 bytes, both big endian), scalars 32 bytes big endian
 
   below_p(x)                               x is a coordinate: smaller than p
   y_for_x(x, odd) -> Option<[u8; 32]>      the y of a point with this x and parity (None: no such
-                                           point; variable time, only for public or hashed x)
+                                           point); no branch on x before the answer
   on_curve(point)                          both coordinates in range and the curve equation
   mul_point(k, point) -> Option<point>     k * point (None: not on the curve, or the identity)
   add_points(a, b) -> Option<point>        a + b (None: not on the curve, or the identity)
@@ -42280,7 +43128,7 @@ multiplication by four-bit windows with a table read in full for every window.
 ```
 
 - **`fn secret_from(random: &[u8; 32]) -> Option<[u8; 32]>`**
-  a scalar in [1, n - 1] from random bytes (None: draw again)
+  a scalar in [1, n - 1] from random bytes (None: draw again); only the answer is a branch
 
 - **`fn public_key(secret: &[u8; 32]) -> [u8; 65]`**
   the public key of a secret scalar: 04 || x || y
@@ -42313,6 +43161,31 @@ multiplication by four-bit windows with a table read in full for every window.
 - **`fn scalar_ok(k: &[u8; 32]) -> bool`**
   k lies in [1, n - 1]
 
+### `crypto/p384.rs`
+
+Source: [`lib/crypto/p384.rs`](../lib/crypto/p384.rs)
+
+```text
+p384 -- Diffie-Hellman on NIST P-384 (SEC 1, RFC 8446 4.2.8.2) in constant time
+
+  public_key(&secret) -> [u8; 97]          (panics on an invalid secret) 04 || x || y of secret * G
+  shared(&secret, &peer_point) -> Option<[u8; 48]>   the x coordinate of secret * peer;
+                                           None for a point that is not on the curve
+  secret_from(random) -> Option<[u8; 48]>  a scalar in [1, n - 1] from 48 random bytes
+
+The arithmetic is nist.rs's: six limbs in Montgomery form, complete addition formulas,
+four-bit windows that read the whole table.
+```
+
+- **`fn secret_from(random: &[u8; 48]) -> Option<[u8; 48]>`**
+  a scalar in [1, n - 1] from random bytes (None: draw again); only the answer is a branch
+
+- **`fn public_key(secret: &[u8; 48]) -> [u8; 97]`**
+  the public key of a secret scalar: 04 || x || y
+
+- **`fn shared(secret: &[u8; 48], peer: &[u8]) -> Option<[u8; 48]>`**
+  the shared secret (x coordinate) with a peer's public point (04 || x || y)
+
 ### `crypto/poly1305.rs`
 
 Source: [`lib/crypto/poly1305.rs`](../lib/crypto/poly1305.rs)
@@ -42341,7 +43214,7 @@ Source: [`lib/crypto/rsa.rs`](../lib/crypto/rsa.rs)
 
 ```text
 rsa -- RSA signatures (RFC 8017): PKCS #1 v1.5 and PSS verification with MGF1, PKCS #1 v1.5
-signing, key generation
+and PSS signing, key generation
 
   PublicKey::new(n, e)                      big-endian modulus (1024..8192 bits) and exponent
   key.verify_pkcs1(hash, digest, sig)       the encoding is rebuilt and compared whole
@@ -42351,7 +43224,13 @@ signing, key generation
                                             same key)
   PrivateKey::from_parts(n, e, d, p, q)     big-endian numbers, checked against each other
   key.sign_pkcs1(hash, digest)              RSASSA-PKCS1-v1_5; the exponent in constant time
+  key.sign_pss(hash, digest, salt)          RSASSA-PSS with MGF1 of the same hash and the
+                                            caller's salt (hash.len() random bytes, as TLS 1.3
+                                            and X.509 use; empty: the same signature each time)
   key.n() / e() / d() / p() / q() / iqmp()  big-endian without leading zeros
+  key.dp() / dq()                           d mod (p - 1), d mod (q - 1) (PKCS #1's
+                                            RSAPrivateKey; one bit of d at a time, the
+                                            subtraction kept by mask)
 
 Public operations are variable time (that is fine for them).  Signing uses pow_ct; generate is
 variable time and meant for simulators and tests, where the random bytes are no secret either.
@@ -42391,12 +43270,20 @@ variable time and meant for simulators and tests, where the random bytes are no 
 - **`fn p(&self) -> &[u8]`**
 - **`fn q(&self) -> &[u8]`**
 - **`fn iqmp(&self) -> Vec<u8>`**
-  q^-1 mod p, big-endian (what key files keep beside the primes; p > q)
+  q^-1 mod p, big-endian (what key files keep beside the primes): q is reduced mod p
+  first (a masked remainder), so the primes may come in either order and of any lengths
+- **`fn dp(&self) -> Vec<u8>`**
+  d mod (p - 1)
+- **`fn dq(&self) -> Vec<u8>`**
+  d mod (q - 1)
 - **`fn public(&self) -> Option<PublicKey>`**
   the public half
 - **`fn sign_pkcs1(&self, hash: HashAlg, digest: &[u8]) -> Option<Vec<u8>>`**
   RSASSA-PKCS1-v1_5 of a digest: k bytes (None: the digest has the wrong length or the
   modulus is too short for it)
+- **`fn sign_pss(&self, hash: HashAlg, digest: &[u8], salt: &[u8]) -> Option<Vec<u8>>`**
+  RSASSA-PSS of a digest (EMSA-PSS, RFC 8017 9.1.1) with MGF1 of the same hash: k bytes.
+  None when the digest has the wrong length or the modulus is too short for digest and salt
 
 ### `crypto/sealbox.rs`
 
@@ -42429,7 +43316,7 @@ OVERHEAD: usize = 32 + 24 + 16
 Source: [`lib/crypto/sha2.rs`](../lib/crypto/sha2.rs)
 
 ```text
-sha2 -- SHA-256, SHA-384 and SHA-512 (FIPS 180-4), streaming and one-shot
+sha2 -- SHA-224, SHA-256, SHA-384 and SHA-512 (FIPS 180-4), streaming and one-shot
 ```
 
 - **`struct Sha256`**
@@ -42440,6 +43327,15 @@ sha2 -- SHA-256, SHA-384 and SHA-512 (FIPS 180-4), streaming and one-shot
 - **`const fn new() -> Sha256`**
 - **`fn update(&mut self, mut data: &[u8])`**
 - **`fn finalize(mut self) -> [u8; 32]`**
+
+- **`struct Sha224(Sha256)`**
+  SHA-224 (SHA-256 with its own initial value, cut to 28 bytes)
+
+**`impl Sha224`**
+
+- **`const fn new() -> Sha224`**
+- **`fn update(&mut self, data: &[u8])`**
+- **`fn finalize(self) -> [u8; 28]`**
 
 - **`struct Sha512`**
   SHA-512
@@ -42459,6 +43355,9 @@ sha2 -- SHA-256, SHA-384 and SHA-512 (FIPS 180-4), streaming and one-shot
 - **`fn update(&mut self, data: &[u8])`**
 - **`fn finalize(self) -> [u8; 48]`**
 
+- **`fn sha224(data: &[u8]) -> [u8; 28]`**
+  SHA-224 of a byte string
+
 - **`fn sha256(data: &[u8]) -> [u8; 32]`**
   SHA-256 of a byte string
 
@@ -42467,6 +43366,30 @@ sha2 -- SHA-256, SHA-384 and SHA-512 (FIPS 180-4), streaming and one-shot
 
 - **`fn sha512(data: &[u8]) -> [u8; 64]`**
   SHA-512 of a byte string
+
+### `crypto/sha3.rs`
+
+Source: [`lib/crypto/sha3.rs`](../lib/crypto/sha3.rs)
+
+```text
+sha3 -- SHA-3 and SHAKE (FIPS 202), streaming and one-shot
+
+  Sha3_224 / Sha3_256 / Sha3_384 / Sha3_512   new, update, finalize; sha3_224(data) .. sha3_512
+  Shake128 / Shake256                         new, update, finalize_xof -> ShakeReader::read(out)
+                                              (any length, read in as many calls as wanted);
+                                              shake128(data, out) / shake256(data, out)
+
+Keccak-f[1600] on 25 64-bit lanes: no tables, no branches on the data.  The state is
+overwritten when a hash is dropped (ML-KEM and HMAC put secrets through it).
+```
+
+- **`struct ShakeReader(Sponge)`**
+  the output of a SHAKE: read as much as wanted, in pieces or at once (the same bytes)
+
+**`impl ShakeReader`**
+
+- **`fn read(&mut self, out: &mut [u8])`**
+  the next out.len() bytes
 
 ### `crypto/x25519.rs`
 
@@ -42524,7 +43447,7 @@ station in message 3 of the 4-way handshake
                                               the result is 8 bytes longer
   aes_unwrap(kek, wrapped) -> Option<Vec<u8>> None when the integrity check fails
 
-kek is a 16- or 32-byte AES key.
+kek is a 16-, 24- or 32-byte AES key.
 ```
 
 - **`fn aes_wrap(kek: &[u8], plain: &[u8]) -> Option<Vec<u8>>`**
@@ -42542,7 +43465,7 @@ Source: [`lib/crypto/cmac.rs`](../lib/crypto/cmac.rs)
 cmac -- AES-CMAC (RFC 4493, NIST SP 800-38B): a message authentication code from the AES
 block cipher, as the MIC of WPA3-Personal's 4-way handshake (AKM 8) and of 802.11w use it
 
-  cmac_aes(key, data) -> Option<[u8; 16]>   key: 16 (AES-128) or 32 bytes; None otherwise
+  cmac_aes(key, data) -> Option<[u8; 16]>   key: 16, 24 or 32 bytes (AES-128/192/256); None otherwise
 ```
 
 - **`fn cmac_aes(key: &[u8], data: &[u8]) -> Option<[u8; 16]>`**
@@ -42579,6 +43502,56 @@ Message-Authenticator of RFC 3579); it is broken for collisions, so new designs 
 
 - **`fn md5_parts(parts: &[&[u8]]) -> [u8; 16]`**
   MD5 of the concatenation of `parts`
+
+### `crypto/mlkem.rs`
+
+Source: [`lib/crypto/mlkem.rs`](../lib/crypto/mlkem.rs)
+
+```text
+mlkem -- ML-KEM (FIPS 203), the module-lattice key encapsulation: ML-KEM-512, -768 and -1024
+
+  Params::MlKem512 / MlKem768 / MlKem1024    .ek_len() .dk_len() .ct_len() (bytes)
+  keygen(params, &seed) -> (ek, dk)          seed = d || z, 64 random bytes (FIPS 203's seed
+                                             form: a key may be kept as these 64 bytes)
+  encaps(params, ek, &m) -> Option<(ct, key)>   m: 32 random bytes; None when ek has the wrong
+                                             length or a coefficient of q or more (FIPS 203 7.2)
+  decaps(params, dk, ct) -> Option<key>      None when a length is wrong or dk's hash of its
+                                             encapsulation key does not match (7.3); a
+                                             ciphertext that does not re-encrypt to itself
+                                             gives the implicit-rejection key J(z || ct),
+                                             which nothing tells apart from a key
+
+The secret paths (keygen's s and e, encryption's y, decapsulation's message and the choice
+between its two keys) have no branch and no table lookup on secret data, and no division:
+reductions modulo q = 3329 are Barrett's with a masked correction, and Compress divides by q
+the same way (KyberSlash, 2024: a division by q compiled to a div instruction whose time
+depends on its operand).  The matrix comes from the public seed rho, so its rejection
+sampling may branch.
+```
+
+- **`enum Params`**
+  the parameter sets of FIPS 203, table 2
+  - `MlKem512`
+  - `MlKem768`
+  - `MlKem1024`
+
+**`impl Params`**
+
+- **`fn ek_len(self) -> usize`**
+  the encapsulation key's length: 384 k + 32
+- **`fn dk_len(self) -> usize`**
+  the decapsulation key's length: 768 k + 96
+- **`fn ct_len(self) -> usize`**
+  the ciphertext's length: 32 (du k + dv)
+
+- **`fn keygen(params: Params, seed: &[u8; 64]) -> (Vec<u8>, Vec<u8>)`**
+  ML-KEM.KeyGen from the 64-byte seed d || z: (encapsulation key, decapsulation key)
+
+- **`fn encaps(params: Params, ek: &[u8], m: &[u8; 32]) -> Option<(Vec<u8>, [u8; 32])>`**
+  ML-KEM.Encaps with the 32 random bytes m: (ciphertext, shared key)
+
+- **`fn decaps(params: Params, dk: &[u8], ct: &[u8]) -> Option<[u8; 32]>`**
+  ML-KEM.Decaps: the shared key (implicit rejection for a ciphertext that does not re-encrypt)
 
 ### `crypto/eappwd.rs`
 
@@ -42647,22 +43620,401 @@ ROUNDS: u8 = 40
   MK = H(ss | Confirm_P | Confirm_S), stretched with the session id (the type byte 52 and
   H(ciphersuite | Scalar_P | Scalar_S)) to 128 bytes: the MSK, then the EMSK
 
-## compress
+## x509
 
-*LZ4 block and frame, Zstandard, xxHash32 and xxHash64, codec ids* -- crate root [`lib/compress/lib.rs`](../lib/compress/lib.rs)
+*X.509 certificates: strict parsing, path validation with name constraints, a private Ed25519 CA's builder, the DER reader and writer (netio::x509 and netpkt::x509 are this crate)* -- crate root [`lib/x509/lib.rs`](../lib/x509/lib.rs)
 
 ```text
-compress -- lossless compression for backup data
+x509 -- certificates (RFC 5280) for all of JFLib: netio's TLS and https, netpkt's TLS core and
+simulators.  A program's own private PKI (Ed25519, RFC 8410; built and signed here) and the
+public web PKI (RSA and P-256 / P-384 keys; RSA PKCS #1 v1.5 / PSS and ECDSA signatures with
+SHA-256 / 384 / 512), parsed strictly; no I/O, no clock (the caller passes the time)
 
+  der                                     the DER reader and writer certificates need
+  IpAddr                                  addresses in names (octets, parse, RFC 5952 text)
+  Cert::parse(der) -> Option<Cert>        subject / issuer, validity, key, CA flag, names,
+                                          key and extended key usage, name constraints,
+                                          unknown critical extensions noticed
+  cert.fingerprint() -> SHA-256 (hex)     fingerprint_bytes(), fingerprint_text() (colons)
+  cert.signed_by(&issuer) -> bool         self_signed(), names(host), name_list(), bytes()
+  cert.verify(alg, data, sig)             a signature made with the certificate's key
+  verify_chain(&[leaf, ...], &anchors, now, name, usage) -> Result<(), String>   builds a
+                                          path through the given intermediates to an anchor
+  CertBuilder { .. }.sign(&issuer_cert_or_self, &issuer_key) -> DER     (Ed25519)
+  CertBuilder { spki, .. }.sign_key(issuer, &PrivateKey, extra) -> DER   any key, signed by any
+  PrivateKey: Ed25519, ECDSA (P-256 / P-384), RSA; PKCS #8 / SEC 1 / PKCS #1 (key.rs)
+
+Not checked: revocation (CRL / OCSP), certificate policies.  Name constraints are processed
+for DNS names, IP addresses, e-mail addresses (rfc822Name), URIs (their host) and directory
+names (a byte-wise prefix of the subject's RDNs); a CA that constrains another form refuses
+every certificate below it that has a name of that form (RFC 5280 4.2.1.10).  They apply to
+the leaf and to the intermediates below the CA, self-issued ones excepted (6.1.3 (b)).
+```
+
+### `x509` crate root
+
+```rust
+OID_ED25519: &[u64] = &[1, 3, 101, 112]
+/// key usage bits as they appear in the first byte
+KU_DIGITAL_SIGNATURE: u8 = 0x80
+KU_KEY_CERT_SIGN: u8 = 0x04
+KU_CRL_SIGN: u8 = 0x02
+```
+
+- **`enum Usage`**
+  - `Server`
+  - `Client`
+
+- **`enum PubKey`**
+  a public key
+  - `Other` -- a key type this code does not use
+  - `Ed25519([u8; 32])`
+  - `Rsa { n: Vec<u8>, e: Vec<u8> }` -- modulus and exponent, big-endian without leading zero bytes
+  - `Ec { curve: Curve, point: Vec<u8> }` -- an uncompressed point (04 || x || y)
+
+- **`enum SigAlg`**
+  a signature algorithm (of certificates and of TLS handshakes)
+  - `Unknown`
+  - `Ed25519`
+  - `RsaPkcs1(HashAlg)`
+  - `RsaPss(HashAlg, Option<usize>)` -- salt length None: any (TLS fixes it to the hash length)
+  - `Ecdsa(HashAlg)`
+
+- **`struct NameConstraints`**
+  the name constraints of a CA
+  - `permitted_dns: Vec<String>`
+  - `excluded_dns: Vec<String>`
+  - `permitted_ip: Vec<Vec<u8>>` -- address and mask (4 + 4 or 16 + 16 bytes)
+  - `excluded_ip: Vec<Vec<u8>>`
+  - `permitted_email: Vec<String>` -- rfc822Name subtrees, lower case: a mailbox ("a@example.com"), all mailboxes of a host
+    ("example.com") or of the subdomains of a domain (".example.com")
+  - `excluded_email: Vec<String>`
+  - `permitted_uri: Vec<String>` -- uniformResourceIdentifier subtrees, lower case: the URI's host ("example.com") or the
+    subdomains of a domain (".example.com")
+  - `excluded_uri: Vec<String>`
+  - `permitted_dn: Vec<Vec<u8>>` -- directoryName subtrees (the DER of a Name): the subject begins with its RDNs
+  - `excluded_dn: Vec<Vec<u8>>`
+  - `other_forms: Vec<u8>` -- the GeneralName tags of constrained forms not processed here (otherName 0xa0,
+    x400Address 0xa3, ediPartyName 0xa5, registeredID 0x88)
+
+- **`struct Cert`**
+  - `der: Vec<u8>`
+  - `tbs: Vec<u8>`
+  - `serial: Vec<u8>`
+  - `issuer: Vec<u8>` -- the raw DER of the issuer and subject names (compared byte for byte)
+  - `subject: Vec<u8>`
+  - `subject_cn: String`
+  - `subject_org: String` -- the subject's organization, the issuer's common name and organization (for dialogs)
+  - `issuer_cn: String`
+  - `issuer_org: String`
+  - `not_before: i64`
+  - `not_after: i64`
+  - `public_key: Vec<u8>` -- Ed25519 public key (empty for other key types)
+  - `key: PubKey`
+  - `ed25519_signed: bool`
+  - `sig_alg: SigAlg`
+  - `signature: Vec<u8>`
+  - `version: u8` -- 1 or 3
+  - `name_constraints: Option<NameConstraints>`
+  - `is_ca: bool`
+  - `path_len: Option<u64>`
+  - `key_usage: Option<u8>`
+  - `eku: Vec<Vec<u8>>`
+  - `dns: Vec<String>`
+  - `ips: Vec<IpAddr>`
+  - `emails: Vec<String>` -- rfc822Name entries of the subject alternative name and emailAddress attributes of the
+    subject (lower case): what e-mail name constraints apply to
+  - `uris: Vec<String>` -- uniformResourceIdentifier entries of the subject alternative name
+  - `dirs: Vec<Vec<u8>>` -- directoryName entries of the subject alternative name (the DER of each Name)
+  - `other_names: Vec<u8>` -- the tags of subject alternative names of other forms (otherName 0xa0, x400Address 0xa3,
+    ediPartyName 0xa5, registeredID 0x88)
+  - `ski: Vec<u8>`
+  - `unknown_critical: bool` -- a critical extension this code does not understand (such a certificate is rejected)
+
+**`impl Cert`**
+
+- **`fn parse(bytes: &[u8]) -> Option<Cert>`**
+- **`fn fingerprint_bytes(&self) -> [u8; 32]`**
+  SHA-256 of the certificate
+- **`fn fingerprint_text(&self) -> String`**
+  the fingerprint in hex with colons, as certificate dialogs write it
+- **`fn self_signed(&self) -> bool`**
+  it names itself as issuer and its own key made the signature
+- **`fn ed25519_key(&self) -> Option<[u8; 32]>`**
+  its Ed25519 key (None for another kind)
+- **`fn name_list(&self) -> Vec<String>`**
+  what its names are, for a dialog: the DNS names, then the addresses
+- **`fn bytes(&self) -> usize`**
+  bytes it holds (an estimate for a memory budget)
+- **`fn fingerprint(&self) -> String`**
+  SHA-256 of the certificate (hex)
+- **`fn verify(&self, alg: SigAlg, data: &[u8], sig: &[u8]) -> bool`**
+  whether a signature over `data` was made with this certificate's key
+- **`fn signed_by(&self, issuer: &Cert) -> bool`**
+  whether `issuer` signed this certificate
+- **`fn names(&self, host: &str) -> bool`**
+  whether the certificate names this host (DNS name, case-insensitive; IP address)
+
+- **`fn verify_chain(chain: &[Cert], anchors: &[Cert], now: i64, name: Option<&str>, usage: Usage) -> Result<(), String>`**
+  check a chain (leaf first) against trusted anchors: a path from the leaf through the other
+  certificates of the chain (in any order) to an anchor
+
+- **`struct CertBuilder`**
+  what a new certificate says
+  - `serial: [u8; 16]`
+  - `cn: String`
+  - `org: String`
+  - `not_before: i64`
+  - `not_after: i64`
+  - `public_key: [u8; 32]`
+  - `is_ca: bool`
+  - `dns: Vec<String>`
+  - `ips: Vec<IpAddr>`
+  - `server_auth: bool`
+  - `client_auth: bool`
+  - `spki: Vec<u8>` -- the subject's key as a SubjectPublicKeyInfo (PrivateKey::spki, spki_of); empty: the
+    Ed25519 key `public_key`
+
+- **`fn extension(oid: &[u64], critical: bool, value: &[u8]) -> Vec<u8>`**
+  a DER Extension (oid, the critical flag, the DER value) for CertBuilder::sign_ext
+
+**`impl CertBuilder`**
+
+- **`fn sign(&self, issuer: Option<&Cert>, key: &Keypair) -> Vec<u8>`**
+  the DER certificate, signed by `key`; `issuer`: the issuing certificate (None: self
+  signed with the builder's own name)
+- **`fn sign_ext(&self, issuer: Option<&Cert>, key: &Keypair, extra: &[Vec<u8>]) -> Vec<u8>`**
+  sign with further extensions (each one from `extension`: name constraints, a CA's
+  extended key usage ...); one with the OID of an extension the builder writes itself
+  replaces that one (basic constraints without a path length, other key usages)
+- **`fn sign_key(&self, issuer: Option<&Cert>, key: &PrivateKey, extra: &[Vec<u8>]) -> Option<Vec<u8>>`**
+  the DER certificate for the key `spki` (any key), signed by `key` (any key: ECDSA with
+  the hash of its curve, RSA with PKCS #1 v1.5 and SHA-256, Ed25519) with further
+  extensions as sign_ext; None when `spki` is not a SubjectPublicKeyInfo
+
+- **`fn ed25519_pkcs8(seed: &[u8; 32]) -> Vec<u8>`**
+  the PKCS#8 form of an Ed25519 private key (for interoperable PEM files)
+
+- **`fn ed25519_from_pkcs8(b: &[u8]) -> Option<[u8; 32]>`**
+  the seed of a PKCS#8 Ed25519 private key
+
+### `x509/der.rs`
+
+Source: [`lib/x509/der.rs`](../lib/x509/der.rs)
+
+```text
+der -- the DER subset X.509 needs: a bounded reader (definite lengths, no indefinite
+forms, at most 16 MiB per element) and a writer
+
+  Der::new(bytes).read(tag) -> Option<(content, rest)>, peek_tag, int, oid, ...
+  writer: tlv(tag, content), seq(&[parts]), int_u(bytes), oid(&[arcs]), utf8(s) ...
+```
+
+```rust
+BOOLEAN: u8 = 0x01
+INTEGER: u8 = 0x02
+BIT_STRING: u8 = 0x03
+OCTET_STRING: u8 = 0x04
+NULL: u8 = 0x05
+OID: u8 = 0x06
+UTF8: u8 = 0x0c
+PRINTABLE: u8 = 0x13
+IA5: u8 = 0x16
+UTC_TIME: u8 = 0x17
+GEN_TIME: u8 = 0x18
+SEQUENCE: u8 = 0x30
+SET: u8 = 0x31
+```
+
+- **`struct Der<'a>`**
+  a cursor over DER bytes
+  - `b: &'a [u8]`
+
+**`impl<'a> Der<'a>`**
+
+- **`fn new(b: &'a [u8]) -> Der<'a>`**
+- **`fn is_empty(&self) -> bool`**
+- **`fn peek_tag(&self) -> Option<u8>`**
+- **`fn next(&mut self) -> Option<(u8, &'a [u8], &'a [u8])>`**
+  the next element: (tag, content, the whole element)
+- **`fn read(&mut self, tag: u8) -> Option<&'a [u8]>`**
+  the next element with this tag -> its content
+- **`fn read_raw(&mut self, tag: u8) -> Option<&'a [u8]>`**
+  the next element with this tag -> the whole element (for signatures over it)
+- **`fn optional(&mut self, tag: u8) -> Option<&'a [u8]>`**
+  an optional element with this tag
+- **`fn seq(&mut self) -> Option<Der<'a>>`**
+- **`fn u64(&mut self) -> Option<u64>`**
+  a non-negative INTEGER up to 64 bits
+- **`fn bool(&mut self) -> Option<bool>`**
+- **`fn bits(&mut self) -> Option<&'a [u8]>`**
+  a BIT STRING without unused bits -> its bytes
+
+- **`fn oid_bytes(arcs: &[u64]) -> Vec<u8>`**
+  the encoded OID content of dotted arcs
+
+- **`fn tlv(tag: u8, content: &[u8]) -> Vec<u8>`**
+
+- **`fn seq(parts: &[&[u8]]) -> Vec<u8>`**
+
+- **`fn set(parts: &[&[u8]]) -> Vec<u8>`**
+
+- **`fn int_u(b: &[u8]) -> Vec<u8>`**
+  an INTEGER of unsigned big-endian bytes (leading zeros dropped, a zero byte added when
+  the top bit is set)
+
+- **`fn small_int(v: u64) -> Vec<u8>`**
+
+- **`fn oid(arcs: &[u64]) -> Vec<u8>`**
+
+- **`fn utf8(s: &str) -> Vec<u8>`**
+
+- **`fn octets(b: &[u8]) -> Vec<u8>`**
+
+- **`fn bits(b: &[u8]) -> Vec<u8>`**
+
+- **`fn boolean(v: bool) -> Vec<u8>`**
+
+- **`fn explicit(n: u8, content: &[u8]) -> Vec<u8>`**
+  [n] EXPLICIT
+
+### `x509/ip.rs`
+
+Source: [`lib/x509/ip.rs`](../lib/x509/ip.rs)
+
+```text
+ip -- the IP addresses of certificates (subject alternative names, name constraints), as
+plain octets with a parser and the text form of RFC 5952; the same shape as plat::net::IpAddr
+(this crate needs no platform), so `IpAddr::from_octets` and `octets` convert
+```
+
+- **`enum IpAddr`**
+  - `V4([u8; 4])`
+  - `V6([u8; 16])`
+
+**`impl IpAddr`**
+
+- **`const LOCALHOST_V4: IpAddr = IpAddr::V4([127, 0, 0, 1])`**
+- **`const UNSPECIFIED_V4: IpAddr = IpAddr::V4([0, 0, 0, 0])`**
+- **`const LOCALHOST_V6: IpAddr = IpAddr::V6([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])`**
+- **`fn is_loopback(&self) -> bool`**
+- **`fn is_unspecified(&self) -> bool`**
+- **`fn mapped_v4(&self) -> Option<IpAddr>`**
+  the IPv4 address inside an IPv4-mapped IPv6 address (::ffff:a.b.c.d)
+- **`fn parse(s: &str) -> Option<IpAddr>`**
+  "192.168.1.2" or "fe80::1" (RFC 5952 shortening)
+
+**`impl IpAddr`**
+
+- **`fn from_octets(b: &[u8]) -> Option<IpAddr>`**
+  the address of 4 or 16 octets (None for another length)
+- **`fn octets(&self) -> &[u8]`**
+  its 4 or 16 octets
+
+### `x509/key.rs`
+
+Source: [`lib/x509/key.rs`](../lib/x509/key.rs)
+
+```text
+key -- private keys that sign: Ed25519, ECDSA on P-256 / P-384 and RSA
+
+  PrivateKey::from(ed25519::Keypair)        PrivateKey::ecdsa(curve, secret)
+  PrivateKey::from_der(der)                 PKCS #8 (RFC 5958: Ed25519, EC, RSA), SEC 1's
+                                            ECPrivateKey (RFC 5915), PKCS #1's RSAPrivateKey
+                                            (RFC 8017 A.1.2); not encrypted ones
+  key.to_pkcs8() -> Option<DER>             to store it (secret)
+  key.public_key() -> PubKey                key.spki() -> SubjectPublicKeyInfo (DER)
+  key.sign(alg, data, random) -> Option<signature>   Ed25519; ECDSA (DER, RFC 6979, `random`
+                                            mixed in as extra entropy); RSA PKCS #1 v1.5 or PSS
+                                            (the salt from `random`)
+  key.cert_alg()                            what it signs certificates with
+
+An ECDSA key is read without a branch on its bytes and checked to be in [1, n - 1]; a public
+key stored with it must be its own.  An RSA key is read once (its numbers are checked against
+each other in variable time, as a program does at start), then signs in constant time.
+```
+
+- **`struct PrivateKey`**
+  a private key that signs (Ed25519, ECDSA on P-256 or P-384, RSA)
+
+**`impl PrivateKey`**
+
+- **`fn ecdsa(curve: Curve, secret: &[u8]) -> Option<PrivateKey>`**
+  an ECDSA key from its secret scalar (curve.bytes() big-endian bytes in [1, n - 1])
+- **`fn generate_ecdsa(curve: Curve, rand: &mut dyn FnMut(&mut [u8])) -> PrivateKey`**
+  a new ECDSA key from `rand` (the platform's random bytes): drawn again until it is in
+  [1, n - 1]
+- **`fn rsa(key: rsa::PrivateKey) -> Option<PrivateKey>`**
+  an RSA key
+- **`fn from_der(b: &[u8]) -> Option<PrivateKey>`**
+  a key in DER: PKCS #8 (PrivateKeyInfo / OneAsymmetricKey), an ECPrivateKey with its curve
+  or an RSAPrivateKey; None for anything else (an encrypted PKCS #8 key among them)
+- **`fn to_pkcs8(&self) -> Option<Vec<u8>>`**
+  the PKCS #8 form (to store the key; secret); None only for a curve without a name here
+- **`fn public_key(&self) -> PubKey`**
+  the public half
+- **`fn spki(&self) -> Vec<u8>`**
+  the public half as a SubjectPublicKeyInfo (DER), as certificates and CSRs carry it
+- **`fn rsa_bits(&self) -> usize`**
+  the RSA modulus's bits (0 for other keys)
+- **`fn ed25519(&self) -> Option<&Keypair>`**
+  the Ed25519 key pair, if it is one
+- **`fn can(&self, alg: SigAlg) -> bool`**
+  whether this key makes signatures of `alg` (ECDSA: of its curve's size or any hash, as
+  X.509 and TLS 1.2 allow; TLS 1.3 ties the hash to the curve itself; RSA-PSS: when the
+  modulus holds the hash, the salt and two bytes, RFC 8017 9.1.1, so a 1024-bit key makes no
+  PSS with SHA-512 and a salt as long)
+- **`fn cert_alg(&self) -> SigAlg`**
+  the algorithm it signs certificates with: Ed25519, ECDSA with SHA-256 (P-256) or
+  SHA-384 (P-384), RSA PKCS #1 v1.5 with SHA-256
+- **`fn sign(&self, alg: SigAlg, data: &[u8], random: &[u8]) -> Option<Vec<u8>>`**
+  a signature of `data` with `alg` (None when the key does not make it): Ed25519's 64
+  bytes; ECDSA as DER (Ecdsa-Sig-Value), its nonce by RFC 6979 with `random` mixed in (empty:
+  the same signature each time); RSA PKCS #1 v1.5, or PSS with MGF1 of the same hash and a
+  salt of the first bytes of `random` (as long as the salt length, the hash length when
+  the algorithm leaves it open; a shorter `random` gives None)
+
+- **`fn spki_of(key: &PubKey) -> Vec<u8>`**
+  the SubjectPublicKeyInfo of a public key (empty for PubKey::Other)
+
+## compress
+
+*DEFLATE, zlib, gzip, Brotli, LZ4, Zstandard, CRC-32, Adler-32 and xxHash, codec ids* -- crate root [`lib/compress/lib.rs`](../lib/compress/lib.rs)
+
+```text
+compress -- lossless compression: DEFLATE, zlib, gzip, Brotli, LZ4 and Zstandard
+
+  deflate::compress(data, level) / decompress(data, max_out)   raw DEFLATE (RFC 1951)
+  zlib::compress / decompress                     zlib streams (RFC 1950)
+  gzip::compress / decompress                     gzip members (RFC 1952; decompress reads
+                                                  all members, as gunzip does)
+  brotli::compress(data, level) / decompress      Brotli streams (RFC 7932; levels 0 to 11,
+                                                  read by libbrotli and the browsers)
   lz4::compress(data) -> Vec<u8>                  LZ4 block (greedy, 64 KiB window)
+  lz4::compress_hc(data, level)                   LZ4 block, longest matches (as lz4 -9)
   lz4::decompress(block, max_out) -> Option<Vec>  bounds-checked; None on any corruption
   lz4::frame_compress / frame_decompress          the LZ4 frame format (lz4 / zstd --format=lz4
                                                   interoperable), xxHash32 checksums
   zstd::compress(data, level) / decompress        Zstandard frames (RFC 8878; the zstd tool
                                                   reads ours and we read its)
-  xxh32(data, seed), xxh64(data, seed)
+  zstd::Dictionary, compress_with_dict / decompress_with_dict   dictionaries: trained on
+                                                  samples or raw content, as zstd -D uses them
+  crc32(crc, data), adler32(adler, data)          the checksums of gzip / PNG / ZIP and zlib
+  xxh32(data, seed), xxh64(data, seed); Xxh32, Xxh64   the same over data in pieces
+  stream::{Decode, Encode}                        every format in pieces, with bounded memory:
+                                                  deflate::, zlib::, gzip::, zstd::Decoder /
+                                                  Encoder, lz4::FrameDecoder / FrameEncoder,
+                                                  brotli::Decoder / Encoder; decode(input, out) /
+                                                  encode(input, out, flush) -> Step; the
+                                                  pumps stream::decode_all / encode_all
   Codec { None, Lz4, Zstd } with id(): the codec byte that formats on disk store per blob;
   Codec::pack(data, level) / unpack(data, max_out)
+
+Every decoder takes the largest output the caller accepts and treats its input as untrusted:
+truncated or corrupt data, a wrong checksum or more output than allowed give None (or an
+Error from the *_into variants), never a panic and never a read or write outside the buffers.
+The stream decoders write at most the caller's buffer per call and keep no more than their
+format's window (stream.rs).
 ```
 
 ### `compress` crate root
@@ -42684,6 +44036,468 @@ compress -- lossless compression for backup data
 - **`fn unpack(self, data: &[u8], max_out: usize) -> Option<Vec<u8>>`**
   the data of pack(); None when it is damaged or longer than max_out
 
+### `compress/brotli/mod.rs`
+
+Source: [`lib/compress/brotli/mod.rs`](../lib/compress/brotli/mod.rs)
+
+```text
+brotli -- Brotli (RFC 7932) both ways, the Content-Encoding "br" of the web and the
+compression of WOFF2 fonts and of JPEG XL's JPEG reconstruction data (until 0.2 in
+img_jxl)                                                               [jxl-plus: no asm]
+
+  compress(data, level) -> stream              levels 0..=11 (LEVEL_DEFAULT 5), the window
+                                               as small as the data allows (enc.rs)
+  decompress(data, max_out) -> Option<Vec<u8>>   the stream that fills data completely;
+                                               None for a damaged stream, data after it
+                                               or more than max_out bytes
+  decompress_prefix(data, max_out) -> Ok((bytes, consumed))   the stream at the start of
+                                               data; Error::Corrupt for a damaged stream,
+                                               Error::Limit past max_out bytes
+  Decoder / Encoder                            in pieces (stream::Decode / Encode; sdec.rs,
+                                               senc.rs)
+
+The decoder makes one pass over the whole input: bit reader, prefix codes (simple and
+complex), block switches, context maps (RLE + move to front), insert-and-copy commands, the
+distance ring buffer and the static dictionary with its 121 transforms (tab.rs, dict.bin;
+tools/gen_brotli_dict.py).  The output is bounded by max_out before it grows, every
+distance is checked against the output so far.  Large windows (an extension outside RFC
+7932) are refused.
+
+The bit reader holds up to 63 bits in a register, refilled eight bytes at a time (byte by
+byte near the end).  A prefix code is a table of its first 8 bits (fewer for short codes)
+and second-level tables for the longer ones, so a symbol takes one or two lookups; reading
+past the end fails exactly where reading bit by bit would.
+```
+
+```rust
+/// the level of compress() for most uses, as for the responses of a web server
+LEVEL_DEFAULT: i32 = 5
+/// the strongest level, for files compressed once and sent often (as `brotli -q 11`)
+LEVEL_MAX: i32 = 11
+```
+
+- **`enum Error`**
+  why a Brotli stream could not be read
+  - `Corrupt` -- the stream is damaged, truncated or uses something RFC 7932 does not allow
+  - `Limit` -- the output would be larger than the caller allows
+
+- **`fn decompress(data: &[u8], max_out: usize) -> Option<Vec<u8>>`**
+  the data of the Brotli stream that fills `data` completely, at most `max_out` bytes
+
+- **`fn decompress_prefix(data: &[u8], max: usize) -> Result<(Vec<u8>, usize), Error>`**
+  the Brotli stream at the start of `data`: (output, bytes of input used)
+
+### `compress/brotli/enc.rs`
+
+Source: [`lib/compress/brotli/enc.rs`](../lib/compress/brotli/enc.rs)
+
+```text
+brotli::enc -- Brotli compression (RFC 7932): compress(), and the parts brotli::Encoder
+(senc.rs) shares with it
+
+Levels 0 to 9 match greedily with lazy evaluation: hash chains over the window (deeper by
+level), after the last distances and their neighbours (the short distance codes, a few
+bits each); a candidate scores as in libbrotli (135 per byte, 30 per bit of distance); the
+search skips ahead in data without matches.  Levels 10 and 11 parse near-optimally: every
+position's matches once, then the cheapest path through the meta-block under a cost model,
+at level 11 a second time with the costs of the first path's commands (as libbrotli's
+Zopfli parse).  A position without a match looks for a word of the static dictionary, also
+with a space before it, its first letter in upper case, one of 44 suffixes after it or up
+to 9 of its last letters cut (the transforms of RFC 7932 appendix B).  Each meta-block
+(64 KiB to 1 MiB of input, by level) gets its own prefix codes: the literals 64 contexts
+from the two bytes before them (the UTF-8 context mode for text, the signed one for the
+rest, from level 9 whichever costs less), merged greedily into as few trees as pays, or
+one tree when that takes fewer bits; the distances 4 contexts by copy length, merged the
+same way.  A meta-block that would come out larger than its input is stored.
+```
+
+- **`const fn bound(n: usize) -> usize`**
+  the largest stream compress() makes from n bytes
+
+- **`fn compress(data: &[u8], level: i32) -> Vec<u8>`**
+  a Brotli stream of `data` at `level` (0..=11; brotli::LEVEL_DEFAULT is 5), with the
+  smallest window that holds the data (at most 4 MiB, 16 MiB at levels 10 and 11)
+
+### `compress/brotli/sdec.rs`
+
+Source: [`lib/compress/brotli/sdec.rs`](../lib/compress/brotli/sdec.rs)
+
+```text
+brotli::sdec -- brotli::Decoder, a Brotli stream in pieces
+
+The decoder of mod.rs as a machine of small steps, each of which starts again when the
+input runs out (stream::drive keeps the bytes of the step that ran out): the window bits,
+a meta-block header, each of the three block-switch descriptions, the context modes, the
+prefix code of a context map and then each of its entries, each prefix code of the
+literals, commands and distances, and then per command: the insert-and-copy code with its
+extra bits, each literal, the distance.  The largest step is a prefix code of 704 symbols,
+well under a kilobyte.  Copies and uncompressed meta-blocks go out in pieces as the
+caller takes them.
+
+While the input surely holds the next part of a command (CMD_BITS, LIT_BITS, DIST_BITS:
+the most a part can read) and the output has room for it, Core::fast runs whole commands
+without the steps and their restarts; it stops in a state the steps go on from, so a call
+ends where the steps alone would end it.
+
+The output goes into a window of the stream's size ((1 << WBITS) - 16, at most 16 MiB):
+it keeps that much of the output, as far as a distance may reach, and moves when it holds
+more than twice that.  Distances beyond it are static dictionary words, as in mod.rs.
+```
+
+- **`struct Decoder`**
+  a Brotli decoder that takes its input in pieces (stream::Decode): one stream of RFC 7932,
+  its window (at most 16 MiB, as the stream says) twice and 64 KiB of output
+
+**`impl Decoder`**
+
+- **`fn new() -> Decoder`**
+- **`fn reset(&mut self)`**
+  start a new stream
+
+### `compress/brotli/senc.rs`
+
+Source: [`lib/compress/brotli/senc.rs`](../lib/compress/brotli/senc.rs)
+
+```text
+brotli::senc -- brotli::Encoder, a Brotli stream in pieces
+
+The input collects in a buffer that keeps the window before the bytes not yet compressed;
+a meta-block is compressed once its input and the 8 bytes after it are there (the match
+finder looks that far ahead), with the same finder, codes and choices as compress().  So a
+stream whose size is given (with_size) is the same bytes as compress() of the whole input;
+without a size the window is the level's (4 MiB, 16 MiB at levels 10 and 11) or the one
+with_window asks for.  Flush::Sync ends a meta-block early and fills the last byte with an
+empty metadata block.  The buffer moves by a step (1 MiB, or the reach of the hash chains)
+once it holds that much more than the window; the tables move with it.
+```
+
+- **`struct Encoder`**
+  a Brotli encoder that takes its input in pieces (stream::Encode): one stream of RFC 7932;
+  memory about twice the window and a meta-block (1 MiB at most), plus the tables of the level
+
+**`impl Encoder`**
+
+- **`fn new(level: i32) -> Encoder`**
+  an encoder at `level` (0..=11 as compress)
+- **`fn with_size(mut self, bytes: u64) -> Encoder`**
+  the input is exactly this long (else Error::Size): the window and the tables fit it,
+  and the stream is the same bytes as compress()
+- **`fn with_window(mut self, log: u32) -> Encoder`**
+  a window of 2^log - 16 bytes (log 10..=24) instead of the level's: what a decoder
+  must keep of the output
+
+### `compress/checksum.rs`
+
+Source: [`lib/compress/checksum.rs`](../lib/compress/checksum.rs)
+
+```text
+checksum -- CRC-32 (zlib / PNG polynomial) and Adler-32 (until 0.2 img_core::checksum)
+                                                                      [src/img/checksum.s]
+
+  crc32(crc, data) -> u32        start with crc = 0 (like zlib's crc32())
+  adler32(adler, data) -> u32    start with adler = 1
+
+CRC: table driven (slice-by-8 here, slice-by-4 in the assembly: the same values).
+Adler-32: blocks of at most 5552 bytes summed exactly in 64 bit, both sums reduced mod
+65521 after every block (as the assembly's SSE2 loop); a call with no data returns the
+start value unchanged.  The 16-byte groups add into 16 column sums, which the
+compiler turns into vector code on every target (the crate depends on nothing, so the
+build tools with std can use it too); the sums are exact, so the value is the same as the
+assembly's psadbw / pmaddwd loop.
+```
+
+- **`fn crc32(crc: u32, data: &[u8]) -> u32`**
+  CRC-32 (zlib / PNG) of data, continuing crc (start with 0)  [crc32]
+
+- **`fn adler32(adler: u32, data: &[u8]) -> u32`**
+  Adler-32 (zlib) of data, continuing adler (start with 1)  [adler32]
+
+### `compress/deflate/mod.rs`
+
+Source: [`lib/compress/deflate/mod.rs`](../lib/compress/deflate/mod.rs)
+
+```text
+deflate -- raw DEFLATE data (RFC 1951), the compressed format inside zlib, gzip, ZIP and PNG
+
+  compress(data, level) -> Vec<u8>         levels 0..=9 (LEVEL_DEFAULT 6; < 0 = 6, > 9 = 9)
+  decompress(data, max_out) -> Option<Vec<u8>>   the whole input must be one DEFLATE stream;
+                                           None on corruption, data after the stream or
+                                           more than max_out bytes
+  compress_with(state, data, level) / compress_into(state, data, level, dst) /
+  compress_padded(state, data, level, head, tail)   with a reusable state (None = a
+                                           temporary one), into the caller's buffer, or with
+                                           free bytes before and room after the data
+  decompress_into(state, data, dst) -> Ok((bytes, consumed))   into the caller's buffer;
+                                           consumed = the input bytes of the stream, so data
+                                           after it is the caller's to judge
+  bound(len)                               an output size with which compress_into never
+                                           fails
+  InflateState / DeflateState              reusable decoder and encoder (~330 KB) states,
+                                           one thread at a time; a reused state gives the
+                                           same bytes and errors as a fresh one
+  Decoder / Encoder                        the same in pieces (stream::Decode / Encode):
+                                           sdec.rs, senc.rs (zlib and gzip wrap them)
+
+The decoder checks every write against the output buffer and every back reference against
+the bytes produced so far, so a corrupt or hostile stream ends with an Error, never with a
+read or write outside the buffers.  The encoder writes the same bytes on every platform
+(zlib's levels: greedy 1..3, lazy 4..9, blocks as the cheapest of stored, fixed and
+dynamic).  dec.rs and enc.rs are the engines, zlib.rs and gzip.rs the two wrappers.
+```
+
+```rust
+/// the level `compress` uses for a negative level, zlib's default
+LEVEL_DEFAULT: i32 = 6
+/// the strongest level; higher levels count as this one
+LEVEL_MAX: i32 = 9
+```
+
+- **`enum Error`**
+  why a DEFLATE, zlib or gzip stream could not be read or written
+  - `Truncated` -- the input ends before the stream does
+  - `Header` -- a zlib or gzip header that is not valid
+  - `Block` -- a block of an unknown type, or a stored block with a wrong length
+  - `Code` -- a Huffman code that is not valid, or a symbol no code allows
+  - `Distance` -- a back reference to before the start of the output
+  - `Overflow` -- the output does not fit into the buffer
+  - `Checksum` -- a checksum (Adler-32, CRC-32) or a stored size that does not match the data
+
+- **`fn bound(len: usize) -> usize`**
+  an output capacity with which `compress_into` (and the zlib and gzip ones) never fail
+
+- **`fn compress(data: &[u8], level: i32) -> Vec<u8>`**
+  raw DEFLATE data of `data` at `level`
+
+- **`fn compress_with(state: Option<&mut DeflateState>, data: &[u8], level: i32) -> Vec<u8>`**
+  `compress` with a reusable state (None = a temporary one)
+
+- **`fn compress_into(state: Option<&mut DeflateState>, data: &[u8], level: i32, dst: &mut [u8]) -> Result<usize, Error>`**
+  `compress` into `dst`, the number of bytes written; `Error::Overflow` when the stream and 8
+  more bytes do not fit (the contents of `dst` are undefined then)
+
+- **`fn compress_padded(state: Option<&mut DeflateState>, data: &[u8], level: i32, head: usize, tail: usize) -> Vec<u8>`**
+  `compress` after `head` zero bytes, with room for `tail` more bytes behind the data (both
+  at most 64 KiB): a container writes its header and trailer around the stream without
+  copying it.  The vector holds the head and the stream.
+
+- **`fn decompress(data: &[u8], max_out: usize) -> Option<Vec<u8>>`**
+  the data of one DEFLATE stream that fills `data` completely, at most `max_out` bytes
+
+- **`fn decompress_into(state: Option<&mut InflateState>, data: &[u8], dst: &mut [u8]) -> Result<(usize, usize), Error>`**
+  the stream at the start of `data` into `dst`: (bytes written, input bytes of the stream)
+
+- **`struct Encoder`**
+  a raw DEFLATE encoder that takes its input in pieces (stream::Encode), about 900 KB of
+  state: pieces of 256 KiB with the 32 KiB before each as their window; the same bytes as
+  compress() for a stream of at most 256 KiB
+
+**`impl Encoder`**
+
+- **`fn new(level: i32) -> Encoder`**
+  an encoder at `level` (as compress: 0..=9, &lt; 0 = 6)
+- **`fn reset(&mut self)`**
+  start a new stream at the same level (the memory stays)
+
+### `compress/deflate/dec.rs`
+
+Source: [`lib/compress/deflate/dec.rs`](../lib/compress/deflate/dec.rs)
+
+```text
+deflate::dec -- the DEFLATE (RFC 1951) and zlib (RFC 1950) decoder behind compress::deflate,
+compress::zlib and compress::gzip (until 0.2 img_core::inflate)          [src/img/inflate.s]
+
+  zlib_inflate_ex(st, src, dst) -> Ok((bytes, consumed)) / Err(Error)   consumed = header,
+                                    deflate data and Adler-32
+  inflate_raw_st(st, src, dst) -> Ok((bytes, consumed)) / Err(Error)   consumed = input
+                                    bytes of the deflate data (up to the end of the final
+                                    block)
+  InflateState::new() -> Box      reusable decoder state (one thread at a time; an error
+                                    never affects later calls); st None = a temporary one
+  rev16(x)                        16-bit bit reversal (shared with deflate)
+  LBASE / LEXT / DBASE / DEXT / CLORDER   the code tables (shared with deflate)
+
+The output buffer has a fixed capacity: every write is bounds-checked (Error::Overflow),
+every back reference is checked against the bytes produced so far (Error::Distance), reading
+past the end of the input gives Error::Truncated.  zlib header errors: Error::Header; a wrong
+Adler-32: Error::Checksum.
+
+The bit buffer behaves exactly as the assembly's (the error codes of corrupt input depend
+on it): refilled 8 bytes at a time while 8 input bytes remain (the count becomes
+56 + count % 8), byte by byte near the end with zero bytes counted as padding (more than
+PAD_MAX of them = Error::Truncated); Huffman tables as stb_image (10-bit fast table, canonical
+slow path); a code table's sorted-index arrays keep entries of an earlier build (the
+slow path checks the length, as the assembly).
+
+Speed (perf-inflate): the symbol loop runs in codes_fast while 8 input bytes remain at
+every refill and a whole match fits the output: no slow refill, no overflow checks, no
+call on the literal path (the state stays in registers), u32 fast tables (lx / dx) with
+the length / distance base and extra-bit count folded in (one load and two shifts per
+code), wide match moves.  It hands over to the careful loop before the symbol where a
+condition fails; both follow the assembly's loop step by step.
+```
+
+- **`struct InflateState`**
+  a reusable decoder state (IS_\*); only `pad` is reset per call, the fixed tables are built
+  once per state, every other table is rebuilt before it is read
+
+**`impl InflateState`**
+
+- **`fn new() -> Box<InflateState>`**
+  a zeroed state  [inflate_state_new]
+
+### `compress/deflate/enc.rs`
+
+Source: [`lib/compress/deflate/enc.rs`](../lib/compress/deflate/enc.rs)
+
+```text
+deflate::enc -- the DEFLATE (RFC 1951) / zlib (RFC 1950) encoder behind compress::deflate,
+compress::zlib and compress::gzip (until 0.2 img_core::deflate)          [src/img/deflate.s]
+
+  zlib_deflate(src, level) -> Vec          zlib stream (level 0..9, < 0 = 6, > 9 = 9)
+  deflate_raw(src, level) -> Vec           raw RFC 1951 data
+  deflate_raw_ex(st, src, level, head, tail) -> Vec   head free bytes before the data
+                                           (gzip writes its header there), tail reserved
+                                           after it (not part of the Vec)
+  DeflateState::new() -> Box               a reusable compressor state (~330 KB; one
+                                           thread at a time); the same bytes as fresh calls
+  zlib_deflate_st(st, src, level) / deflate_raw_st(st, src, level) -> Vec
+  zlib_deflate_to(st, src, level, dst) / deflate_raw_to(...) -> Ok(bytes) /
+                                           Err(Error::Overflow): into dst (no allocation with
+                                           a state); overflow when the stream + 8 bytes do
+                                           not fit (dst contents undefined then)
+  deflate_bound(len) -> len + len / 512 + 128   a cap with which *_to never overflow
+
+The algorithm and every table of the assembly: 3-byte multiplicative hash, head / prev
+chains over "global" positions (input offset + base; every input starts GEN_GAP after
+the previous one, so a reused state matches a fresh one), zlib's levels (greedy 1..3, lazy
+4..9, chain depth / nice / lazy limits), TOO_FAR, 16K-symbol blocks written as the
+cheapest of stored / fixed / dynamic by exact bit count, two-queue Huffman lengths with
+miniz's Kraft repair, RLE-coded code lengths.  Inputs of 4 GiB - 64 KiB and more are
+stored.  The output limit: a block that would end past cap - 8 stops the compressor
+(Error::Overflow).  Speed (perf-inflate): the LZ77 loops keep their state in locals and
+load the next position's hash head before the current chain walk (the walk is a chain of
+dependent loads; the early load overlaps it) -- the same candidates in the same order.
+```
+
+- **`struct DeflateState`**
+  a compressor state (DS_\*); reusable, one thread at a time
+
+**`impl DeflateState`**
+
+- **`fn new() -> Box<DeflateState>`**
+  a zeroed state  [deflate_state_new]
+
+### `compress/deflate/sdec.rs`
+
+Source: [`lib/compress/deflate/sdec.rs`](../lib/compress/deflate/sdec.rs)
+
+```text
+deflate::sdec -- deflate::Decoder, raw DEFLATE data in pieces (zlib::Decoder and
+gzip::Decoder wrap it)
+
+The decoder of dec.rs in steps that start again when the input runs out: a block header
+(at most 563 bytes: 17 bits, 19 code length codes, 316 lengths of up to 14 bits), one
+symbol (a literal, the end of a block, or a length and a distance: at most 48 bits), or a
+piece of a stored block.  A step that runs out leaves the bit position at its start; the
+bytes from there wait in the stage (stream::drive).  While a step finds 8 input bytes and
+room for a whole match, codes_fast of dec.rs runs the symbols as for a whole input.
+
+The output goes into a window of 128 KiB: the last 32 KiB of output (the reach of a
+distance) and room for new bytes.  When the caller has taken everything, the window
+keeps the last 32 KiB and moves them to its start.  A distance is checked against the
+bytes in the window, which hold every byte of the output while there are fewer than 32 KiB
+and the last 32 KiB afterwards: the same checks as for a whole input.
+```
+
+- **`struct Decoder`**
+  a decoder of raw DEFLATE data (RFC 1951) that takes its input in pieces (stream::Decode):
+  about 150 KB of state, of which 128 KiB are the window
+
+**`impl Decoder`**
+
+- **`fn new() -> Decoder`**
+- **`fn reset(&mut self)`**
+  start a new stream (the memory stays)
+
+### `compress/gzip.rs`
+
+Source: [`lib/compress/gzip.rs`](../lib/compress/gzip.rs)
+
+```text
+gzip -- the gzip format (RFC 1952): members of a header, DEFLATE data, CRC-32 and size
+(until 0.2 img_core::gzip)                                               [src/img/gzip.s]
+
+  compress(data, level) -> Vec<u8>   one member: 1F 8B 08, FLG 0, MTIME 0, XFL (2 for level
+                                     9, 4 for level 1, else 0), OS 255, deflate, CRC32, ISIZE
+  decompress(data, max_out) -> Option<Vec<u8>>   every member of data, one after the other
+                                     as gunzip reads them; None on corruption, a wrong
+                                     CRC-32 or size, bytes that are no member, or more than
+                                     max_out bytes
+  compress_with(state, data, level) / compress_into(state, data, level, dst) -> Ok(bytes) /
+                                     Err(Error::Overflow)   into dst (deflate::bound(len)
+                                     always suffices)
+  decompress_member_into(state, data, dst) -> Ok((bytes, consumed))   ONE member; consumed
+                                     = the member's length including the trailer
+  stored_size(data) -> Option<u32>   ISIZE, the last 4 bytes of a single member (the size
+                                     mod 2^32, as the member claims it)
+  Decoder / Encoder                  in pieces (stream::Decode / Encode); Decoder reads every
+                                     member, Decoder::single() the first
+
+Decoding: ID1 ID2, CM 8, FLG (reserved bits 5..7 must be 0), MTIME, XFL, OS, then FEXTRA,
+FNAME, FCOMMENT, FHCRC (low 16 bits of the CRC-32 of the header bytes), the deflate data,
+CRC32 and ISIZE.  Errors: Error::Truncated, Error::Header, Error::Checksum and the inflate
+errors.
+```
+
+- **`fn decompress(data: &[u8], max_out: usize) -> Option<Vec<u8>>`**
+  the data of all members that fill `data` completely, at most `max_out` bytes
+
+- **`fn decompress_member_into(st: Option<&mut InflateState>, src: &[u8], dst: &mut [u8]) -> Result<(usize, usize), Error>`**
+  the first member of `data` into `dst` with a reusable state (None = a temporary one):
+  (bytes written, input bytes of the member)  [gzip_decode_st]
+
+- **`fn compress(src: &[u8], level: i32) -> Vec<u8>`**
+  one gzip member of `data` at `level`  [gzip_encode]
+
+- **`fn compress_with(st: Option<&mut DeflateState>, src: &[u8], level: i32) -> Vec<u8>`**
+  `compress` with a reusable state (None = a temporary one)  [gzip_encode_st]
+
+- **`fn compress_into(st: Option<&mut DeflateState>, src: &[u8], level: i32, dst: &mut [u8]) -> Result<usize, Error>`**
+  the member of `compress` into `dst`, the number of bytes written  [gzip_encode_to]
+
+- **`fn stored_size(src: &[u8]) -> Option<u32>`**
+  the ISIZE field (uncompressed size mod 2^32) of a single-member stream; None for fewer than
+  18 bytes  [gzip_isize]
+
+- **`struct Decoder`**
+  a gzip decoder that takes its input in pieces (stream::Decode): every member, one after
+  the other as gunzip reads them (`single()`: only the first, and the input after it is not
+  taken); the header with its optional fields, the DEFLATE data through deflate::Decoder,
+  the CRC-32 and the size of each member
+
+**`impl Decoder`**
+
+- **`fn new() -> Decoder`**
+  a decoder of all members
+- **`fn single() -> Decoder`**
+  a decoder of one member: Status::End after it, input behind it is not taken
+- **`fn reset(&mut self)`**
+  start anew (the memory stays)
+- **`fn members(&self) -> u64`**
+  the members ended so far
+
+- **`struct Encoder`**
+  a gzip encoder that takes its input in pieces (stream::Encode): one member with the header of
+  compress(), DEFLATE data as deflate::Encoder writes it, the CRC-32 and size; the same bytes as
+  compress() for a stream of at most 256 KiB
+
+**`impl Encoder`**
+
+- **`fn new(level: i32) -> Encoder`**
+  an encoder at `level` (as compress: 0..=9, &lt; 0 = 6)
+- **`fn reset(&mut self)`**
+  start a new stream at the same level (the memory stays)
+
 ### `compress/lz4.rs`
 
 Source: [`lib/compress/lz4.rs`](../lib/compress/lz4.rs)
@@ -42693,11 +44507,14 @@ lz4 -- the LZ4 block and frame formats
 
   compress(data) -> block                greedy matcher, 16K-entry hash table, skip
                                          acceleration on incompressible data
+  compress_hc(data, level) -> block      the longest match along a hash chain of
+                                         2^(level-1) candidates (levels 3..=12, as lz4 -9)
   decompress(block, max_out)             None on truncation, a bad offset, or more than
                                          max_out bytes; never reads or writes out of bounds
   decompress_into(block, &mut out, limit) appends (back references may reach into the
                                          earlier contents of out: linked frame blocks)
   frame_compress(data) / frame_decompress(frame, max_out)
+  FrameDecoder / FrameEncoder           LZ4 frames in pieces (stream::Decode / Encode)
 
 Block rules kept by the compressor: the last 5 bytes are literals, no match starts in the
 last 12 bytes, offsets 1..=65535.
@@ -42708,6 +44525,16 @@ last 12 bytes, offsets 1..=65535.
 
 - **`fn compress(src: &[u8]) -> Vec<u8>`**
   compress into one LZ4 block
+
+```rust
+/// the level of compress_hc() for most uses (as `lz4 -9`)
+LEVEL_HC_DEFAULT: i32 = 9
+```
+
+- **`fn compress_hc(src: &[u8], level: i32) -> Vec<u8>`**
+  compress into one LZ4 block, smaller than compress() and slower: at each position the
+  longest match along a hash chain of 2^(level-1) candidates (level 3..=12; LZ4's own high
+  compression levels search as far, its levels 10 to 12 also parse optimally)
 
 - **`fn decompress_into(src: &[u8], out: &mut Vec<u8>, limit: usize) -> bool`**
   decode one block, appending to out (out.len() stays &lt;= limit) -> false on corrupt input
@@ -42723,12 +44550,136 @@ last 12 bytes, offsets 1..=65535.
   max_out bytes in total; None on corruption, an unsupported feature (dictionary ids), a
   checksum mismatch, or too much output
 
+- **`struct FrameDecoder`**
+  an LZ4 frame decoder that takes its input in pieces (stream::Decode): frames one after
+  the other, skippable frames skipped (`single()`: only the first frame).  It holds one
+  block (at most 4 MiB, as the frame's descriptor allows) and the last 64 KiB of output,
+  which linked blocks may reach.
+
+**`impl FrameDecoder`**
+
+- **`fn new() -> FrameDecoder`**
+  a decoder of all frames
+- **`fn single() -> FrameDecoder`**
+  a decoder of one frame: Status::End after it, input behind it is not taken
+- **`fn reset(&mut self)`**
+  start anew (single() stays)
+- **`fn frames(&self) -> u64`**
+  the frames ended so far (skippable ones not counted)
+
+- **`struct FrameEncoder`**
+  an LZ4 frame encoder that takes its input in pieces (stream::Encode): independent blocks
+  of 4 MiB and the content checksum, as frame_compress writes them; the content size only
+  when it is given (with_size), and then the same bytes as frame_compress.  Flush::Sync ends
+  a block early.  It holds one block of input and its output.
+
+**`impl FrameEncoder`**
+
+- **`fn new() -> FrameEncoder`**
+- **`fn with_size(mut self, bytes: u64) -> FrameEncoder`**
+  state the content size in the frame (the input must have exactly this length, else
+  Error::Size)
+
+### `compress/stream.rs`
+
+Source: [`lib/compress/stream.rs`](../lib/compress/stream.rs)
+
+```text
+stream -- compression and decompression in pieces, with bounded memory
+
+  Decode::decode(input, out) -> Ok(Step)   take input, write into the caller's buffer
+  Decode::finish()                          Ok when the input so far ended a whole stream
+  Encode::encode(input, out, flush) -> Ok(Step)
+  Step { read, written, status }            Status::Input (all input taken, give more),
+                                            Output (out is full, call again), End
+  Flush::None / Sync / Finish               encoders: buffer, make all input so far
+                                            decodable, or end the stream
+  decode_all(dec, read, write, limit)       pump a whole stream from a reader to a writer
+  encode_all(enc, read, write)
+
+The decoders and encoders are deflate::, zlib::, gzip::, zstd::, lz4:: (FrameDecoder,
+FrameEncoder) and brotli::Decoder.  Each keeps only what its format needs to go on: the
+window a back reference may reach (32 KiB for DEFLATE, the frame's for zstd and Brotli, 64
+KiB for LZ4), the bytes of one block where the format sizes its blocks (zstd, LZ4) and at
+most a kilobyte of input otherwise.  Every call writes at most out.len() bytes, so the
+caller decides how much output a piece of input may produce.
+
+The rules for a decoder:
+  - Status::Input: every byte of input was taken (read == input.len()); call again with
+    more.  If there is no more, the stream is truncated (finish() says so).
+  - Status::Output: out is full; call again with the input from `read` on.
+  - Status::End: a whole stream ends at input[read]; every byte of it has been written.
+    DEFLATE, zlib and Brotli hold one stream, so input after it is not taken.  gzip, zstd
+    and LZ4 files may hold several in a row: more input goes on with the next member or
+    frame, as their tools read them (Decoder::single() stops after the first).
+  - An error is final; the decoder must not be used again (reset() starts it anew).
+Decoders take untrusted input: damaged data gives an Error, never a panic, a read outside
+the input or memory beyond the format's window.
+```
+
+- **`struct Step`**
+  how far one call got
+  - `read: usize` -- bytes of input taken
+  - `written: usize` -- bytes written to the output buffer
+  - `status: Status`
+
+- **`enum Status`**
+  why a call returned
+  - `Input` -- all input was taken: give more, or end (finish / Flush::Finish)
+  - `Output` -- the output buffer is full: call again with room, and the input from `read` on
+  - `End` -- the stream is complete: everything of it is written (decoders: `read` stops at its end)
+
+- **`enum Flush`**
+  what an encoder does with the input it has
+  - `None` -- collect input as the format compresses best (output comes in blocks)
+  - `Sync` -- compress everything so far so that a decoder can give all of it back (the stream goes
+    on: DEFLATE ends it with an empty stored block, zstd and LZ4 with a whole block)
+  - `Finish` -- compress the rest and end the stream (call again while it returns Status::Output)
+
+- **`enum Error`**
+  why a stream could not be read or written
+  - `Truncated` -- the input ended inside a stream
+  - `Corrupt` -- the data is damaged, or is no stream of the format
+  - `Checksum` -- a checksum or a stored size does not match the data
+  - `Unsupported` -- the stream needs something this crate does not read: an LZ4 dictionary, a zlib preset
+    dictionary, a Brotli large window
+  - `Limit` -- more memory or output than allowed: a zstd window above the decoder's limit, more
+    output than a pump's limit
+  - `Size` -- the encoder got more or less input than the size it was given
+  - `Dictionary` -- a zstd frame names a dictionary that was not given
+  - `Io` -- a pump's reader or writer failed
+
+- **`trait Decode`**
+  a decoder that takes its input in pieces
+  - `fn decode(&mut self, input: &[u8], out: &mut [u8]) -> Result<Step, Error>`
+    decode from `input` into `out` (see the module's rules for the Step)
+  - `fn finish(&self) -> Result<(), Error>`
+    Ok when the input so far ended a whole stream (and everything is written), else
+    Error::Truncated
+
+- **`trait Encode`**
+  an encoder that takes its input in pieces
+  - `fn encode(&mut self, input: &[u8], out: &mut [u8], flush: Flush) -> Result<Step, Error>`
+    take `input` (fewer bytes when out fills up), write compressed bytes into `out`.
+    Status::Input: all input taken and, for Sync and Finish, all output of it written;
+    Output: call again (with the same flush); End: Finish is done.
+
+- **`fn decode_all<D: Decode + ?Sized>( dec: &mut D, mut read: impl FnMut(&mut [u8]) -> Option<usize>, mut write: impl FnMut(&[u8]) -> bool, limit: u64, ) -> Result<u64, Error>`**
+  decode a whole stream: `read(buf)` gives input (Some(0) at its end, None on an error),
+  `write(bytes)` takes output (false on an error); at most `limit` bytes are written.  The
+  input must be complete streams and nothing else -> the number of bytes written.
+
+- **`fn encode_all<E: Encode + ?Sized>( enc: &mut E, mut read: impl FnMut(&mut [u8]) -> Option<usize>, mut write: impl FnMut(&[u8]) -> bool, ) -> Result<u64, Error>`**
+  compress everything `read(buf)` gives (Some(0) at the end, None on an error) into
+  `write(bytes)` (false on an error) and end the stream -> the number of bytes written
+
 ### `compress/xxh.rs`
 
 Source: [`lib/compress/xxh.rs`](../lib/compress/xxh.rs)
 
 ```text
-xxh -- xxHash32 (the checksum of LZ4 frames) and xxHash64 (zstd frames); not cryptographic
+xxh -- xxHash32 (the checksum of LZ4 frames) and xxHash64 (zstd frames); not cryptographic.
+Xxh32 / Xxh64 give the same values for data that comes in pieces (the streams use them).
 ```
 
 - **`fn xxh32(data: &[u8], seed: u32) -> u32`**
@@ -42736,6 +44687,86 @@ xxh -- xxHash32 (the checksum of LZ4 frames) and xxHash64 (zstd frames); not cry
 
 - **`fn xxh64(data: &[u8], seed: u64) -> u64`**
   xxHash64 of a byte string (zstd's content checksum is its low 32 bits)
+
+- **`struct Xxh32`**
+  xxHash32 over data that comes in pieces: `update` as often as needed, then `digest`
+  (the same value as `xxh32` of all pieces in a row)
+
+**`impl Xxh32`**
+
+- **`fn new(seed: u32) -> Xxh32`**
+- **`fn update(&mut self, mut data: &[u8])`**
+- **`fn digest(&self) -> u32`**
+  the hash of everything so far (the state stays usable)
+
+- **`struct Xxh64`**
+  xxHash64 over data that comes in pieces (the same value as `xxh64` of all pieces in a row)
+
+**`impl Xxh64`**
+
+- **`fn new(seed: u64) -> Xxh64`**
+- **`fn update(&mut self, mut data: &[u8])`**
+- **`fn digest(&self) -> u64`**
+  the hash of everything so far (the state stays usable)
+
+### `compress/zlib.rs`
+
+Source: [`lib/compress/zlib.rs`](../lib/compress/zlib.rs)
+
+```text
+zlib -- the zlib format (RFC 1950): a two-byte header, DEFLATE data and an Adler-32
+
+  compress(data, level) -> Vec<u8>         levels as deflate::compress; the header names the
+                                           level as zlib does (78 01 / 5E / 9C / DA)
+  decompress(data, max_out) -> Option<Vec<u8>>   the whole input must be one zlib stream;
+                                           None on corruption, a wrong Adler-32, data after
+                                           the stream or more than max_out bytes
+  compress_with(state, data, level) / compress_into(state, data, level, dst)
+  decompress_into(state, data, dst) -> Ok((bytes, consumed))   consumed = header, DEFLATE
+                                           data and Adler-32; data after it is not looked at
+  Decoder / Encoder                        in pieces (stream::Decode / Encode)
+
+A preset dictionary (FDICT) is refused as Error::Header.
+```
+
+- **`fn compress(data: &[u8], level: i32) -> Vec<u8>`**
+  a zlib stream of `data` at `level`
+
+- **`fn compress_with(state: Option<&mut DeflateState>, data: &[u8], level: i32) -> Vec<u8>`**
+  `compress` with a reusable state (None = a temporary one)
+
+- **`fn compress_into(state: Option<&mut DeflateState>, data: &[u8], level: i32, dst: &mut [u8]) -> Result<usize, Error>`**
+  `compress` into `dst`, the number of bytes written; `Error::Overflow` when it does not fit
+  with 8 bytes to spare (`deflate::bound` always suffices)
+
+- **`fn decompress(data: &[u8], max_out: usize) -> Option<Vec<u8>>`**
+  the data of the zlib stream that fills `data` completely, at most `max_out` bytes
+
+- **`fn decompress_into(state: Option<&mut InflateState>, data: &[u8], dst: &mut [u8]) -> Result<(usize, usize), Error>`**
+  the zlib stream at the start of `data` into `dst`: (bytes written, input bytes of the
+  stream including its Adler-32)
+
+- **`struct Decoder`**
+  a zlib decoder that takes its input in pieces (stream::Decode): the header, the DEFLATE
+  data through deflate::Decoder, the Adler-32 of the output
+
+**`impl Decoder`**
+
+- **`fn new() -> Decoder`**
+- **`fn reset(&mut self)`**
+  start a new stream (the memory stays)
+
+- **`struct Encoder`**
+  a zlib encoder that takes its input in pieces (stream::Encode): the header, DEFLATE data as
+  deflate::Encoder writes it, the Adler-32; the same bytes as compress() for a stream of at
+  most 256 KiB
+
+**`impl Encoder`**
+
+- **`fn new(level: i32) -> Encoder`**
+  an encoder at `level` (as compress: 0..=9, &lt; 0 = 6)
+- **`fn reset(&mut self)`**
+  start a new stream at the same level (the memory stays)
 
 ### `compress/zstd/mod.rs`
 
@@ -42746,11 +44777,17 @@ zstd -- the Zstandard format (RFC 8878), interoperable with the zstd tool both w
 
   compress(data, level) -> frame        levels 1..=19 (LEVEL_DEFAULT 3); content size and
                                         checksum in the frame; window up to 8 MiB
-  decompress(frames, max_out)           any conforming frames without a dictionary,
-                                        concatenated and skippable ones too; None on
-                                        corruption, a checksum mismatch or > max_out bytes
-  content_size(frame)                   the size a frame header declares
+  decompress(frames, max_out)           any conforming frames, concatenated and skippable
+                                        ones too; None on corruption, a checksum mismatch,
+                                        > max_out bytes or a frame that names a dictionary
+  Dictionary::train(samples, max) / parse / raw / to_bytes   dictionaries as `zstd --train`
+                                        makes them (dict.rs, train.rs)
+  compress_with_dict / decompress_with_dict   frames with a dictionary (zstd -D)
+  content_size(frame), dictionary_id(frame)   what a frame header declares
   bound(n)                              the largest frame compress() makes from n bytes
+  Decoder / Encoder                     in pieces (stream::Decode / Encode; sdec.rs, senc.rs):
+                                        windows up to 128 MiB (with_window_max), with_size
+                                        for the bytes of compress(), with_dictionary
 ```
 
 ```rust
@@ -42766,15 +44803,69 @@ Source: [`lib/compress/zstd/dec.rs`](../lib/compress/zstd/dec.rs)
 dec -- the zstd frame decoder (RFC 8878): frames and skippable frames, raw / RLE /
 compressed blocks, raw / RLE / Huffman / treeless literals with 1 or 4 streams, sequences
 with predefined / RLE / FSE / repeat tables, repeat offsets, content size and checksum.
-Dictionaries are not supported (a frame that names one is refused).  Every length, offset
-and table is checked: corrupt input gives None, never a panic or more than max_out bytes.
+A frame that names a dictionary needs it (decompress_with_dict; dict.rs): its tables and
+repeat offsets start the frame, its content stands before the output.  Every length,
+offset and table is checked: corrupt input gives None, never a panic or more than max_out
+bytes.
 ```
 
 - **`fn decompress(src: &[u8], max_out: usize) -> Option<Vec<u8>>`**
   decode all frames of src -> None on corruption, unsupported features or > max_out bytes
 
+- **`fn decompress_with_dict(src: &[u8], max_out: usize, dict: &Dictionary) -> Option<Vec<u8>>`**
+  decompress with a dictionary: frames that name it or none (None also for a frame that
+  names another one)
+
+- **`fn dictionary_id(src: &[u8]) -> Option<u32>`**
+  the dictionary ID a frame header names (None: none, or not a zstd frame)
+
 - **`fn content_size(src: &[u8]) -> Option<u64>`**
   the content size a frame header declares (None: not stated or not a zstd frame)
+
+### `compress/zstd/dict.rs`
+
+Source: [`lib/compress/zstd/dict.rs`](../lib/compress/zstd/dict.rs)
+
+```text
+dict -- Zstandard dictionaries (RFC 8878 section 5)
+
+  Dictionary::parse(bytes)   the format of `zstd --train` (magic EC30A437, the ID, the
+                             literals' Huffman table, the FSE tables of the offset, match
+                             length and literal length codes, three repeat offsets, the
+                             content), or bytes without the magic as raw content (ID 0)
+  Dictionary::raw(content)   content only: matches may reach into it, no tables
+  Dictionary::train(samples, max_size)   train.rs
+  to_bytes / id / content
+
+A frame that names a dictionary starts with its tables and repeat offsets, and its content
+stands before the frame's output, where matches may reach.  Every table is checked as a
+frame's would be: a damaged dictionary is refused, never a panic.
+```
+
+- **`struct Dictionary`**
+  a Zstandard dictionary: content that matches may reach into, and for the trained
+  format the entropy tables and repeat offsets a frame starts with
+
+**`impl Dictionary`**
+
+- **`fn raw(content: &[u8]) -> Dictionary`**
+  a dictionary of content only (ID 0): frames made with it name no dictionary, so the
+  decoder must be given it
+- **`fn parse(b: &[u8]) -> Option<Dictionary>`**
+  a dictionary in the zstd format, or raw content when the bytes do not start with its
+  magic (as libzstd reads them); None for a damaged zstd-format dictionary
+- **`fn train(samples: &[&[u8]], max_size: usize) -> Option<Dictionary>`**
+  a dictionary of at most max_size bytes (at least 256; zstd's default is 112 640)
+  trained on samples of the data it will compress, as `zstd --train` makes them
+  (train.rs); None without enough samples
+- **`fn to_bytes(&self) -> Vec<u8>`**
+  the dictionary as a file of `zstd --train` (raw content: the content)
+- **`fn id(&self) -> u32`**
+  the ID frames name it by (0: raw content, named by none)
+- **`fn content(&self) -> &[u8]`**
+  the content matches may reach into
+- **`fn has_tables(&self) -> bool`**
+  whether it has the trained format's entropy tables
 
 ### `compress/zstd/enc.rs`
 
@@ -42789,6 +44880,10 @@ offsets are tried first.  Literals are Huffman coded when that is smaller; each 
 sequence codes takes the cheapest of RLE, the predefined distribution and its own table.
 A block that does not get smaller is stored raw; a run of one byte value becomes an RLE
 block.  The decoder's repeat offsets do not move on raw blocks, so the encoder rolls them back.
+The tables the decoder already has (the previous block's, or a dictionary's at the start)
+are used again when that is cheapest: the literals without a new tree, a sequence code in
+Repeat_Mode.  With a dictionary its content stands before the input, so the first matches
+can reach into it.
 ```
 
 - **`const fn bound(n: usize) -> usize`**
@@ -42797,9 +44892,87 @@ block.  The decoder's repeat offsets do not move on raw blocks, so the encoder r
 - **`fn compress(src: &[u8], level: i32) -> Vec<u8>`**
   one zstd frame
 
+- **`fn compress_with_dict(src: &[u8], level: i32, dict: &Dictionary) -> Vec<u8>`**
+  one zstd frame with a dictionary: its content is where the first matches can come from,
+  its tables and repeat offsets start the frame, the frame names its ID (none for raw
+  content, Dictionary::raw)
+
+### `compress/zstd/sdec.rs`
+
+Source: [`lib/compress/zstd/sdec.rs`](../lib/compress/zstd/sdec.rs)
+
+```text
+zstd::sdec -- zstd::Decoder, Zstandard frames in pieces
+
+A frame is a header, blocks of at most 128 KiB whose sizes stand in their 3-byte headers,
+and a checksum: each part is collected whole (at most one block's bytes wait) and decoded
+with dec.rs.  The output goes into a window that holds what the frame's matches may reach:
+its Window_Size (the content size when it is smaller), refused above the decoder's limit
+(128 MiB by default, as the zstd tool's).  A match farther back than the window is an
+error, as in the zstd tool's streaming decoder (dec.rs's one-shot decompress allows any
+distance inside the frame).  The next block is decoded once the caller has taken the
+output of the last one; the window moves when it holds more than twice its size.  With a
+dictionary (with_dictionary), its content goes into the window before the frame's output
+(not given to the caller) and widens the reach by its length.
+```
+
+- **`struct Decoder`**
+  a Zstandard decoder that takes its input in pieces (stream::Decode): frames one after the
+  other as `zstd -d` reads them, skippable frames skipped (`single()`: only the first frame).
+  Its memory is about twice a frame's window and one block.
+
+**`impl Decoder`**
+
+- **`fn new() -> Decoder`**
+  a decoder of all frames, windows up to 128 MiB
+- **`fn single() -> Decoder`**
+  a decoder of one frame: Status::End after it, input behind it is not taken
+- **`fn with_window_max(mut self, bytes: usize) -> Decoder`**
+  refuse frames whose window is larger than `bytes` (Error::Limit)
+- **`fn with_dictionary(mut self, dict: Dictionary) -> Decoder`**
+  a dictionary for the frames that name its ID (several may be given); a frame that
+  names none takes the only one given (raw content: Dictionary::raw).  A frame that names
+  one not given is Error::Dictionary.
+- **`fn reset(&mut self)`**
+  start anew (the limit and single() stay)
+- **`fn frames(&self) -> u64`**
+  the frames ended so far (skippable ones not counted)
+
+### `compress/zstd/senc.rs`
+
+Source: [`lib/compress/zstd/senc.rs`](../lib/compress/zstd/senc.rs)
+
+```text
+zstd::senc -- zstd::Encoder, one Zstandard frame in pieces
+
+The input collects in a buffer that keeps the frame's window (8 MiB, or the content when
+a smaller size is given) before the bytes not yet compressed; a block of 128 KiB is
+compressed once 8 more bytes are there (the match finder looks that far ahead), with the
+same finder, tables and block choices as compress().  So a frame whose size is given
+(with_size) is the same bytes as compress() of the whole input; without a size the
+frame header states none, the window is 8 MiB and the tables have their full size.
+Flush::Sync ends a block early.  The buffer moves by 4 MiB once it holds more than the
+window and 4 MiB; the tables move with it.
+```
+
+- **`struct Encoder`**
+  a Zstandard encoder that takes its input in pieces (stream::Encode): one frame with a
+  checksum, the content size when it is given; memory up to about 12 MiB plus the tables
+  of the level
+
+**`impl Encoder`**
+
+- **`fn new(level: i32) -> Encoder`**
+  an encoder at `level` (1..=19 as compress)
+- **`fn with_size(mut self, bytes: u64) -> Encoder`**
+  state the content size in the frame (the input must have exactly this length, else
+  Error::Size); the frame is then the same bytes as compress()
+- **`fn with_dictionary(mut self, dict: &Dictionary) -> Encoder`**
+  compress with a dictionary (as compress_with_dict; with a size, the same bytes)
+
 ## datastore
 
-*an embedded journal database: JSON collections, transactions, snapshots, crash recovery* -- crate root [`lib/datastore/lib.rs`](../lib/datastore/lib.rs)
+*an embedded journal database: JSON collections, transactions, snapshots, crash recovery, secondary indexes, encryption at rest* -- crate root [`lib/datastore/lib.rs`](../lib/datastore/lib.rs)
 
 ```text
 datastore -- an embedded, crash-safe store for one server process: collections of JSON
@@ -42811,18 +44984,27 @@ append-only journals for logs that grow without bound (audit, session logs)
   write(|tx| { tx.put(coll, id, v); tx.delete(coll, id); }) -> Result<seq>
   update(coll, id, |v| ...)                                     read-modify-write in one txn
   compact()                                                     snapshot now
-  Journal::open(dir, durable) / append(name, yyyymm, &value) / tail(name, n) / read_month(name, yyyymm)
+  add_index(coll, name, Index::field("owner").unique()) / find / find_one / range
+                                secondary indexes in memory (index.rs), unique ones refuse a
+                                transaction that breaks them (StoreError::Conflict)
+  Store::open_encrypted(dir, opts, &key) / rekey(Some(&key) | None)   encryption at rest
+                                (seal.rs): snapshots and log sealed, rekey encrypts, changes
+                                the key or decrypts
+  Journal::open(dir, durable) / open_encrypted(dir, durable, &key) / append(name, yyyymm,
+       &value) / tail(name, n) / read_month(name, yyyymm) / rekey
 
 Files in `dir`: LOCK, snap-<seq>.bcs, wal-<first seq>.log; journal/<name>/<yyyymm>.jl.
   snapshot: "BCS1" seq:u64 | colls:u32 | per collection name, records:u32 | per record id,
-            JSON | BLAKE3 of everything before (32 bytes)
+            JSON | BLAKE3 of everything before (32 bytes); encrypted: "BCE1" (seal.rs)
   WAL frame: "BCW1" len:u32 seq:u64 payload BLAKE3(len ‖ seq ‖ payload)[..16]; the payload is
-            a JSON array of ["put", coll, id, value] / ["del", coll, id]
+            a JSON array of ["put", coll, id, value] / ["del", coll, id]; encrypted: "BCW2"
+            and the payload sealed (seal.rs)
 A transaction is one frame, written and fsynced before it becomes visible.  Opening loads the
 newest valid snapshot and replays the frames after it.  A torn frame at the very end (a crash
 during a write) is cut off; a damaged frame with intact data behind it stops the open with
-StoreError::Corrupt unless Options::repair is set (then the log is cut there).
-Values are plain JSON: secrets are sealed by the caller (crypto::aead) before they get here.
+StoreError::Corrupt unless Options::repair is set (then the log is cut there).  An encrypted
+store always has a snapshot (one at seq 0 when it is new): its key id names the key.  A store
+opened with the wrong key, or one of the other kind, is StoreError::Key, never repaired.
 ```
 
 ### `datastore` crate root
@@ -42835,6 +45017,10 @@ Values are plain JSON: secrets are sealed by the caller (crypto::aead) before th
   - `Io(String)` -- reading or writing a file failed
   - `Corrupt(String)` -- a damaged log frame with intact data behind it (open with repair to cut the log there)
   - `TooLarge` -- a record or transaction over the size limits
+  - `Conflict(String)` -- a transaction or a new index that would give two records the key of a unique index
+  - `Key(String)` -- the store is encrypted and no key was given, it is not and one was, or it is sealed
+    with another key
+  - `NoIndex(String)` -- no index of this name on the collection (Store::add_index)
 
 - **`type StoreResult<T> = Result<T, StoreError>`**
 
@@ -42869,6 +45055,12 @@ Values are plain JSON: secrets are sealed by the caller (crypto::aead) before th
 
 - **`fn open(dir: &str) -> StoreResult<Store>`**
 - **`fn open_with(dir: &str, opts: Options) -> StoreResult<Store>`**
+- **`fn open_encrypted(dir: &str, opts: Options, key: &[u8; 32]) -> StoreResult<Store>`**
+  open an encrypted store (a new one in an empty or missing folder) with its 32-byte key,
+  for example one kept in the system's secret store (plat::secret::secret_get).  A store
+  in the clear, or one sealed with another key, is StoreError::Key
+- **`fn encrypted(&self) -> bool`**
+  whether the store is encrypted
 - **`fn recovery(&self) -> &Recovery`**
   what open() found and repaired
 - **`fn seq(&self) -> u64`**
@@ -42892,6 +45084,84 @@ Values are plain JSON: secrets are sealed by the caller (crypto::aead) before th
   change one record in place (None: it does not exist)
 - **`fn compact(&self) -> StoreResult<()>`**
   write a snapshot now and start a new log
+- **`fn rekey(&self, key: Option<&[u8; 32]>) -> StoreResult<()>`**
+  encrypt the store with `key`, change its key, or (None) keep it in the clear again: a
+  snapshot under the new key and a new log, then every other snapshot and log goes (they
+  are under the old key).  Removed, not wiped: on an SSD nothing promises the old blocks
+  are gone.  A crash in between leaves the new snapshot, which the new key opens.  Err(Io)
+  after the switch names files under the old key that could not be removed
+- **`fn add_index(&self, coll: &str, name: &str, def: Index) -> StoreResult<()>`**
+  index the records of a collection (built now from what is there, kept up to date by
+  every commit; replaces an index of the same name).  A unique index over records that
+  share a key is refused (Conflict), and from then on every transaction that would make
+  two share one.  Indexes are not stored: add them after each open
+- **`fn drop_index(&self, coll: &str, name: &str) -> bool`**
+  remove an index -> whether there was one
+- **`fn index_names(&self, coll: &str) -> Vec<String>`**
+  the names of a collection's indexes
+- **`fn find(&self, coll: &str, index: &str, key: &Key) -> StoreResult<Vec<(String, Value)>>`**
+  the records that have `key` in the index, ordered by id
+- **`fn find_one(&self, coll: &str, index: &str, key: &Key) -> StoreResult<Option<(String, Value)>>`**
+  the first record that has `key` (the one of a unique index)
+- **`fn range(&self, coll: &str, index: &str, keys: impl RangeBounds<Key>, order: Order, limit: usize) -> StoreResult<Vec<(String, Value)>>`**
+  the records whose keys lie in `keys`, by key and then id (Desc: the other way round),
+  at most `limit` (usize::MAX: all); a record with several keys in the range comes once
+  for each
+- **`fn count_key(&self, coll: &str, index: &str, key: &Key) -> StoreResult<usize>`**
+  how many records have `key` in the index
+
+### `datastore/index.rs`
+
+Source: [`lib/datastore/index.rs`](../lib/datastore/index.rs)
+
+```text
+index -- secondary indexes of a collection: keys of a record (a field, or a function of the
+record) -> the ids that have them, kept in memory beside the data and updated by every
+commit.  A unique index refuses a transaction that would give two records one key
+(StoreError::Conflict) before anything is written.
+
+  Key            Bool < Int < Str (by kind, then value); Key::of(&Value): strings, booleans
+                 and integral numbers (i64 and u64), nothing else
+  Index::field("owner.id") / Index::by(|id, v| keys) / .unique()
+  Store::add_index / drop_index / find / find_one / range (lib.rs)
+
+Indexes are not stored: an app adds them after every open, and they are built from the
+records then (one pass).  An array at a field's path gives one key per element; missing
+members, null, objects and fractions give none (the record is not in the index).
+```
+
+- **`enum Key`**
+  a key of an index
+  - `Bool(bool)`
+  - `Int(i128)` -- an integral number (every i64 and u64)
+  - `Str(String)`
+
+**`impl Key`**
+
+- **`fn of(v: &Value) -> Option<Key>`**
+  a JSON value as a key: a string, a boolean or an integral number; None for the rest
+  (null, arrays, objects, fractions and numbers beyond i64 and u64)
+
+- **`struct Index`**
+  what an index takes from a record: Index::field or Index::by, maybe unique
+
+**`impl Index`**
+
+- **`fn field(path: &str) -> Index`**
+  the value at a path of members, '.' between them ("owner" or "owner.id"); an array
+  there gives a key for each element that is one (Key::of)
+- **`fn by(f: impl Fn(&str, &Value) -> Vec<Key> + Send + Sync + 'static) -> Index`**
+  keys computed from a record (its id and value): a member name with a '.', several
+  fields together (as one Key::Str), a fraction scaled to an integer.  The keys of a
+  record are kept with it, so they are removed exactly when it changes
+- **`fn unique(mut self) -> Index`**
+  no two records may share a key (a record may have a key twice)
+- **`fn is_unique(&self) -> bool`**
+
+- **`enum Order`**
+  the order of Store::range
+  - `Asc` -- by key, then id
+  - `Desc` -- the other way round
 
 ### `datastore/journal.rs`
 
@@ -42901,6 +45171,9 @@ Source: [`lib/datastore/journal.rs`](../lib/datastore/journal.rs)
 journal -- append-only logs of JSON lines, one file per name and month
 (<dir>/<name>/<yyyymm>.jl): audit entries, session logs.  A line is complete or ignored (a
 crash during an append leaves at most one partial last line, which readers skip).
+Encrypted (open_encrypted): every line sealed on its own ("~" + base64url, seal.rs), bound
+to its journal and month; lines that do not open -- plain ones too -- are skipped.
+Journal::rekey rewrites the files for another key, or none.
 ```
 
 - **`struct Journal`**
@@ -42909,6 +45182,11 @@ crash during an append leaves at most one partial last line, which readers skip)
 
 - **`fn open(dir: &str, durable: bool) -> StoreResult<Journal>`**
   journals below `dir`; `durable`: fsync each append
+- **`fn open_encrypted(dir: &str, durable: bool, key: &[u8; 32]) -> StoreResult<Journal>`**
+  journals below `dir` whose lines are sealed with a 32-byte key (the key of a Store may
+  be used: the journal derives keys of its own)
+- **`fn encrypted(&self) -> bool`**
+  whether the lines are sealed
 - **`fn append(&self, name: &str, month: u32, v: &Value) -> StoreResult<()>`**
   append one entry to journal `name` in month `yyyymm` (e.g. 202610)
 - **`fn months(&self, name: &str) -> Vec<u32>`**
@@ -42921,6 +45199,13 @@ crash during an append leaves at most one partial last line, which readers skip)
   remove the months before `month` (retention)
 - **`fn remove(&self, name: &str)`**
   remove a whole journal (e.g. the log of a deleted session)
+- **`fn rekey(dir: &str, from: Option<&[u8; 32]>, to: Option<&[u8; 32]>) -> StoreResult<usize>`**
+  rewrite the journals below `dir` for another key: `from` (None: in the clear) is the
+  key they have, `to` the one they get (None: in the clear) -> the files rewritten.  Each
+  file is replaced whole (written aside, synced, renamed).  Interrupted, it is run again
+  with the same keys: lines that are under `to` already stay.  Lines that open under
+  neither (damaged, a third key) stay as they are, unreadable as before.  No Journal may
+  be open on `dir` meanwhile (an append could be lost)
 
 ## netio
 
@@ -42937,11 +45222,13 @@ netio -- network protocols on top of plat::net
              the HTTP/1.1 wire format (bounded parsing, chunked transfer, keep-alive)
   server     Server::start(addr, ServerConfig, handler): accept thread + worker pool
   client     Client::request(...): blocking, timeouts, size limit
-  tls        TLS 1.3 for own deployments (ChaCha20-Poly1305, X25519, Ed25519, mutual auth)
-             and a client for public servers (AES-GCM, RSA / ECDSA, TLS 1.2 fallback):
-             connect / accept -> TlsStream (a Stream)
-  x509 / der / pem   certificates: Ed25519 of a private CA (parse, build, verify chains) and
-             the RSA / ECDSA certificates of the web PKI
+  tls        TLS 1.3 servers and clients (ChaCha20-Poly1305, AES-GCM; X25519MLKEM768,
+             X25519, P-256, P-384; Ed25519, ECDSA, RSA keys; SNI, ALPN, mutual auth;
+             resumption with tickets, 0-RTT where the server allows it) and the TLS 1.2
+             fallback for public servers: connect / accept -> TlsStream (a Stream)
+  x509 / der the crate jflib-x509 (re-exported): certificates (parse, build with any key,
+             verify chains) of a private CA and of the web PKI; PrivateKey (PKCS #8 ...)
+  pem        PEM blocks
   roots      the system's certificate authorities (Windows: CryptoAPI; Linux: the bundle)
   ssh        SSH-2 client (curve25519, ssh-ed25519, chacha20-poly1305): run commands with
              stdin; the server side of the transport for tests
@@ -42958,6 +45245,10 @@ error answer or a closed connection, never a panic.
 ```
 
 ### `netio` crate root
+
+Re-exports: `x509`
+
+Re-exports: `x509::der`
 
 - **`trait Stream: Send + Sync`**
   a byte stream HTTP runs over (shared between a reader and a writer: &self methods)
@@ -43051,86 +45342,6 @@ an optional connector for https (TLS wraps the TCP connection)
 - **`fn json_headers(token: &str) -> Headers`**
   "Bearer &lt;token>" headers plus JSON content type
 
-### `netio/der.rs`
-
-Source: [`lib/netio/der.rs`](../lib/netio/der.rs)
-
-```text
-der -- the DER subset X.509 needs: a bounded reader (definite lengths, no indefinite
-forms, at most 16 MiB per element) and a writer
-
-  Der::new(bytes).read(tag) -> Option<(content, rest)>, peek_tag, int, oid, ...
-  writer: tlv(tag, content), seq(&[parts]), int_u(bytes), oid(&[arcs]), utf8(s) ...
-```
-
-```rust
-BOOLEAN: u8 = 0x01
-INTEGER: u8 = 0x02
-BIT_STRING: u8 = 0x03
-OCTET_STRING: u8 = 0x04
-NULL: u8 = 0x05
-OID: u8 = 0x06
-UTF8: u8 = 0x0c
-PRINTABLE: u8 = 0x13
-IA5: u8 = 0x16
-UTC_TIME: u8 = 0x17
-GEN_TIME: u8 = 0x18
-SEQUENCE: u8 = 0x30
-SET: u8 = 0x31
-```
-
-- **`struct Der<'a>`**
-  a cursor over DER bytes
-  - `b: &'a [u8]`
-
-**`impl<'a> Der<'a>`**
-
-- **`fn new(b: &'a [u8]) -> Der<'a>`**
-- **`fn is_empty(&self) -> bool`**
-- **`fn peek_tag(&self) -> Option<u8>`**
-- **`fn next(&mut self) -> Option<(u8, &'a [u8], &'a [u8])>`**
-  the next element: (tag, content, the whole element)
-- **`fn read(&mut self, tag: u8) -> Option<&'a [u8]>`**
-  the next element with this tag -> its content
-- **`fn read_raw(&mut self, tag: u8) -> Option<&'a [u8]>`**
-  the next element with this tag -> the whole element (for signatures over it)
-- **`fn optional(&mut self, tag: u8) -> Option<&'a [u8]>`**
-  an optional element with this tag
-- **`fn seq(&mut self) -> Option<Der<'a>>`**
-- **`fn u64(&mut self) -> Option<u64>`**
-  a non-negative INTEGER up to 64 bits
-- **`fn bool(&mut self) -> Option<bool>`**
-- **`fn bits(&mut self) -> Option<&'a [u8]>`**
-  a BIT STRING without unused bits -> its bytes
-
-- **`fn oid_bytes(arcs: &[u64]) -> Vec<u8>`**
-  the encoded OID content of dotted arcs
-
-- **`fn tlv(tag: u8, content: &[u8]) -> Vec<u8>`**
-
-- **`fn seq(parts: &[&[u8]]) -> Vec<u8>`**
-
-- **`fn set(parts: &[&[u8]]) -> Vec<u8>`**
-
-- **`fn int_u(b: &[u8]) -> Vec<u8>`**
-  an INTEGER of unsigned big-endian bytes (leading zeros dropped, a zero byte added when
-  the top bit is set)
-
-- **`fn small_int(v: u64) -> Vec<u8>`**
-
-- **`fn oid(arcs: &[u64]) -> Vec<u8>`**
-
-- **`fn utf8(s: &str) -> Vec<u8>`**
-
-- **`fn octets(b: &[u8]) -> Vec<u8>`**
-
-- **`fn bits(b: &[u8]) -> Vec<u8>`**
-
-- **`fn boolean(v: bool) -> Vec<u8>`**
-
-- **`fn explicit(n: u8, content: &[u8]) -> Vec<u8>`**
-  [n] EXPLICIT
-
 ### `netio/dns.rs`
 
 Source: [`lib/netio/dns.rs`](../lib/netio/dns.rs)
@@ -43138,9 +45349,14 @@ Source: [`lib/netio/dns.rs`](../lib/netio/dns.rs)
 ```text
 dns -- host names to addresses
 
-  resolve(host, port) -> NetResult<Vec<SocketAddr>>   numeric addresses and "localhost"
-                    directly; Windows: the system resolver (plat); Linux: /etc/hosts, then
-                    the name servers of /etc/resolv.conf (search domains, ndots)
+  resolve(host, port) -> NetResult<Vec<SocketAddr>>   numeric addresses, "localhost" and
+                    names under .localhost, with a final dot as well (the loopback addresses,
+                    RFC 6761) directly, on every system; Windows, macOS and iOS: the system
+                    resolver (plat::net::resolve, getaddrinfo on Apple: VPNs with name
+                    servers of their own, .local over mDNS, iOS's profiles and the app
+                    sandbox, none of which /etc/resolv.conf shows); Linux: /etc/hosts, then
+                    the name servers of /etc/resolv.conf
+                    (search domains, ndots)
   resolve_with(host, port, &Config)   the same with a given configuration (tests)
   Config::system()                    /etc/hosts + /etc/resolv.conf; Windows: the hosts file
                                       of %SystemRoot% and the DNS servers of the adapters
@@ -43151,13 +45367,20 @@ Name servers on IPv6 link-local addresses carry their zone into the socket addre
 plat::net::ip_scope_parse), the adapter's index on Windows.  A server whose zone names no
 interface of this computer is left out.
 
-Queries: A and AAAA over UDP (2 s per server and attempt, two rounds), over TCP when the answer
-is truncated; an answer must come from the server asked and carry the query's id and question.
-IPv4 addresses come first.  Not here: DNSSEC validation, mDNS, caching.
+Queries of this resolver (resolve on Linux, resolve_with everywhere; the system resolver of
+Windows, macOS and iOS checks its answers in its own way): A and AAAA over UDP (2 s per server
+and attempt, two rounds), over TCP when the answer is truncated; an answer must come from the
+server asked and carry the query's id and question (an NXDOMAIN too), and only addresses of the
+asked name count, or of the name its CNAME chain in the answer leads to (at most 8 steps):
+records for other names in an answer are ignored, names compared label by label.
+IPv4 addresses come first (the system resolver keeps its own order, RFC 6724's, and a
+link-local address's zone).  Not here: DNSSEC validation, mDNS, caching.
 
 The app's permissions: a name its net.connect rules do not cover fails with
 NetErrorKind::Denied before any query; the addresses of a covered name are registered
-(plat::policy::net_resolved), so connections to them follow that name's ports.
+(plat::policy::net_resolved), so connections to them follow that name's ports.  Names under
+.localhost need no rule, since nothing is asked for them, but their loopback addresses are
+registered too: a rule for app.localhost:8080 covers them.
 ```
 
 - **`struct Config`**
@@ -43353,14 +45576,16 @@ MAX_HEADERS: usize = 100
 Source: [`lib/netio/pem.rs`](../lib/netio/pem.rs)
 
 ```text
-pem -- "-----BEGIN LABEL-----" blocks (RFC 7468)
+pem -- "-----BEGIN LABEL-----" blocks (RFC 7468): each marker on a line of its own
 ```
 
 - **`fn encode(label: &str, der: &[u8]) -> String`**
   a PEM block of DER bytes
 
 - **`fn decode_all(text: &str, label: &str) -> Vec<Vec<u8>>`**
-  every block with this label, decoded
+  every block with this label, decoded.  Read line by line: the lines of a body (a private key
+  is secret) are only compared with the markers, which no Base64 line equals (none begins with
+  '-'); no substring search runs over them, whose steps would depend on the characters
 
 - **`fn decode(text: &str, label: &str) -> Option<Vec<u8>>`**
   the first block with this label
@@ -43659,16 +45884,24 @@ MSG_CHANNEL_FAILURE: u8 = 100
 Source: [`lib/netio/tls/mod.rs`](../lib/netio/tls/mod.rs)
 
 ```text
-tls -- TLS between a program's own servers and clients and to public servers (RFC 8446, 5246)
+tls -- TLS 1.3 servers and clients, and TLS 1.2 towards public servers (RFC 8446, 5246)
 
-  Own deployments (both sides): TLS 1.3, TLS_CHACHA20_POLY1305_SHA256 · X25519 · Ed25519
-  certificates (own CA) · mutual authentication · HelloRetryRequest · KeyUpdate.
-  Public servers (client side, Trust::System): also TLS_AES_128_GCM_SHA256, RSA / ECDSA
-  certificates of the system's CAs, and TLS 1.2 with ECDHE (X25519) and AEAD suites.
-  Not here: PSK / resumption, 0-RTT, renegotiation, revocation checks.
+  Both sides: TLS 1.3 · ChaCha20-Poly1305, AES-128-GCM, AES-256-GCM · X25519MLKEM768
+  (post-quantum hybrid), X25519, P-256, P-384 · certificates and keys of Ed25519, ECDSA
+  (P-256 / P-384) and RSA (the web PKI or a CA of one's own) · mutual authentication ·
+  HelloRetryRequest · KeyUpdate · resumption with session tickets (psk_dhe_ke) · 0-RTT with
+  replay protection (opt-in).
+  Public servers (client side, Trust::System / Custom): also TLS 1.2 with ECDHE and AEAD suites.
+  Not here: external PSKs, psk_ke, TLS 1.2 resumption, renegotiation, revocation checks.
 
   connect(stream, ClientConfig) -> TlsStream     accept(stream, ServerConfig) -> TlsStream
   TlsStream implements Stream (HTTP runs over it unchanged); peer_certs() after the handshake
+  Resumption: ServerConfig::tickets (Tickets: keys, lifetime), ClientConfig::sessions
+  (Sessions: a client's tickets per server); TlsStream::resumed()
+  0-RTT: ServerConfig::early_data (bytes; 0 = none), connect_early(stream, cfg, data) ->
+  (TlsStream, bytes taken), TlsStream::read_early (a server: data that may be a replay)
+  Identity::new(chain, key) / Identity::from_pem(certs, key): a chain and its key (PrivateKey:
+  Ed25519, ECDSA, RSA; PKCS #8, SEC 1, PKCS #1)
   Trust::Anchors(CAs) / Pinned(SHA-256 of the leaf) / Any (trust on first use: the caller
   shows the fingerprint and pins it) / System(extra CAs) (the operating system's CAs)
 
@@ -43676,9 +45909,18 @@ conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over 
 ```
 
 - **`struct Identity`**
-  a certificate chain (DER, leaf first) and the leaf's private key
+  a certificate chain (DER, leaf first) and the leaf's private key (Ed25519, ECDSA, RSA)
   - `chain: Vec<Vec<u8>>`
-  - `key: Keypair`
+  - `key: PrivateKey`
+
+**`impl Identity`**
+
+- **`fn new(chain: Vec<Vec<u8>>, key: impl Into<PrivateKey>) -> Identity`**
+  a chain (DER, leaf first) and its key (an ed25519::Keypair or an x509::PrivateKey)
+- **`fn from_pem(certs: &str, key: &str) -> Result<Identity, String>`**
+  from PEM: the certificates (leaf first, as a CA hands them out) and the key ("PRIVATE
+  KEY", "EC PRIVATE KEY" or "RSA PRIVATE KEY"; not an encrypted one); the key must be the
+  leaf's
 
 - **`enum Trust`**
   - `Anchors(Vec<Cert>)` -- certificates issued by one of these CAs
@@ -43686,18 +45928,75 @@ conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over 
   - `Any` -- anything (only to read the fingerprint for a trust decision)
   - `System(Vec<Cert>)` -- the operating system's certificate authorities, and these as well (a company CA);
     allows TLS 1.2 and the public suites (crate::roots)
+  - `Custom(Verifier)` -- a check the program brings (a PKI of its own, keys pinned by their SPKI, Certificate
+    Transparency, the platform's verifier, a test peer); a client offers with it what it
+    offers with System (TLS 1.2, the public suites)
+
+- **`type Verifier = Arc<dyn Fn(&[Cert], &str, i64) -> Result<(), String> + Send + Sync>`**
+  the check of Trust::Custom: the certificates the peer sent that could be read (leaf first),
+  the name the client asked for ("" for a client's certificate) and the time (Unix seconds) ->
+  Ok, or why they are refused (the handshake ends with bad_certificate)
 
 - **`struct ClientConfig`**
+  a client's side: `ClientConfig { identity: Some(id), ..ClientConfig::new(trust, "host") }`
   - `trust: Trust`
   - `identity: Option<Identity>`
   - `server_name: String` -- the name the certificate must carry (DNS name or IP address); may be empty only with
     Trust::Pinned / Trust::Any, which do not check it
+  - `alpn: Vec<String>` -- the application protocols to offer (ALPN, RFC 7301: "h2", "http/1.1", "acme-tls/1"),
+    in order of preference; the server's choice is TlsStream::alpn.  An empty name or one
+    over 255 bytes is left out, and the names after the first 8 KiB of them; none left: no
+    ALPN offered
+  - `sessions: Option<Arc<Sessions>>` -- session tickets to resume with (TLS 1.3): the connection offers one of this server and
+    keeps the ones it gets.  Several configs may share a cache: it keeps the tickets by
+    server name, trust and client identity.  None: no resumption
+
+**`impl ClientConfig`**
+
+- **`fn new(trust: Trust, server_name: &str) -> ClientConfig`**
+  this trust and server name; no client certificate, no ALPN, no resumption
+
+- **`struct Hello`**
+  what a ClientHello asks for: the program's ServerConfig::select picks the identity by it
+  - `server_name: String` -- the name of server_name (SNI), lower case; empty: none
+  - `alpn: Vec<Vec<u8>>` -- the application protocols offered (ALPN), as the client sent them: byte strings
+    (RFC 7301 3.1), b"h2", b"http/1.1"
+  - `sig_algs: Vec<u16>` -- the signature schemes the client takes (TLS code points)
+
+- **`type Select = Arc<dyn Fn(&Hello) -> Option<Identity> + Send + Sync>`**
+  ServerConfig::select: the identity for a ClientHello, or None for the configured ones
 
 - **`struct ServerConfig`**
+  a server's side: `ServerConfig { client_auth: Some(trust), ..ServerConfig::new(identity) }`
   - `identity: Identity`
+  - `identities: Vec<Identity>` -- more certificates (SNI: other names; or other key types for the same name, as an ECDSA
+    and an RSA certificate): the server shows the first of these and then `identity` that
+    names the server_name the client asked for and whose key makes a signature the client
+    takes; without such one `identity`, or the first whose key fits when its key does not
+  - `select: Option<Select>` -- a choice of the program's own, asked before the lists (certificates renewed while the
+    server runs, ACME's tls-alpn-01 challenge); None from it: the lists decide
   - `client_auth: Option<Trust>` -- ask for a client certificate trusted like this
   - `client_auth_optional: bool` -- a client without a certificate is accepted too (one that sends one must pass the
     check); for a port that consoles and agents share
+  - `alpn: Vec<String>` -- the application protocols the server speaks (ALPN), in its order of preference; a
+    client that offers protocols, none of them these, is refused (no_application_protocol,
+    RFC 7301 3.2).  Empty: ALPN is not answered
+  - `tickets: Option<Arc<Tickets>>` -- session tickets (TLS 1.3 resumption): sent after each handshake and taken back for a
+    handshake without certificates.  A resumed connection keeps the client certificates of
+    its first handshake (peer_certs) for up to 7 days, while the same client_auth trust asks
+    for them and takes them again (each resumption checks them).  None: no tickets
+  - `early_data: u32` -- 0-RTT (needs tickets): the most bytes of early data a client may send with a ticket; 0
+    (the default): none.  A ticket that allows more than the server takes now is resumed
+    without 0-RTT.  Early data can be replayed by an attacker (RFC 8446 8, E.5): the
+    server takes it only from a ClientHello within 10 seconds of the ticket's age and the
+    first time it comes (Tickets::replay_check), keeps it apart (TlsStream::read_early) and
+    hands it to read() only once the handshake is done.  With 0-RTT taken, accept returns
+    after the server's flight, before the client's Finished
+
+**`impl ServerConfig`**
+
+- **`fn new(identity: Identity) -> ServerConfig`**
+  this identity; no client certificates, no ALPN, no tickets
 
 - **`enum TlsError`**
   - `Alert(u8, &'static str)` -- we ended the connection with this alert
@@ -43719,9 +46018,30 @@ conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over 
 - **`fn last_error(&self) -> Option<TlsError>`**
 - **`fn version(&self) -> (&'static str, u16)`**
   "TLS 1.3" / "TLS 1.2" and the cipher suite number
+- **`fn group(&self) -> u16`**
+  the key exchange group (kx: X25519_MLKEM768, X25519, SECP256R1 ...)
+- **`fn alpn(&self) -> Option<String>`**
+  the application protocol both sides agreed on (ALPN), if any
+- **`fn server_name(&self) -> String`**
+  a server: the name the client asked for (SNI, lower case; empty: none)
+- **`fn resumed(&self) -> bool`**
+  the handshake resumed a session (a ticket instead of certificates)
+- **`fn read_early(&self, buf: &mut [u8]) -> NetResult<usize>`**
+  a server that took 0-RTT: the client's early data as it comes, before the handshake is
+  done; Ok(0) at its end (or when none was taken).  An attacker may have replayed it
+  (RFC 8446 8): act on it only where twice does no harm (RFC 8470).  What is not read here
+  comes first from read() once the handshake is done
 
 - **`fn connect(inner: Box<dyn Stream>, cfg: ClientConfig) -> Result<TlsStream, TlsError>`**
   client side: handshake over `inner`
+
+- **`fn connect_early(inner: Box<dyn Stream>, cfg: ClientConfig, early: &[u8]) -> Result<(TlsStream, usize), TlsError>`**
+  client side with 0-RTT: `early` goes right after the ClientHello when a ticket of
+  cfg.sessions allows early data (as much as the ticket takes).  -> the stream and the bytes of
+  `early` the server took: 0 when none went (no such ticket) or the server refused them; the
+  caller sends the rest with write_all, if it still applies (TlsStream::alpn may differ: RFC
+  8446 4.2.10).  Early data can be replayed by an attacker: only for requests that do no harm
+  twice
 
 - **`fn accept(inner: Box<dyn Stream>, cfg: ServerConfig) -> Result<TlsStream, TlsError>`**
   server side: handshake over `inner`
@@ -43739,20 +46059,29 @@ conn -- the TLS handshake and the record stream, without I/O
   read_plain / write_plain / close
   established(), peer_cert(), version(), suite()
 
-Our own servers and agents (private PKI): TLS 1.3 with TLS_CHACHA20_POLY1305_SHA256, X25519,
-Ed25519 signatures and certificates, a HelloRetryRequest when the client offered X25519
-without a key share (or a cookie), mutual authentication.  The server side speaks only that.
+TLS 1.3 on both sides: the suites ChaCha20-Poly1305, AES-128-GCM (SHA-256) and AES-256-GCM
+(SHA-384); the groups X25519MLKEM768 (post-quantum hybrid), X25519, P-256 and P-384, and on
+the server also SecP256r1MLKEM768 and SecP384r1MLKEM1024 (kx.rs); certificates and handshake
+signatures with Ed25519, ECDSA (P-256 / P-384), RSA-PSS (RSA PKCS #1 v1.5 for certificates);
+mutual authentication with any of these keys.  A client sends key shares for
+X25519MLKEM768 and X25519 and takes a HelloRetryRequest for P-256 or P-384; a server sends one
+for the first group of the client it has when no share fits, and a dummy change_cipher_spec
+for middleboxes (D.4).
 
 A client that trusts the system's certificate authorities (Trust::System: mail servers,
-update servers, web hooks) also offers TLS_AES_128_GCM_SHA256, RSA (PKCS #1 v1.5 / PSS) and
-ECDSA (P-256 / P-384) signatures and the P-256 key exchange (after a HelloRetryRequest),
-and falls back to TLS 1.2 with ECDHE (X25519 or P-256) and AEAD suites (AES-128-GCM,
-ChaCha20-Poly1305), the extended master secret and the TLS 1.3 downgrade check.  Private
-connections never fall back.
+update servers, web hooks) or a check of its own (Trust::Custom) falls back to TLS 1.2 with
+ECDHE (X25519, P-256, P-384) and AEAD suites (AES-GCM, ChaCha20-Poly1305), the extended
+master secret when the server has it and the TLS 1.3 downgrade check.  Other connections
+never fall back.
 
-No PSK, no 0-RTT, no session tickets (a client ignores them), no renegotiation;
-post-handshake KeyUpdate is supported.  Every protocol error ends the connection with the
-matching alert.
+Resumption (TLS 1.3, RFC 8446 2.2, 4.6.1): a server with ServerConfig::tickets sends session
+tickets after the client's Finished and takes them back with psk_dhe_ke (the PSK and a fresh
+key exchange); a client with ClientConfig::sessions keeps the tickets it gets and offers one.
+0-RTT (2.3, 4.2.10) when the server allows it (ServerConfig::early_data): the client sends
+data right after its ClientHello, the server takes it only from a fresh ClientHello it has
+not seen (8.2, 8.3) and hands it apart from the rest (read_early).  No external PSKs, no
+psk_ke, no TLS 1.2 resumption, no renegotiation; post-handshake KeyUpdate is supported.
+Every protocol error ends the connection with the matching alert.
 ```
 
 ```rust
@@ -43772,16 +46101,46 @@ AL_PROTOCOL_VERSION: u8 = 70
 AL_INTERNAL_ERROR: u8 = 80
 AL_NO_RENEGOTIATION: u8 = 100
 AL_MISSING_EXTENSION: u8 = 109
+AL_UNSUPPORTED_EXTENSION: u8 = 110
 AL_CERTIFICATE_REQUIRED: u8 = 116
+AL_NO_APPLICATION_PROTOCOL: u8 = 120
 ```
 
 - **`struct Conn`**
 
 **`impl Conn`**
 
+- **`fn group(&self) -> u16`**
+  the key exchange group
+- **`fn alpn(&self) -> Option<&str>`**
+  the application protocol agreed on (ALPN; one that is not UTF-8 gives None)
+- **`fn server_name(&self) -> &str`**
+  a server: the name of the client's server_name (lower case)
 - **`fn client(cfg: ClientConfig) -> Conn`**
+- **`fn client_early(cfg: ClientConfig, early: &[u8]) -> Conn`**
+  a client that sends `early` as 0-RTT data right after its ClientHello when a session of
+  cfg.sessions allows it (as much as the session takes); early_taken() says after the
+  handshake what the server took.  Empty: Conn::client
 - **`fn server(cfg: ServerConfig) -> Conn`**
 - **`fn established(&self) -> bool`**
+- **`fn ready(&self) -> bool`**
+  the connection carries data: established, or a server that took 0-RTT and sent its
+  flight (it may read the early data and answer before the client's Finished, RFC 8446
+  4.2.10; read_plain gives data only once the handshake is done)
+- **`fn resumed(&self) -> bool`**
+  the handshake took a ticket (a PSK) instead of certificates
+- **`fn early_taken(&self) -> usize`**
+  a client: the bytes of its 0-RTT data the server took (0: none sent, the server refused
+  them, or it has not answered yet)
+- **`fn in_early(&self) -> bool`**
+  a server: 0-RTT data may still come (it took 0-RTT and the client's EndOfEarlyData has
+  not come)
+- **`fn has_early(&self) -> bool`**
+  a server: 0-RTT data received and not read yet
+- **`fn read_early(&mut self, buf: &mut [u8]) -> usize`**
+  a server: read 0-RTT data (data an attacker may have replayed, RFC 8446 8: for requests
+  that do no harm twice); what is not read here comes first from read_plain once the
+  handshake is done
 - **`fn closed(&self) -> bool`**
 - **`fn peer_closed(&self) -> bool`**
   the peer sent close_notify (an orderly end, not a cut connection)
@@ -43795,6 +46154,11 @@ AL_CERTIFICATE_REQUIRED: u8 = 116
 - **`fn has_plain(&self) -> bool`**
 - **`fn read_plain(&mut self, buf: &mut [u8]) -> usize`**
 - **`fn write_plain(&mut self, data: &[u8]) -> Result<(), TlsError>`**
+- **`fn test_cr_sig_algs(&mut self, algs: Vec<u16>)`**
+  (tests) the signature schemes a server's CertificateRequest lists (empty: all it takes)
+- **`fn test_server_prefs(&mut self, suites: Vec<u16>, groups: Vec<u16>)`**
+  (tests) a server that prefers these suites, in this order, and has only these groups
+  (empty: its own): HelloRetryRequests and suites of SHA-384 between two JFLib programs
 - **`fn write_empty(&mut self) -> Result<(), TlsError>`**
   (tests) an application data record without data
 - **`fn close(&mut self)`**
@@ -43807,47 +46171,127 @@ AL_CERTIFICATE_REQUIRED: u8 = 116
 Source: [`lib/netio/tls/keysched.rs`](../lib/netio/tls/keysched.rs)
 
 ```text
-keysched -- the TLS 1.3 key schedule with SHA-256 (RFC 8446 7.1): HKDF-Expand-Label,
-Derive-Secret, traffic keys and finished keys; the TLS 1.2 PRF with SHA-256 (RFC 5246 5)
+keysched -- the TLS 1.3 key schedule (RFC 8446 7.1) with the hash of the cipher suite (SHA-256
+or SHA-384): HKDF-Expand-Label, Derive-Secret, traffic keys and finished keys; the TLS 1.2 PRF
+(RFC 5246 5) with SHA-256 or SHA-384; the running transcript hash of a handshake
+
+Every function computes with the hash it is given (HMAC of any HashAlg); the TLS suites use
+SHA-256 and SHA-384, and the Transcript keeps those two only
 ```
 
-- **`type Secret = [u8; 32]`**
+- **`type Secret = Vec<u8>`**
+  a secret of the schedule (as long as the hash: 32 or 48 bytes)
 
-- **`fn expand_label(secret: &[u8], label: &str, context: &[u8], out: &mut [u8])`**
-  HKDF-Expand-Label(secret, label, context, len)
+- **`fn expand_label(h: HashAlg, secret: &[u8], label: &str, context: &[u8], out: &mut [u8])`**
+  HKDF-Expand-Label(secret, label, context, len); `out` at most 255 blocks of the hash (panics
+  beyond)
 
-- **`fn derive(secret: &Secret, label: &str, hash: &[u8; 32]) -> Secret`**
+- **`fn derive(h: HashAlg, secret: &[u8], label: &str, hash: &[u8]) -> Secret`**
   Derive-Secret(secret, label, transcript hash)
 
-- **`fn extract(salt: &[u8], ikm: &[u8]) -> Secret`**
+- **`fn extract(h: HashAlg, salt: &[u8], ikm: &[u8]) -> Secret`**
+  HKDF-Extract (RFC 5869 2.2): HMAC(salt, ikm); an empty salt is the same as zeros of the
+  hash's length (HMAC pads its key with zeros)
 
-- **`fn empty_hash() -> [u8; 32]`**
+- **`fn empty_hash(h: HashAlg) -> Vec<u8>`**
   the hash of no messages
+
+- **`fn early_secret(h: HashAlg, psk: &[u8]) -> Secret`**
+  the early secret of a pre-shared key (RFC 8446 7.1): HKDF-Extract(0, PSK)
+
+- **`fn binder_key(h: HashAlg, early: &[u8]) -> Secret`**
+  the binder key of a resumption PSK ("res binder", RFC 8446 4.2.11.2) from its early secret
 
 - **`struct Schedule`**
   the secrets of one handshake
+  - `hash: HashAlg`
+  - `early: Secret` -- the early secret (of the PSK, or of zeros)
   - `handshake: Secret`
   - `master: Secret`
 
 **`impl Schedule`**
 
-- **`fn new(ecdhe: &[u8; 32]) -> Schedule`**
-  from the (EC)DHE shared secret (no PSK)
+- **`fn new(h: HashAlg, psk: Option<&[u8]>, shared: &[u8]) -> Schedule`**
+  from the pre-shared key (None: zeros) and the (EC)DHE / hybrid shared secret
+- **`fn binder_key(&self, external: bool) -> Secret`**
+  the binder key of a resumption PSK ("res binder") or an external one ("ext binder")
 
-- **`fn traffic_keys_len(secret: &Secret, key_len: usize) -> (Vec<u8>, [u8; 12])`**
+- **`fn traffic_keys_len(h: HashAlg, secret: &[u8], key_len: usize) -> (Vec<u8>, [u8; 12])`**
   the AEAD key (of key_len bytes) and IV of a traffic secret
 
-- **`fn prf12(secret: &[u8], label: &str, seed: &[u8], out: &mut [u8])`**
-  TLS 1.2: PRF(secret, label, seed) with P_SHA256
+- **`fn prf12(h: HashAlg, secret: &[u8], label: &str, seed: &[u8], out: &mut [u8])`**
+  TLS 1.2: PRF(secret, label, seed) with P_SHA256, or P_SHA384 for the SHA-384 suites
 
-- **`fn traffic_keys(secret: &Secret) -> ([u8; 32], [u8; 12])`**
-  the AEAD key and IV of a traffic secret
+- **`fn finished(h: HashAlg, base: &[u8], transcript: &[u8]) -> Vec<u8>`**
+  verify_data of a Finished message (and a PSK binder: the binder key as `base`)
 
-- **`fn finished(base: &Secret, transcript: &[u8; 32]) -> [u8; 32]`**
-  verify_data of a Finished message
-
-- **`fn update(secret: &Secret) -> Secret`**
+- **`fn update(h: HashAlg, secret: &[u8]) -> Secret`**
   the next traffic secret (KeyUpdate)
+
+- **`struct Transcript`**
+  the transcript hash of a handshake: both hashes until the cipher suite picks one
+
+**`impl Transcript`**
+
+- **`fn new() -> Transcript`**
+- **`fn update(&mut self, m: &[u8])`**
+- **`fn hash(&self, h: HashAlg) -> Vec<u8>`**
+  the hash so far with `h`: SHA-256 or SHA-384 while it is kept, else empty
+- **`fn keep(&mut self, h: HashAlg)`**
+  keep only `h` from here on (the suite is chosen); a hash other than these two keeps none
+
+### `netio/tls/kx.rs`
+
+Source: [`lib/netio/tls/kx.rs`](../lib/netio/tls/kx.rs)
+
+```text
+kx -- the key exchange groups of TLS: X25519, P-256 and P-384 (ECDHE: RFC 8446 4.2.8.2, RFC
+8422 5.4) and the hybrids of an ECDHE share and ML-KEM (draft-ietf-tls-ecdhe-mlkem): each
+side's share is the two halves concatenated, the shared secret both secrets
+
+  group                 client share                server share                secret
+  X25519MLKEM768        ML-KEM-768 ek || X25519     ciphertext || X25519        ML-KEM || X25519
+  SecP256r1MLKEM768     P-256 point || ek           P-256 point || ciphertext   ECDH || ML-KEM
+  SecP384r1MLKEM1024    P-384 point || ek (1024)    P-384 point || ciphertext   ECDH || ML-KEM
+
+  Share::new(group) -> our key share (client, TLS 1.2 client: ECDHE only), its secrets
+  share.finish(peer) -> the shared secret from the peer's share
+  respond(group, client_share) -> (our share, the shared secret) for a TLS 1.3 server
+
+Every length is exact; an ECDHE point off the curve, an X25519 result of zeros or an
+encapsulation key that fails FIPS 203's modulus check gives None (illegal_parameter).
+```
+
+```rust
+SECP256R1: u16 = 0x0017
+SECP384R1: u16 = 0x0018
+X25519: u16 = 0x001d
+SECP256R1_MLKEM768: u16 = 0x11eb
+X25519_MLKEM768: u16 = 0x11ec
+SECP384R1_MLKEM1024: u16 = 0x11ed
+/// every group here.  The order is no preference: a server goes by the client's list and takes
+/// the first group here that the client sent a share of; without one it asks for the first
+/// group here the client lists (HelloRetryRequest)
+GROUPS: [u16; 6] = [X25519_MLKEM768, X25519, SECP256R1, SECP384R1, SECP256R1 ...
+```
+
+- **`fn known(group: u16) -> bool`**
+  whether this is a group here
+
+- **`struct Share`**
+  a key share we made, with its secrets (wiped when dropped)
+  - `group: u16`
+  - `public: Vec<u8>`
+
+**`impl Share`**
+
+- **`fn new(group: u16) -> Option<Share>`**
+  a new share of `group` (None: not a group here)
+- **`fn finish(&self, peer: &[u8]) -> Option<Vec<u8>>`**
+  the shared secret from the peer's share (None: of the wrong length or not valid)
+
+- **`fn respond(group: u16, client: &[u8]) -> Option<(Vec<u8>, Vec<u8>)>`**
+  a TLS 1.3 server's answer to the client's share of `group`: (our share, the shared secret)
 
 ### `netio/tls/record.rs`
 
@@ -43855,7 +46299,7 @@ Source: [`lib/netio/tls/record.rs`](../lib/netio/tls/record.rs)
 
 ```text
 record -- the TLS record layer: TLS 1.3 (RFC 8446) and, for public servers, TLS 1.2 (RFC
-5246 with AEAD suites only: RFC 5288 AES-GCM, RFC 7905 ChaCha20-Poly1305)
+5246 with AEAD suites only: RFC 5288 / 5289 AES-GCM, RFC 7905 ChaCha20-Poly1305)
 
   plaintext record    type | 0x0303 | length | fragment          (handshake before keys,
                                                                    alerts, CCS)
@@ -43878,15 +46322,21 @@ MAX_PLAIN: usize = 1 << 14
 MAX_RECORD: usize = MAX_PLAIN + 256
 /// the cipher suites (TLS 1.3, then TLS 1.2 ECDHE)
 TLS_AES_128_GCM_SHA256: u16 = 0x1301
+TLS_AES_256_GCM_SHA384: u16 = 0x1302
 TLS_CHACHA20_POLY1305_SHA256: u16 = 0x1303
 ECDHE_ECDSA_AES128_GCM: u16 = 0xC02B
+ECDHE_ECDSA_AES256_GCM: u16 = 0xC02C
 ECDHE_RSA_AES128_GCM: u16 = 0xC02F
+ECDHE_RSA_AES256_GCM: u16 = 0xC030
 ECDHE_RSA_CHACHA20: u16 = 0xCCA8
 ECDHE_ECDSA_CHACHA20: u16 = 0xCCA9
 ```
 
 - **`fn key_iv_len(suite: u16) -> Option<(usize, usize)>`**
   key and IV lengths of a suite (TLS 1.2: the IV is the implicit part)
+
+- **`fn suite_hash(suite: u16) -> crypto::HashAlg`**
+  the hash of a suite's key schedule (TLS 1.3) or PRF (TLS 1.2)
 
 - **`struct Cipher`**
   one direction's keys
@@ -43899,11 +46349,105 @@ ECDHE_ECDSA_CHACHA20: u16 = 0xCCA9
   the keys of a suite (key and IV of key_iv_len); None for an unknown suite
 - **`fn seal(&mut self, ty: u8, content: &[u8]) -> Vec<u8>`**
   a protected record of `content` of type `ty`
-- **`fn open(&mut self, hdr: &[u8; 5], body: &[u8]) -> Option<(u8, Vec<u8>)>`**
+- **`fn open(&mut self, hdr: &[u8; 5], body: &[u8]) -> Result<(u8, Vec<u8>), OpenError>`**
   open a protected record body (header given) -> (type, content)
+
+- **`enum OpenError`**
+  why a protected record did not open
+  - `Mac` -- it does not authenticate (bad_record_mac)
+  - `Overflow` -- more than a record may hold (record_overflow)
+  - `NoType` -- only padding, no content type (unexpected_message)
 
 - **`fn plain(ty: u8, content: &[u8]) -> Vec<u8>`**
   a plaintext record
+
+### `netio/tls/session.rs`
+
+Source: [`lib/netio/tls/session.rs`](../lib/netio/tls/session.rs)
+
+```text
+session -- TLS 1.3 resumption (RFC 8446 2.2, 4.6.1): a server's tickets, a client's sessions,
+and the anti-replay register of 0-RTT (RFC 8446 8)
+
+  Tickets::new()          a server's tickets: stateless, sealed with XChaCha20-Poly1305 under
+                          keys that are made and rotated by themselves (or set_keys, for
+                          servers that share them); lifetime, tickets per handshake, the
+                          replay check of 0-RTT
+  Sessions::new(servers)  a client's tickets, per server: the name, the trust and the client
+                          identity of the connection that got them; each is used once
+
+A ticket holds the resumption PSK and what the server must check before it takes it again:
+the suite, the server name, the ALPN protocol, when the handshake that authenticated the
+client ran, the client's certificates (which a resumption checks again) and the trust that
+checked them.  A session lasts at
+most 7 days from that handshake, however often its tickets are renewed (RFC 8446 4.6.1).
+```
+
+```rust
+/// the longest a ticket is valid and a session lasts from the handshake that authenticated the
+/// peer: 7 days (RFC 8446 4.6.1)
+MAX_LIFETIME: u32 = 604_800
+/// how far the client's age of a ticket and the server's may differ for 0-RTT (RFC 8446 8.3)
+FRESH_WINDOW_MS: i64 = 10_000
+```
+
+- **`struct Sessions`**
+  a client's tickets (ClientConfig::sessions): per server, a connection takes the newest and
+  the server sends new ones.  The key of a server is its name, the trust of the connection and
+  its client identity, so a ticket a connection with Trust::Any got is never offered by one that
+  checks certificates, nor one of a client certificate by a connection without it.  Shared by
+  threads; in memory only
+
+**`impl Sessions`**
+
+- **`fn new(servers: usize) -> Sessions`**
+  the tickets of up to `servers` servers (the least recently used go first), 8 each
+- **`fn clear(&self)`**
+  forget every ticket
+- **`fn len(&self) -> usize`**
+  the tickets kept (all servers)
+- **`fn is_empty(&self) -> bool`**
+  no ticket kept
+- **`fn test_shift(&self, ms: i64)`**
+  (tests) move this cache's clock by `ms`
+- **`fn test_max_early(&self, n: u32)`**
+  (tests) the 0-RTT limit of every kept ticket, as a client that sends more than its
+  ticket allows would believe
+
+- **`type ReplayCheck = Arc<dyn Fn(&[u8]) -> bool + Send + Sync>`**
+  the replay check of 0-RTT (Tickets::replay_check): a value unique to a ClientHello with early
+  data (16 bytes of its PSK binder, which the PSK authenticates) -> true the first time it is
+  seen, false when it was seen in the last 20 seconds (the client's 0-RTT is refused then, not
+  the connection)
+
+- **`struct Tickets`**
+  a server's session tickets (ServerConfig::tickets).  A ticket is the session's state, sealed
+  with XChaCha20-Poly1305: the server keeps nothing per client.  Its keys are made at random and
+  replaced every lifetime, the previous one still opening the tickets it sealed; servers that
+  share tickets (behind a load balancer) set the same keys with set_keys.  Shared by threads
+
+**`impl Tickets`**
+
+- **`fn new() -> Tickets`**
+  tickets valid for a day, two per handshake, keys of their own
+- **`fn lifetime(mut self, secs: u32) -> Tickets`**
+  how long a ticket is valid (seconds, 1 to 7 days); the keys change at this interval
+- **`fn per_handshake(mut self, n: u8) -> Tickets`**
+  the tickets a handshake gets (1 to 8): a client uses each once, so one that opens
+  connections in parallel wants several
+- **`fn replay_check(mut self, f: ReplayCheck) -> Tickets`**
+  the replay check of 0-RTT instead of this process's register: servers that share tickets
+  must share it too, or a ClientHello replayed to another of them gets its 0-RTT taken
+  again (RFC 8446 8.2)
+- **`fn set_keys(&self, keys: &[[u8; 32]])`**
+  the keys of servers that share tickets: the first seals, all open (the previous ones,
+  while tickets they sealed may still come); they no longer change by themselves.  Empty:
+  keys of their own again
+- **`fn rotate(&self)`**
+  a new key now (keys of their own): the tickets of the previous one are taken for one
+  more lifetime, older ones no longer
+- **`fn test_shift(&self, ms: i64)`**
+  (tests) move these tickets' clock by `ms`
 
 ### `netio/trust.rs`
 
@@ -43922,6 +46466,10 @@ the user decide (trust on first use, like SSH host keys)
   fingerprint_text(&digest)        "AB:CD:..." for people to compare
   system_connector(extra_cas)      https to public servers: the system's CAs (and these),
                                    TLS 1.3 or 1.2 (mail servers, update servers, web hooks)
+
+The connectors of a CA (system_connector, ServerTrust::Ca) keep the session tickets of the
+servers they reach (tls::Sessions), so the next request to a server resumes its session
+(TLS 1.3, no 0-RTT).
 ```
 
 ```rust
@@ -43950,7 +46498,8 @@ UNTRUSTED: &str = "untrusted-ca"
   "AB:CD:.." / "abcd.." / with spaces -> the 32 bytes
 
 - **`fn system_connector(extra: Vec<Cert>) -> Connector`**
-  https to public servers (the system's certificate authorities and `extra`)
+  https to public servers (the system's certificate authorities and `extra`); resumes the
+  sessions of servers it reached before
 
 - **`fn connector(trust: ServerTrust, identity: Option<Identity>, seen: Arc<Mutex<Option<Presented>>>) -> Connector`**
 
@@ -44201,136 +46750,6 @@ CLOSE_INTERNAL: u16 = 1011
   connect to a WebSocket server: TCP (and TLS for wss:// through `cfg.connector`), the upgrade
   request, the server's 101 with the right Sec-WebSocket-Accept, all within handshake_ms
 
-### `netio/x509.rs`
-
-Source: [`lib/netio/x509.rs`](../lib/netio/x509.rs)
-
-```text
-x509 -- certificates (RFC 5280): a program's own private PKI (Ed25519, RFC 8410; built
-and signed here) and the public web PKI (RSA and P-256 / P-384 keys; RSA PKCS #1 v1.5 / PSS
-and ECDSA signatures with SHA-256 / 384 / 512), parsed strictly
-
-  Cert::parse(der) -> Option<Cert>        subject / issuer, validity, key, CA flag, names,
-                                          key and extended key usage, name constraints,
-                                          unknown critical extensions noticed
-  cert.fingerprint() -> SHA-256 (hex)     cert.signed_by(&issuer) -> bool
-  cert.verify(alg, data, sig)             a signature made with the certificate's key
-  verify_chain(&[leaf, ...], &anchors, now, name, usage) -> Result<(), String>   builds a
-                                          path through the given intermediates to an anchor
-  CertBuilder { .. }.sign(&issuer_cert_or_self, &issuer_key) -> DER
-
-Not checked: revocation (CRL / OCSP), certificate policies; name constraints cover DNS
-names and IP addresses (the names a TLS server is reached by).
-```
-
-```rust
-OID_ED25519: &[u64] = &[1, 3, 101, 112]
-/// key usage bits as they appear in the first byte
-KU_DIGITAL_SIGNATURE: u8 = 0x80
-KU_KEY_CERT_SIGN: u8 = 0x04
-KU_CRL_SIGN: u8 = 0x02
-```
-
-- **`enum Usage`**
-  - `Server`
-  - `Client`
-
-- **`enum PubKey`**
-  a public key
-  - `Other` -- a key type this code does not use
-  - `Ed25519([u8; 32])`
-  - `Rsa { n: Vec<u8>, e: Vec<u8> }` -- modulus and exponent, big-endian
-  - `Ec { curve: Curve, point: Vec<u8> }` -- an uncompressed point (04 || x || y)
-
-- **`enum SigAlg`**
-  a signature algorithm (of certificates and of TLS handshakes)
-  - `Unknown`
-  - `Ed25519`
-  - `RsaPkcs1(HashAlg)`
-  - `RsaPss(HashAlg, Option<usize>)` -- salt length None: any (TLS fixes it to the hash length)
-  - `Ecdsa(HashAlg)`
-
-- **`struct NameConstraints`**
-  DNS and IP name constraints of a CA (other forms are recorded as present only)
-  - `permitted_dns: Vec<String>`
-  - `excluded_dns: Vec<String>`
-  - `permitted_ip: Vec<Vec<u8>>` -- address and mask (4 + 4 or 16 + 16 bytes)
-  - `excluded_ip: Vec<Vec<u8>>`
-
-- **`struct Cert`**
-  - `der: Vec<u8>`
-  - `tbs: Vec<u8>`
-  - `serial: Vec<u8>`
-  - `issuer: Vec<u8>` -- the raw DER of the issuer and subject names (compared byte for byte)
-  - `subject: Vec<u8>`
-  - `subject_cn: String`
-  - `not_before: i64`
-  - `not_after: i64`
-  - `public_key: Vec<u8>` -- Ed25519 public key (empty for other key types)
-  - `key: PubKey`
-  - `ed25519_signed: bool`
-  - `sig_alg: SigAlg`
-  - `signature: Vec<u8>`
-  - `version: u8` -- 1 or 3
-  - `name_constraints: Option<NameConstraints>`
-  - `is_ca: bool`
-  - `path_len: Option<u64>`
-  - `key_usage: Option<u8>`
-  - `eku: Vec<Vec<u8>>`
-  - `dns: Vec<String>`
-  - `ips: Vec<IpAddr>`
-  - `ski: Vec<u8>`
-  - `unknown_critical: bool` -- a critical extension this code does not understand (such a certificate is rejected)
-
-**`impl Cert`**
-
-- **`fn parse(bytes: &[u8]) -> Option<Cert>`**
-- **`fn fingerprint(&self) -> String`**
-  SHA-256 of the certificate (hex)
-- **`fn verify(&self, alg: SigAlg, data: &[u8], sig: &[u8]) -> bool`**
-  whether a signature over `data` was made with this certificate's key
-- **`fn signed_by(&self, issuer: &Cert) -> bool`**
-  whether `issuer` signed this certificate
-- **`fn names(&self, host: &str) -> bool`**
-  whether the certificate names this host (DNS name, case-insensitive; IP address)
-
-- **`fn verify_chain(chain: &[Cert], anchors: &[Cert], now: i64, name: Option<&str>, usage: Usage) -> Result<(), String>`**
-  check a chain (leaf first) against trusted anchors: a path from the leaf through the other
-  certificates of the chain (in any order) to an anchor
-
-- **`struct CertBuilder`**
-  what a new certificate says
-  - `serial: [u8; 16]`
-  - `cn: String`
-  - `org: String`
-  - `not_before: i64`
-  - `not_after: i64`
-  - `public_key: [u8; 32]`
-  - `is_ca: bool`
-  - `dns: Vec<String>`
-  - `ips: Vec<IpAddr>`
-  - `server_auth: bool`
-  - `client_auth: bool`
-
-- **`fn extension(oid: &[u64], critical: bool, value: &[u8]) -> Vec<u8>`**
-  a DER Extension (oid, the critical flag, the DER value) for CertBuilder::sign_ext
-
-**`impl CertBuilder`**
-
-- **`fn sign(&self, issuer: Option<&Cert>, key: &Keypair) -> Vec<u8>`**
-  the DER certificate, signed by `key`; `issuer`: the issuing certificate (None: self
-  signed with the builder's own name)
-- **`fn sign_ext(&self, issuer: Option<&Cert>, key: &Keypair, extra: &[Vec<u8>]) -> Vec<u8>`**
-  sign with further extensions (each one from `extension`: name constraints, a CA's
-  extended key usage ...); one with the OID of an extension the builder writes itself
-  replaces that one (basic constraints without a path length, other key usages)
-
-- **`fn ed25519_pkcs8(seed: &[u8; 32]) -> Vec<u8>`**
-  the PKCS#8 form of an Ed25519 private key (for interoperable PEM files)
-
-- **`fn ed25519_from_pkcs8(b: &[u8]) -> Option<[u8; 32]>`**
-  the seed of a PKCS#8 Ed25519 private key
-
 ## netpkt
 
 *network packets byte for byte: addresses, checksums, Ethernet to TCP codecs, DHCP, DNS, NTP, syslog, SNMP, SSH, TLS 1.3, EAP and IMAP without I/O, X.509, cookies, URI references, a dissector, pcapng* -- crate root [`lib/netpkt/lib.rs`](../lib/netpkt/lib.rs)
@@ -44431,7 +46850,8 @@ on every target (simulators, packet tools, tests).
   cookie    SetCookie::parse, parse_date, domain_match, path_match, default_path, site_of; Jar:
             store, header, matching, script_text, purge, drop_session; SameSite as far as a small
             browser needs it; the time comes from the caller          (RFC 6265, 6265bis)
-  x509      certificates of a private PKI (Ed25519): CertSpec::sign, Cert::parse, names, fingerprint,
+  x509      certificates: the crate jflib-x509 (netio's as well), CertSpec as its builder's
+            earlier name, check_chain: what is wrong with a chain as fault bits for dialogs
             signed_by, check_chain with F_* faults; no clock; uses crate crypto  (RFC 5280, 8410)
   tls       TLS 1.3 without I/O: Core for a client or a server (push bytes, take_out bytes, read,
             send, take_events), TLS_CHACHA20_POLY1305_SHA256, X25519, Ed25519; the key schedule,
@@ -51152,25 +53572,21 @@ MAX_COOKIES: usize = 500
 Source: [`lib/netpkt/x509.rs`](../lib/netpkt/x509.rs)
 
 ```text
-x509 -- certificates of a small private PKI without I/O and without a clock (RFC 5280; Ed25519,
-RFC 8410): written and read as DER and checked against anchors at a time the caller passes in.
-netio::x509 is the other X.509 of the library, with the web's RSA and ECDSA keys, on a crate that
-needs plat
+x509 -- netpkt's view of JFLib's certificates: the crate jflib-x509, which netio uses as well
+(one parser, one path validation), and what is wrong with a chain as fault bits for the
+dialogs of simulators and packet tools
 
-  CertSpec { serial, cn, org, not_before, not_after, public_key, is_ca, dns, ips }
-  spec.sign(issuer: Option<&Cert>, key) -> DER      issuer None: self-signed with its own name
-  Cert::parse(der) -> Option<Cert>                  subject and issuer (common name, organization),
-                                                    validity, the Ed25519 key, the CA flag, names;
-                                                    other keys parse with key None (they verify nothing)
-  cert.names(host)                                  a DNS name (case-insensitive, one wildcard
-                                                    label) or an address of its alternative names
-  cert.fingerprint() / fingerprint_text()           SHA-256 of the DER; in hex with colons
-  cert.signed_by(&issuer), cert.self_signed()       the signature checks out
-  check_chain(&[leaf, ...], anchors, host, now) -> faults   what is wrong with it: F_* bits, 0 for
-                                                    nothing
-
-Not here: revocation, name constraints, key usage checks beyond the CA flag, certificate policies.
+  Cert, CertBuilder, IpAddr, verify_chain ...   the crate x509, re-exported
+  CertSpec                                      CertBuilder under netpkt's earlier name
+  check_chain(&[leaf, ...], anchors, host, now) -> faults   what is wrong with it: F_* bits, 0
+                                                for nothing (a browser's list, where
+                                                verify_chain gives the first reason)
 ```
+
+Re-exports: `x509::*`
+
+- **`type CertSpec = x509::CertBuilder`**
+  the builder of a certificate (netpkt's earlier name of x509::CertBuilder)
 
 ```rust
 /// the time of a certificate has passed
@@ -51187,61 +53603,9 @@ F_UNKNOWN_ISSUER: u32 = 1 << 4
 F_BAD_SIGNATURE: u32 = 1 << 5
 ```
 
-- **`struct CertSpec`**
-  what a new certificate says
-  - `serial: [u8; 16]`
-  - `cn: String`
-  - `org: String`
-  - `not_before: i64` -- seconds since 1970
-  - `not_after: i64`
-  - `public_key: [u8; 32]`
-  - `is_ca: bool`
-  - `dns: Vec<String>`
-  - `ips: Vec<IpAddr>`
-
-**`impl CertSpec`**
-
-- **`fn sign(&self, issuer: Option<&Cert>, key: &Keypair) -> Vec<u8>`**
-  the DER certificate, signed by `key`; `issuer`: the certificate that issues it (None:
-  self-signed with its own name)
-
-- **`struct Cert`**
-  a certificate as this code reads it
-  - `der: Vec<u8>`
-  - `serial: Vec<u8>`
-  - `subject_cn: String`
-  - `subject_org: String`
-  - `issuer_cn: String`
-  - `issuer_org: String`
-  - `not_before: i64` -- seconds since 1970
-  - `not_after: i64`
-  - `key: Option<[u8; 32]>` -- its Ed25519 key (None: another kind of key)
-  - `is_ca: bool`
-  - `dns: Vec<String>`
-  - `ips: Vec<IpAddr>`
-
-**`impl Cert`**
-
-- **`fn parse(bytes: &[u8]) -> Option<Cert>`**
-  a certificate from DER; None: not one (or trailing bytes, or a version before v3)
-- **`fn fingerprint(&self) -> [u8; 32]`**
-  SHA-256 of the DER
-- **`fn fingerprint_text(&self) -> String`**
-  the fingerprint in hex with colons, as certificate dialogs write it
-- **`fn signed_by(&self, issuer: &Cert) -> bool`**
-  issuer's key made the signature (and the names fit)
-- **`fn self_signed(&self) -> bool`**
-  it says it issued itself, and the signature checks out
-- **`fn names(&self, host: &str) -> bool`**
-  it names this host: a DNS name (one wildcard label at the left), or an address; only its
-  alternative names count (RFC 9110 4.3.4), the common name does not
-- **`fn name_list(&self) -> Vec<String>`**
-  what the names are, for a dialog
-- **`fn bytes(&self) -> usize`**
-  bytes it holds (an estimate for a budget)
-
 - **`fn check_chain(chain: &[Cert], anchors: &[Cert], host: &str, now: i64) -> u32`**
-  what is wrong with a chain (leaf first) for this host at this time: F_\* bits, 0 for nothing
+  what is wrong with a chain (leaf first) for this host at this time: F_\* bits, 0 for nothing.
+  For a private Ed25519 PKI: a leaf with another kind of key counts as F_BAD_SIGNATURE
 
 ### `netpkt/tls.rs`
 
@@ -51323,6 +53687,7 @@ AL_DECRYPT_ERROR: u8 = 51
 AL_PROTOCOL_VERSION: u8 = 70
 AL_INTERNAL_ERROR: u8 = 80
 AL_MISSING_EXTENSION: u8 = 109
+AL_UNSUPPORTED_EXTENSION: u8 = 110
 EXT_SERVER_NAME: u16 = 0
 EXT_GROUPS: u16 = 10
 EXT_SIG_ALGS: u16 = 13
@@ -51553,7 +53918,10 @@ cas -- a content-addressed, deduplicating, encrypted chunk store (BackupCraft's 
 format "bcrepo-1")
 
   Repo::create(path, &CreateOptions) / Repo::open(path, Unlock::{Master, Passphrase,
-       Recovery})                       one process holds a repository at a time (LOCK)
+       Recovery})                       a repository in a folder (store::Folder)
+  Repo::create_in(store, ..) / open_in(store, ..)   in any Store (store.rs: objects by kind
+                                        and name, the way S3, SFTP or WebDAV keep them);
+                                        one holder at a time (Store::lock)
   repo.writer() -> Writer               put(kind, bytes) / put_stream(reader) -> chunk ids,
                                         finish() (packs and indexes are durable);
                                         finish_unsaved() -> (stats, Unsaved): the same, and
@@ -51573,16 +53941,19 @@ The list sits in repo.json under the MAC of the repository key, so it keeps out 
 and mistakes, not someone who holds the repository key (who could call trust_signer).  A
 repo.json without a MAC (taken away) does not open (Corrupt).
 
-Layout:  repo.json  data/<xx>/<pack>.pack  index/<pack>.idx  snapshots/<id>.snap  LOCK
+Objects: the config "repo" (repo.json), packs, their indexes, snapshots; a Folder keeps them
+         as repo.json  data/<xx>/<pack>.pack  index/<pack>.idx  snapshots/<id>.snap  LOCK
 Keys:    one random repository key, wrapped in repo.json for the server's master key, for
          passphrases (Argon2id) and for the recovery kit (sealed box); per purpose keys are
          derived from it with BLAKE3 derive_key (chunk ids, data, index, snapshots, gear).
 Chunks:  id = BLAKE3-keyed(id key, plain) -> identical data is stored once, the ids reveal
-         nothing without the key.  Commit order of a backup: packs (fsync) -> indexes
-         (fsync) -> snapshot (atomic rename, directory sync); a crash leaves at most
-         unreferenced packs, which gc removes.  Until its snapshot is there a backup's chunks
-         are such packs too: gc waits for open writers and for an Unsaved, and a snapshot
-         saved the plain way after a gc took chunks of it is refused (save_snapshot).
+         nothing without the key.  Commit order of a backup: packs -> indexes -> snapshot,
+         each put atomic and durable (Store's rule; Folder: synced, renamed, the folder
+         synced); a crash leaves at most unreferenced packs, which gc removes.  A listing
+         that fails stops gc (it is no empty repository).  Until its snapshot is there a
+         backup's chunks are such packs too: gc waits for open writers and for an Unsaved,
+         and a snapshot saved the plain way after a gc took chunks of it is refused
+         (save_snapshot).
 ```
 
 ### `cas` crate root
@@ -51683,9 +54054,16 @@ KIND_TREE: u8 = 1
 
 - **`fn create(path: &str, o: &CreateOptions) -> CasResult<Repo>`**
   create a repository in an empty (or new) folder
+- **`fn create_in(store: impl Store + 'static, o: &CreateOptions) -> CasResult<Repo>`**
+  create a repository in a store that holds nothing yet (NotEmpty)
 - **`fn open(path: &str, unlock: Unlock) -> CasResult<Repo>`**
-  open a repository
+  open the repository in a folder
+- **`fn open_in(store: impl Store + 'static, unlock: Unlock) -> CasResult<Repo>`**
+  open the repository in a store
 - **`fn path(&self) -> &str`**
+  where the repository is: its folder (Repo::open), else the store's location
+- **`fn store(&self) -> &dyn Store`**
+  the store the repository lives in
 - **`fn id(&self) -> String`**
 - **`fn immutable_days(&self) -> u32`**
 - **`fn chunker(&self) -> &Chunker`**
@@ -51694,7 +54072,7 @@ KIND_TREE: u8 = 1
   chunks in the index
 - **`fn has_chunk(&self, id: &ChunkId) -> bool`**
 - **`fn stored_bytes(&self) -> u64`**
-  bytes of all pack files
+  bytes of all pack files (0 when the store cannot list them)
 - **`fn add_passphrase(&self, pass: &str, label: &str, repo_key_from: Unlock) -> CasResult<()>`**
   let a passphrase open the repository (Argon2id, 64 MiB)
 - **`fn has_passphrase(&self, label: &str) -> bool`**
@@ -51725,6 +54103,7 @@ KIND_TREE: u8 = 1
   of it are gone -- looked up once a gc of this process has removed anything.  It waits
   for a running gc: not to be called while the same thread holds a Writer or an Unsaved.
 - **`fn snapshot_ids(&self) -> Vec<String>`**
+  the ids of the snapshots, sorted (none when the store cannot list them)
 - **`fn load_snapshot(&self, id: &str) -> CasResult<Snapshot>`**
   a snapshot, checked (signature by a trusted key, authentic encryption)
 - **`fn delete_snapshot(&self, id: &str, now: i64) -> CasResult<()>`**
@@ -51746,6 +54125,9 @@ KIND_TREE: u8 = 1
 
 - **`fn peek_id(path: &str) -> CasResult<String>`**
   the id of a repository folder without opening it
+
+- **`fn peek_id_in(store: &dyn Store) -> CasResult<String>`**
+  the id of the repository in a store without opening it
 
 - **`struct Writer<'a>`**
   writes new chunks into packs
@@ -51978,6 +54360,83 @@ SNAP_MAGIC: &[u8; 4] = b"BCN1"
 - **`fn open(key: &[u8; 32], id: &str, b: &[u8]) -> Result<(Snapshot, [u8; 32]), CasError>`**
   open a snapshot file: the snapshot and its signer (the signature is checked; whether the
   signer is trusted is the caller's decision)
+
+### `cas/store.rs`
+
+Source: [`lib/cas/store.rs`](../lib/cas/store.rs)
+
+```text
+store -- where a repository keeps its objects: the Store trait and Folder, a folder of the
+file system (plat::fs, so also a vfs mount such as mem://)
+
+  Store                 init, lock, get, get_range, put, delete, list, location: objects by
+                        kind and name, the way S3, SFTP or WebDAV keep them
+  Kind                  Config ("repo"), Pack, Index, Snapshot
+  Folder::new(path)     repo.json  data/<xx>/<pack>.pack  index/<pack>.idx
+                        snapshots/<id>.snap  LOCK
+
+What the repository asks of a store (Repo::create_in / open_in):
+  - put is atomic and durable: once it returns Ok, get and list see the whole object, also
+    after a crash, and a put that failed leaves the old object or none (the commit order of a
+    backup -- packs, indexes, snapshot -- rests on it)
+  - a delete that returned Ok stays done; deleting what is not there is Ok
+  - get and list see every put that returned before them (read after write)
+  - lock keeps a second holder out, also one of another process or host, until the guard
+    is dropped
+Nothing that comes back from a store is trusted: packs, indexes and snapshots are sealed and
+repo.json carries a MAC, so a store that changes, swaps or replays objects is found out (a
+rollback to older objects of the same repository is not); names and sizes of a listing are
+checked before use.  A store sees the names, the sizes and when objects come and go: pack
+and index names are random, snapshot names are the ids given to save_snapshot.
+```
+
+- **`enum Kind`**
+  what an object of a repository is
+  - `Config` -- the repository's settings and wrapped keys; the repository uses one, named "repo"
+  - `Pack` -- a pack of sealed chunks (written once, read in ranges, deleted by gc)
+  - `Index` -- the sealed index of the pack of the same name
+  - `Snapshot` -- a sealed and signed snapshot, named by its id
+
+- **`type StoreLock = Box<dyn Any + Send + Sync>`**
+  what [`Store::lock`] hands out: the repository is held until it is dropped
+
+- **`trait Store: Send + Sync`**
+  Where a repository keeps its objects.  A name is not empty and has none of '/', '\\\\', '.',
+  ':' (pack and index names are hex, snapshot names the ids given to save_snapshot).  The
+  rules a store keeps are those in the header of this module: put atomic and durable, read
+  after write, a lock that keeps every other holder out.
+  - `fn location(&self) -> String`
+    where it is, for messages and Repo::path ("D:/Backups/repo", "s3://bucket/prefix")
+  - `fn init(&self) -> CasResult<()>`
+    make the place of a new repository: NotEmpty when it already holds anything
+  - `fn lock(&self) -> CasResult<StoreLock>`
+    hold the repository (InUse while another holder has it)
+  - `fn get(&self, kind: Kind, name: &str) -> CasResult<Option<Vec<u8>>>`
+    the whole object; Ok(None) when there is none
+  - `fn get_range(&self, kind: Kind, name: &str, off: u64, len: usize) -> CasResult<Vec<u8>>`
+    `len` bytes from `off` on, fewer only where the object ends (NotFound when there is
+    none).  The default reads the whole object: a store with ranged reads does better
+  - `fn put(&self, kind: Kind, name: &str, data: &[u8]) -> CasResult<()>`
+    store an object (replacing one of the same name), atomic and durable
+  - `fn delete(&self, kind: Kind, name: &str) -> CasResult<()>`
+    remove an object; one that is not there is fine
+  - `fn list(&self, kind: Kind) -> CasResult<Vec<(String, u64)>>`
+    the names and sizes of the objects of a kind, in any order
+
+- **`fn name_ok(name: &str) -> bool`**
+  whether a store may be asked for this name (Store's rule)
+
+- **`struct Folder`**
+  A repository in a folder of the file system: repo.json, data/&lt;xx>/&lt;pack>.pack (the first
+  two hex digits), index/&lt;pack>.idx, snapshots/&lt;id>.snap and LOCK (plat::FileLock: one
+  holder at a time on this machine).  Files and folders are the owner's only
+  (write_file_private, mkdir_private); a write goes to a temporary sibling that is synced
+  and renamed into place.  The path can be a vfs name too (mem://, a mount).
+
+**`impl Folder`**
+
+- **`fn new(path: &str) -> Folder`**
+- **`fn path(&self) -> &str`**
 
 ## update
 
@@ -52426,7 +54885,7 @@ MAX_SIG: usize = 4096
 
 ```text
 In-memory ZIP interchange (ZIP32, ZIP64 when it is needed). New native library code,
-independent of document/UI code. Raw DEFLATE, inflate and CRC reuse img_core's safe codec
+independent of document/UI code. Raw DEFLATE, inflate and CRC come from jflib-compress
 primitives; no paths are extracted. `opc` builds the Open Packaging Conventions on top;
 `cfb` reads compound files ("OLE", [MS-CFB]), the container of Office's binary formats.
 ZipFs shows an archive as a read-only plat::vfs tree:
@@ -57234,9 +59693,11 @@ Source: [`lib/diagram_core/src/formula/xml.rs`](../lib/diagram_core/src/formula/
 xml -- a small element tree of a theme part (DrawingML with Visio's extensions)
 
 Theme parts are a few dozen kilobytes of attributes; the engine reads colours, fonts and
-style lists from them.  This reader keeps elements (local names, attributes, children) and
-drops text, comments, processing instructions and the DOCTYPE; it refuses nothing: what it
-cannot read ends the tree there.  Limits: 200 000 elements, depth 256.
+style lists from them.  The reading is formats::xml::Lenient's (nothing is an error: a broken
+tag or reference is read as far as it goes); this tree keeps elements (local names, attributes
+without the xmlns declarations, children) and drops text, comments, processing instructions and
+the DOCTYPE; an end tag closes the element open last.  Limits: 200 000 elements, depth 256; a
+second root element or a limit ends the tree there.
 ```
 
 - **`struct Elem`**
@@ -61318,7 +63779,7 @@ corner.  The stencil windows are template.rs's (stencil_windows, set_stencil_win
 Source: [`lib/diagram_io/src/xml.rs`](../lib/diagram_io/src/xml.rs)
 
 ```text
-xml -- a bounded pull reader for the XML parts of the VSDX family
+xml -- the XML parts of the VSDX family: formats::xml's strict pull reader with the namespaces it knows
 
   Reader::new(text, depth, attrs)    a part's text (UTF-8 or UTF-16 decoded by text_of)
   r.next() -> Event                  Start, End, Text, Eof; an empty element <a/> gives Start
@@ -61326,18 +63787,14 @@ xml -- a bounded pull reader for the XML parts of the VSDX family
   r.skip(&start) -> &str             the rest of an element, returned as the file wrote it
                                      (an unknown element kept for DF-03)
 
-Why not base::xml: shape text is mixed content (<Text>ab<cp IX='0'/>cd</Text>), and unknown
-elements must come back as written; base::xml builds trees of element-only or text-only nodes.
-
-What it reads: elements, attributes in ' or ", the five predefined entities and character
-references, CDATA, comments and processing instructions (both skipped), namespaces (each name
-is resolved to the few namespaces the reader knows, Ns).  Refused: a DOCTYPE (no entities,
-no external anything), an undefined entity, a character XML does not allow, an encoding other
-than UTF-8 / UTF-16 in the declaration, mismatched or unclosed tags, an unbound prefix, a
-duplicate attribute, more nesting than `depth` and more attributes on one element than
-`attrs`.  Line ends are normalised as XML says: CR LF and CR become LF in text; in attribute
-values a literal tab, line end or CR becomes a space (character references stay).  Nothing
-recurses: a reader's stack is its own Vec, bounded by `depth`.
+The reader is formats::xml::Reader (strict: well-formed XML 1.0 with namespaces; mixed content,
+which shape text is: <Text>ab<cp IX='0'/>cd</Text>; positions for the raw text of unknown
+elements).  This file maps its namespace URIs to the few the VSDX reader knows (Ns), its errors to
+XmlError, and skips comments and processing instructions; CDATA is text.  Refused, as there: a
+DOCTYPE (no entities, no external anything), an undefined entity, a character XML does not allow,
+an encoding other than UTF-8 / UTF-16 in the declaration, mismatched or unclosed tags, an unbound
+prefix, a duplicate attribute, more nesting than `depth` and more attributes on one element than
+`attrs`.  Nothing recurses.
 ```
 
 - **`enum XmlError`**
@@ -61929,7 +64386,7 @@ callback such as a window procedure: core panics once more there, with one of NO
 
 ## pdf
 
-*vector PDF writer with embedded font subsets, links and outlines* -- crate root [`lib/pdf/src/lib.rs`](../lib/pdf/src/lib.rs)
+*PDF writer (vector pages, font subsets, links, outlines) and reader (encryption, text, outlines, forms, attachments, drawing pages)* -- crate root [`lib/pdf/src/lib.rs`](../lib/pdf/src/lib.rs)
 
 ```text
 pdf -- a vector PDF writer: pages of their own size drawn on a canvas (paths, fills with the
@@ -61940,7 +64397,9 @@ FlateDecode and their alpha as a soft mask), text in embedded TrueType / OpenTyp
 (CID fonts with Identity-H, ToUnicode for search and copy, glyphs and widths from the
 library's shaping), links to URIs and to places in the document, nested outlines
 (bookmarks), the document information and XMP metadata.  PDF 1.7 with a classic xref table;
-the same document always gives the same bytes.  Not here: PDF/A, encryption, forms.
+the same document always gives the same bytes.  Not here: PDF/A, encryption, forms.  And a
+reader, pdf::read: structure, encryption, text, outlines, forms, attachments, and drawing pages
+(below).
 
   let mut doc = Document::new();
   let page = doc.add_page(A4.0, A4.1);              // points (1/72 inch); mm(210.0) converts
@@ -61988,6 +64447,11 @@ alpha a luminosity soft mask (a transparency group painting the alphas as a Devi
 in the same user space).  Degenerate gradients paint the last stop's colour as SVG does.
 Hatches are clipped, stroked lines in one path, not tiling patterns (pdfium shows seams between
 rotated pattern cells, and readers round the cell step to device pixels).
+
+Reading: pdf::read (read/mod.rs) opens PDF files of every version, also encrypted and damaged
+ones, and gives their objects, pages, text with the position of every glyph, information,
+outlines, links and other annotations, form fields, attachments and page labels.  It shares
+Info and Date with the writer and nothing else.
 ```
 
 ### `pdf` crate root
@@ -62410,6 +64874,502 @@ FlateDecode with PNG predictors and their alpha as a soft mask (SMask)
   width and height in pixels
 - **`fn is_jpeg(&self) -> bool`**
 - **`fn has_alpha(&self) -> bool`**
+
+### `pdf/src/read/mod.rs`
+
+Source: [`lib/pdf/src/read/mod.rs`](../lib/pdf/src/read/mod.rs)
+
+```text
+pdf::read -- a PDF reader: the objects of a file, its pages, information, outlines, links and
+other annotations, form fields, attachments, page labels, the text of each page with where
+each glyph stands, and the pages drawn as pixels (render/).  PDF 1.0 to 2.0: classic cross-reference tables and cross-reference
+streams, object streams, incremental updates, hybrid files; files whose table is missing or
+wrong are rebuilt from their objects, as the common readers do.  Encrypted files with the
+standard security handler open with their password, or without one when only the owner
+password is set (RC4 40 to 128 bit, AES-128, AES-256).
+
+  let doc = read::Document::open(bytes)?;            // or open_with(bytes, &Options { password, .. })
+  for i in 0..doc.page_count() {
+      let text = doc.text(i)?;                       // the page's text in reading order
+      let size = doc.page(i)?.size();                // points, after /Rotate
+  }
+  let info = doc.info();                             // pdf::Info: title, author, dates, ...
+  for o in doc.outlines() { .. }                     // bookmarks with their Action
+  let px = doc.render(0, &RenderOptions { dpi: 150.0, ..Default::default() })?;  // gfx::Surface
+
+  Document     open / open_with, version, is_encrypted / permissions / opened_as_owner,
+               was_repaired, trailer / catalog, get(Ref) / resolve, decode(Stream) /
+               decode_until_image, page_count / page / pages / contents, info / metadata /
+               language, outlines, named_dest, annotations / links, fields, attachments,
+               page_label, page_text (glyphs with positions) / text, page_pixels / render
+               (RenderOptions: dpi, region, background, annotations, fonts: a FontSource,
+               SystemFonts by default)
+  Object       Null, Bool, Int, Real, String, Name, Array, Dict, Stream, Ref; text_string
+  Ops          the operators of a content stream with their operands (content::Op)
+
+Untrusted input: a damaged or hostile file gives an Error or less than it claims, never a
+panic, a hang or memory without end.  Nesting, the objects of one parse, the depth of
+references, page trees, outlines and form XObjects are bounded; every decoded stream is at
+most Options::max_stream bytes.  Permissions are reported, not enforced: what a program
+allows its user to do with the document is its own decision.
+
+Not here: the image filters for decode_until_image (it stops before DCT, JPX, JBIG2 and
+CCITTFax; drawing decodes DCT and CCITTFax), JPX and JBIG2 images at all, the predefined CMaps
+of East Asian fonts other than Identity and the Unicode ones, verifying signatures, changing
+and saving documents.
+```
+
+- **`struct Options`**
+  how a document is opened
+  - `password: String` -- the user or the owner password ("" for files without one)
+  - `max_stream: usize` -- the largest decoded stream, in bytes (a content stream, an image, an attachment)
+
+- **`enum Error`**
+  why a document or a part of it cannot be read
+  - `NotPdf` -- not a PDF file: no header and no objects
+  - `Damaged(&'static str)` -- the file is damaged where it was needed
+  - `Password` -- encrypted, and the password is missing or wrong
+  - `Unsupported(&'static str)` -- something this reader does not do (a security handler other than the standard one, an
+    image filter)
+  - `Limit(&'static str)` -- more than the Options allow
+  - `NoPage` -- a page number past the last page
+
+- **`struct Page`**
+  a page: its boxes (points, PDF page space with y up), rotation and dictionaries
+  - `obj: Option<Ref>` -- the page object
+  - `media_box: [f64; 4]` -- x0, y0, x1, y1
+  - `crop_box: [f64; 4]` -- the visible part (the media box when the page sets none)
+  - `rotate: u16` -- clockwise when shown: 0, 90, 180 or 270
+  - `user_unit: f64` -- the size of a unit in points (PDF 1.6; usually 1)
+  - `dict: Dict` -- the page dictionary, and its resources (inherited ones included)
+  - `resources: Dict`
+
+**`impl Page`**
+
+- **`fn size(&self) -> (f64, f64)`**
+  width and height of the crop box in points as the page is shown (after /Rotate)
+
+- **`struct Document`**
+  a PDF document opened for reading
+
+**`impl Document`**
+
+- **`fn open(data: Vec<u8>) -> Result<Document, Error>`**
+  open a document without a password
+- **`fn open_with(data: Vec<u8>, opt: &Options) -> Result<Document, Error>`**
+- **`fn version(&self) -> (u8, u8)`**
+  the version of the header, or of the catalog's /Version when that is newer
+- **`fn is_encrypted(&self) -> bool`**
+- **`fn permissions(&self) -> Option<u32>`**
+  the permission bits /P of an encrypted file (ISO 32000-1, Table 22: bit 3 print, 4
+  modify, 5 copy text and graphics, 6 annotate, 9 fill in forms, 10 extract for
+  accessibility, 11 assemble, 12 print in high quality; counted from 1)
+- **`fn encryption_revision(&self) -> Option<u8>`**
+  the revision of the standard security handler (2 to 6) of an encrypted file
+- **`fn opened_as_owner(&self) -> bool`**
+  the password given was the owner password
+- **`fn was_repaired(&self) -> bool`**
+  the cross-reference was rebuilt from the objects of the file
+- **`fn trailer(&self) -> &Dict`**
+- **`fn catalog(&self) -> Dict`**
+  the document catalog (empty when there is none)
+- **`fn data(&self) -> &[u8]`**
+  the raw bytes of the file
+- **`fn get(&self, r: Ref) -> Object`**
+  an indirect object (Null when it is missing, as ISO 32000 has it)
+- **`fn resolve(&self, o: &Object) -> Object`**
+  follow references until an object that is none (Null after too many)
+- **`fn decode(&self, s: &Stream) -> Result<Vec<u8>, Error>`**
+  a stream's data with all its filters applied (an image filter is Error::Unsupported)
+- **`fn decode_until_image(&self, s: &Stream) -> Result<(Vec<u8>, Option<(Name, Dict)>), Error>`**
+  a stream's data with its filters applied up to an image filter: the data, and the image
+  filter with its parameters (DCTDecode is a JPEG file then, JPXDecode a JPEG 2000 one)
+- **`fn page_count(&self) -> usize`**
+- **`fn pages(&self) -> &[Page]`**
+- **`fn page(&self, i: usize) -> Result<&Page, Error>`**
+- **`fn page_of(&self, r: Ref) -> Option<usize>`**
+  the page a page object is (for destinations)
+- **`fn contents(&self, i: usize) -> Result<Vec<u8>, Error>`**
+  the content of a page: its content streams decoded and joined (a stream that cannot be
+  decoded adds nothing)
+- **`fn info(&self) -> Info`**
+  the document information (the Info dictionary; dates as the file writes them)
+- **`fn metadata(&self) -> Option<Vec<u8>>`**
+  the XMP metadata of the document (the catalog's /Metadata stream)
+- **`fn language(&self) -> Option<String>`**
+  the natural language of the document (/Lang: "de-DE")
+
+- **`fn parse_date(s: &str) -> Option<Date>`**
+  a date of a PDF file (7.9.4: "D:YYYYMMDDHHmmSSOHH'mm'"; every part after the year may be
+  missing, as may "D:")
+
+### `pdf/src/read/content.rs`
+
+Source: [`lib/pdf/src/read/content.rs`](../lib/pdf/src/read/content.rs)
+
+```text
+The operators of a content stream (ISO 32000-1, 7.8.2): operands, then the operator.  An
+inline image (BI ... ID data EI) comes as one operator "BI" with two operands, its
+dictionary and its data.  Damaged content gives what can be read: an unknown token is skipped,
+operands beyond MAX_OPERANDS are dropped, and the stream ends where the bytes end.
+```
+
+- **`struct Op<'a>`**
+  one operator with its operands
+  - `operator: &'a [u8]` -- the operator: b"Tj", b"re", b"BI" (an inline image), ...
+  - `operands: Vec<Object>`
+
+- **`struct Ops<'a>`**
+  the operators of content-stream bytes, in order
+
+**`impl<'a> Ops<'a>`**
+
+- **`fn new(content: &'a [u8]) -> Ops<'a>`**
+
+### `pdf/src/read/nav.rs`
+
+Source: [`lib/pdf/src/read/nav.rs`](../lib/pdf/src/read/nav.rs)
+
+```text
+What a document holds besides its pages' content (ISO 32000-1, 12): the outline
+(bookmarks), destinations (explicit and named, through the /Dests dictionary or the name
+tree), actions, annotations with links, the fields of an interactive form with their values
+and signatures (read, not verified), embedded files and page labels.  Trees and lists are
+walked with a set of the objects seen and a budget, so a loop or a huge tree ends.
+```
+
+- **`enum View`**
+  how a destination shows its page (12.3.2.2); None keeps what the viewer has
+  - `Xyz { left: Option<f64>, top: Option<f64>, zoom: Option<f64> }`
+  - `Fit`
+  - `FitH(Option<f64>)`
+  - `FitV(Option<f64>)`
+  - `FitR([f64; 4])` -- left, bottom, right, top
+  - `FitB`
+  - `FitBH(Option<f64>)`
+  - `FitBV(Option<f64>)`
+
+- **`struct Dest`**
+  a place in the document: a page (counted from 0) and how it is shown
+  - `page: usize`
+  - `view: View`
+
+- **`enum Action`**
+  what an outline item or a link does (12.6.4)
+  - `GoTo(Dest)`
+  - `Uri(String)` -- a web address or other URI
+  - `GoToFile { file: String, page: Option<usize> }` -- a page of another PDF file (GoToR): the file, the page when given as a number
+  - `Launch(String)` -- start another file or program (Launch)
+  - `Named(String)` -- a viewer command (Named: NextPage, PrevPage, FirstPage, LastPage, ...)
+  - `Other(String)` -- any other kind of action (JavaScript, SubmitForm, ...), by its /S
+
+- **`struct Outline`**
+  an item of the outline, with its children
+  - `title: String`
+  - `action: Option<Action>`
+  - `open: bool` -- its children are shown
+  - `children: Vec<Outline>`
+
+- **`struct Annotation`**
+  an annotation of a page
+  - `subtype: String` -- /Subtype: Link, Text, Highlight, Widget, FileAttachment, ...
+  - `rect: [f64; 4]` -- x0, y0, x1, y1 in page space
+  - `contents: Option<String>` -- /Contents: the text of a note or comment
+  - `author: Option<String>` -- /T: the author of a markup annotation
+  - `modified: Option<Date>`
+  - `action: Option<Action>` -- a link's action (its /A, or its /Dest as GoTo)
+  - `obj: Option<Ref>`
+
+- **`enum FieldKind`**
+  a form field's kind (12.7.4)
+  - `Text`
+  - `CheckBox`
+  - `Radio`
+  - `PushButton`
+  - `ComboBox`
+  - `ListBox`
+  - `Signature`
+  - `Unknown` -- a field without /FT
+
+- **`struct Signature`**
+  a field's signature as the file states it (12.8): the signature is not verified
+  - `filter: String` -- /Filter and /SubFilter: Adobe.PPKLite, adbe.pkcs7.detached, ETSI.CAdES.detached, ...
+  - `sub_filter: String`
+  - `name: Option<String>` -- /Name, /Reason, /Location, /ContactInfo as given
+  - `reason: Option<String>`
+  - `location: Option<String>`
+  - `time: Option<Date>`
+  - `byte_range: Vec<(u64, u64)>` -- the byte ranges of the file the signature covers: (start, length) pairs
+  - `contents: Vec<u8>` -- the signature (a PKCS #7 / CMS structure for the usual kinds)
+  - `covers_file: bool` -- the ranges cover the whole file but the signature itself (later changes make it false)
+
+- **`struct Field`**
+  a field of the interactive form
+  - `name: String` -- the full name: the partial names of its parents and its own, with dots
+  - `kind: FieldKind`
+  - `value: Vec<String>` -- the value: text, the chosen option(s), a button's state ("Off" when not checked)
+  - `flags: u32` -- /Ff
+  - `read_only: bool`
+  - `required: bool`
+  - `options: Vec<String>` -- the options of a choice field, as shown
+  - `widgets: Vec<(Option<usize>, [f64; 4])>` -- the widgets: the page (when known) and the rectangle
+  - `signature: Option<Signature>` -- for a signature field with a value
+
+- **`struct Attachment`**
+  a file embedded in the document (7.11.4)
+  - `name: String` -- the file name (/UF, else /F)
+  - `description: Option<String>`
+  - `mime: Option<String>` -- /Subtype of the file stream: a MIME type ("text/xml")
+  - `size: Option<u64>`
+  - `modified: Option<Date>`
+  - `relationship: Option<String>` -- /AFRelationship (PDF/A-3, ZUGFeRD: Data, Source, Alternative, ...)
+  - `stream: Option<Stream>` -- the data: Document::decode(&stream)
+
+**`impl Document`**
+
+- **`fn named_dest(&self, name: &str) -> Option<Dest>`**
+  a named destination ("chapter1")
+- **`fn outlines(&self) -> Vec<Outline>`**
+  the outline (bookmarks)
+- **`fn annotations(&self, page: usize) -> Result<Vec<Annotation>, Error>`**
+  the annotations of a page
+- **`fn links(&self, page: usize) -> Result<Vec<([f64; 4], Action)>, Error>`**
+  the links of a page: (rectangle, action)
+- **`fn fields(&self) -> Vec<Field>`**
+  the fields of the interactive form (the AcroForm), terminal fields only
+- **`fn attachments(&self) -> Vec<Attachment>`**
+  the embedded files: the /EmbeddedFiles name tree, then file attachment annotations
+- **`fn page_label(&self, page: usize) -> Option<String>`**
+  a page's label (12.4.2: "iv", "A-3"); None when the document sets no labels
+
+### `pdf/src/read/object.rs`
+
+Source: [`lib/pdf/src/read/object.rs`](../lib/pdf/src/read/object.rs)
+
+```text
+The objects of a PDF file as the reader gives them (ISO 32000-1, 7.3): null, booleans,
+integers, reals, strings (bytes; text strings are decoded by text_string), names, arrays,
+dictionaries, streams and references to indirect objects.  A stream holds its dictionary and
+where its data lies in the file; Document::decode gives the data with the filters applied.
+```
+
+- **`struct Ref`**
+  a reference to an indirect object: its number and generation
+  - `num: u32`
+  - `generation: u16`
+
+- **`struct Name(pub Vec<u8>)`**
+  a name (/Type): its bytes with #xx escapes resolved
+
+**`impl Name`**
+
+- **`fn as_bytes(&self) -> &[u8]`**
+- **`fn to_text(&self) -> String`**
+  the name as text (bytes that are not UTF-8 become U+FFFD)
+
+- **`struct Dict(pub(crate) BTreeMap<Name, Object>)`**
+  a dictionary; a key given twice keeps its last value
+
+**`impl Dict`**
+
+- **`fn new() -> Dict`**
+- **`fn get(&self, key: &str) -> Option<&Object>`**
+  the value of a key (without the slash: "Type")
+- **`fn get_bytes(&self, key: &[u8]) -> Option<&Object>`**
+- **`fn contains(&self, key: &str) -> bool`**
+- **`fn insert(&mut self, key: &str, value: Object)`**
+- **`fn len(&self) -> usize`**
+- **`fn is_empty(&self) -> bool`**
+- **`fn iter(&self) -> impl Iterator<Item = (&Name, &Object)>`**
+- **`fn name(&self, key: &str) -> Option<&[u8]>`**
+  the name under a key (Type, Subtype, ...), if it is one
+- **`fn is(&self, key: &str, v: &str) -> bool`**
+  a key whose value is the name `v`
+- **`fn int(&self, key: &str) -> Option<i64>`**
+- **`fn num(&self, key: &str) -> Option<f64>`**
+
+- **`struct Stream`**
+  a stream: its dictionary, and where its (still encoded) data lies in the file
+  - `dict: Dict`
+
+**`impl Stream`**
+
+- **`fn raw_len(&self) -> usize`**
+  the number of encoded bytes
+
+- **`enum Object`**
+  one object of a PDF file
+  - `Null`
+  - `Bool(bool)`
+  - `Int(i64)`
+  - `Real(f64)`
+  - `String(Vec<u8>)` -- a string's bytes (decrypted); text strings decode with text_string
+  - `Name(Name)`
+  - `Array(Vec<Object>)`
+  - `Dict(Dict)`
+  - `Stream(alloc::boxed::Box<Stream>)` -- boxed: keeps every object at 32 bytes
+  - `Ref(Ref)`
+
+**`impl Object`**
+
+- **`fn name(s: &str) -> Object`**
+- **`fn is_null(&self) -> bool`**
+- **`fn as_bool(&self) -> Option<bool>`**
+- **`fn as_int(&self) -> Option<i64>`**
+  an integer, or a real that is one (some writers put 1.0 where an integer belongs)
+- **`fn as_f64(&self) -> Option<f64>`**
+  a number
+- **`fn as_name(&self) -> Option<&[u8]>`**
+- **`fn as_bytes(&self) -> Option<&[u8]>`**
+  a string's bytes
+- **`fn as_array(&self) -> Option<&[Object]>`**
+- **`fn as_dict(&self) -> Option<&Dict>`**
+  a dictionary, or a stream's dictionary
+- **`fn as_stream(&self) -> Option<&Stream>`**
+- **`fn as_ref(&self) -> Option<Ref>`**
+- **`fn as_rect(&self) -> Option<[f64; 4]>`**
+  a rectangle [x0 y0 x1 y1], normalized so that x0 &lt;= x1 and y0 &lt;= y1
+
+- **`fn text_string(b: &[u8]) -> String`**
+  a text string (7.9.2.2) as text: UTF-16BE after FE FF, UTF-16LE after FF FE (seen in the
+  wild), UTF-8 after EF BB BF (PDF 2.0), else PDFDocEncoding
+
+### `pdf/src/read/render/mod.rs`
+
+Source: [`lib/pdf/src/read/render/mod.rs`](../lib/pdf/src/read/render/mod.rs)
+
+```text
+Drawing pages (ISO 32000-1, 8 to 11): Document::render gives the page as pixels.  The content
+stream runs through a graphics state (q / Q, cm, the line style, colours in every colour
+space, ExtGState with alpha, blend mode and soft mask), paths are filled with the non-zero or
+even-odd rule and stroked with caps, joins, miter limit and dashes in user space (also under
+a non-uniform matrix), clipping paths and text clipping are masks.  Text through the glyph
+outlines of the embedded fonts (Type 1, CFF, TrueType, OpenType, Type 3) or substitutes
+(FontSource); every text render mode.  Images with every bit depth and colour space, Decode,
+stencil masks, colour-key masks, soft masks, the JPEG filter (through img_jpeg) and
+CCITTFax; shadings of every type (sh and as patterns), tiling patterns coloured and
+uncoloured; form XObjects, transparency groups and soft masks (luminosity and alpha, with
+backdrop and transfer function); the annotations' appearances; optional content (the
+default configuration, membership dictionaries).  Not here: JPXDecode and JBIG2Decode images
+(left out), knockout and non-isolated groups (drawn as isolated ones), overprint, halftones,
+transfer functions outside soft masks.
+
+  let doc = read::Document::open(bytes)?;
+  let page: gfx::Surface = doc.render(0, &RenderOptions { dpi: 150.0, ..Default::default() })?;
+
+Untrusted input: the work of a page is bounded (the operators, the pixels painted, forms,
+patterns, Type 3 glyphs and soft masks inside each other, the pixels of images and layers),
+a page that needs more gives Error::Limit.
+```
+
+- **`struct RenderOptions`**
+  how to draw a page
+  - `dpi: f64` -- pixels per inch: 72 draws a point as a pixel
+  - `region: Option<[u32; 4]>` -- the part of the page image to draw, in pixels: x, y, width, height (None: all of it)
+  - `background: Option<u32>` -- the colour under the page, straight 0xAARRGGBB (None: transparent)
+  - `annotations: bool` -- draw the annotations' appearances (form fields, stamps, comments)
+  - `fonts: Option<Rc<dyn FontSource>>` -- fonts for the fonts a document does not embed (None: the system's, text::fontdb)
+  - `max_pixels: u64` -- the largest image to draw, in pixels
+
+- **`struct FontQuery<'a>`**
+  a font a page uses but does not embed
+  - `name: &'a str` -- its PostScript name without a subset tag (Helvetica-Bold, ArialMT, ...)
+  - `family: Option<&'a str>`
+  - `bold: bool`
+  - `italic: bool`
+  - `serif: bool` -- serifs, a fixed pitch, a symbol font (by the descriptor's flags)
+  - `fixed: bool`
+  - `symbolic: bool`
+  - `text: bool` -- a simple font (one byte per code), not a composite one
+
+- **`trait FontSource`**
+  where substitutes for fonts that are not embedded come from: a TrueType, OpenType or Type 1
+  file and the face in it
+  - `fn find(&self, q: &FontQuery) -> Option<(Vec<u8>, u32)>`
+
+- **`struct SystemFonts`**
+  the system's fonts (text::fontdb), searched once: for the 14 standard fonts their
+  metric-compatible families (URW's Nimbus, Liberation, the Windows fonts), others by name and
+  flags
+
+**`impl SystemFonts`**
+
+- **`fn new() -> SystemFonts`**
+
+**`impl Document`**
+
+- **`fn page_pixels(&self, page: usize, dpi: f64) -> Result<(u32, u32), Error>`**
+  the size of a page drawn at dpi: width and height in pixels (the crop box after /Rotate)
+- **`fn render(&self, page: usize, opt: &RenderOptions) -> Result<gfx::Surface, Error>`**
+  draw a page into a new surface (premultiplied ARGB, gfx::FMT_PARGB)
+
+### `pdf/src/read/render/shade.rs`
+
+Source: [`lib/pdf/src/read/render/shade.rs`](../lib/pdf/src/read/render/shade.rs)
+
+```text
+Shadings and patterns (ISO 32000-1, 8.7): function-based, axial and radial shadings by pixel
+(axial and radial through a table of 1024 colours over their domain, with Extend), the mesh
+shadings (free-form and lattice triangles, Coons and tensor-product patches, the patches
+cut into a grid of triangles fine enough for the device; each vertex, and each patch, begins
+on a byte as Poppler and pdf.js read them) drawn with Gouraud colours and without
+antialiasing between their triangles; sh fills the clip (and the shading's BBox),
+a shading pattern fills a path, with its Background where the shading does not reach.
+Tiling patterns draw one cell at device resolution into a tile (coloured, or uncoloured in
+the colour of the scn) that repeats with the pattern's steps.
+```
+
+**`impl Shading`**
+
+- **`fn parse(doc: &Document, o: &Object, res: &Dict) -> Option<Shading>`**
+
+### `pdf/src/read/text.rs`
+
+Source: [`lib/pdf/src/read/text.rs`](../lib/pdf/src/read/text.rs)
+
+```text
+The text of a page (ISO 32000-1, 9.4): the content stream is interpreted for its text
+state (fonts, sizes, the text and line matrices, character and word spacing, horizontal
+scaling, rise, the current transformation matrix with q / Q and cm, form XObjects with their
+own matrix and resources), and every glyph shown becomes a TextItem with its text, origin and
+advance in page space.  PageText::text lays them out as Poppler's pdftotext -raw does: in the
+order the page draws them, a new line where the baseline moves by more than half the font
+size, a space where a gap is wider than 0.15 of it (0.08 after a space glyph; a space glyph
+that leaves no gap is no space; a glyph without text leaves a gap), a glyph drawn again on
+one of the last 64 (fake bold, a word printed twice) once, a run of Hebrew or Arabic drawn
+left to right in reading order.
+```
+
+- **`struct TextItem`**
+  one glyph shown on a page
+  - `text: String` -- the characters the glyph stands for (usually one; empty when the font does not say)
+  - `x: f64` -- where the glyph starts on its baseline, in page space (points, y up, before /Rotate)
+  - `y: f64`
+  - `dx: f64` -- how far the glyph moves the pen, in page space (along the baseline; with character and
+    word spacing)
+  - `dy: f64`
+  - `width: f64` -- the glyph's own width along the baseline in page space (without the spacing)
+  - `size: f64` -- the font size in page space
+  - `font: u16` -- which of PageText::fonts
+  - `invisible: bool` -- render mode 3: drawn invisibly (the text layer of a scan)
+
+- **`struct PageText`**
+  the glyphs of a page and the names of their fonts
+  - `items: Vec<TextItem>`
+  - `fonts: Vec<String>`
+
+**`impl Document`**
+
+- **`fn page_text(&self, page: usize) -> Result<PageText, Error>`**
+  the glyphs of a page, in the order the page draws them
+- **`fn text(&self, page: usize) -> Result<String, Error>`**
+  the text of a page in reading order (PageText::text)
+
+**`impl PageText`**
+
+- **`fn text(&self) -> String`**
+  the text: lines in the order the page draws them, words apart where the glyphs are,
+  right-to-left runs in reading order
 
 ### `pdf/src/shading.rs`
 
@@ -62973,8 +65933,9 @@ dimension styles, blocks with their entities, and the entities of the drawing.  
 Binary DXF is refused (Error::Binary).  Files are untrusted input: every count, length and size is bounded
 (Limits), a malformed value is skipped with a note, a group code that is no number ends the file with an error;
 nothing nests deeper than POLYLINE / VERTEX and INSERT / ATTRIB, so there is no recursion.  Strings before AutoCAD
-2007 are in the header's code page ($DWGCODEPAGE, codepages.rs), from AC1021 on UTF-8; \U+XXXX is decoded
-everywhere, %% codes and MTEXT's codes where the text is drawn (specials, mtext).
+2007 are in the header's code page ($DWGCODEPAGE, formats::encoding's character sets and multi-byte encodings), from
+AC1021 on UTF-8; \U+XXXX and \M+NXXXX are decoded everywhere, %% codes and MTEXT's codes where the text is drawn
+(specials, mtext).
 ```
 
 ### `dxf` crate root
@@ -63453,7 +66414,7 @@ mtext -- MTEXT's inline format codes (G6e2): a text as paragraphs of runs, each 
   \C<aci>;  colour of the palette (0 by block, 256 by layer)   \c<bgr>;  a true colour (blue in the high byte)
   \S<top><sep><bottom>;  stacked: / with a bar, # diagonal, ^ without a bar (tolerances)
   \p...;  paragraph: i<first line indent>, l<left indent>, r<right>, q<l|c|r|j|d> alignment, t<tabs> (x: ignored)
-  \U+XXXX  a character   \M+NXXXX  a double-byte character (read as U+FFFD)   ^I tab, ^J line break, ^<c> control
+  \U+XXXX  a character   \M+NXXXX  a double byte of an East Asian page   ^I tab, ^J line break, ^<c> control
   %%c %%d %%p %%% %%nnn  as in TEXT (strings::specials)
 
 Unknown codes are dropped with their letter (a code with a ';' to its end); nothing recurses (the groups are a stack
@@ -63533,12 +66494,13 @@ Source: [`lib/dxf/src/strings.rs`](../lib/dxf/src/strings.rs)
 
 ```text
 strings -- a DXF's bytes as text: UTF-8 from AutoCAD 2007 (AC1021) on, before that the header's code page
-($DWGCODEPAGE; codepages.rs), \U+XXXX in any version; TEXT's %% codes (specials).
+($DWGCODEPAGE: formats::encoding's character sets and multi-byte encodings), \U+XXXX and \M+NXXXX in any
+version; TEXT's %% codes (specials).
 ```
 
 - **`fn decode_unicode_escapes(s: &str) -> String`**
-  \\U+XXXX (four or five hex digits) as the character it names; \\M+NXXXX (a double byte of an East Asian page) as
-  U+FFFD.  Everything else stays (also "\\\\": TEXT has no escapes; MTEXT is parsed by mtext::parse)
+  \\U+XXXX (four or five hex digits) as the character it names; \\M+NXXXX as the double byte XXXX of the East Asian
+  page N (`mbcs`).  Everything else stays (also "\\\\": TEXT has no escapes; MTEXT is parsed by mtext::parse)
 
 - **`struct Special`**
   a run of a TEXT after its %% codes: the text and how it is decorated
@@ -68326,21 +71288,28 @@ MERGE_RATIO: f64 = 1e-9
 netchan -- message channels for games (G7d, docs/TRANSPORT.md)
 
   Client::connect(Endpoint::Udp(addr) | Endpoint::WebSocket(url), ClientConfig)
-           poll() -> ClientEvent (Connected, Message { seq, data }, Delivered(seq), Lost(seq),
-           Disconnected(reason)), send(payload) -> seq, state, reliable, max_payload, stats
+           poll() -> ClientEvent (Connected, Message { seq, data }, Reliable(data),
+           Delivered(seq), Lost(seq), Disconnected(reason)), send(payload) -> seq,
+           send_reliable(message), state, reliable, max_payload, stats
   Server::new(ServerConfig) [.bind_udp(addr)] [.listen_ws(addr, path) | .ws_endpoint()]
-           poll() -> ServerEvent, send(id, payload) -> seq, disconnect(id), stats(id)
+           poll() -> ServerEvent, send(id, payload) -> seq, send_reliable(id, message),
+           disconnect(id), stats(id)
            (Windows, Linux, Apple: it needs netio's HTTP server)
   WebSocket::connect(url): one non-blocking client type for the browser and the desktop
-  packet / conn / endpoint: the wire format, the sequence numbers and acks, the handshake --
-           without I/O, for tests on a simulated network and for other transports
+  packet / conn / endpoint / seal / reliable: the wire format, the sequence numbers and acks,
+           the handshake, its keys, the reliable channel -- without I/O, for tests on a
+           simulated network and for other transports
 
 The same channel over two transports: unreliable and unordered over UDP (a handshake with a
-stateless cookie, a token in every packet, keep-alives and timeouts), reliable and ordered
-over a WebSocket (the browser's only way, docs/GAME.md E8).  Both carry the same header: a
+stateless cookie and X25519 keys, every packet after it sealed with ChaCha20-Poly1305,
+keep-alives and timeouts; optionally a static server key the client pins), reliable and
+ordered over a WebSocket (the browser's only way, docs/GAME.md E8; wss:// encrypts it).  Both carry the same header: a
 sequence number per packet and acks of the newest 33 received, so the netcode (G7e) learns
-which packets arrived over either.  Limits everywhere: payload sizes, packets and bytes a
-second per connection, connections per server and per address, handshake answers a second.
+which packets arrived over either.  Beside the packets, a reliable, ordered channel on both
+(send_reliable, reliable.rs): messages up to max_message (1 MiB), over UDP in chunks of a
+packet, resent until acknowledged, sent at a fixed pace.  Limits everywhere: payload sizes,
+packets and bytes a second per connection, connections per server and per address, handshake
+answers a second, the reliable channel's message size, queue and pace.
 
 Why a crate of its own and not netio: netio is not built for the browser and Android (plat had
 no sockets there), and the client side must run in the browser; the WebSocket client type
@@ -68367,6 +71336,8 @@ it at the same time; the transport has no game in it).
   - `RateLimit` -- the peer broke the rate limits (the server ended it)
   - `Closed(u16)` -- the WebSocket under it closed with this code (1006: without a close frame)
   - `Replaced` -- the same address made a new handshake
+  - `ServerKey` -- the server did not prove the static key of ClientConfig::server_key: it has none (DENY),
+    or its ACCEPT did not check (another server, or someone on the path in its place)
 
 - **`enum Error`**
   why a call failed
@@ -68388,6 +71359,8 @@ client -- a game client's channel to its server (G7d)
   Client::connect(Endpoint, ClientConfig) -> Result<Client, Error>    Connecting at once
   client.poll() -> Option<ClientEvent>    every frame until None: reads, keep-alives, timeouts
   client.send(payload) -> Result<u16, Error>    the message's sequence number
+  client.send_reliable(message) -> Result<(), Error>    the reliable channel (ClientEvent::Reliable
+                                          on the other side); poll() sends what is due
   client.state() / reliable() / max_payload() / stats() / rtt_ms() / disconnect()
 
 Nothing blocks.  UDP (Windows, Linux, Apple): a thread of its own reads the socket, keeps only
@@ -68415,6 +71388,10 @@ Endpoint::WebSocket exists; on Android nothing yet (Unsupported).
 - **`fn send(&mut self, payload: &[u8]) -> Result<u16, Error>`**
   send a message -> its sequence number (Delivered / Lost name it later; Backlog: the
   WebSocket has WsOptions::max_unsent bytes waiting, nothing was sent)
+- **`fn send_reliable(&mut self, payload: &[u8]) -> Result<(), Error>`**
+  send a message on the reliable channel: any size up to ClientConfig::max_message, in
+  order, over UDP sent again until the server has it (endpoint::ClientCore::send_reliable).
+  It goes out at reliable_bytes_per_s, the rest with the next polls
 - **`fn state(&self) -> State`**
   where it stands
 - **`fn reliable(&self) -> bool`**
@@ -68441,6 +71418,13 @@ conn -- one connection's sequence numbers and acks, without I/O (docs/TRANSPORT.
                                                      the caller)
   conn.take_event() -> Message / Delivered / Lost    conn.rate_ok(bytes, now), keepalive_due,
                                                      timed_out, stats, rtt_ms
+  Conn::new(..).with_keys(Keys)                      sealed (UDP): write_data and
+                                                     write_disconnect seal, open(wire, head,
+                                                     seq) checks and decrypts what came
+  conn.send_reliable(message, chunk_max)             the reliable channel (reliable.rs):
+  conn.write_reliable(now, room, &mut out) -> seq    RELIABLE packets of the chunks due,
+  conn.on_reliable(seq, ack, bits, payload, now)     what came (Event::Reliable: whole
+                                                     messages in order); with_reliable(Limits)
 
 Every DATA packet has its own sequence number (u16, wrapping) and acknowledges the newest
 number received plus the 32 before it as bits.  Unreliable (UDP): packets may come late, twice
@@ -68450,9 +71434,17 @@ it, Lost when the acks have moved more than 32 past it without naming it.  Relia
 the transport keeps order and loses nothing, so an ack of n delivers everything up to n.
 A peer that only receives (or sends less than one packet per 32 received) would let packets
 pass the bits unacknowledged: after ACK_EVERY packets without one of its own, an unreliable
-connection owes an empty DATA packet at once (ack_due).
+connection owes an empty DATA packet at once (ack_due).  RELIABLE packets are acknowledged
+sooner, after two or within ACK_DELAY_US: their sender times its resends by the acks.
 The round-trip time comes from the newest ack only (bits name older packets, whose wait would
 count twice), smoothed as TCP does (RFC 6298).
+Sealed (seal.rs): each packet sent takes the next packet number (u64; its low 16 bits are the
+sequence number), the nonce of ChaCha20-Poly1305; open() takes the number nearest the largest
+authenticated one and leaves the state alone when the tag does not check (Stats::forged).  The
+receive window above then drops a replayed packet as a duplicate or stale: only after the tag.
+RELIABLE packets take numbers and acks from the same sequence as DATA; their Delivered and
+Lost come as events like those of keep-alives, and tell the reliable sender which chunks the
+peer has.
 ```
 
 ```rust
@@ -68460,6 +71452,11 @@ count twice), smoothed as TCP does (RFC 6298).
 WINDOW: usize = 1024
 /// (unreliable) packets received without sending one, after which an ack is due (half the bits)
 ACK_EVERY: u32 = 16
+/// (unreliable) RELIABLE packets received without sending one, after which an ack is due: the
+/// peer waits for it to free its window and to send nothing twice (as TCP's delayed ack)
+ACK_EVERY_RELIABLE: u32 = 2
+/// (unreliable) the longest a RELIABLE packet waits for its ack (keepalive_due then holds)
+ACK_DELAY_US: u64 = 10_000
 ```
 
 - **`struct Settings`**
@@ -68478,14 +71475,19 @@ ACK_EVERY: u32 = 16
   - `duplicates: u64` -- packets that came a second time
   - `stale: u64` -- packets older than the window
   - `dropped: u64` -- packets dropped for the rate limits or their size
+  - `forged: u64` -- sealed packets with this connection's token whose tag did not check (forged or damaged;
+    nothing else was done with them)
   - `bytes_sent: u64` -- bytes of DATA packets sent (headers included)
   - `bytes_received: u64` -- bytes of DATA packets taken in (headers included)
+  - `resent: u64` -- chunks of the reliable channel sent again (UDP: lost, or no ack within the timeout)
+  - `reliable_queued: u64` -- bytes of reliable messages the peer does not have yet
   - `rtt_ms: f32` -- the smoothed round-trip time (0 before the first sample)
   - `rtt_var_ms: f32` -- its variation
 
 - **`enum Event`**
   what a connection reports
   - `Message { seq: u16, data: Vec<u8> }` -- a message of the peer with its sequence number
+  - `Reliable(Vec<u8>)` -- a message of the peer's reliable channel, whole and in order
   - `Delivered(u16)` -- the peer has a packet this side sent
   - `Lost(u16)` -- the peer's acks passed this packet by
 
@@ -68496,28 +71498,59 @@ ACK_EVERY: u32 = 16
 
 - **`fn new(token: u32, reliable: bool, set: Settings, now_us: u64) -> Conn`**
   a connection with the token both sides put into DATA (0 over a WebSocket)
+- **`fn with_reliable(mut self, limits: Limits) -> Conn`**
+  the reliable channel with these limits (instead of Limits::default())
+- **`fn with_keys(mut self, keys: Keys) -> Conn`**
+  the connection sealed with these keys (UDP after the handshake): every packet written is
+  encrypted and authenticated, every packet taken in must pass open()
+- **`fn sealed(&self) -> bool`**
+  whether its packets are sealed
 - **`fn token(&self) -> u32`**
   the token of DATA and DISCONNECT packets
+- **`fn open(&mut self, wire: &[u8], head: usize, seq: u16) -> Option<Vec<u8>>`**
+  check and decrypt a packet that came: `wire` the whole packet, `head` the bytes before its
+  payload (DATA_HEADER, DISCONNECT_HEADER), `seq` its sequence number -> the payload
+  (unsealed connections: the bytes after the header as they are).  None: too short or a
+  wrong tag (counted as forged); the connection's state is not touched then
 - **`fn reliable(&self) -> bool`**
   whether the transport is reliable (a WebSocket)
 - **`fn ack_fields(&self) -> (u16, u32)`**
   the newest number received and the bits of the 32 before it (0xffff, 0 before any)
 - **`fn write_data(&mut self, payload: &[u8], now: u64, out: &mut Vec<u8>) -> u16`**
-  append a DATA packet with `payload` (empty: a keep-alive) -> its sequence number
+  append a DATA packet with `payload` (empty: a keep-alive), sealed if the connection is
+  -> its sequence number
+- **`fn write_disconnect(&mut self, reason: u8, out: &mut Vec<u8>)`**
+  append a DISCONNECT with `reason` (BYE_\*), sealed if the connection is; it takes a
+  sequence number of its own, so its seal never shares a nonce with a DATA packet
 - **`fn rate_ok(&mut self, bytes: usize, now: u64) -> bool`**
   whether a packet of `bytes` from the peer stays within the rate limits (false: drop it,
   or end a reliable connection)
 - **`fn count_dropped(&mut self)`**
   count a packet dropped by the caller (its size)
+- **`fn send_reliable(&mut self, msg: &[u8], chunk_max: usize) -> Result<(), Error>`**
+  queue a message on the reliable channel, cut into chunks of at most `chunk_max` bytes
+  (the room of a packet less reliable::CHUNK_HEAD); Size: empty or over Limits::max_message,
+  Backlog: more than Limits::max_queued would wait
+- **`fn write_reliable(&mut self, now: u64, room: usize, out: &mut Vec<u8>) -> Option<u16>`**
+  append a RELIABLE packet with the chunks that are due (new ones, and over UDP those whose
+  packet was lost or went unacknowledged past the timeout), at most `room` bytes of
+  payload -> its sequence number; None: nothing due now (or the rate of the channel spent)
+- **`fn reliable_pending(&self) -> bool`**
+  whether the reliable channel has chunks the peer does not have yet
 - **`fn on_data(&mut self, seq: u16, ack: u16, bits: u32, payload: &[u8], now: u64)`**
   a DATA packet of the peer (its token already checked)
+- **`fn on_reliable(&mut self, seq: u16, ack: u16, bits: u32, payload: &[u8], now: u64) -> bool`**
+  a RELIABLE packet of the peer (its token checked, opened) -> false when its chunks break
+  the protocol (malformed, a message over max_message): the caller ends the connection
 - **`fn take_event(&mut self) -> Option<Event>`**
   the next event (messages, deliveries, losses in the order they happened)
 - **`fn ack_due(&self) -> bool`**
   (unreliable) whether an empty DATA packet is due at once: ACK_EVERY packets came without
-  one of this side's, so the older ones would pass the bits unacknowledged
+  one of this side's, so the older ones would pass the bits unacknowledged (or
+  ACK_EVERY_RELIABLE RELIABLE packets, whose sender waits for the acks)
 - **`fn keepalive_due(&self, now: u64) -> bool`**
-  whether a keep-alive is due (nothing sent for keepalive_ms)
+  whether a keep-alive is due (nothing sent for keepalive_ms; unreliable: or a RELIABLE
+  packet waited ACK_DELAY_US for its ack)
 - **`fn timed_out(&self, now: u64) -> bool`**
   whether nothing came for timeout_ms
 - **`fn stats(&self) -> Stats`**
@@ -68540,19 +71573,30 @@ endpoint -- the server's and the client's protocol without I/O (docs/TRANSPORT.m
                                        a WebSocket (or any reliable message stream)
     .tick(now)                         keep-alives, timeouts, streams that never said CONNECT
     .send(conn, payload, now) -> seq   .disconnect(conn, now)
+    .send_reliable(conn, message, now) the reliable channel: any size up to max_message, in
+                                       order, resent until it arrives (reliable.rs)
     .take_out() -> Out (what to send where, streams to close)   .poll_event() -> ServerEvent
-  ClientCore::new(ClientConfig, nonce, stream)
+    .set_static_key(secret) / .public_key()   a long-lived X25519 key clients may pin
+  ClientCore::new(ClientConfig, random [32], stream)
     .start(now) / .packet(bytes, now) / .tick(now) / .send(payload, now) / .disconnect(now)
+    .send_reliable(message, now)
     .transport_closed(code) / .take_out() -> bytes / .poll_event() -> ClientEvent
 
-Time is the caller's (microseconds), so tests run them on a virtual clock over a simulated
-network (apps/nettest).  The UDP handshake: CONNECT (padded) -> CHALLENGE with a stateless
-cookie, HMAC-SHA256 over the client's address, its nonce and the time -> RESPONSE (padded) with
-the cookie -> ACCEPT with a random token, which every DATA and DISCONNECT then carries.  Nothing
-is kept for an address before its RESPONSE proves it receives there, the answers before that
-are smaller than the requests, and challenges_per_s bounds the work for all of them.  A
-WebSocket sends CONNECT and gets ACCEPT (token 0); TCP has proved the address.  The token is no
-encryption: it keeps senders out that do not see the traffic.
+Time and randomness are the caller's (microseconds; the server's secret, the client's 32 random
+bytes), so tests run them on a virtual clock over a simulated network (apps/nettest), the same
+on every run.  The UDP handshake: CONNECT (padded) -> CHALLENGE with a stateless cookie,
+HMAC-SHA256 over the client's address, its nonce and the time -> RESPONSE (padded) with the
+cookie and the client's ephemeral X25519 key -> ACCEPT with a random token, the server's
+ephemeral key and `confirm`, the proof that it derived the same keys (seal.rs).  From then on
+every DATA and DISCONNECT is sealed with ChaCha20-Poly1305 under keys of this connection alone:
+who listens reads nothing, a changed, forged or replayed packet is dropped.  With
+ClientConfig::server_key the keys also need the server's static secret, so nobody on the path
+can take the server's place; without it they keep out only those who listen.  Nothing is kept
+for an address before its RESPONSE proves it receives there, the answers before that are
+smaller than the requests, and challenges_per_s bounds the work for all of them (an HMAC for a
+CHALLENGE; for an ACCEPT two or three X25519, which a lost ACCEPT does not repeat).  A WebSocket
+sends CONNECT and gets ACCEPT (token 0, no keys); TCP has proved the address, and wss:// is
+its encryption.
 ```
 
 - **`struct ServerConfig`**
@@ -68568,6 +71612,10 @@ encryption: it keeps senders out that do not see the traffic.
   - `bytes_per_s: u32` -- bytes a second from one client (as packets_per_s)
   - `challenges_per_s: u32` -- answers to handshakes a second, for all addresses together
   - `handshake_ms: u32` -- a WebSocket must send its CONNECT within this long
+  - `max_message: usize` -- the largest message of the reliable channel, both ways (a client's larger one ends its
+    connection)
+  - `max_reliable_queued: usize` -- bytes of reliable messages queued for one client before send_reliable says Backlog
+  - `reliable_bytes_per_s: u32` -- bytes a second of reliable chunks to one client (below what its bytes_per_s takes)
 
 - **`enum Route`**
   where a packet goes
@@ -68583,6 +71631,7 @@ encryption: it keeps senders out that do not see the traffic.
   what happened on the server
   - `Connected { id: u32, transport: Transport, addr: Option<SocketAddr> }` -- a client came (`addr`: its address, if the transport knows it)
   - `Message { id: u32, seq: u16, data: Vec<u8> }` -- a message of a client
+  - `Reliable { id: u32, data: Vec<u8> }` -- a message of a client's reliable channel, whole and in order
   - `Delivered { id: u32, seq: u16 }` -- a client has a packet the server sent
   - `Lost { id: u32, seq: u16 }` -- a packet the server sent did not reach the client (UDP)
   - `Disconnected { id: u32, reason: Reason }` -- a client is gone
@@ -68592,7 +71641,8 @@ encryption: it keeps senders out that do not see the traffic.
   - `challenges: u64` -- CHALLENGE answers sent
   - `accepted: u64` -- connections taken
   - `denied: u64` -- clients refused (full, protocol, address)
-  - `bad: u64` -- packets that were no packet, a wrong kind or a wrong cookie or token
+  - `bad: u64` -- packets that were no packet, a wrong kind, a wrong cookie or token, or a handshake with a
+    key that gives no shared secret (forged DATA of a connection: its Stats::forged)
   - `throttled: u64` -- handshakes over challenges_per_s, left without an answer
   - `unknown: u64` -- DATA from addresses without a connection
 
@@ -68602,10 +71652,16 @@ encryption: it keeps senders out that do not see the traffic.
 **`impl ServerCore`**
 
 - **`fn new(cfg: ServerConfig, secret: [u8; 32], now: u64) -> ServerCore`**
-  a server with these limits; `secret` keys the cookies and tokens (random in a real server,
-  fixed in tests)
+  a server with these limits; `secret` keys the cookies and tokens and seeds the ephemeral
+  keys of the handshakes (random in a real server, fixed in tests)
 - **`fn config(&self) -> &ServerConfig`**
   the limits in force (max_payload clamped)
+- **`fn set_static_key(&mut self, secret: [u8; 32])`**
+  a long-lived X25519 secret: clients that know its public key (ClientConfig::server_key)
+  include it in their keys, so only this server can answer them.  Kept by the app (32 random
+  bytes, made once); clients without the key still connect with ephemeral keys only
+- **`fn public_key(&self) -> Option<[u8; 32]>`**
+  the public key of set_static_key (for the clients' ClientConfig::server_key)
 - **`fn datagram(&mut self, from: SocketAddr, data: &[u8], now: u64)`**
   a UDP datagram from `from`
 - **`fn stream_open(&mut self, stream: u32, addr: Option<SocketAddr>, now: u64)`**
@@ -68619,6 +71675,11 @@ encryption: it keeps senders out that do not see the traffic.
 - **`fn send(&mut self, id: u32, payload: &[u8], now: u64) -> Result<u16, Error>`**
   send a message to a client -> its sequence number (Size: empty or over the limit of its
   transport; NotConnected: no such client)
+- **`fn send_reliable(&mut self, id: u32, payload: &[u8], now: u64) -> Result<(), Error>`**
+  send a message on a client's reliable channel: any size up to max_message, cut into
+  chunks of a packet each, in order, over UDP sent again until the client has it; it goes
+  out at reliable_bytes_per_s, so a large one takes a while (Size: empty or over
+  max_message; Backlog: more than max_reliable_queued would wait; NotConnected)
 - **`fn disconnect(&mut self, id: u32, reason: u8)`**
   end a client's connection (DISCONNECT goes out, Disconnected(Local) follows)
 - **`fn disconnect_all(&mut self)`**
@@ -68650,6 +71711,14 @@ encryption: it keeps senders out that do not see the traffic.
   - `resend_ms: u32` -- UDP: CONNECT / RESPONSE again after this long without an answer
   - `packets_per_s: u32` -- packets a second from the server, on average (more are dropped)
   - `bytes_per_s: u32` -- bytes a second from the server, on average (more are dropped)
+  - `server_key: Option<[u8; 32]>` -- UDP: the server's static public key (ServerCore::set_static_key, Server::set_static_key).
+    Given, the keys need the server's secret, and a server without it is refused
+    (Reason::ServerKey); None: ephemeral keys only, safe from listeners but not from someone
+    on the path who answers in the server's place
+  - `max_message: usize` -- the largest message of the reliable channel, both ways (the server's larger one ends the
+    connection)
+  - `max_reliable_queued: usize` -- bytes of reliable messages queued before send_reliable says Backlog
+  - `reliable_bytes_per_s: u32` -- bytes a second of reliable chunks to the server (below its bytes_per_s)
 
 - **`enum State`**
   where a client stands
@@ -68661,6 +71730,7 @@ encryption: it keeps senders out that do not see the traffic.
   what happened on the client
   - `Connected` -- the server took the connection
   - `Message { seq: u16, data: Vec<u8> }` -- a message of the server
+  - `Reliable(Vec<u8>)` -- a message of the server's reliable channel, whole and in order
   - `Delivered(u16)` -- the server has a packet this side sent
   - `Lost(u16)` -- a packet this side sent did not reach the server (UDP)
   - `Disconnected(Reason)` -- the connection ended
@@ -68670,8 +71740,10 @@ encryption: it keeps senders out that do not see the traffic.
 
 **`impl ClientCore`**
 
-- **`fn new(cfg: ClientConfig, nonce: u64, stream: bool) -> ClientCore`**
-  a client with a random `nonce` (it names this attempt); `stream`: over a WebSocket
+- **`fn new(cfg: ClientConfig, random: [u8; 32], stream: bool) -> ClientCore`**
+  a client; `random`: 32 random bytes of this attempt (its nonce and, over UDP, its
+  ephemeral key come from them: plat::random_bytes in a real client, fixed in tests);
+  `stream`: over a WebSocket
 - **`fn start(&mut self, now: u64)`**
   begin the handshake (CONNECT goes out)
 - **`fn packet(&mut self, data: &[u8], now: u64)`**
@@ -68681,6 +71753,11 @@ encryption: it keeps senders out that do not see the traffic.
 - **`fn send(&mut self, payload: &[u8], now: u64) -> Result<u16, Error>`**
   send a message -> its sequence number (Size: empty or over the server's limit;
   NotConnected before Connected and after the end)
+- **`fn send_reliable(&mut self, payload: &[u8], now: u64) -> Result<(), Error>`**
+  send a message on the reliable channel: any size up to max_message, cut into chunks of
+  a packet each, in order, over UDP sent again until the server has it; it goes out at
+  reliable_bytes_per_s (Size: empty or over max_message; Backlog: more than
+  max_reliable_queued would wait; NotConnected before Connected and after the end)
 - **`fn disconnect(&mut self)`**
   end the connection (DISCONNECT goes out; UDP several times)
 - **`fn transport_closed(&mut self, code: u16)`**
@@ -68703,33 +71780,44 @@ encryption: it keeps senders out that do not see the traffic.
 Source: [`lib/netchan/src/packet.rs`](../lib/netchan/src/packet.rs)
 
 ```text
-packet -- the channel's wire format, version 1 (docs/TRANSPORT.md "Paketformat")
+packet -- the channel's wire format, version 2 (docs/TRANSPORT.md "Paketformat")
 
   byte 0: VERSION << 4 | kind; then, little-endian:
-  CONNECT     client -> server  protocol u32, nonce u64              13 bytes (UDP: padded to 64)
+  CONNECT     client -> server  protocol u32, nonce u64              13 bytes (UDP: padded to 96)
   CHALLENGE   server -> client  nonce u64, time u32, mac [16]        29 bytes (UDP only)
-  RESPONSE    client -> server  protocol u32, nonce u64, time u32,   33 bytes (UDP only, padded
-                                mac [16]                                       to 64)
-  ACCEPT      server -> client  nonce u64, token u32, max payload u16   15 bytes
+  RESPONSE    client -> server  protocol u32, nonce u64, time u32,   66 bytes (UDP only, padded
+                                mac [16], flags u8, key [32]                   to 96)
+  ACCEPT      server -> client  nonce u64, token u32, max payload    63 bytes
+                                u16, key [32], confirm [16]
   DENY        server -> client  nonce u64, reason u8                 10 bytes
-  DATA        both              token u32, seq u16, ack u16, ack bits u32, payload   13 + n
-  DISCONNECT  both              token u32, reason u8                  6 bytes
+  DATA        both              token u32, seq u16, ack u16, ack bits u32, payload
+                                                                     13 + n (UDP: + 16)
+  RELIABLE    both              as DATA; the payload: chunk records of the reliable channel
+                                (reliable.rs: id u16, flags u8, len u16, bytes)
+  DISCONNECT  both              token u32, seq u16, reason u8          8 bytes (UDP: + 16)
 
-A UDP client pads CONNECT and RESPONSE to HANDSHAKE_SIZE, and every answer of the server before
-a connection is smaller: a forged sender address gets back less than was sent (no
-amplification).  Over a WebSocket the CONNECT is not padded and CHALLENGE / RESPONSE do not
-occur (TCP has proved the address).  parse() reads untrusted bytes: exact sizes, no panics,
-no allocation.
+Over UDP the handshake agrees on keys (RESPONSE: the client's ephemeral X25519 key; ACCEPT: the
+server's and `confirm`, the proof that the server derived the same keys; seal.rs), and every
+DATA and DISCONNECT after it is sealed with ChaCha20-Poly1305: the payload is encrypted, the
+header before it is authenticated with it, and the 16-byte tag follows (DATA's payload as
+parse() returns it is the ciphertext and the tag).  RELIABLE is sealed as DATA and shares its
+sequence numbers and acks; DATA itself stays as it was, so a channel that sends nothing
+reliably writes the same bytes as before.  A UDP client pads CONNECT and RESPONSE to
+HANDSHAKE_SIZE, and every answer of the server before a connection is smaller: a forged sender
+address gets back less than was sent (no amplification).  Over a WebSocket the CONNECT is not
+padded, CHALLENGE / RESPONSE do not occur (TCP has proved the address), ACCEPT's key and
+confirm are zeros and nothing is sealed (wss:// is the encryption there).  parse() reads
+untrusted bytes: exact sizes, no panics, no allocation.
 ```
 
 ```rust
 /// the format's version (the high nibble of byte 0)
-VERSION: u8 = 1
+VERSION: u8 = 2
 /// a client asks for a connection
 KIND_CONNECT: u8 = 1
 /// the server's stateless cookie for a UDP client
 KIND_CHALLENGE: u8 = 2
-/// the client returns the cookie
+/// the client returns the cookie with its key
 KIND_RESPONSE: u8 = 3
 /// the server took the client
 KIND_ACCEPT: u8 = 4
@@ -68739,19 +71827,30 @@ KIND_DENY: u8 = 5
 KIND_DATA: u8 = 6
 /// one side ends the connection
 KIND_DISCONNECT: u8 = 7
+/// chunks of the reliable channel, with sequence number and acks as DATA
+KIND_RELIABLE: u8 = 8
 /// the bytes of a DATA packet before its payload
 DATA_HEADER: usize = 13
+/// the bytes of a DISCONNECT packet before its tag
+DISCONNECT_HEADER: usize = 8
+/// the tag after a sealed DATA or DISCONNECT (UDP)
+TAG: usize = 16
 /// the size a UDP client pads CONNECT and RESPONSE to (at most the server takes)
-HANDSHAKE_SIZE: usize = 64
-/// the largest payload of a UDP DATA packet that may be configured (1400 + 13 + 8 + 40 bytes
-/// stay below the 1500 of Ethernet also over IPv6)
+HANDSHAKE_SIZE: usize = 96
+/// the largest payload of a UDP DATA packet that may be configured (1400 + 13 + 16 + 8 + 40
+/// bytes stay below the 1500 of Ethernet also over IPv6)
 MAX_UDP_PAYLOAD: usize = 1400
+/// RESPONSE flags: the client knows the server's static key (ClientConfig::server_key), and the
+/// keys include a Diffie-Hellman with it
+FLAG_STATIC_KEY: u8 = 1
 /// DENY: the server has max_connections clients
 DENY_FULL: u8 = 1
 /// DENY: the client speaks another protocol id (another game or version)
 DENY_PROTOCOL: u8 = 2
 /// DENY: the client's address has max_per_ip connections
 DENY_ADDRESS: u8 = 3
+/// DENY: the client expects a static key, and the server has none
+DENY_KEY: u8 = 4
 /// DISCONNECT: an orderly end
 BYE_NORMAL: u8 = 0
 /// DISCONNECT: nothing came for timeout_ms
@@ -68770,25 +71869,204 @@ BYE_SHUTDOWN: u8 = 5
   one packet, borrowed from the bytes it was read from
   - `Connect { protocol: u32, nonce: u64 }` -- a client asks: the app's protocol id, the nonce of this attempt
   - `Challenge { nonce: u64, time: u32, mac: [u8; 16] }` -- the server's cookie for a UDP client: the time (seconds) and the MAC over address, nonce, time
-  - `Response { protocol: u32, nonce: u64, time: u32, mac: [u8; 16] }` -- the client returns the cookie
-  - `Accept { nonce: u64, token: u32, max_payload: u16 }` -- the server took the client: the token of its packets, the largest payload it takes
+  - `Response { protocol: u32, nonce: u64, time: u32, mac: [u8; 16], flags: u8, key: [u8; 32] }` -- the client returns the cookie with FLAG_\* and its ephemeral X25519 public key
+  - `Accept { nonce: u64, token: u32, max_payload: u16, key: [u8; 32], confirm: [u8; 16] }` -- the server took the client: the token of its packets, the largest payload it takes, its
+    ephemeral X25519 public key and the proof of the keys (over a WebSocket: zeros)
   - `Deny { nonce: u64, reason: u8 }` -- the server refused the client (DENY_\*)
-  - `Data { token: u32, seq: u16, ack: u16, bits: u32, payload: &'a [u8] }` -- a message (empty: a keep-alive) with its number, the newest number received and the bits of the 32 before
-  - `Disconnect { token: u32, reason: u8 }` -- one side ends the connection (BYE_\*)
+  - `Data { token: u32, seq: u16, ack: u16, bits: u32, payload: &'a [u8] }` -- a message (empty: a keep-alive) with its number, the newest number received and the bits
+    of the 32 before; over UDP `payload` is the ciphertext and its tag
+  - `Reliable { token: u32, seq: u16, ack: u16, bits: u32, payload: &'a [u8] }` -- chunks of the reliable channel (reliable.rs), numbered and acknowledged as DATA; over UDP
+    `payload` is the ciphertext and its tag
+  - `Disconnect { token: u32, seq: u16, reason: u8, tag: &'a [u8] }` -- one side ends the connection (BYE_\*) under the sequence number it took; over UDP `tag`
+    holds the 16 bytes of the seal, over a WebSocket nothing
 
 - **`fn parse(b: &[u8]) -> Option<Packet<'_>>`**
   read one packet: None for anything that is not exactly a packet of this version (handshake
-  packets between their size and HANDSHAKE_SIZE, the fixed-size ones exactly)
+  packets between their size and HANDSHAKE_SIZE, the fixed-size ones exactly, DISCONNECT with
+  or without its tag)
 
 **`impl Packet<'_>`**
 
 - **`fn write(&self, out: &mut Vec<u8>, pad: bool)`**
-  append the packet to `out`; `pad`: CONNECT and RESPONSE filled with zeros to HANDSHAKE_SIZE
+  append the packet to `out`; `pad`: CONNECT and RESPONSE filled with zeros to HANDSHAKE_SIZE.
+  DATA and DISCONNECT are written as given (Conn seals them)
 - **`fn to_vec(&self, pad: bool) -> Vec<u8>`**
   the packet as new bytes
 
 - **`fn seq_newer(a: u16, b: u16) -> bool`**
   whether sequence number `a` is newer than `b` (wrapping: within half the range ahead)
+
+### `netchan/src/reliable.rs`
+
+Source: [`lib/netchan/src/reliable.rs`](../lib/netchan/src/reliable.rs)
+
+```text
+reliable -- the reliable, ordered channel beside the packets (docs/TRANSPORT.md "Zuverlässige
+Nachrichten"), without I/O
+
+  Sender::push(message, chunk_max) -> Size / Backlog     a message cut into chunks
+  Sender::fill(now, rto, resend, room, bucket, out) -> ids   the chunks a RELIABLE packet carries
+  Sender::sent(seq, ids) / delivered(seq) / lost(seq)     the fate of the packets that carried them
+  Receiver::take(payload) -> Err(protocol) / Ok             the chunks of a packet that came
+  Receiver::message() -> Option<Vec<u8>>                  the next whole message, in order
+
+A message is cut into chunks of at most `chunk_max` bytes, each with a number of its own (u16,
+wrapping) and a flag "more chunks of this message follow".  A RELIABLE packet carries one or
+more chunk records:  id u16 | flags u8 (1: more) | len u16 | len bytes.  The packet is
+acknowledged as every packet (conn.rs); a chunk is done when a packet that carried it is
+Delivered.  Over UDP a chunk goes again when a packet that carried it is Lost, or when no ack
+came within the retransmission timeout (the round-trip time, four times its variation and the
+peer's ack delay, doubled for every retry up to a second); over a WebSocket never, since the transport loses
+nothing.  The receiver keeps the chunks that came early and hands out whole messages in the
+order they were sent.
+
+Limits: at most WINDOW chunks after the oldest open one are in flight (the receiver drops what
+lies further ahead, which a sender that keeps the window never sends); the sender's queue holds
+at most `max_queued` bytes (push: Backlog); a message has at most `max_message` bytes on both
+sides (the receiver ends the connection on more), the chunks kept before their turn at most
+EARLY_MAX bytes (more: the connection ends too); the bytes a second of reliable chunks come
+from a token bucket (`reliable_bytes_per_s` of the configs), so a large message does not run
+into the peer's rate limits.
+```
+
+```rust
+/// chunks in flight after the oldest open one
+WINDOW: u16 = 256
+/// the bytes of a chunk record before its data
+CHUNK_HEAD: usize = 5
+/// the bytes of chunks a receiver keeps before their turn (a sender within the window over UDP
+/// has at most WINDOW * MAX_UDP_PAYLOAD in flight; over a WebSocket chunks come in order)
+EARLY_MAX: usize = 512 * 1024
+```
+
+- **`struct Limits`**
+  the limits of the reliable channel of a connection
+  - `max_message: usize` -- the largest message, sent or taken
+  - `max_queued: usize` -- bytes this side keeps queued until the peer has them (push: Backlog beyond)
+  - `bytes_per_s: u32` -- bytes a second of reliable chunks this side sends
+
+- **`fn rto_us(srtt_us: f64, rttvar_us: f64) -> u64`**
+  the retransmission timeout from the smoothed round-trip time and its variation (µs): as
+  QUIC's probe timeout, the round trip, four times the variation (at least 10 ms) and the
+  longest the peer may hold an ack back (conn::ACK_DELAY_US)
+
+- **`struct Sender`**
+  what a connection sends reliably
+  - `resent: u64` -- chunks sent again
+
+**`impl Sender`**
+
+- **`fn new(limits: Limits, now: u64) -> Sender`**
+- **`fn push(&mut self, msg: &[u8], chunk_max: usize) -> Result<(), Error>`**
+  queue a message, cut into chunks of at most `chunk_max` bytes (Size: empty or over
+  max_message; Backlog: more than max_queued would wait)
+- **`fn queued(&self) -> usize`**
+  bytes queued that the peer does not have yet
+- **`fn pending(&self) -> bool`**
+  whether a chunk is waiting to go out (now or after a timeout)
+- **`fn fill(&mut self, now: u64, rto: u64, resend: bool, room: usize, out: &mut Vec<u8>) -> Vec<u16>`**
+  append the records of the chunks that are due to `out`, at most `room` bytes of them ->
+  their ids (empty: nothing due, or the bucket is empty).  `resend`: chunks whose packet
+  went unacknowledged for `rto` µs go again (UDP; a WebSocket loses nothing)
+- **`fn sent(&mut self, seq: u16, ids: Vec<u16>)`**
+  the packet `seq` carried these chunks
+- **`fn delivered(&mut self, seq: u16)`**
+  the peer has packet `seq`: its chunks are done
+- **`fn lost(&mut self, seq: u16)`**
+  packet `seq` did not reach the peer: its chunks are due again (UDP)
+
+- **`struct Receiver`**
+  what a connection takes in reliably
+
+**`impl Receiver`**
+
+- **`fn new(max_message: usize) -> Receiver`**
+- **`fn take(&mut self, mut b: &[u8]) -> Result<(), ()>`**
+  the chunk records of a RELIABLE packet that came (authentic, not a duplicate) -> Err when
+  they are malformed or a message grows past max_message (the peer breaks the protocol)
+- **`fn message(&mut self) -> Option<Vec<u8>>`**
+  the next whole message, in the order they were sent
+
+### `netchan/src/seal.rs`
+
+Source: [`lib/netchan/src/seal.rs`](../lib/netchan/src/seal.rs)
+
+```text
+seal -- the keys of the UDP handshake and the sealing of its packets (docs/TRANSPORT.md
+"Verschlüsselung")
+
+  derive(&Handshake, &dh1, dh2) -> Derived { c2s, s2c, confirm }   the keys of a connection
+  confirm_tag(&confirm, accept_bytes) -> [u8; 16]                  ACCEPT's proof of the keys
+  Keys::new(send, recv)        one side's keys (Conn::with_keys)
+  full_pn(largest, seq) -> u64 the packet number a 16-bit sequence number stands for
+  nonce(pn) -> [u8; 12]        ChaCha20-Poly1305's nonce of a packet number
+  Generator::new(seed) / next_secret() -> [u8; 32]   the server's ephemeral secrets (forward secure)
+
+Both sides have an ephemeral X25519 key per connection; the client may also know the server's
+static key (ClientConfig::server_key), as in Noise's NK pattern.  The transcript hash h is
+SHA-256 over a label, the protocol id, the nonce, the flags and the public keys (the client's,
+the server's ephemeral one, the static one if used); the keys are HKDF-SHA256 with salt h over
+dh1 (ephemeral with ephemeral) and dh2 (the client's ephemeral with the static key): 32 bytes
+client to server, 32 bytes server to client, 32 bytes for `confirm`.  Without a static key the
+channel is safe from those who only listen and from blind senders, not from someone on the path
+who answers the handshake in the server's place; with it, only the holder of the static secret
+can make an ACCEPT whose confirm checks.
+
+Every sealed packet takes the next packet number of its direction (u64, from 0), and its 16-bit
+sequence number is that number's low bits.  The receiver takes the number closest to the one
+after the largest it authenticated (as QUIC does with its truncated numbers, RFC 9000 A.3), so
+the nonce never repeats under one key and a replay of an old packet fails its tag or is found
+by the receive window of conn.rs.
+```
+
+- **`struct Keys`**
+  one side's keys of a connection; zeroed when dropped
+
+**`impl Keys`**
+
+- **`fn new(send: [u8; 32], recv: [u8; 32]) -> Keys`**
+  the key this side seals with and the one it opens with
+
+- **`struct Handshake<'a>`**
+  what the transcript hash covers: the handshake as both sides saw it
+  - `protocol: u32`
+  - `nonce: u64`
+  - `client: &'a [u8; 32]` -- the client's ephemeral public key (RESPONSE)
+  - `server: &'a [u8; 32]` -- the server's ephemeral public key (ACCEPT)
+  - `stat: Option<&'a [u8; 32]>` -- the server's static public key, when the client uses it (FLAG_STATIC_KEY)
+
+- **`struct Derived`**
+  the keys of one connection; zeroed when dropped
+  - `c2s: [u8; 32]` -- client to server
+  - `s2c: [u8; 32]` -- server to client
+  - `confirm: [u8; 32]` -- the key of ACCEPT's confirm
+
+- **`fn derive(hs: &Handshake<'_>, dh1: &[u8; 32], dh2: Option<&[u8; 32]>) -> Derived`**
+  the keys of a connection: `dh1` = X25519(ephemeral, ephemeral), `dh2` = X25519(the client's
+  ephemeral, the static key) when hs.stat is set (both must be given together)
+
+- **`fn confirm_tag(key: &[u8; 32], accept: &[u8]) -> [u8; 16]`**
+  ACCEPT's confirm: the first 16 bytes of HMAC-SHA256 under the confirm key over the ACCEPT
+  before it (kind, nonce, token, max payload, the server's key)
+
+- **`fn nonce(pn: u64) -> [u8; 12]`**
+  the nonce of packet number `pn` (the keys differ per direction, so both may count from 0)
+
+- **`fn full_pn(largest: Option<u64>, seq: u16) -> u64`**
+  the packet number that sequence number `seq` stands for: the one closest to the number after
+  `largest`, the largest authenticated so far (None: nothing yet, so the next is 0)
+
+- **`struct Generator`**
+  a forward-secure source of the server's ephemeral secrets: each one comes from the state,
+  which is replaced by a hash of itself, so what leaks later does not give the earlier ones.
+  Seeded once with 32 random bytes (fixed in tests: the same keys on every run)
+
+**`impl Generator`**
+
+- **`fn new(seed: &[u8; 32]) -> Generator`**
+  a generator from 32 secret bytes
+- **`fn next_secret(&mut self) -> [u8; 32]`**
+  the next 32 secret bytes
 
 ### `netchan/src/server.rs`
 
@@ -68804,8 +72082,10 @@ server -- a game server's channels (G7d): UDP and WebSocket clients in one table
                                        endpoint.accept(&req) in the app's own handler (with
                                        its page's files beside it, say)
   server.poll() -> Option<ServerEvent>   send(id, payload) -> seq   disconnect(id)
+  server.send_reliable(id, message)      the reliable channel (ClientEvent::Reliable at the client)
   server.wait(ms)                        sleep until something arrives (a loop without a tick)
   connections() / ids() / stats(id) / peer(id) / server_stats() / stop()
+  set_static_key(secret) / public_key()  the key clients may pin (ClientConfig::server_key)
 
 Threads: one reads the UDP socket; each WebSocket has a reading one (netio's thread of the
 upgrade) and a writing one, so neither a full socket buffer nor a slow client holds the
@@ -68858,8 +72138,18 @@ LINK_UNSENT: usize = 1 << 20
 - **`fn send(&mut self, id: u32, payload: &[u8]) -> Result<u16, Error>`**
   send a message to a client -> its sequence number (Backlog: a WebSocket client has
   LINK_UNSENT bytes waiting)
+- **`fn send_reliable(&mut self, id: u32, payload: &[u8]) -> Result<(), Error>`**
+  send a message on a client's reliable channel: any size up to ServerConfig::max_message,
+  in order, over UDP sent again until the client has it (endpoint::ServerCore::send_reliable).
+  It goes out at reliable_bytes_per_s, the rest with the next polls
 - **`fn disconnect(&mut self, id: u32)`**
   end a client's connection (Disconnected(Local) follows)
+- **`fn set_static_key(&mut self, secret: [u8; 32])`**
+  a long-lived X25519 secret (32 random bytes the app made once and keeps): clients with its
+  public key in ClientConfig::server_key can tell this server from anyone in its place
+  (endpoint::ServerCore::set_static_key)
+- **`fn public_key(&self) -> Option<[u8; 32]>`**
+  the public key of set_static_key, for the clients
 - **`fn connections(&self) -> usize`**
   connections now
 - **`fn ids(&self) -> Vec<u32>`**
@@ -68967,11 +72257,11 @@ pages"), while CSV files from Excel come in Windows-1252.  CSV sits next to XLSX
 deliver the same typed Table.
 
 Every file is untrusted input: the ZIP container is bounded before anything is inflated
-(archive::Limits, the compression ratio included), the XML reader takes no DTD and no entity
-but the five predefined ones and bounds the nesting, rows, columns, cells, shared strings and
-their bytes are bounded, no size a file advertises (<dimension>, count, uniqueCount) sizes an
-allocation, cells are stored sparsely, nothing recurses.  A broken file is an error, never a
-panic.
+(archive::Limits, the compression ratio included), the XML reader (formats::xml::Reader) takes
+no DTD and no entity but the five predefined ones and bounds the nesting, rows, columns, cells,
+shared strings and their bytes are bounded, no size a file advertises (<dimension>, count,
+uniqueCount) sizes an allocation, cells are stored sparsely, nothing recurses.  A broken file
+is an error, never a panic.
 ```
 
 ### `sheet_io` crate root

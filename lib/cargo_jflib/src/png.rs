@@ -3,8 +3,7 @@
 // files; it writes RGBA without filters (tools/pngutil.py), downscales by area (the same numbers)
 // and draws the placeholder icon.
 
-use crate::deflate;
-use crate::zip::crc32;
+use compress::crc32;
 
 pub(crate) struct Image {
     pub w: usize,
@@ -71,7 +70,7 @@ pub(crate) fn decode(data: &[u8]) -> Result<Image, String> {
     }
     let bpp = channels * depth as usize / 8;
     let stride = w * bpp;
-    let raw = deflate::unzlib(&idat, h * (stride + 1))?;
+    let raw = compress::zlib::decompress(&idat, h * (stride + 1)).ok_or("a PNG file with damaged image data")?;
     if raw.len() != h * (stride + 1) {
         return Err("a PNG file with too little image data".to_string());
     }
@@ -125,14 +124,14 @@ pub(crate) fn encode(img: &Image) -> Vec<u8> {
         let mut c = kind.to_vec();
         c.extend_from_slice(body);
         out.extend_from_slice(&c);
-        out.extend_from_slice(&crc32(&c).to_be_bytes());
+        out.extend_from_slice(&crc32(0, &c).to_be_bytes());
     };
     let mut out = b"\x89PNG\r\n\x1a\n".to_vec();
     let mut ihdr = (img.w as u32).to_be_bytes().to_vec();
     ihdr.extend_from_slice(&(img.h as u32).to_be_bytes());
     ihdr.extend_from_slice(&[8, 6, 0, 0, 0]);
     chunk(&mut out, b"IHDR", &ihdr);
-    chunk(&mut out, b"IDAT", &deflate::zlib(&raw));
+    chunk(&mut out, b"IDAT", &compress::zlib::compress(&raw, 9));
     chunk(&mut out, b"IEND", &[]);
     out
 }

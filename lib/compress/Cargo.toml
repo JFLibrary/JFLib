@@ -1,10 +1,10 @@
 [package]
 name = "jflib-compress"
-description = "Lossless compression for JFLib"
+description = "Lossless compression for JFLib: DEFLATE, zlib, gzip, Brotli, LZ4 and Zstandard"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-license.workspace = true
+license = "(MIT OR Apache-2.0) AND (MIT OR Unlicense) AND Zlib AND MIT"
 repository.workspace = true
 homepage.workspace = true
 

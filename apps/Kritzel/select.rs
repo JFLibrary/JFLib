@@ -647,7 +647,7 @@ fn sel_paste(pt: &mut Kritzel, ui: &mut Ui) -> bool {
     }
     // the canvas may grow to the image, but never beyond DOC_MAX
     if sf.w > DOC_MAX || sf.h > DOC_MAX {
-        paint_error(pt, ui, "Einfügen: Das Bild ist größer als 16384 × 16384 Pixel.");
+        paint_error(pt, ui, i18n::t("Einfügen: Das Bild ist größer als 16384 × 16384 Pixel."));
         return false;
     }
     sel_done(pt, ui);
@@ -1482,7 +1482,7 @@ pub(crate) fn select_ribbon(pt: &mut Kritzel, ui: &mut Ui) {
     let m = ui.dp(2);
     ui.next_rect_px(r[0] + m, r[1] + r[3] - ch - m, r[2] - m - m, ch);
     ui.next_flags(ST_NOFOCUS);
-    if ui.icon_button(ID_SELECT, IC_CHEV_DOWN_SMALL, "Auswahloptionen") & EV_ACT != 0 {
+    if ui.icon_button(ID_SELECT, IC_CHEV_DOWN_SMALL, i18n::t("Auswahloptionen")) & EV_ACT != 0 {
         ui.popup_open(ID_SELECT);
     }
     let s = &pt.sel;
@@ -1500,22 +1500,22 @@ pub(crate) fn select_ribbon(pt: &mut Kritzel, ui: &mut Ui) {
             }
         };
         mark_mode(ui, IC_SELECT_RECT, 0);
-        if ui.menu_item(ID_SEL_RECT, "Rechteckige Auswahl") & EV_ACT != 0 {
+        if ui.menu_item(ID_SEL_RECT, i18n::t("Rechteckige Auswahl")) & EV_ACT != 0 {
             ui.cmd_run(CMD_SEL_MODE, 0);
         }
         mark_mode(ui, IC_LASSO, 1);
-        if ui.menu_item(ID_SEL_FREE, "Freihandauswahl") & EV_ACT != 0 {
+        if ui.menu_item(ID_SEL_FREE, i18n::t("Freihandauswahl")) & EV_ACT != 0 {
             ui.cmd_run(CMD_SEL_MODE, 1);
         }
         ui.menu_sep();
         // whole image
         ui.next_icon(IC_SELECT_ALL);
-        if ui.menu_item(ID_SEL_ALL, "Alle auswählen") & EV_ACT != 0 {
+        if ui.menu_item(ID_SEL_ALL, i18n::t("Alle auswählen")) & EV_ACT != 0 {
             ui.cmd_run(CMD_SELECT_ALL, 0);
         }
         need_sel(ui);
         ui.next_icon(IC_SWITCH);
-        if ui.menu_item(ID_SEL_INV, "Auswahl umkehren") & EV_ACT != 0 {
+        if ui.menu_item(ID_SEL_INV, i18n::t("Auswahl umkehren")) & EV_ACT != 0 {
             ui.cmd_run(CMD_SEL_INVERT, 0);
         }
         ui.menu_sep();
@@ -1524,12 +1524,12 @@ pub(crate) fn select_ribbon(pt: &mut Kritzel, ui: &mut Ui) {
             ui.next_flags(ST_CHECKED);
         }
         ui.next_icon(IC_GRID);
-        if ui.menu_item(ID_SEL_TRANSP, "Hintergrundfarbe aussparen") & EV_ACT != 0 {
+        if ui.menu_item(ID_SEL_TRANSP, i18n::t("Hintergrundfarbe aussparen")) & EV_ACT != 0 {
             ui.cmd_run(CMD_SEL_TRANSP, 0);
         }
         need_sel(ui);
         ui.next_icon(IC_DELETE);
-        if ui.menu_item(ID_SEL_DEL, "Löschen") & EV_ACT != 0 {
+        if ui.menu_item(ID_SEL_DEL, i18n::t("Löschen")) & EV_ACT != 0 {
             ui.cmd_run(CMD_DELETE, 0);
         }
     }

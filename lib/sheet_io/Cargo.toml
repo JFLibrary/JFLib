@@ -18,10 +18,12 @@ doctest = false
 workspace = true
 
 [dependencies]
-# base: numbers (f64_parse / f64_format); archive: ZIP and OPC of the workbooks; datetime: civil dates
+# base: numbers (f64_parse / f64_format); archive: ZIP and OPC of the workbooks; datetime: civil dates;
+# formats: the strict XML pull reader of the parts
 base.workspace = true
 archive.workspace = true
 datetime.workspace = true
+formats.workspace = true
 
 # the unit tests (cargo test --lib): a test binary has std's start, panic handler and allocator
 [dev-dependencies]

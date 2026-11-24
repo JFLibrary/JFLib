@@ -16,7 +16,6 @@ use std::collections::BTreeMap;
 use std::fs;
 
 use crate::debfile::{self, Tree};
-use crate::deflate;
 use crate::linux::Linux;
 use crate::package::{self, App, APPIMAGERT};
 use crate::pkgmeta::{self, About};
@@ -272,7 +271,7 @@ impl App<'_> {
         let tarball = format!("{pkg}-{ver}-root.tar.gz");
         let top = self.dist.join("rpm");
         let tree: Tree = files.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
-        package::write(&top.join("SOURCES").join(&tarball), &deflate::gzip(&debfile::tar(&tree, pkgmeta::now(), false)))?;
+        package::write(&top.join("SOURCES").join(&tarball), &compress::gzip::compress(&debfile::tar(&tree, pkgmeta::now(), false), 9))?;
         let spec = top.join("SPECS").join(format!("{pkg}.spec"));
         package::write(&spec, self.rpm_spec(&pkg, &ver, &tarball, &files)?.as_bytes())?;
         println!("  {}", spec.display());

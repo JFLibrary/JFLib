@@ -97,10 +97,15 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 - (JD11) New documents are themed: a style "Theme" (ID 5) with THEMEVAL() cells, "Normal" based on it, "Connector" on the connector scheme's style 1, "Text Only" with the dark font style 1 and Visio's text contrast rule; the page shows the design NetLab, variant 1 (its theme part now carries Visio's extensions); the root style holds the NetLab look without a design
 - The stencil tool's SVG import keeps the document's order as JFNetworker's tools/vsym.py does: consecutive elements of one format share a subshape, a format that comes back later is a subshape of its own (before, every format was one layer where it first appeared and later parts vanished under the body); overlapping filled parts of one format get subshapes of their own (no holes from the even-odd rule); sub-paths of one kind share a Geometry section; an SVG group gets SelectMode 0; SVG masters get new UniqueIDs
+- The VSDX parts are read with jflib-formats' strict `formats::xml::Reader` instead of a reader of the crate's own (namespaces, positions and `skip` came along from it; the rules are the same). Every file diagramiotest writes is the same as before.
 
 ### Fixed
 
 - The stencil tool rendered each master's icon after a recalculation of the whole stencil: a stencil of 150 masters took minutes; the icon instance now inherits the values computed for the master
 - (JD13) Rows of a shape's Geometry and Connection sections are written with their type `T`, as Visio writes them: a row that overrides an inherited one (a resized instance of a master) gets the inherited row's type, a Connection row without one `T='Connection'`. Without it Office's previewer (`VPREVIEW.EXE`, the preview pane of Windows Explorer) hung, and Explorer with it, and desktop Visio passed over the rows and drew such shapes with the master's geometry
+
+### Security
+
+- An XML part with `<?>` (a processing instruction without a target) made the reader panic, which ends an app built with panic = abort; it is a syntax error now.
 
 [Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...HEAD

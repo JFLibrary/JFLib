@@ -5,7 +5,7 @@
 extern crate alloc;
 use alloc::{collections::BTreeSet, format, string::String, vec, vec::Vec};
 use archive::{Entry, Limits};
-use base::{
+use formats::{
     encoding,
     xml::{self, Node},
 };

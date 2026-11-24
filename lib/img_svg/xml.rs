@@ -1,23 +1,24 @@
-// xml -- a small, forgiving XML reader for SVG files: elements, attributes, character data
+// xml -- the element tree of an SVG file, from formats::xml's forgiving reader
 //
 //   parse(bytes) -> Ok(Dom) / Err(ERR_*)   the element tree (the first element is the root)
 //
-// Handled: the UTF-8 byte order mark, <?..?>, comments, CDATA, a DOCTYPE with an internal
-// subset (its `<!ENTITY name "value">` declarations are used: their values are not expanded
-// again, so no entity can grow exponentially), the five predefined entities and character
-// references.  Forgiving where browsers are strict (SVG files from editors are often sloppy):
-// a mismatched end tag closes up to the matching open element (or is ignored), unquoted
-// attribute values run to the next blank, an unterminated construct ends the document.
-// Limits: MAX_ELS elements, MAX_DEPTH nesting (deeper elements are dropped with their
-// content), MAX_ATTRS attributes per element (a repeated one counts; the first stays), MAX_ENT
-// entity declarations, MAX_EXPAND bytes produced by entity references in all.  Element names
-// "svg:x" become "x"; other prefixes stay (inkscape:..., sodipodi:... are foreign elements that
-// are not drawn).  Character data is kept only where it matters (text, tspan, style, title,
-// desc, textPath).
+// The reading is formats::xml::Lenient's (SVG files from editors are often sloppy): the declaration,
+// processing instructions, comments and declarations skipped; CDATA; a DOCTYPE's internal subset and
+// its `<!ENTITY name "value">` declarations (values not expanded again, so no entity can grow
+// exponentially; MAX_ENT declarations, MAX_EXPAND bytes produced by entity references in all); the
+// five predefined entities and character references; unquoted attribute values to the next blank, an
+// unterminated construct ends the document.  Bytes that are no UTF-8 count as Latin-1 (old files).
+// The tree is this file's: a mismatched end tag closes up to the matching open element (or is
+// ignored), deeper than MAX_DEPTH elements are dropped with their content, so is everything beyond
+// MAX_ELS elements and a second root; MAX_ATTRS attributes per element (a repeated one counts; the
+// first stays).  Element names "svg:x" become "x"; other prefixes stay (inkscape:..., sodipodi:...
+// are foreign elements that are not drawn).  Character data is kept only where it matters (text,
+// tspan, style, title, desc, textPath).
 
 use alloc::string::String;
 use alloc::vec::Vec;
 
+use formats::xml::{Lenient, Token};
 use img_core::{ERR_HDR, ERR_LIMIT, ERR_UNSUPPORTED};
 
 pub(crate) const MAX_ELS: usize = 250_000;
@@ -56,36 +57,10 @@ pub(crate) struct Dom {
 }
 
 struct P<'a> {
-    s: &'a [u8],
-    i: usize,
-    ents: Vec<(String, String)>,
-    expanded: usize,
+    lex: Lenient<'a>,
     dom: Dom,
     stack: Vec<u32>,
     skip: usize, // > 0: inside elements dropped for depth / count (their nesting level)
-}
-
-fn is_blank(c: u8) -> bool {
-    matches!(c, b' ' | b'\t' | b'\r' | b'\n')
-}
-
-fn name_end(c: u8) -> bool {
-    is_blank(c) || matches!(c, b'/' | b'>' | b'=' | b'<' | b'"' | b'\'')
-}
-
-fn find(s: &[u8], from: usize, pat: &[u8]) -> Option<usize> {
-    if pat.is_empty() || from >= s.len() {
-        return None;
-    }
-    let first = pat[0];
-    let mut i = from;
-    while i + pat.len() <= s.len() {
-        if s[i] == first && &s[i..i + pat.len()] == pat {
-            return Some(i);
-        }
-        i += 1;
-    }
-    None
 }
 
 // text of the kinds whose character data is kept
@@ -93,118 +68,31 @@ fn keeps_text(name: &str) -> bool {
     matches!(name, "text" | "tspan" | "style" | "title" | "desc" | "textPath")
 }
 
-fn push_utf8(out: &mut String, b: &[u8]) {
-    match core::str::from_utf8(b) {
-        Ok(s) => out.push_str(s),
-        Err(_) => {
-            // Latin-1 fallback for stray bytes (old files): each invalid byte as its code point
-            let mut i = 0;
-            while i < b.len() {
-                match core::str::from_utf8(&b[i..]) {
-                    Ok(s) => {
-                        out.push_str(s);
-                        break;
-                    }
-                    Err(e) => {
-                        let ok = e.valid_up_to();
-                        if let Ok(s) = core::str::from_utf8(&b[i..i + ok]) {
-                            out.push_str(s);
-                        }
-                        let bad = b[i + ok];
-                        out.push(char::from(bad));
-                        i += ok + 1;
-                    }
+// the bytes as text: UTF-8, each byte that is no part of it as its Latin-1 code point (old files)
+fn latin1_fallback(b: &[u8]) -> String {
+    let mut out = String::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        match core::str::from_utf8(&b[i..]) {
+            Ok(s) => {
+                out.push_str(s);
+                break;
+            }
+            Err(e) => {
+                let ok = e.valid_up_to();
+                if let Ok(s) = core::str::from_utf8(&b[i..i + ok]) {
+                    out.push_str(s);
                 }
+                out.push(char::from(b[i + ok]));
+                i += ok + 1;
             }
         }
     }
-}
-
-// a repeated attribute (not well-formed): the first one stays.  Sorted once per element; a
-// search per attribute cost up to MAX_ATTRS steps for each attribute of the file
-fn dedup_first(attrs: &mut Vec<(String, String)>) {
-    if attrs.len() <= 8 {
-        let mut k = 1;
-        while k < attrs.len() {
-            if attrs[..k].iter().any(|(x, _)| *x == attrs[k].0) {
-                attrs.remove(k);
-            } else {
-                k += 1;
-            }
-        }
-        return;
-    }
-    let mut ix: Vec<u32> = (0..attrs.len() as u32).collect();
-    ix.sort_unstable_by(|&a, &b| attrs[a as usize].0.cmp(&attrs[b as usize].0).then(a.cmp(&b)));
-    let mut dup = alloc::vec![false; attrs.len()];
-    for w in ix.windows(2) {
-        if attrs[w[0] as usize].0 == attrs[w[1] as usize].0 {
-            dup[w[1] as usize] = true;
-        }
-    }
-    let mut k = 0;
-    attrs.retain(|_| {
-        k += 1;
-        !dup[k - 1]
-    });
+    out
 }
 
 impl P<'_> {
-    // decode entity / character references of raw text into out
-    fn decode(&mut self, raw: &[u8], out: &mut String) {
-        let mut i = 0;
-        let mut start = 0;
-        while i < raw.len() {
-            if raw[i] != b'&' {
-                i += 1;
-                continue;
-            }
-            // a bare '&' must not swallow a real reference after it ("AT&T &amp; Co")
-            let Some(semi) = raw[i + 1..].iter().take(63).position(|&c| c == b';' || c == b'&').filter(|&k| raw[i + 1 + k] == b';').map(|k| k + 1) else {
-                i += 1;
-                continue;
-            };
-            push_utf8(out, &raw[start..i]);
-            let name = &raw[i + 1..i + semi];
-            let mut done = true;
-            match name {
-                b"lt" => out.push('<'),
-                b"gt" => out.push('>'),
-                b"amp" => out.push('&'),
-                b"quot" => out.push('"'),
-                b"apos" => out.push('\''),
-                _ if name.first() == Some(&b'#') => {
-                    let (digits, radix) = if name.get(1).map(|c| c | 32) == Some(b'x') { (&name[2..], 16) } else { (&name[1..], 10) };
-                    let v = core::str::from_utf8(digits).ok().and_then(|d| u32::from_str_radix(d, radix).ok());
-                    out.push(v.and_then(char::from_u32).filter(|&c| c != '\0').unwrap_or('\u{FFFD}'));
-                }
-                _ => {
-                    // ents is sorted by name (entity): no walk over all of them per reference
-                    let found = self.ents.binary_search_by(|(n, _)| n.as_bytes().cmp(name)).ok();
-                    match found {
-                        Some(k) if self.expanded + self.ents[k].1.len() <= MAX_EXPAND => {
-                            self.expanded += self.ents[k].1.len();
-                            let v = self.ents[k].1.clone();
-                            out.push_str(&v);
-                        }
-                        Some(_) => self.dom.truncated = true,
-                        None => done = false,
-                    }
-                }
-            }
-            if done {
-                i += semi + 1;
-            } else {
-                // an unknown entity stays as written
-                push_utf8(out, &raw[i..i + semi + 1]);
-                i += semi + 1;
-            }
-            start = i;
-        }
-        push_utf8(out, &raw[start..]);
-    }
-
-    fn text(&mut self, raw: &[u8], cdata: bool) {
+    fn text(&mut self, raw: &str, cdata: bool) {
         if self.skip > 0 {
             return;
         }
@@ -215,9 +103,9 @@ impl P<'_> {
         }
         let mut s = String::new();
         if cdata {
-            push_utf8(&mut s, raw);
+            s.push_str(raw);
         } else {
-            self.decode(raw, &mut s);
+            self.lex.decode(raw, &mut s);
         }
         if s.is_empty() {
             return;
@@ -231,197 +119,31 @@ impl P<'_> {
         }
     }
 
-    // <!DOCTYPE ... [ subset ] >: the entity declarations of the subset
-    fn doctype(&mut self) {
-        let s = self.s;
-        let mut i = self.i;
-        let mut depth = 0;
-        while i < s.len() {
-            match s[i] {
-                b'[' => depth += 1,
-                b']' => depth -= 1,
-                b'"' | b'\'' => {
-                    let q = s[i];
-                    i += 1;
-                    while i < s.len() && s[i] != q {
-                        i += 1;
-                    }
-                }
-                b'<' if depth > 0 && s[i..].starts_with(b"<!ENTITY") => {
-                    // the declaration ends at the first ">" outside quotes
-                    let mut end = i + 8;
-                    let mut q = 0u8;
-                    while end < s.len() && (q != 0 || s[end] != b'>') {
-                        if q == 0 && (s[end] == b'"' || s[end] == b'\'') {
-                            q = s[end];
-                        } else if s[end] == q {
-                            q = 0;
-                        }
-                        end += 1;
-                    }
-                    self.entity(&s[i + 8..end]);
-                    i = end;
-                }
-                b'<' if depth > 0 && s[i..].starts_with(b"<!--") => {
-                    i = find(s, i + 4, b"-->").map_or(s.len(), |e| e + 2);
-                }
-                b'>' if depth <= 0 => {
-                    self.i = i + 1;
-                    return;
-                }
-                _ => {}
-            }
-            i += 1;
-        }
-        self.i = s.len();
-    }
-
-    // name "value" (general entities only; parameter entities and external ones are skipped)
-    fn entity(&mut self, d: &[u8]) {
-        let mut i = 0;
-        while i < d.len() && is_blank(d[i]) {
-            i += 1;
-        }
-        if d.get(i) == Some(&b'%') {
-            return;
-        }
-        let n0 = i;
-        while i < d.len() && !is_blank(d[i]) {
-            i += 1;
-        }
-        let name = &d[n0..i];
-        while i < d.len() && is_blank(d[i]) {
-            i += 1;
-        }
-        let Some(&q) = d.get(i) else { return };
-        if q != b'"' && q != b'\'' {
-            return;
-        }
-        let v0 = i + 1;
-        let Some(len) = d[v0..].iter().position(|&c| c == q) else { return };
-        if name.is_empty() || self.ents.len() >= MAX_ENT || len > 65536 {
-            return;
-        }
-        let mut val = String::new();
-        // character references inside the value; other entities are not expanded again
-        let saved = core::mem::take(&mut self.ents);
-        self.decode(&d[v0..v0 + len], &mut val);
-        self.ents = saved;
-        let mut nm = String::new();
-        push_utf8(&mut nm, name);
-        // sorted by name; the first declaration of a name stays
-        if let Err(at) = self.ents.binary_search_by(|(n, _)| n.as_bytes().cmp(nm.as_bytes())) {
-            self.ents.insert(at, (nm, val));
-        }
-    }
-
-    fn end_tag(&mut self) {
-        let s = self.s;
-        let n0 = self.i + 2;
-        let mut j = n0;
-        while j < s.len() && !name_end(s[j]) {
-            j += 1;
-        }
-        let name = &s[n0..j];
-        self.i = find(s, j, b">").map_or(s.len(), |e| e + 1);
+    fn end_tag(&mut self, name: &str) {
         if self.skip > 0 {
             self.skip -= 1;
             return;
         }
         let local = local_name(name);
-        let pos = self.stack.iter().rposition(|&k| self.dom.els.get(k as usize).is_some_and(|e| e.name.as_bytes() == local));
+        let pos = self.stack.iter().rposition(|&k| self.dom.els.get(k as usize).is_some_and(|e| e.name == local));
         if let Some(p) = pos {
             self.stack.truncate(p);
         }
     }
 
-    fn start_tag(&mut self) {
-        let s = self.s;
-        let n0 = self.i + 1;
-        let mut j = n0;
-        while j < s.len() && !name_end(s[j]) {
-            j += 1;
-        }
-        let name = &s[n0..j];
-        let mut attrs: Vec<(String, String)> = Vec::new();
-        let mut closed = false;
-        let mut i = j;
-        // attributes
-        loop {
-            while i < s.len() && is_blank(s[i]) {
-                i += 1;
-            }
-            if i >= s.len() {
-                self.dom.truncated = true;
-                break;
-            }
-            match s[i] {
-                b'>' => {
-                    i += 1;
-                    break;
-                }
-                b'/' => {
-                    if s.get(i + 1) == Some(&b'>') {
-                        closed = true;
-                        i += 2;
-                        break;
-                    }
-                    i += 1;
-                    continue;
-                }
-                b'<' => break, // a broken tag: the next one starts here
-                _ => {}
-            }
-            let a0 = i;
-            while i < s.len() && !name_end(s[i]) {
-                i += 1;
-            }
-            if i == a0 {
-                i += 1; // a stray quote or '='
-                continue;
-            }
-            let an = &s[a0..i];
-            while i < s.len() && is_blank(s[i]) {
-                i += 1;
-            }
-            let mut val = String::new();
-            if s.get(i) == Some(&b'=') {
-                i += 1;
-                while i < s.len() && is_blank(s[i]) {
-                    i += 1;
-                }
-                let raw = match s.get(i) {
-                    Some(&q) if q == b'"' || q == b'\'' => {
-                        let v0 = i + 1;
-                        let end = s[v0..].iter().position(|&c| c == q).map_or(s.len(), |k| v0 + k);
-                        i = (end + 1).min(s.len());
-                        &s[v0..end]
-                    }
-                    _ => {
-                        let v0 = i;
-                        while i < s.len() && !is_blank(s[i]) && s[i] != b'>' {
-                            i += 1;
-                        }
-                        &s[v0..i]
-                    }
-                };
-                if self.skip == 0 {
-                    self.decode(raw, &mut val);
-                }
-            }
-            if self.skip == 0 && attrs.len() < MAX_ATTRS {
-                let mut n = String::new();
-                push_utf8(&mut n, an);
-                attrs.push((n, val));
-            }
-        }
-        dedup_first(&mut attrs);
-        self.i = i;
+    fn start_tag(&mut self, name: &str, raw: &[(&str, &str)], closed: bool) {
         if self.skip > 0 {
             if !closed {
                 self.skip += 1;
             }
             return;
+        }
+        // the values of an element that is kept (or dropped for a limit) count against the budget
+        let mut attrs = Vec::with_capacity(raw.len());
+        for (n, v) in raw {
+            let mut val = String::new();
+            self.lex.decode(v, &mut val);
+            attrs.push((String::from(*n), val));
         }
         if self.stack.len() >= MAX_DEPTH || self.dom.els.len() >= MAX_ELS {
             self.dom.truncated = true;
@@ -439,9 +161,7 @@ impl P<'_> {
         }
         let k = self.dom.els.len() as u32;
         let parent = self.stack.last().copied().unwrap_or(NONE);
-        let mut nm = String::new();
-        push_utf8(&mut nm, local_name(name));
-        self.dom.els.push(El { name: nm, attrs, kids: Vec::new(), parent });
+        self.dom.els.push(El { name: String::from(local_name(name)), attrs, kids: Vec::new(), parent });
         if let Some(p) = self.dom.els.get_mut(parent as usize) {
             p.kids.push(Item::El(k));
         }
@@ -451,47 +171,25 @@ impl P<'_> {
     }
 
     fn run(&mut self) {
-        let s = self.s;
-        while self.i < s.len() {
-            let i = self.i;
-            if s[i] != b'<' {
-                let end = s[i..].iter().position(|&c| c == b'<').map_or(s.len(), |k| i + k);
-                self.text(&s[i..end], false);
-                self.i = end;
-                continue;
-            }
-            let rest = &s[i..];
-            if rest.starts_with(b"<?") {
-                self.i = find(s, i + 2, b"?>").map_or(s.len(), |e| e + 2);
-            } else if rest.starts_with(b"<!--") {
-                self.i = find(s, i + 4, b"-->").map_or(s.len(), |e| e + 3);
-            } else if rest.starts_with(b"<![CDATA[") {
-                let end = find(s, i + 9, b"]]>").unwrap_or(s.len());
-                self.text(&s[i + 9..end], true);
-                self.i = (end + 3).min(s.len());
-            } else if rest.len() >= 9 && rest[..9].eq_ignore_ascii_case(b"<!DOCTYPE") {
-                self.i = i + 9;
-                self.doctype();
-            } else if rest.starts_with(b"<!") {
-                self.i = find(s, i + 2, b">").map_or(s.len(), |e| e + 1);
-            } else if rest.starts_with(b"</") {
-                self.end_tag();
-            } else if rest.len() > 1 && !name_end(rest[1]) {
-                self.start_tag();
-            } else {
-                self.text(&s[i..i + 1], false); // a lone '<'
-                self.i = i + 1;
+        loop {
+            match self.lex.next() {
+                Token::Text(t) => self.text(t, false),
+                Token::CData(t) => self.text(t, true),
+                Token::Start { name, attrs, empty } => self.start_tag(name, &attrs, empty),
+                Token::End { name } => self.end_tag(name),
+                Token::Eof => break,
+                _ => {}
             }
         }
-        if !self.stack.is_empty() {
+        if !self.stack.is_empty() || self.lex.truncated() {
             self.dom.truncated = true;
         }
     }
 }
 
 // "svg:rect" -> "rect"; other prefixes stay
-fn local_name(name: &[u8]) -> &[u8] {
-    if name.len() > 4 && name[..4].eq_ignore_ascii_case(b"svg:") { &name[4..] } else { name }
+fn local_name(name: &str) -> &str {
+    if name.len() > 4 && name.as_bytes()[..4].eq_ignore_ascii_case(b"svg:") { &name[4..] } else { name }
 }
 
 /// the element tree of an SVG document: Err(ERR_HDR) without any element,
@@ -507,7 +205,8 @@ pub(crate) fn parse(data: &[u8]) -> Result<Dom, i32> {
     if s.starts_with(&[0xFF, 0xFE]) || s.starts_with(&[0xFE, 0xFF]) {
         return Err(ERR_UNSUPPORTED);
     }
-    let mut p = P { s, i: 0, ents: Vec::new(), expanded: 0, dom: Dom::default(), stack: Vec::new(), skip: 0 };
+    let text = latin1_fallback(s);
+    let mut p = P { lex: Lenient::with_limits(&text, MAX_ATTRS, MAX_ENT, MAX_EXPAND), dom: Dom::default(), stack: Vec::new(), skip: 0 };
     p.run();
     if p.dom.els.is_empty() {
         return Err(ERR_HDR);

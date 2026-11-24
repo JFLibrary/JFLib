@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Added
+
+- INFO names and describes the style in English, French, Spanish, Italian, Dutch, Polish, Arabic and Hebrew too (name.<lang>= / desc.<lang>= lines), for the setup's pages; so do the INFO files of BackupCraft's and jfOffice's styles
+
 ### Changed
 
 - The ribbon (only ribbons use these; JFNetworker has none): a 92 DIP band in the panel colour

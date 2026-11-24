@@ -41,6 +41,8 @@ pub fn t_power(t: &mut T) {
             ok &= g.is_some();
         }
         t.check(ok && inhibited() == 0, "power: 50 requests made and released in a row (empty reason = the app id)");
+    } else if cfg!(target_os = "ios") {
+        ios(t);
     } else {
         let saved = plat::env("DBUS_SESSION_BUS_ADDRESS");
         plat::setenv("DBUS_SESSION_BUS_ADDRESS", Some("unix:path=/nonexistent/plattest/bus"));
@@ -49,6 +51,38 @@ pub fn t_power(t: &mut T) {
         plat::setenv("DBUS_SESSION_BUS_ADDRESS", saved.as_deref());
     }
 }
+
+// iOS: INHIBIT_IDLE turns UIApplication's idle timer off while a guard lives; INHIBIT_SUSPEND alone
+// has nothing to hold (None).  The timer itself only under UIKit's host (tools/apple.py simapp)
+#[cfg(target_os = "ios")]
+fn ios(t: &mut T) {
+    let app = plat::ios_pad_view().is_some();
+    t.check(inhibit("plattest", INHIBIT_SUSPEND).is_none(), "power: iOS: suspend alone -> None (no sleep but the lock)");
+    t.expect_i(inhibited() as i64, 0, "power: iOS: nothing counted for it");
+    let a = inhibit("plattest: screen on", INHIBIT_IDLE);
+    t.check(a.as_ref().is_some_and(|g| g.what() == INHIBIT_IDLE | INHIBIT_SUSPEND), "power: iOS: the screen kept on");
+    let b = inhibit("", INHIBIT_IDLE | INHIBIT_SUSPEND);
+    t.check(b.is_some(), "power: iOS: a second guard");
+    if app {
+        t.check(plat::ios_idle_timer_off(), "power: iOS: the idle timer is off");
+    }
+    drop(a);
+    if app {
+        t.check(plat::ios_idle_timer_off(), "power: iOS: still off while the second guard lives");
+    }
+    drop(b);
+    t.expect_i(inhibited() as i64, 0, "power: iOS: all released");
+    if app {
+        t.check(!plat::ios_idle_timer_off(), "power: iOS: the idle timer is on again");
+        let ok = (0..50).all(|_| inhibit("", INHIBIT_IDLE).is_some());
+        t.check(ok && !plat::ios_idle_timer_off(), "power: iOS: 50 guards made and released in a row, the timer on after");
+    } else {
+        t.info("  (power: no UIKit host here: the idle timer itself under tools/apple.py simapp)\n");
+    }
+}
+
+#[cfg(not(target_os = "ios"))]
+fn ios(_: &mut T) {}
 
 #[cfg(not(target_os = "linux"))]
 pub fn t_power_bus(_: &mut T) {

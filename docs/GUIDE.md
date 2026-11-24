@@ -1724,6 +1724,18 @@ ui.dialog_end(); // always
   * Metadata and colour: `img_core::meta` (conversions `convert` / `surf_convert` between
     `FMT_PARGB` and `FMT_ARGB`, `all_opaque`), `img_core::exif`, `img_core::icc` /
     `icc_xform` (colour management, `legacy/ASMLIB/docs/modules/COLOR_MANAGEMENT.md`).
+* **PDF files** (`pdf`): `pdf::Document` writes them (pages drawn on a canvas, font subsets,
+  images, links, bookmarks). `pdf::read::Document::open(bytes)` reads any of them, encrypted ones
+  with `open_with(bytes, &Options { password, .. })`: `page_count`, `page(i).size()`, `text(i)`
+  (the page's text in reading order), `page_text(i)` (every glyph with its position, for search
+  and selection), `info`, `outlines`, `links`, `fields` (the form's values), `attachments`
+  (embedded files such as the XML of a ZUGFeRD invoice). A damaged file is rebuilt from its
+  objects; a hostile one gives an error, never a panic. `render(i, &RenderOptions { dpi, region,
+  background, annotations, fonts, .. })` draws a page into a `gfx::Surface` (a viewer asks for
+  the tiles it shows with `region`; `page_pixels(i, dpi)` gives the size): every colour space,
+  embedded fonts and the system's fonts for the others, images, shadings, patterns and
+  transparency, as Poppler's `pdftoppm` draws them. Fonts a document does not embed come from a
+  `FontSource` (by default `SystemFonts`, the installed fonts through `text::fontdb`).
 
 **Logging** (`plat::log`): `plat::log!(plat::LOG_INFO, "net", "{} bytes from {}", n, host)` formats
 only when a sink wants the level; `plat::log_error / log_warn / log_info / log_debug(target, msg)`
@@ -2678,7 +2690,8 @@ The texts are the string literals of `t("…")`, `tc("…")`, `tr("…")` (not t
 `i18n::tr`), `tf("…")`, `msg!` / `Msg::new` / `phrase` templates, `list(&TABLE)`, tables
 marked `// i18n` (`// i18n: name title` for some fields of a table, `… // i18n` for one
 line), and the labels of `Command::new` and `Mi::*` when the app translates its command
-table and menus. A text the library translates (`LIB_TEXTS`) needs no row in an app that
+table and menus, and the reasons of the `ask` lines in the app's `PERMISSIONS` files (the
+dialog reads them through the catalogue). A text the library translates (`LIB_TEXTS`) needs no row in an app that
 installs its catalogue with `i18n::set_catalog` (`t` falls back to the library). `python build_rs.py i18n APP` lists one app's gaps (`lib`: the library's `tr("…")`
 against `LIB_TEXTS`), `--update` adds the missing texts as rows with empty cells to the app's
 catalogue (the one whose texts come from the same folder, `src/` or `crates/`), at its end in
@@ -2740,6 +2753,11 @@ text fields, canvas, colour pads, pan and angle controls do it already -- go bet
 `ui.ltr_begin(x, w)` and `ui.ltr_end()`, and read the pointer with `ui.ltr_x(mx)`; an app
 that lays out text itself for `textbox_surface` wraps it that way. Rectangles that leave the
 UI (scripts' `expect rect`, the agent, popup windows, the platform's hit tests) are physical.
+A line of text with right-to-left characters is drawn in its visual order (the Unicode bidi
+algorithm, `text::Text::set_bidi`; Arabic joined by its fallback font), in mirrored windows and
+others alike: labels, buttons, check boxes, headings, lists, and text fields with their caret and
+selection. The rich-text and code editors keep such letters in logical order for now (their
+carets are logical).
 
 ## 16. Several programs per app, app-local crates
 
@@ -2785,13 +2803,20 @@ crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)
 * `netio::Client` / `client::Session` -- requests with timeouts and size limits, kept-alive
   sessions; `with_connector(netio::trust::connector(..))` for https to a server with its own CA
   (a CA file, a pinned fingerprint, or trust on first use).
-* `netio::tls` -- TLS 1.3 (ChaCha20-Poly1305, X25519, Ed25519 certificates, mutual
-  authentication); `netio::x509` builds and checks the certificates of a private CA
-  (`CertBuilder::sign_ext` adds or replaces extensions: name constraints, a CA's purposes).
+* `netio::tls` -- TLS 1.3 servers and clients (ChaCha20-Poly1305, AES-GCM; X25519MLKEM768,
+  X25519, P-256, P-384; Ed25519, ECDSA and RSA certificates and keys, mutual authentication),
+  certificates by SNI (`ServerConfig::identities`, `select`), ALPN (`ClientConfig::alpn`,
+  `ServerConfig::alpn`); `Identity::from_pem(chain, key)` reads what a CA hands out (PKCS #8,
+  SEC 1, PKCS #1). Resumption with session tickets: `ServerConfig::tickets`
+  (`Arc<tls::Tickets>`, one for all connections of a server) and `ClientConfig::sessions`
+  (`Arc<tls::Sessions>`, a client's tickets); 0-RTT only where the server allows it
+  (`ServerConfig::early_data`, `tls::connect_early`, `TlsStream::read_early` for data that may be
+  a replay). `netio::x509` builds and checks the certificates of a private CA
+  (`CertBuilder::sign_key` with any key, `sign_ext` adds or replaces extensions: name
+  constraints, a CA's purposes; `x509::PrivateKey`).
   The chain check honours name constraints for wildcards by the names they stand for and the
   extended key usage of every CA on the path (a CA for client certificates certifies no server).
-  `Trust::System(extra)` connects to public servers: TLS 1.3 (AES-GCM or ChaCha20, X25519 or
-  P-256) or TLS 1.2 with ECDHE, RSA / ECDSA / Ed25519 certificates, the chain built and checked
+  `Trust::System(extra)` connects to public servers: TLS 1.3 or TLS 1.2 with ECDHE, the chain built and checked
   against the system's authorities (Windows CryptoAPI, Linux CA bundle) and extra CAs;
   `netio::trust::system_connector(extra)` gives the connector for `Client`.
 * `netio::smtp::send(&SmtpConfig, &Mail)` -- e-mail (STARTTLS, TLS, or plain to any server
@@ -2807,11 +2832,18 @@ crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)
   `if_index` and `local_addrs` (the computer's own addresses) are the pieces; `SocketAddr::parse`
   and `Display` know `[fe80::1%2]:53`.
 * `datastore::Store` -- JSON collections in a crash-safe journal database with transactions;
-  `Journal` for append-only logs.
+  `Journal` for append-only logs. Secondary indexes in memory (`add_index` with `Index::field`
+  or `Index::by`, `unique()` refusing what breaks it with `StoreError::Conflict`; `find`,
+  `find_one`, `range`), and encryption at rest (`Store::open_encrypted`,
+  `Journal::open_encrypted` with a 32-byte key, for example from `plat::secret::secret_get`;
+  `rekey` encrypts, changes the key or decrypts).
 * `cas::Repo` -- content-addressed, deduplicated, encrypted repositories with signed snapshots:
   only trusted keys (`CreateOptions::signer`, `trust_signer`) save and load them
   (`CasError::UntrustedSigner`); the list is protected by the repository key, so it does not
-  keep out someone who can open the repository.
+  keep out someone who can open the repository. A repository lives in a folder (`cas::Folder`,
+  `Repo::open(path, ..)`) or in any `cas::Store`, which keeps its objects by kind and name the
+  way S3, SFTP or WebDAV do (`Repo::create_in` / `open_in`; writes atomic and durable, reads of
+  chunks in ranges, one holder through `Store::lock`).
 * `crypto` -- hashes (SHA-2 incl. SHA-384, BLAKE2b, BLAKE3), MACs, KDFs, Argon2id, AEAD
   (ChaCha20-Poly1305, XChaCha, AES-GCM), X25519, P-256 key exchange, Ed25519, RSA (PKCS#1 v1.5,
   PSS) and ECDSA P-256 / P-384 verification (randomness comes from the caller:
@@ -2822,8 +2854,29 @@ crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)
   `aes_unwrap`, which checks the integrity value) and AES-CMAC of RFC 4493 (`cmac_aes`).
   For protocols defined with MD5 (RADIUS): MD5 (`md5`, `Md5`, `md5_parts`) and HMAC-MD5
   (`hmac_md5`); broken for collisions, so new designs take SHA-256 (RFC 1321, 2104).
-* `compress` -- LZ4 and zstd (`compress::zstd::compress(data, level)` / `decompress`; levels
-  1 to 19, single-segment frames with checksums); `Codec` picks one by name.
+* `compress` -- DEFLATE, zlib and gzip in both directions (`compress::gzip::compress(data,
+  level)` / `decompress(data, max_out)`; levels 0 to 9), Brotli, the `br` of HTTP
+  (`compress::brotli::compress(data, level)` / `decompress`; levels 0 to 11, `LEVEL_DEFAULT` 5
+  for a web server's responses, 11 for files compressed once), LZ4 (`lz4::compress_hc` for
+  smaller blocks) and zstd (`compress::zstd::compress(data, level)` /
+  `decompress`; levels 1 to 19, single-segment frames with checksums), zstd dictionaries for
+  small records (`zstd::Dictionary::train(&samples, 16 << 10)`, `compress_with_dict`, in the
+  format of `zstd --train`), CRC-32, Adler-32 and xxHash; `Codec` picks LZ4 or zstd by name. Each format also in pieces (`compress::stream`):
+  `gzip::Decoder::new().decode(input, out)` takes input as it comes and writes at most `out`,
+  with a window of the format's size as its only memory; `gzip::Encoder`, `zstd::Encoder` and
+  the others with `Flush::Sync` for live data; `stream::decode_all(dec, read, write, limit)`
+  pumps a whole file.
+* `formats` -- data formats as text, without a dependency: `formats::json` (strict bounded JSON,
+  numbers kept as their exact token, `parse_with_limits` / `stringify_pretty`),
+  `formats::jmap` (typed records, below), `formats::xml` (`Reader`, the strict pull reader with
+  namespaces and offsets; `Lenient`, the forgiving one for files from editors; `parse`, a bounded
+  tree of a subset that refuses a DTD, comments and mixed content) and `formats::encoding` (strict UTF-8 and
+  UTF-16 by their byte-order mark; every encoding of the WHATWG Encoding Standard as browsers read and
+  write it: `Charset`, the single-byte sets of the web and of DOS files, `MultiByte`, Shift_JIS, EUC-JP,
+  ISO-2022-JP, GBK, gb18030, Big5 and EUC-KR with `encode` / `encode_html`; `label("iso-8859-2")`,
+  `from_code_page(932)` and `decode_label` as the standard reads labels; `Decoder` for input in
+  pieces). `agent_core::json` / `jmap` and `base::xml` / `encoding` are the same
+  modules under their names until 0.2.1.
 * `plat::watch::Watcher::new(&roots)` / `take(ms)` -- the changed paths below folders
   (ReadDirectoryChangesW / inotify, recursive; `overflow` when events were lost). Every change
   after `new` returned is seen. A root that is deleted or moved away (Linux: also a folder that
@@ -3276,7 +3329,7 @@ crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)
   `(a|a)*b` against a long text costs linear time instead of exponential; a refused pattern
   says why with `ReErr::text()` in GNU grep's words (JFNetworker's shell, `apps/coretest`
   group `pattern`).
-* `agent_core::jmap` -- typed JSON for protocols and files: `record! { pub struct P { pub a:
+* `formats::jmap` -- typed JSON for protocols and files: `record! { pub struct P { pub a:
   String, pub n: u32 } }` declares the struct with `to_json` / `from_json`, `wire_enum!` an
   enum carried as a string; missing or mistyped members read as their defaults, unknown ones
   are ignored (old and new programs read each other's data). `json::stringify_pretty(&v,
@@ -3870,9 +3923,10 @@ UIC_ACTIVE if arg != 0 => self.browser = None,       // ask again in the next fr
   `ui.default_browser_request()` prints `ui_default_browser_request`. `plat::default_browser_*`
   are the real calls (Windows: `jfgui_OPEN_DRYRUN=1` prints the Settings page instead of opening
   it).
-* The Windows setup of a browser asks once itself: its options page has "Als Standardbrowser
-  festlegen" ("Make <App> my default browser" in other languages), checked as in Firefox's
-  setup, and its last button opens the same Settings page ([PACKAGING.md](PACKAGING.md)). The
+* The Windows setup of a browser asks once itself: its last page has "Als Standardbrowser
+  festlegen" ("Make <App> my default browser" in English, the setup speaks nine languages),
+  checked as in Firefox's setup, and its last button opens the same Settings page
+  ([PACKAGING.md](PACKAGING.md)). The
   Linux and macOS packages have no pages: there only the app offers it.
 
 **Recent files.** `ui.recent_add(path)` after opening or saving a file keeps the app's own

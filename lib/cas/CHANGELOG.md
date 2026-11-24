@@ -8,6 +8,19 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Added
+
+- The storage is a trait: cas::Store (lib/cas/store.rs) keeps a repository's objects by kind (store::Kind: Config, Pack, Index, Snapshot) and name, the way S3, SFTP or WebDAV keep files -- location, init (a new repository; NotEmpty), lock (one holder; InUse, a StoreLock guard), get, get_range (with a default that reads the whole object), put, delete, list with sizes; implemented for Box and Arc of a store. Its rules: a put is atomic and durable, a delete stays done, reads see every put before them, the lock keeps out holders of other processes and machines. cas::Folder is the store in a folder (the layout as before, also on vfs mounts such as mem://); Repo::create_in, Repo::open_in, Repo::store and peek_id_in take any store, Repo::create, Repo::open and peek_id a folder as before. store::name_ok says which names a store is asked for
+
+### Changed
+
+- JSON (pack indexes, snapshots, the repository's config) goes through jflib-formats (`formats::json`); the crate no longer depends on jflib-agent-core. Its API is unchanged.
+- Repairing a lost index file (repair_index, and gc before it sweeps) reads the index from the pack's end in two ranges instead of the whole pack. A pack the index names but the store does not have is Corrupt ("pack ... missing"), it was Io; a snapshot id with a NUL is refused like the other invalid ids (NotFound), and snapshot_ids leaves out names that cannot be ids. Repo::open reads repo.json again once it holds the lock, and Repo::create takes the lock before it writes repo.json
+
+### Fixed
+
+- gc deleted every pack when the snapshots folder could not be read (a refused read_dir: the rights, a network share gone): it took the folder for one without snapshots. It now stops with the error, and check fails too (snapshot_ids alone still answers an empty list). gc also keeps a pack whose index file it cannot delete, where it deleted the pack anyway: the index left behind named chunks that were gone, and on the next open it could win over the copies a repack had moved
+
 ### Security
 
 - A repo.json without its MAC no longer opens (`Corrupt`). It was sealed again as genuine, so whoever could write it could change signers, retention and keys; every published version writes the MAC.

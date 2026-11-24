@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Changed
+
+- `base::xml` and `base::encoding` are re-exports of jflib-formats (`formats::xml`, `formats::encoding`), where the code lives now; the items and their behaviour are the same. The crate depends on jflib-formats.
+
 ### Fixed
 
 - `pattern::Regex`: the matcher follows jumps and splits with a list instead of recursion, one level per alternative and per optional repetition (6000 alternatives took about a megabyte of stack).

@@ -143,7 +143,7 @@ use netio::http::Response;
 fn connector(ctx: &Ctx, pin: [u8; 32]) -> netio::client::Connector {
     let identity = ctx.pki.client.clone();
     Arc::new(move |_url: &Url, tcp: TcpStream| {
-        let cfg = ClientConfig { trust: Trust::Pinned(alloc::vec![pin]), identity: Some(identity.clone()), server_name: String::new() };
+        let cfg = ClientConfig { identity: Some(identity.clone()), ..ClientConfig::new(Trust::Pinned(alloc::vec![pin]), "") };
         tls::connect(Box::new(tcp), cfg).map(|s| Box::new(s) as Box<dyn Stream>).map_err(|e| netio::HttpError::Tls(format!("{}", e)))
     })
 }

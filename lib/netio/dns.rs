@@ -1,8 +1,13 @@
 // dns -- host names to addresses
 //
-//   resolve(host, port) -> NetResult<Vec<SocketAddr>>   numeric addresses and "localhost"
-//                     directly; Windows: the system resolver (plat); Linux: /etc/hosts, then
-//                     the name servers of /etc/resolv.conf (search domains, ndots)
+//   resolve(host, port) -> NetResult<Vec<SocketAddr>>   numeric addresses, "localhost" and
+//                     names under .localhost, with a final dot as well (the loopback addresses,
+//                     RFC 6761) directly, on every system; Windows, macOS and iOS: the system
+//                     resolver (plat::net::resolve, getaddrinfo on Apple: VPNs with name
+//                     servers of their own, .local over mDNS, iOS's profiles and the app
+//                     sandbox, none of which /etc/resolv.conf shows); Linux: /etc/hosts, then
+//                     the name servers of /etc/resolv.conf
+//                     (search domains, ndots)
 //   resolve_with(host, port, &Config)   the same with a given configuration (tests)
 //   Config::system()                    /etc/hosts + /etc/resolv.conf; Windows: the hosts file
 //                                       of %SystemRoot% and the DNS servers of the adapters
@@ -13,13 +18,20 @@
 // plat::net::ip_scope_parse), the adapter's index on Windows.  A server whose zone names no
 // interface of this computer is left out.
 //
-// Queries: A and AAAA over UDP (2 s per server and attempt, two rounds), over TCP when the answer
-// is truncated; an answer must come from the server asked and carry the query's id and question.
-// IPv4 addresses come first.  Not here: DNSSEC validation, mDNS, caching.
+// Queries of this resolver (resolve on Linux, resolve_with everywhere; the system resolver of
+// Windows, macOS and iOS checks its answers in its own way): A and AAAA over UDP (2 s per server
+// and attempt, two rounds), over TCP when the answer is truncated; an answer must come from the
+// server asked and carry the query's id and question (an NXDOMAIN too), and only addresses of the
+// asked name count, or of the name its CNAME chain in the answer leads to (at most 8 steps):
+// records for other names in an answer are ignored, names compared label by label.
+// IPv4 addresses come first (the system resolver keeps its own order, RFC 6724's, and a
+// link-local address's zone).  Not here: DNSSEC validation, mDNS, caching.
 //
 // The app's permissions: a name its net.connect rules do not cover fails with
 // NetErrorKind::Denied before any query; the addresses of a covered name are registered
-// (plat::policy::net_resolved), so connections to them follow that name's ports.
+// (plat::policy::net_resolved), so connections to them follow that name's ports.  Names under
+// .localhost need no rule, since nothing is asked for them, but their loopback addresses are
+// registered too: a rule for app.localhost:8080 covers them.
 
 use alloc::format;
 use alloc::string::String;
@@ -128,25 +140,6 @@ pub fn query(id: u16, name: &str, qtype: u16) -> Option<Vec<u8>> {
     Some(q)
 }
 
-/// skip a (possibly compressed) name
-fn skip_name(m: &[u8], mut p: usize) -> Option<usize> {
-    for _ in 0..128 {
-        let l = *m.get(p)? as usize;
-        if l == 0 {
-            return Some(p + 1);
-        }
-        if l & 0xC0 == 0xC0 {
-            m.get(p + 1)?;
-            return Some(p + 2);
-        }
-        if l & 0xC0 != 0 {
-            return None;
-        }
-        p += 1 + l;
-    }
-    None
-}
-
 /// what an answer says
 #[derive(Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -161,6 +154,52 @@ pub enum Answer {
     Bad,
 }
 
+const TYPE_CNAME: u16 = 5;
+
+/// a (possibly compressed) name at p, in lower case with dots, and where it ends in the message.
+/// One name, one text: a dot or backslash inside a label is escaped and a byte outside printable
+/// ASCII is \DDD (RFC 1035 5.1), so the labels "a.b" and "a", "b" stay apart
+fn read_name(m: &[u8], mut p: usize) -> Option<(String, usize)> {
+    let mut out = String::new();
+    let mut end = None;
+    let mut wire = 1; // the name's length on the wire, at most 255 (RFC 1035 2.3.4)
+    // 128 steps: no name has more labels, and a loop of pointers ends here
+    for _ in 0..128 {
+        let l = *m.get(p)? as usize;
+        if l == 0 {
+            return Some((out, end.unwrap_or(p + 1)));
+        }
+        if l & 0xC0 == 0xC0 {
+            end.get_or_insert(p + 2);
+            p = (l & 0x3F) << 8 | *m.get(p + 1)? as usize;
+            continue;
+        }
+        if l & 0xC0 != 0 {
+            return None;
+        }
+        let label = m.get(p + 1..p + 1 + l)?;
+        wire += 1 + l;
+        if wire > 255 {
+            return None;
+        }
+        if !out.is_empty() {
+            out.push('.');
+        }
+        for &b in label {
+            match b.to_ascii_lowercase() {
+                c @ (b'.' | b'\\') => {
+                    out.push('\\');
+                    out.push(c as char);
+                }
+                c @ 0x21..=0x7e => out.push(c as char),
+                c => out.push_str(&format!("\\{c:03}")),
+            }
+        }
+        p += 1 + l;
+    }
+    None
+}
+
 /// read an answer to `q` (the query it answers)
 pub fn parse_answer(m: &[u8], q: &[u8], qtype: u16) -> Answer {
     if m.len() < 12 || m[..2] != q[..2] || m[2] & 0x80 == 0 {
@@ -169,6 +208,12 @@ pub fn parse_answer(m: &[u8], q: &[u8], qtype: u16) -> Answer {
     if m[2] & 0x02 != 0 {
         return Answer::Truncated;
     }
+    let qd = u16::from_be_bytes([m[4], m[5]]) as usize;
+    let an = u16::from_be_bytes([m[6], m[7]]) as usize;
+    // the question must be ours, also before "no such name" (NXDOMAIN) counts
+    if qd != 1 || m.get(12..q.len()).is_none_or(|qq| !qq.eq_ignore_ascii_case(&q[12..])) {
+        return Answer::Bad;
+    }
     let rcode = m[3] & 0x0F;
     if rcode == 3 {
         return Answer::NoName;
@@ -176,31 +221,44 @@ pub fn parse_answer(m: &[u8], q: &[u8], qtype: u16) -> Answer {
     if rcode != 0 {
         return Answer::Bad;
     }
-    let qd = u16::from_be_bytes([m[4], m[5]]) as usize;
-    let an = u16::from_be_bytes([m[6], m[7]]) as usize;
-    // the question must be ours
-    if qd != 1 || m.get(12..q.len()).is_none_or(|qq| !qq.eq_ignore_ascii_case(&q[12..])) {
-        return Answer::Bad;
-    }
+    let Some((asked, _)) = read_name(q, 12) else { return Answer::Bad };
+    // the records of the answer section: (owner, type, class, where the data begins, its length)
     let mut p = q.len();
-    let mut out = Vec::new();
+    let mut rrs = Vec::new();
     for _ in 0..an {
-        let Some(np) = skip_name(m, p) else { return Answer::Bad };
+        let Some((owner, np)) = read_name(m, p) else { return Answer::Bad };
         let Some(h) = m.get(np..np + 10) else { return Answer::Bad };
         let (t, class, len) = (u16::from_be_bytes([h[0], h[1]]), u16::from_be_bytes([h[2], h[3]]), u16::from_be_bytes([h[8], h[9]]) as usize);
-        let Some(data) = m.get(np + 10..np + 10 + len) else { return Answer::Bad };
-        if class == 1 && t == qtype {
-            match (t, len) {
-                (TYPE_A, 4) => out.push(IpAddr::V4([data[0], data[1], data[2], data[3]])),
-                (TYPE_AAAA, 16) => {
-                    let mut a = [0u8; 16];
-                    a.copy_from_slice(data);
-                    out.push(IpAddr::V6(a));
-                }
-                _ => {}
-            }
+        if m.get(np + 10..np + 10 + len).is_none() {
+            return Answer::Bad;
         }
+        rrs.push((owner, t, class, np + 10, len));
         p = np + 10 + len;
+    }
+    // follow the CNAME chain from the asked name, then take that name's addresses only
+    let mut name = asked;
+    for _ in 0..8 {
+        let next = rrs.iter().find(|r| r.0 == name && r.1 == TYPE_CNAME && r.2 == 1).and_then(|r| read_name(m, r.3));
+        match next {
+            Some((target, _)) if qtype != TYPE_CNAME => name = target,
+            _ => break,
+        }
+    }
+    let mut out = Vec::new();
+    for (owner, t, class, at, len) in &rrs {
+        if *owner != name || *class != 1 || *t != qtype {
+            continue;
+        }
+        let data = &m[*at..*at + *len];
+        match (*t, *len) {
+            (TYPE_A, 4) => out.push(IpAddr::V4([data[0], data[1], data[2], data[3]])),
+            (TYPE_AAAA, 16) => {
+                let mut a = [0u8; 16];
+                a.copy_from_slice(data);
+                out.push(IpAddr::V6(a));
+            }
+            _ => {}
+        }
     }
     Answer::Found(out)
 }
@@ -265,13 +323,22 @@ fn not_found() -> NetError {
     NetError::new(NetErrorKind::NotFound, 0)
 }
 
+/// "localhost" and the names under .localhost (RFC 6761 6.3), the absolute form (app.localhost.)
+/// too, as the rules compare names
+fn loopback_name(h: &str) -> bool {
+    let bare = h.trim_end_matches('.');
+    bare.eq_ignore_ascii_case("localhost") || bare.to_ascii_lowercase().ends_with(".localhost")
+}
+
 pub fn resolve_with(host: &str, port: u16, cfg: &Config) -> NetResult<Vec<SocketAddr>> {
     let h = host.trim_start_matches('[').trim_end_matches(']');
     if let Some((ip, scope)) = plat::net::ip_scope_parse(h) {
         return Ok(alloc::vec![SocketAddr::with_scope(ip, port, scope)]);
     }
-    if h.eq_ignore_ascii_case("localhost") || h.to_ascii_lowercase().ends_with(".localhost") {
-        return Ok(alloc::vec![SocketAddr::new(IpAddr::LOCALHOST_V4, port), SocketAddr::new(IpAddr::LOCALHOST_V6, port)]);
+    if loopback_name(h) {
+        let addrs = alloc::vec![SocketAddr::new(IpAddr::LOCALHOST_V4, port), SocketAddr::new(IpAddr::LOCALHOST_V6, port)];
+        plat::policy::net_resolved(h, &addrs); // a rule for the name covers them
+        return Ok(addrs);
     }
     if h.is_empty() || h.len() > 253 || !h.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'.' || b == b'_') {
         return Err(not_found());
@@ -325,12 +392,12 @@ pub fn resolve_with(host: &str, port: u16, cfg: &Config) -> NetResult<Vec<Socket
 
 /// the addresses of a host (see the top of this file)
 pub fn resolve(host: &str, port: u16) -> NetResult<Vec<SocketAddr>> {
-    if cfg!(windows) {
+    if cfg!(any(windows, target_vendor = "apple")) {
         return plat::net::resolve(host, port);
     }
-    // numbers and localhost need no system files (on macOS the app's rules do not grant them)
+    // numbers and localhost need no system files (an app's rules may not grant them)
     let h = host.trim_start_matches('[').trim_end_matches(']');
-    if plat::net::ip_scope_parse(h).is_some() || h.eq_ignore_ascii_case("localhost") {
+    if plat::net::ip_scope_parse(h).is_some() || loopback_name(h) {
         return resolve_with(host, port, &Config::default());
     }
     resolve_with(host, port, &Config::system())

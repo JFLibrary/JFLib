@@ -8,11 +8,13 @@
 //              the HTTP/1.1 wire format (bounded parsing, chunked transfer, keep-alive)
 //   server     Server::start(addr, ServerConfig, handler): accept thread + worker pool
 //   client     Client::request(...): blocking, timeouts, size limit
-//   tls        TLS 1.3 for own deployments (ChaCha20-Poly1305, X25519, Ed25519, mutual auth)
-//              and a client for public servers (AES-GCM, RSA / ECDSA, TLS 1.2 fallback):
-//              connect / accept -> TlsStream (a Stream)
-//   x509 / der / pem   certificates: Ed25519 of a private CA (parse, build, verify chains) and
-//              the RSA / ECDSA certificates of the web PKI
+//   tls        TLS 1.3 servers and clients (ChaCha20-Poly1305, AES-GCM; X25519MLKEM768,
+//              X25519, P-256, P-384; Ed25519, ECDSA, RSA keys; SNI, ALPN, mutual auth;
+//              resumption with tickets, 0-RTT where the server allows it) and the TLS 1.2
+//              fallback for public servers: connect / accept -> TlsStream (a Stream)
+//   x509 / der the crate jflib-x509 (re-exported): certificates (parse, build with any key,
+//              verify chains) of a private CA and of the web PKI; PrivateKey (PKCS #8 ...)
+//   pem        PEM blocks
 //   roots      the system's certificate authorities (Windows: CryptoAPI; Linux: the bundle)
 //   ssh        SSH-2 client (curve25519, ssh-ed25519, chacha20-poly1305): run commands with
 //              stdin; the server side of the transport for tests
@@ -32,7 +34,6 @@
 extern crate alloc;
 
 pub mod client;
-pub mod der;
 pub mod dns;
 pub mod http;
 pub mod pem;
@@ -44,7 +45,11 @@ pub mod tls;
 pub mod trust;
 pub mod url;
 pub mod ws;
-pub mod x509;
+
+/// certificates and their DER: the crate jflib-x509, which netpkt uses as well (netio::x509 and
+/// netio::der stay the paths they were)
+pub use x509;
+pub use x509::der;
 
 pub use client::{Client, HttpError, Part};
 pub use http::{Body, Headers, Request, Response};

@@ -100,7 +100,7 @@ pub fn load_paired(dir: &str) -> Result<Paired, String> {
     if crypto::hex(&crypto::sha256(&ca.der)) != cfg.ca_fingerprint {
         return Err(String::from("ca.pem ist nicht die Zertifizierungsstelle der Kopplung"));
     }
-    Ok(Paired { cfg, identity: Identity { chain: alloc::vec![cert.der.clone(), ca.der.clone()], key }, ca })
+    Ok(Paired { cfg, identity: Identity::new(alloc::vec![cert.der.clone(), ca.der.clone()], key), ca })
 }
 
 /// store the result of a pairing

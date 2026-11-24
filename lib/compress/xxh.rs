@@ -1,4 +1,5 @@
-// xxh -- xxHash32 (the checksum of LZ4 frames) and xxHash64 (zstd frames); not cryptographic
+// xxh -- xxHash32 (the checksum of LZ4 frames) and xxHash64 (zstd frames); not cryptographic.
+// Xxh32 / Xxh64 give the same values for data that comes in pieces (the streams use them).
 
 const P1: u32 = 0x9E37_79B1;
 const P2: u32 = 0x85EB_CA77;
@@ -110,4 +111,159 @@ pub fn xxh64(data: &[u8], seed: u64) -> u64 {
     h = h.wrapping_mul(Q3);
     h ^= h >> 32;
     h
+}
+
+/// xxHash32 over data that comes in pieces: `update` as often as needed, then `digest`
+/// (the same value as `xxh32` of all pieces in a row)
+#[derive(Clone, Debug)]
+pub struct Xxh32 {
+    v: [u32; 4],
+    buf: [u8; 16],
+    nbuf: usize,
+    total: u64,
+    seed: u32,
+}
+
+impl Xxh32 {
+    pub fn new(seed: u32) -> Xxh32 {
+        Xxh32 {
+            v: [seed.wrapping_add(P1).wrapping_add(P2), seed.wrapping_add(P2), seed, seed.wrapping_sub(P1)],
+            buf: [0; 16],
+            nbuf: 0,
+            total: 0,
+            seed,
+        }
+    }
+
+    pub fn update(&mut self, mut data: &[u8]) {
+        self.total += data.len() as u64;
+        if self.nbuf > 0 {
+            let k = (16 - self.nbuf).min(data.len());
+            self.buf[self.nbuf..self.nbuf + k].copy_from_slice(&data[..k]);
+            self.nbuf += k;
+            data = &data[k..];
+            if self.nbuf < 16 {
+                return;
+            }
+            let b = self.buf;
+            for (i, x) in self.v.iter_mut().enumerate() {
+                *x = round(*x, rd(&b[i * 4..]));
+            }
+            self.nbuf = 0;
+        }
+        while data.len() >= 16 {
+            for (i, x) in self.v.iter_mut().enumerate() {
+                *x = round(*x, rd(&data[i * 4..]));
+            }
+            data = &data[16..];
+        }
+        self.buf[..data.len()].copy_from_slice(data);
+        self.nbuf = data.len();
+    }
+
+    /// the hash of everything so far (the state stays usable)
+    pub fn digest(&self) -> u32 {
+        let v = self.v;
+        let mut h = if self.total >= 16 {
+            v[0].rotate_left(1).wrapping_add(v[1].rotate_left(7)).wrapping_add(v[2].rotate_left(12)).wrapping_add(v[3].rotate_left(18))
+        } else {
+            self.seed.wrapping_add(P5)
+        };
+        h = h.wrapping_add(self.total as u32);
+        let mut p = &self.buf[..self.nbuf];
+        while p.len() >= 4 {
+            h = h.wrapping_add(rd(p).wrapping_mul(P3)).rotate_left(17).wrapping_mul(P4);
+            p = &p[4..];
+        }
+        for &b in p {
+            h = h.wrapping_add((b as u32).wrapping_mul(P5)).rotate_left(11).wrapping_mul(P1);
+        }
+        h ^= h >> 15;
+        h = h.wrapping_mul(P2);
+        h ^= h >> 13;
+        h = h.wrapping_mul(P3);
+        h ^= h >> 16;
+        h
+    }
+}
+
+/// xxHash64 over data that comes in pieces (the same value as `xxh64` of all pieces in a row)
+#[derive(Clone, Debug)]
+pub struct Xxh64 {
+    v: [u64; 4],
+    buf: [u8; 32],
+    nbuf: usize,
+    total: u64,
+    seed: u64,
+}
+
+impl Xxh64 {
+    pub fn new(seed: u64) -> Xxh64 {
+        Xxh64 {
+            v: [seed.wrapping_add(Q1).wrapping_add(Q2), seed.wrapping_add(Q2), seed, seed.wrapping_sub(Q1)],
+            buf: [0; 32],
+            nbuf: 0,
+            total: 0,
+            seed,
+        }
+    }
+
+    pub fn update(&mut self, mut data: &[u8]) {
+        self.total += data.len() as u64;
+        if self.nbuf > 0 {
+            let k = (32 - self.nbuf).min(data.len());
+            self.buf[self.nbuf..self.nbuf + k].copy_from_slice(&data[..k]);
+            self.nbuf += k;
+            data = &data[k..];
+            if self.nbuf < 32 {
+                return;
+            }
+            let b = self.buf;
+            for (i, x) in self.v.iter_mut().enumerate() {
+                *x = round64(*x, rd8(&b[i * 8..]));
+            }
+            self.nbuf = 0;
+        }
+        while data.len() >= 32 {
+            for (i, x) in self.v.iter_mut().enumerate() {
+                *x = round64(*x, rd8(&data[i * 8..]));
+            }
+            data = &data[32..];
+        }
+        self.buf[..data.len()].copy_from_slice(data);
+        self.nbuf = data.len();
+    }
+
+    /// the hash of everything so far (the state stays usable)
+    pub fn digest(&self) -> u64 {
+        let v = self.v;
+        let mut h = if self.total >= 32 {
+            let mut h = v[0].rotate_left(1).wrapping_add(v[1].rotate_left(7)).wrapping_add(v[2].rotate_left(12)).wrapping_add(v[3].rotate_left(18));
+            for x in v {
+                h = merge64(h, x);
+            }
+            h
+        } else {
+            self.seed.wrapping_add(Q5)
+        };
+        h = h.wrapping_add(self.total);
+        let mut p = &self.buf[..self.nbuf];
+        while p.len() >= 8 {
+            h = (h ^ round64(0, rd8(p))).rotate_left(27).wrapping_mul(Q1).wrapping_add(Q4);
+            p = &p[8..];
+        }
+        if p.len() >= 4 {
+            h = (h ^ (rd(p) as u64).wrapping_mul(Q1)).rotate_left(23).wrapping_mul(Q2).wrapping_add(Q3);
+            p = &p[4..];
+        }
+        for &b in p {
+            h = (h ^ (b as u64).wrapping_mul(Q5)).rotate_left(11).wrapping_mul(Q1);
+        }
+        h ^= h >> 33;
+        h = h.wrapping_mul(Q2);
+        h ^= h >> 29;
+        h = h.wrapping_mul(Q3);
+        h ^= h >> 32;
+        h
+    }
 }

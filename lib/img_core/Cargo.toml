@@ -1,10 +1,10 @@
 [package]
 name = "jflib-img-core"
-description = "The shared part of JFLib's image codecs: records, error codes, DEFLATE, colour management"
+description = "The shared part of JFLib's image codecs: records, error codes, colour management"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-license = "(MIT OR Apache-2.0) AND (MIT OR Unlicense) AND Zlib AND MIT"
+license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 
@@ -20,6 +20,8 @@ workspace = true
 [dependencies]
 simd.workspace = true
 gfx.workspace = true
+# DEFLATE, zlib, gzip and the checksums (inflate.rs, deflate.rs, gzip.rs, checksum.rs keep the old calls)
+compress.workspace = true
 
 # inside a loadable module (--cfg jflib_module) the same names are modrt and modplat
 [target.'cfg(not(jflib_module))'.dependencies]

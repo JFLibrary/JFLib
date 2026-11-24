@@ -1,0 +1,4 @@
+#!args --test wirefuzz
+# (Rust only) plattest --test wirefuzz: the decoders of other programs' data (plat::fuzz, the
+# clipboard and drop formats; on Linux D-Bus messages and Wayland events) with valid data and a
+# fixed-seed corpus of random and mutated bytes: no panic, lengths within the input (t_wire.rs)

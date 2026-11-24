@@ -12,13 +12,18 @@
 //        buffer (OLT_ON / OLT_CUBIC, font units)
 //   outline_var(table, glyph, coords, ol)   the same at a CFF2 instance's normalized
 //        coordinates (F2Dot14 per axis, avar applied: var.rs normalize; empty = the default)
+//   outline_seac(table, glyph, ol) -> (ok, seac)   outline, and the accent of an endchar with
+//        four arguments (adx, ady, bchar, achar: the base and the accent by StandardEncoding
+//        code, the accent moved by adx, ady before the FontMatrix), for a caller that has the
+//        glyph names (a font of a PDF file: the CFF charset)
+//   matrix() -> the FontMatrix scaled to the units of the outline (None: none or 1/upem)
 //
 // Type 2 operators: all path operators (r/h/v moveto, lineto, rrcurveto, hh/vv/hv/vh curveto,
 // rcurveline, rlinecurve, flex, hflex, hflex1, flex1), hint operators (stems are counted for
 // hintmask / cntrmask and skipped), callsubr / callgsubr (bias 107 / 1131 / 32768, nesting
-// <= 10), return, endchar (a seac accent is ignored), the arithmetic / storage operators
-// (abs add sub div neg eq drop put get ifelse random mul sqrt dup exch index roll and or
-// not).  Argument stack 48, transient array 32, at most 200000 operators per glyph, at most
+// <= 10), return, endchar (a seac accent is not drawn: outline_seac reports it), the
+// arithmetic / storage operators (abs add sub div neg eq drop put get ifelse random mul sqrt
+// dup exch index roll and or not).  Argument stack 48, transient array 32, at most 200000 operators per glyph, at most
 // 256 font DICTs, a Private DICT read to at most 64 KiB.  The
 // width argument is dropped (advances come from hmtx).  Like the assembly, the transient
 // array and the random generator are process-wide.
@@ -814,19 +819,34 @@ impl Cff {
     /// outline at a CFF2 instance's normalized coordinates (empty: the default instance; CFF
     /// ignores them)
     pub fn outline_var(&self, t: Tb, glyph: u32, coords: &[i16], ol: &mut Outline) -> bool {
+        self.outline_at(t, glyph, coords, ol).0
+    }
+
+    /// outline, and the accent of a seac endchar: (adx, ady, bchar, achar)
+    pub fn outline_seac(&self, t: Tb, glyph: u32, ol: &mut Outline) -> (bool, Option<[f32; 4]>) {
+        self.outline_at(t, glyph, &[], ol)
+    }
+
+    /// the FontMatrix in the units of the outline (applied to it already): None when the font
+    /// has none or it is 1/unitsPerEm
+    pub fn matrix(&self) -> Option<[f32; 6]> {
+        self.hasmat.then_some(self.mat)
+    }
+
+    fn outline_at(&self, t: Tb, glyph: u32, coords: &[i16], ol: &mut Outline) -> (bool, Option<[f32; 4]>) {
         if glyph >= self.cs.count {
-            return true;
+            return (true, None);
         }
         let (ls, vsi) = if self.cid {
             let fd = self.fdselect(t, glyph);
             if fd as u32 >= self.nfd {
-                return false;
+                return (false, None);
             }
             (self.fdls[fd as usize], self.fdvs.get(fd as usize).copied().unwrap_or(0))
         } else {
             (self.ls, 0)
         };
-        let Some((s, l)) = ix_get(t, &self.cs, glyph) else { return false };
+        let Some((s, l)) = ix_get(t, &self.cs, glyph) else { return (false, None) };
         let mut cs = Cs {
             t,
             gs: self.gs,
@@ -852,11 +872,13 @@ impl Cff {
             sc: Vec::new(),
             nreg: None,
             blended: false,
+            seac: None,
             ol,
         };
         if cs.run(s, s.wrapping_add(l), 0) < 0 {
-            return false;
+            return (false, None);
         }
+        let seac = cs.seac;
         let ol = cs.ol;
         ol.close();
         if self.hasmat {
@@ -865,7 +887,7 @@ impl Cff {
             ol.transform(0, m[0], m[1], m[2], m[3]);
             ol.translate(0, m[4], m[5]);
         }
-        true
+        (true, seac)
     }
 }
 
@@ -916,6 +938,8 @@ struct Cs<'a, 'o> {
     sc: Vec<f32>,
     nreg: Option<usize>,
     blended: bool,
+    /// an endchar with the four arguments of seac
+    seac: Option<[f32; 4]>,
     ol: &'o mut Outline,
 }
 
@@ -1350,7 +1374,12 @@ impl Cs<'_, '_> {
                         Flow::Loop // the values stay on the stack
                     }
                     14 => {
-                        // endchar (a seac accent is ignored)
+                        // endchar; with four arguments (five with the width) a seac accent,
+                        // reported to the caller (outline_seac)
+                        if !self.v2 && (self.sp == 4 + !self.wd as usize) {
+                            let b = self.sp - 4;
+                            self.seac = Some([self.st[b], self.st[b + 1], self.st[b + 2], self.st[b + 3]]);
+                        }
                         self.wd = true;
                         self.moveto_begin();
                         Flow::Ret1

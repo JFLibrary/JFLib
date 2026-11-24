@@ -86,6 +86,7 @@ pub const AL_DECRYPT_ERROR: u8 = 51;
 pub const AL_PROTOCOL_VERSION: u8 = 70;
 pub const AL_INTERNAL_ERROR: u8 = 80;
 pub const AL_MISSING_EXTENSION: u8 = 109;
+pub const AL_UNSUPPORTED_EXTENSION: u8 = 110;
 
 pub const EXT_SERVER_NAME: u16 = 0;
 pub const EXT_GROUPS: u16 = 10;
@@ -808,8 +809,9 @@ impl Core {
             (State::ClientSh, HS_SERVER_HELLO) => self.client_sh(msg, body),
             (State::ClientEe, HS_ENCRYPTED_EXTENSIONS) => {
                 let mut r = R { b: body };
-                extensions(r.v16()?)?;
+                let exts = extensions(r.v16()?)?;
                 r.done()?;
+                self.server_exts(&exts, &[EXT_SERVER_NAME, EXT_GROUPS])?;
                 self.transcript.update(msg);
                 self.state = State::ClientCert;
                 Ok(())
@@ -828,7 +830,7 @@ impl Core {
                 if scheme != ED25519 {
                     return Err((AL_ILLEGAL_PARAMETER, "a signature scheme not offered"));
                 }
-                let key = self.peer.first().and_then(|c| c.key).ok_or((AL_BAD_CERTIFICATE, "a certificate without an Ed25519 key"))?;
+                let key = self.peer.first().and_then(|c| c.ed25519_key()).ok_or((AL_BAD_CERTIFICATE, "a certificate without an Ed25519 key"))?;
                 let sig: &[u8; 64] = sig.try_into().map_err(|_| (AL_DECODE_ERROR, "a signature's length"))?;
                 if !ed25519::verify(&key, &cv_content(&self.hash()), sig) {
                     return Err((AL_DECRYPT_ERROR, "CertificateVerify"));
@@ -886,6 +888,27 @@ impl Core {
 
     // ---------------------------------------------------------------- the client
 
+    /// the ClientHello names the server (a DNS name; an address is no server_name, RFC 6066 3)
+    fn sends_sni(&self) -> bool {
+        !self.name.is_empty() && IpAddr::parse(self.name.trim_matches(['[', ']'])).is_none()
+    }
+
+    /// what a server's message may hold (RFC 8446 4.2): an extension the ClientHello did not
+    /// offer is unsupported_extension (unknown types and GREASE values, RFC 8701 4, included),
+    /// one it offered outside the messages that answer it illegal_parameter
+    fn server_exts(&self, exts: &[(u16, &[u8])], allowed: &[u16]) -> Res<()> {
+        for (t, _) in exts {
+            let offered = [EXT_VERSIONS, EXT_GROUPS, EXT_SIG_ALGS, EXT_KEY_SHARE].contains(t) || (*t == EXT_SERVER_NAME && self.sends_sni());
+            if !offered {
+                return Err((AL_UNSUPPORTED_EXTENSION, "an extension the client did not offer"));
+            }
+            if !allowed.contains(t) {
+                return Err((AL_ILLEGAL_PARAMETER, "an extension in a message it does not belong in"));
+            }
+        }
+        Ok(())
+    }
+
     fn client_hello(&mut self) {
         let random = rand32(&self.seed, b"tls client random");
         let mut b = Vec::new();
@@ -896,7 +919,7 @@ impl Core {
         put_v16(&mut b, &SUITE.to_be_bytes());
         put_v8(&mut b, &[0]);
         let mut e = Vec::new();
-        if !self.name.is_empty() && IpAddr::parse(self.name.trim_matches(['[', ']'])).is_none() {
+        if self.sends_sni() {
             let mut sni = alloc::vec![0u8];
             put_v16(&mut sni, self.name.as_bytes());
             let mut list = Vec::new();
@@ -919,9 +942,8 @@ impl Core {
 
     fn client_sh(&mut self, msg: &[u8], body: &[u8]) -> Res<()> {
         let mut r = R { b: body };
-        if r.u16()? != 0x0303 {
-            return Err((AL_PROTOCOL_VERSION, "a legacy version"));
-        }
+        // legacy_version: ignored, supported_versions says the version (RFC 8446 4.2.1)
+        r.u16()?;
         r.take(32)?;
         let sid = r.v8()?;
         let suite = r.u16()?;
@@ -936,6 +958,7 @@ impl Core {
         if sid != self.session_id.as_slice() {
             return Err((AL_ILLEGAL_PARAMETER, "a session id not echoed"));
         }
+        self.server_exts(&exts, &[EXT_VERSIONS, EXT_KEY_SHARE])?;
         if suite != SUITE {
             return Err((AL_ILLEGAL_PARAMETER, "a cipher suite not offered"));
         }
@@ -990,7 +1013,7 @@ impl Core {
         }
         let Some(cfg) = self.cfg.as_ref() else { return Err((AL_INTERNAL_ERROR, "no configuration")) };
         let faults = check_chain(&chain, &cfg.anchors, &cfg.name, cfg.now);
-        let excused = cfg.insecure || cfg.accept.contains(&chain[0].fingerprint());
+        let excused = cfg.insecure || cfg.accept.contains(&chain[0].fingerprint_bytes());
         self.peer = chain;
         self.faults = faults;
         self.events.push(Event::Certificate { faults });

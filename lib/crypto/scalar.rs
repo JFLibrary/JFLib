@@ -39,7 +39,7 @@ fn reduce_limbs(n: &[u64; 8]) -> [u64; 4] {
             t[i] = d;
             borrow = (b1 | b2) as u64;
         }
-        let keep_r = 0u64.wrapping_sub(borrow); // all ones when r < L
+        let keep_r = crate::ct_mask(0u64.wrapping_sub(borrow)); // all ones when r < L
         for i in 0..4 {
             r[i] = (r[i] & keep_r) | (t[i] & !keep_r);
         }

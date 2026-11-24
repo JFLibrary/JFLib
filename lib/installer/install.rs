@@ -2,27 +2,31 @@
 // shortcuts, the uninstall entry and install.ini; uninstall it again
 //                                                              [apps/installer/src/install.s]
 //
-//   inst_run(st) -> Ok / Err (st.err)   install into st.dir (style st.sel, options st.opt_*)
+//   inst_run(st) -> Ok / Err (st.err)   install into st.dir (style st.sel, options st.opt_*,
+//                                       for st.scope: the user or all users)
 //   inst_launch(st) -> bool             start the installed program
 //   inst_default_browser(st, headless)  (browser=1) Settings at the program's page of the
 //                                       default apps (test mode, script runs: printed only)
 //   un_load(st) -> Ok / Err             uninstaller: read install.ini next to the own exe
 //   un_run(st)                          remove files, shortcuts, uninstall entry, then let cmd
-//                                       delete uninstall.exe and the folder after the exit
+//                                       delete uninstall.exe and the folder once it has ended
 //
 // install.ini (key=value): app, display, style, desktop, start (shortcut paths or empty),
 // reg (1 / 0), files (further files relative to the folder, ';'-separated, '\'; one line of any
 // length, an older setup cut it at 4096 bytes), assoc (what
 // the file types, URL schemes and a browser's registration added, assoc.rs), app_id (the program's AppUserModelID: the
 // shortcuts, the pins and the ProgIDs carry it, and the program runs under it when it finds
-// this line beside itself, lib/plat/assoc.rs app_id_boot)
+// this line beside itself, lib/plat/assoc.rs app_id_boot), scope=machine for an installation
+// for all users (its keys are below HKLM; no line: the user's, HKCU)
 
 use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
+use ui::i18n::{t, tf};
+
 use crate::payload::{PK_FILE, STY_MAX, kv_get, parent_dir, path_cap, pl_inflate};
-use crate::shell::{Reg, sh_assoc_remove, sh_assoc_set, sh_browser_request, sh_folder, sh_link, sh_pins, sh_reg_delete, sh_run};
+use crate::shell::{Reg, Scope, sh_assoc_remove, sh_assoc_set, sh_browser_request, sh_folder, sh_link, sh_pins, sh_reg_delete, sh_run};
 use crate::{Inst, PATH_CAP, str_cap};
 
 /// install.ini's lists (files=, assoc=) have no limit: the asm's buffers of 4096 and 8192 bytes
@@ -34,9 +38,10 @@ fn in_path(st: &Inst, name: &str) -> String {
     path_cap(&format!("{}\\{}", st.dir, name))
 }
 
-/// st.err = msg with its %s replaced by arg (512 bytes)  [in_fail]
-fn in_fail(st: &mut Inst, msg: &str, arg: &str) -> Result<(), ()> {
-    st.err = str_cap(&msg.replacen("%s", arg, 1), 512);
+/// st.err = the text msg (a catalogue key) in the language of the pages, its {} replaced by
+/// arg (512 bytes)  [in_fail]
+fn in_fail(st: &mut Inst, msg: &'static str, arg: &str) -> Result<(), ()> {
+    st.err = str_cap(&tf(msg, &[arg]), 512);
     Err(())
 }
 
@@ -71,10 +76,17 @@ fn in_ini(txt: &mut String, key: &str, value: &str) {
 }
 
 /// the style index installed: st.sel, the first when out of range
-fn sel_index(st: &Inst) -> usize {
+pub(crate) fn sel_index(st: &Inst) -> usize {
     let s = if (st.sel as u32 as usize) < st.sty.len() { st.sel as usize } else { 0 };
     s & (STY_MAX - 1)
 }
+
+/// the program's file name: "<app>.exe"
+pub(crate) fn exe_name(st: &Inst) -> String {
+    str_cap(&(str_cap(&st.app, 64) + ".exe"), 64)
+}
+
+const E_WRITE: &str = "„{}“ konnte nicht geschrieben werden.";
 
 /// install into st.dir -> Ok / Err (st.err)  [inst_run]
 pub(crate) fn inst_run(st: &mut Inst) -> Result<(), ()> {
@@ -86,15 +98,14 @@ pub(crate) fn inst_run(st: &mut Inst) -> Result<(), ()> {
     // folder
     if !plat::mkdir(&st.dir) {
         let d = st.dir.clone();
-        return in_fail(st, "Der Ordner „%s“ konnte nicht angelegt werden.", &d);
+        return in_fail(st, "Der Ordner „{}“ konnte nicht angelegt werden.", &d);
     }
     // the program in the chosen style
     let ent = st.sty[sel_index(st)].ent;
-    let name = str_cap(&(str_cap(&st.app, 64) + ".exe"), 64);
-    st.exepath = in_path(st, &name);
+    st.exepath = in_path(st, &exe_name(st));
     if !in_write_entry(st, ent, &st.exepath) {
         let p = st.exepath.clone();
-        return in_fail(st, "„%s“ konnte nicht geschrieben werden (läuft das Programm noch?).", &p);
+        return in_fail(st, "„{}“ konnte nicht geschrieben werden (läuft das Programm noch?).", &p);
     }
     // further files
     for i in 0..st.ents.len() {
@@ -105,7 +116,7 @@ pub(crate) fn inst_run(st: &mut Inst) -> Result<(), ()> {
         let path = in_path(st, &st.ents[i].name);
         in_mkparent(&path);
         if !in_write_entry(st, i, &path) {
-            return in_fail(st, "„%s“ konnte nicht geschrieben werden.", &path);
+            return in_fail(st, E_WRITE, &path);
         }
         // (the whole list: a name cut short is another file for the uninstaller, a name left
         // out a file it leaves behind)
@@ -117,7 +128,7 @@ pub(crate) fn inst_run(st: &mut Inst) -> Result<(), ()> {
     // the uninstaller: the setup without its payload (and without a signature of the setup)
     let un = in_path(st, "uninstall.exe");
     if !plat::write_file(&un, &crate::payload::stub(st)) {
-        return in_fail(st, "„%s“ konnte nicht geschrieben werden.", &un);
+        return in_fail(st, E_WRITE, &un);
     }
     // shortcuts: <folder>\<display>.lnk
     let lnk = str_cap(&(st.disp.clone() + ".lnk"), 128);
@@ -127,14 +138,17 @@ pub(crate) fn inst_run(st: &mut Inst) -> Result<(), ()> {
     if st.opt_start != 0 {
         st.lnk_start = in_link(st, 1, &lnk);
     }
-    // the taskbar's pins of an earlier version: the program's new id (else two buttons)
-    sh_pins(&st.exepath, &st.appid);
+    // the taskbar's pins of an earlier version: the program's new id (else two buttons); the
+    // pins are the user's, an installation for all users had no earlier version without an id
+    if st.scope == Scope::User {
+        sh_pins(&st.exepath, &st.appid);
+    }
     if st.opt_reg != 0 {
         in_regentry(st);
     }
     // file types and URL schemes (PACKAGE filetypes= / schemes=), a web browser (browser=1)
     let plan = crate::assoc::plan(&package(st), &st.exepath);
-    sh_assoc_set(&plan.set);
+    sh_assoc_set(&plan.set, st.scope);
     in_ini(&mut initxt, "app", &st.app);
     in_ini(&mut initxt, "display", &st.disp);
     let style = &st.ents[st.sty[sel_index(st)].ent].name;
@@ -142,6 +156,9 @@ pub(crate) fn inst_run(st: &mut Inst) -> Result<(), ()> {
     in_ini(&mut initxt, "desktop", &st.lnk_desk);
     in_ini(&mut initxt, "start", &st.lnk_start);
     in_ini(&mut initxt, "reg", if st.opt_reg != 0 { "1" } else { "0" });
+    if st.scope == Scope::Machine {
+        in_ini(&mut initxt, "scope", "machine");
+    }
     in_ini(&mut initxt, "files", &files);
     in_ini(&mut initxt, "assoc", &plan.remove);
     if !st.appid.is_empty() {
@@ -150,29 +167,32 @@ pub(crate) fn inst_run(st: &mut Inst) -> Result<(), ()> {
     // (without it the uninstaller of "installed apps" finds nothing to remove)
     let ini = in_path(st, "install.ini");
     if !plat::write_file(&ini, initxt.as_bytes()) {
-        return in_fail(st, "„%s“ konnte nicht geschrieben werden.", &ini);
+        return in_fail(st, E_WRITE, &ini);
     }
     Ok(())
 }
 
-/// shortcut in the desktop (0) / start menu (1) folder -> its path ("" when it failed)  [in_link]
+/// shortcut in the desktop (0) / start menu (1) folder of st.scope -> its path ("" when it
+/// failed)  [in_link]
 fn in_link(st: &Inst, which: u32, lnk: &str) -> String {
-    let Some(dir) = sh_folder(which) else { return String::new() };
+    let Some(dir) = sh_folder(which, st.scope) else { return String::new() };
     let path = path_cap(&format!("{dir}\\{lnk}"));
     if sh_link(&path, &st.exepath, &st.dir, &st.disp, &st.appid) { path } else { String::new() }
 }
 
 /// the "installed apps" entry  [in_regentry]
 fn in_regentry(st: &Inst) {
-    let Some(mut r) = Reg::begin(&st.app) else { return };
+    let Some(mut r) = Reg::begin(&st.app, st.scope) else { return };
     r.sz("DisplayName", &st.disp);
     r.sz("DisplayVersion", &st.ver);
     r.sz("Publisher", &st.pub_);
     r.sz("DisplayIcon", &st.exepath);
     r.sz("InstallLocation", &st.dir);
-    // "<folder>\uninstall.exe" --uninstall
+    // "<folder>\uninstall.exe" --uninstall; without questions (package managers, scripts):
+    // --quiet
     let un = path_cap(&format!("\"{}\\uninstall.exe\" --uninstall", st.dir));
     r.sz("UninstallString", &un);
+    r.sz("QuietUninstallString", &(un.clone() + " --quiet"));
     r.dword("NoModify", 1);
     r.dword("NoRepair", 1);
     r.dword("EstimatedSize", (st.self_.len() >> 10) as u32);
@@ -207,15 +227,24 @@ pub(crate) fn inst_default_browser(st: &Inst, headless: bool) -> bool {
     sh_browser_request(&package(st), headless)
 }
 
-// ------------------------------------------------------------------ uninstall
+/// after an installation by another process (the setup with administrator rights): the
+/// program's path and the shortcuts it made, from the install.ini it wrote
+pub(crate) fn inst_read_back(st: &mut Inst) {
+    st.dir = in_slash(&st.dir);
+    st.exepath = in_path(st, &exe_name(st));
+    if let Some(ini) = plat::read_file(&in_path(st, "install.ini")) {
+        st.lnk_desk = kv_get(&ini, "desktop", PATH_CAP).unwrap_or_default();
+        st.lnk_start = kv_get(&ini, "start", PATH_CAP).unwrap_or_default();
+    }
+}
 
-const ERR_NOINI: &str = "Die Installationsdaten (install.ini) wurden nicht gefunden.";
+// ------------------------------------------------------------------ uninstall
 
 /// st.dir = the own folder, the values of its install.ini  [un_load]
 pub(crate) fn un_load(st: &mut Inst) -> Result<(), ()> {
     let r = un_load_ini(st);
     if r.is_err() {
-        st.err = String::from(ERR_NOINI);
+        st.err = String::from(t("Die Installationsdaten (install.ini) wurden nicht gefunden."));
     }
     r
 }
@@ -232,6 +261,7 @@ fn un_load_ini(st: &mut Inst) -> Result<(), ()> {
     st.assoc = kv_get(&ini, "assoc", NO_CAP).unwrap_or_default();
     let reg = kv_get(&ini, "reg", 8).unwrap_or_default();
     st.opt_reg = reg.as_bytes().first().is_some_and(|&c| c == b'1') as i32;
+    st.scope = if kv_get(&ini, "scope", 16).is_some_and(|s| s == "machine") { Scope::Machine } else { Scope::User };
     Ok(())
 }
 
@@ -261,12 +291,20 @@ fn un_folders(names: &[String]) -> Vec<String> {
     dirs
 }
 
+/// the hidden command that deletes uninstall.exe (self) and then its folder: a running exe
+/// cannot be deleted, so it tries once a second until the uninstaller has ended (at most five
+/// minutes; the window of the uninstaller stays open on its last page, and an uninstaller with
+/// administrator rights runs while the one that started it waits).  An older uninstaller
+/// tried once after two seconds and left both behind when its window stayed open longer
+fn un_cleanup_cmd(self_: &str, dir: &str) -> String {
+    format!("cmd.exe /c (for /l %i in (1,1,300) do @if exist \"{self_}\" (del /f /q \"{self_}\" & ping -n 2 127.0.0.1 >nul)) & rmdir \"{dir}\"")
+}
+
 /// remove the installation; cmd deletes uninstall.exe and the folder once this process has
 /// ended  [un_run]
 pub(crate) fn un_run(st: &mut Inst) {
     // the program
-    let name = str_cap(&(str_cap(&st.app, 64) + ".exe"), 64);
-    plat::delete(&in_path(st, &name));
+    plat::delete(&in_path(st, &exe_name(st)));
     // further files, then the folders that held them, deepest first (a delete fails while the
     // folder is not empty: what the user put there stays)
     let names = un_names(&st.files);
@@ -283,14 +321,10 @@ pub(crate) fn un_run(st: &mut Inst) {
         plat::delete(&st.lnk_start);
     }
     if st.opt_reg != 0 {
-        sh_reg_delete(&st.app);
+        sh_reg_delete(&st.app, st.scope);
     }
-    sh_assoc_remove(&st.assoc);
+    sh_assoc_remove(&st.assoc, st.scope);
     plat::delete(&in_path(st, "install.ini"));
     // uninstall.exe and the folder: cmd removes them once this process has ended
-    let cmd = path_cap(&format!(
-        "cmd.exe /c ping -n 3 127.0.0.1 >nul & del /f /q \"{}\" & rmdir \"{}\"",
-        st.selfpath, st.dir
-    ));
-    sh_run(&cmd, None, true);
+    sh_run(&un_cleanup_cmd(&st.selfpath, &st.dir), None, true);
 }

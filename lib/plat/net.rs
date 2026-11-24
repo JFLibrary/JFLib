@@ -20,8 +20,10 @@
 //             (bind removes only a socket file nobody listens on; the drop only its own)
 //             -> UnixStream (the stream calls of TcpStream; addresses and nodelay do not apply)
 //             Linux, and Windows 10 1803 and later (AF_UNIX)
-//   resolve(host, port): numeric addresses, "localhost"; Windows also the system resolver
-//             (GetAddrInfoW).  Linux names go through netio::dns (no libc here).
+//   resolve(host, port): numeric addresses, "localhost" and names under .localhost (the loopback
+//             addresses, RFC 6761; with a final dot as well); Windows, macOS and iOS also the
+//             system resolver (GetAddrInfoW, getaddrinfo).  Linux: other names NotFound, since
+//             there is no libc here: netio::dns resolves them (/etc/hosts, the name servers).
 //   NetError: the kinds callers act on, with the OS code
 //
 // (G7d) Everywhere: the addresses, NetError and host_port.  The sockets, names and interfaces are
@@ -644,8 +646,9 @@ mod sys {
         cnt(unsafe { WSAPoll(fds.as_mut_ptr(), fds.len() as u32, ms) })
     }
 
-    /// the system resolver: the addresses of a host name
-    pub fn resolve_system(host: &str) -> NetResult<alloc::vec::Vec<super::IpAddr>> {
+    /// the system resolver: the addresses of a host name (port 0; a link-local IPv6 address with
+    /// its zone, sin6_scope_id)
+    pub fn resolve_system(host: &str) -> NetResult<alloc::vec::Vec<super::SocketAddr>> {
         startup();
         let w: alloc::vec::Vec<u16> = host.encode_utf16().chain(core::iter::once(0)).collect();
         let hints = AddrInfoW { flags: 0, family: 0, socktype: 1, protocol: 6, addrlen: 0, canonname: core::ptr::null_mut(), addr: core::ptr::null(), next: core::ptr::null_mut() };
@@ -664,8 +667,9 @@ mod sys {
                 // SAFETY: ai.addr points to ai.addrlen bytes.
                 let raw = unsafe { core::slice::from_raw_parts(ai.addr, ai.addrlen) };
                 if let Some(a) = super::decode_sockaddr(raw) {
-                    if !out.contains(&a.ip) {
-                        out.push(a.ip);
+                    let a = super::SocketAddr::with_scope(a.ip, 0, a.scope);
+                    if !out.contains(&a) {
+                        out.push(a);
                     }
                 }
             }
@@ -1157,8 +1161,9 @@ mod sys {
         call(|| unsafe { c_poll(fds.as_mut_ptr(), fds.len() as c_uint, ms) } as isize)
     }
 
-    /// the system resolver: the addresses of a host name (getaddrinfo)
-    pub fn resolve_system(host: &str) -> NetResult<alloc::vec::Vec<super::IpAddr>> {
+    /// the system resolver: the addresses of a host name (getaddrinfo; port 0, a link-local IPv6
+    /// address with its zone: a name under .local often has one)
+    pub fn resolve_system(host: &str) -> NetResult<alloc::vec::Vec<super::SocketAddr>> {
         let mut z = host.as_bytes().to_vec();
         z.push(0);
         let hints = AddrInfo { flags: 0, family: 0, socktype: 1, protocol: 6, addrlen: 0, canonname: core::ptr::null_mut(),
@@ -1178,8 +1183,9 @@ mod sys {
                 // SAFETY: ai.addr points to ai.addrlen bytes.
                 let raw = unsafe { core::slice::from_raw_parts(ai.addr, ai.addrlen as usize) };
                 if let Some(a) = super::decode_sockaddr(raw) {
-                    if !out.contains(&a.ip) {
-                        out.push(a.ip);
+                    let a = super::SocketAddr::with_scope(a.ip, 0, a.scope);
+                    if !out.contains(&a) {
+                        out.push(a);
                     }
                 }
             }
@@ -1689,16 +1695,25 @@ pub fn connect_unix(path: &str, timeout_ms: u32) -> NetResult<UnixStream> {
 
 // ------------------------------------------------------------------ names
 
-/// the addresses of a host: numeric forms and "localhost" everywhere; on Windows, macOS and iOS
-/// other names through the system resolver (Linux: netio::dns)
+/// the addresses of a host: numeric forms, "localhost" and names under .localhost, with a final
+/// dot as well (both loopback addresses, RFC 6761 6.3, as netio::dns answers them) everywhere;
+/// on Windows, macOS and iOS other names through the system resolver, on Linux NotFound for them
+/// (no libc here: netio::dns::resolve reads /etc/hosts and asks the name servers).  The
+/// addresses of a name are registered with the app's rules (policy::net_resolved), so a rule
+/// for the name (app.localhost:8080) covers connections to them
 #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub fn resolve(host: &str, port: u16) -> NetResult<Vec<SocketAddr>> {
     let h = host.trim_start_matches('[').trim_end_matches(']');
     if let Some((ip, scope)) = ip_scope_parse(h) {
         return Ok(alloc::vec![SocketAddr::with_scope(ip, port, scope)]);
     }
-    if h.eq_ignore_ascii_case("localhost") {
-        return Ok(alloc::vec![SocketAddr::new(IpAddr::LOCALHOST_V4, port), SocketAddr::new(IpAddr::LOCALHOST_V6, port)]);
+    // the absolute form too (app.localhost.), as the rules compare names
+    let bare = h.trim_end_matches('.');
+    if bare.eq_ignore_ascii_case("localhost") || bare.to_ascii_lowercase().ends_with(".localhost") {
+        let addrs = alloc::vec![SocketAddr::new(IpAddr::LOCALHOST_V4, port), SocketAddr::new(IpAddr::LOCALHOST_V6, port)];
+        // no lookup to permit (nothing is asked), but a rule for the name covers its addresses
+        crate::policy::net_resolved(h, &addrs);
+        return Ok(addrs);
     }
     #[cfg(any(windows, target_vendor = "apple"))]
     {
@@ -1710,11 +1725,12 @@ pub fn resolve(host: &str, port: u16) -> NetResult<Vec<SocketAddr>> {
         if !crate::policy::net_name_allowed(h) {
             return Err(denied());
         }
-        let ips = sys::resolve_system(h)?;
-        if ips.is_empty() {
+        let found = sys::resolve_system(h)?;
+        if found.is_empty() {
             return Err(NetError::new(NetErrorKind::NotFound, 0));
         }
-        let addrs: Vec<SocketAddr> = ips.into_iter().map(|ip| SocketAddr::new(ip, port)).collect();
+        // the zone stays with a link-local address: without it no connection to it
+        let addrs: Vec<SocketAddr> = found.into_iter().map(|a| SocketAddr::with_scope(a.ip, port, a.scope)).collect();
         crate::policy::net_resolved(h, &addrs);
         Ok(addrs)
     }

@@ -20,12 +20,14 @@ and tests); `../legacy`, `../rewrite` and `../booksAndContext` lie next to it.
 | [AGENT_WEB.md](AGENT_WEB.md) | modular source layout, opt-in CLI/JSON/MCP control, shared browser host, capabilities and measured platform coverage |
 | [jfWord implementation](../apps/jfWord/docs/IMPLEMENTATION.md) | jfOffice, scientific editing, completed checks and remaining Office/Word compatibility work |
 | [STYLES.md](STYLES.md) | the style model (`ui::Style` + sub-traits), the styles, writing and checking a style |
-| [PACKAGING.md](PACKAGING.md) | `tools/package.py`: setup.exe with a choice of style, the .deb, AppImage (runtime `apps/appimagert`), RPM .spec, Flatpak, MSIX, icons, `apps/NAME/PACKAGE`, signing (Authenticode, MSIX, apt repository, Android release key), `pkg_check.py` |
+| [PACKAGING.md](PACKAGING.md) | `tools/package.py`: setup.exe with a choice of style, the .deb, AppImage (runtime `apps/appimagert`), RPM .spec, Flatpak, MSIX, icons, `apps/NAME/PACKAGE`, signing (Authenticode, MSIX, apt repository, Android release key), `pkg_check.py`; the setup's languages, all-users installs and quiet mode, `setup_check.py` (Windows or Wine) |
 | [VERSIONING.md](VERSIONING.md) | the library's version and the apps' own (`rt::app_version!()`), what the public API is, the SemVer rules, deprecations, `build_rs.py api-diff` / `release`, the [changelog](../CHANGELOG.md) |
 | [UPDATES.md](UPDATES.md) | `lib/update`: signed update channels, background download, putting in place at the next start, health marker, rollback |
 | [VFS.md](VFS.md) | one file namespace: `app://` (bundled `apps/NAME/assets`), `config://`, `data://`, `cache://`, `mem://`, your own mounts (folders, overlays, ZIP) |
 | [PERMISSIONS.md](PERMISSIONS.md) | `apps/NAME/PERMISSIONS`: the files, programs, URL schemes, plugins, printing and network addresses an app may use, and how `plat` enforces them |
 | [SECRETS.md](SECRETS.md) | `plat::secret`: passwords, tokens and keys in the Credential Manager (DPAPI files for large values) and the Secret Service, the `secrets` permission, limits |
+| [PLAT_INPUTS.md](PLAT_INPUTS.md) | Other programs' data in `plat`: clipboard, drag and drop, Wayland, X11, D-Bus, the agent interface; how each way is bounded, where its `unsafe` is, what tests it (`plattest --test wirefuzz`), what is open |
+| [EXTERNAL_SUITES.md](EXTERNAL_SUITES.md) | Wycheproof, x509-limbo, tlsfuzzer and TLS-Anvil against `lib/crypto`, `lib/x509` and netio's TLS: the commands, the results, every failure with its cause |
 | [`../README.md`](../README.md) | building and testing the Rust code, the rules (`no_std`, no crates, `unsafe` only in `rt` / `simd` / `plat` / `gpu` and the module runtimes), the crate layout |
 
 ## What is where
@@ -33,11 +35,11 @@ and tests); `../legacy`, `../rewrite` and `../booksAndContext` lie next to it.
 | Path (in `RustLib/`) | Content |
 |---|---|
 | `build_rs.py` | build and test (`lib`, `app NAME [--style S]`, `all`, `run`, `test [--quick]`, `check`, `plugin`, `ide`) |
-| `lib/` | the library crates: `rt`, `simd`, `plat`, `base`, `gfx`, `text`, `img_core` + one crate per codec family + `img_all`, `img_jxl_enc`, `fx`, `ui`, `plugin`; the network and data crates `netio`, `crypto`, `datastore`, `cas`, `update` |
+| `lib/` | the library crates: `rt`, `simd`, `plat`, `base`, `gfx`, `text`, `img_core` + one crate per codec family + `img_all`, `img_jxl_enc`, `fx`, `ui`, `plugin`; the network and data crates `netio`, `x509`, `crypto`, `datastore`, `cas`, `update` |
 | `styles/` | the style crates `winui`, `classic`, `macos`, `kde` (assets and `INFO` included) |
 | `apps/NAME/` | one folder per app: its Rust code (`main.rs` ...), `tests/*.uis` + fixtures, `res/` (icons), `STYLE`, `TARGETS`, `PACKAGE`, `PERMISSIONS`, `assets/` (app://), `parity.txt`; (until 2026-11 `apps/PaintCraft/docs/`, the PaintCraft specification: document, layers, tools, effects, plugins, settings, diagnostics, ...) |
 | `modules/` | loadable modules (`jxlenc`, the JPEG XL writer) and their runtime crates `modrt` / `modplat` |
-| `tools/` | `parity.py` (assembly against Rust: apps), `diffcheck.py` (assembly against Rust: check tools), `gendoc.py` (API.md), the check tools (`*_check.py`: codecs, kernels, effects, fonts, plugins), reference models (`*_ref.py`), `package.py` (with `pkg_linux.py`, `pkg_msix.py`, `pkgmeta.py`, `codesign.py`, `sign_check.py`, `pkg_check.py`), `update_manifest.py` / `update_server.py` (update channels), `mkicon.py`, `ttf2bin.py` / `fontpreview.py` / `refrender.py` (fonts), `wincap.py` / `wslcap.py` (real-window captures), `wincheck.py` / `x11check.py` / `pencheck.py` (real windows, pen input), `testenv.py`, table generators (`gen_*.py`), `measure.py`, `platshared/` and `wlproxy/` (platform acceptance) |
+| `tools/` | `parity.py` (assembly against Rust: apps), `diffcheck.py` (assembly against Rust: check tools), `gendoc.py` (API.md), the check tools (`*_check.py`: codecs, kernels, effects, fonts, plugins), reference models (`*_ref.py`), `package.py` (with `pkg_linux.py`, `pkg_msix.py`, `pkgmeta.py`, `codesign.py`, `sign_check.py`, `pkg_check.py`, `setup_check.py`), `update_manifest.py` / `update_server.py` (update channels), `mkicon.py`, `ttf2bin.py` / `fontpreview.py` / `refrender.py` (fonts), `wincap.py` / `wslcap.py` (real-window captures), `wincheck.py` / `x11check.py` / `pencheck.py` (real windows, pen input), `testenv.py`, table generators (`gen_*.py`), `measure.py`, `platshared/` and `wlproxy/` (platform acceptance) |
 | `docs/` | these documents |
 | `build/` | outputs: `win/`, `linux/` (development), `release/`, the assembly reference builds `rwref*/` for parity, tool inputs (`jxl/`, `ext/`, ...) |
 | `../rewrite/` | the rebuild: `PLAN.md` (plan and phases R0-R13, German), `AGENTS.md` (briefs of the agent waves), `REPORT.md` (measurements), `README.md` (the language spike) |

@@ -8,6 +8,14 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Added
+
+- The setup manifest carries the styles' names and descriptions in other languages: styles/S/INFO's further lines name.<lang>= and desc.<lang>= become label_<style>.<lang>= and desc_<style>.<lang>= (cargo jflib package, tools/package.py)
+
+### Changed
+
+- Compresses with jflib-compress instead of its own DEFLATE and LZ4: the .deb's archives, the update channel and the source tarball with gzip at level 9, the setup's payload and the PNGs with zlib at level 9, the AppImage's SquashFS with lz4::compress_hc; its PNG reader with zlib::decompress, CRC-32 from compress. The bytes of the packages change, they get 0.2 to 0.3 % smaller
+
 ### Fixed
 
 - Debian package: a pre-release version is written with `~` (`1.2.0~beta.1`, older than `1.2.0` for dpkg; with `-` it counted as newer), the description's lines are indented and a multi-line summary is joined (a line break ended the field and broke `control`); Android: `versionCode` is MAJOR * 1 000 000 + MINOR * 1000 + PATCH (with 10000 / 100, 1.0.100 had the code of 1.1.0), a version outside that is an error.

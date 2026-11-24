@@ -62,7 +62,7 @@ use consts::*;
 const SLIDER_CARD_DIP: i32 = 56; // space of the floating size / opacity card
 
 const DESC: AppDesc = AppDesc {
-    title: "Unbenannt - Kritzel",
+    title: "Unbenannt - Kritzel", // i18n
     flags: AF_RESIZABLE | AF_CUSTOM_TITLEBAR,
     w: 1280,
     h: 800,
@@ -302,7 +302,7 @@ fn menu_row(_p: &mut Kritzel, ui: &mut Ui) {
     ui.cmd_button(CMD_UNDO, ST_ICON_ONLY | ST_SUBTLE);
     ui.cmd_button(CMD_REDO, ST_ICON_ONLY | ST_SUBTLE);
     ui.spacer(-1);
-    if ui.icon_button(2010, IC_SETTINGS, "Design wechseln") & EV_ACT != 0 {
+    if ui.icon_button(2010, IC_SETTINGS, i18n::t("Design wechseln")) & EV_ACT != 0 {
         ui.cmd_run(CMD_THEME, 0);
     }
     ui.box_end();
@@ -343,7 +343,7 @@ fn ribbon(p: &mut Kritzel, ui: &mut Ui) {
     let ic = select::select_icon(p); // (select agent) rectangle / lasso icon
     tool(p, ui, TOOL_SELECT, ic, "");
     select::select_ribbon(p, ui);
-    group_end(ui, "Auswahl");
+    group_end(ui, i18n::t("Auswahl"));
     // ---- Bild
     group_begin(ui);
     col_begin(ui);
@@ -352,7 +352,7 @@ fn ribbon(p: &mut Kritzel, ui: &mut Ui) {
     ui.box_end();
     col_begin(ui);
     // rotate / flip drop-down
-    if ui.icon_button(ID_ROTATE, IC_ROTATE, "Drehen und spiegeln") & EV_ACT != 0 {
+    if ui.icon_button(ID_ROTATE, IC_ROTATE, i18n::t("Drehen und spiegeln")) & EV_ACT != 0 {
         ui.popup_open(ID_ROTATE);
     }
     if ui.flyout_begin(ID_ROTATE, FL_BELOW) {
@@ -365,36 +365,36 @@ fn ribbon(p: &mut Kritzel, ui: &mut Ui) {
     }
     ui.flyout_end();
     ui.box_end();
-    group_end(ui, "Bild");
+    group_end(ui, i18n::t("Bild"));
     // ---- Tools (2 rows x 3)
     group_begin(ui);
     col_begin(ui);
-    tool(p, ui, TOOL_PENCIL, IC_PENCIL, "Stift");
-    tool(p, ui, TOOL_ERASER, IC_ERASER, "Radierer");
+    tool(p, ui, TOOL_PENCIL, IC_PENCIL, i18n::t("Stift"));
+    tool(p, ui, TOOL_ERASER, IC_ERASER, i18n::t("Radierer"));
     ui.box_end();
     col_begin(ui);
-    tool(p, ui, TOOL_FILL, IC_DROP, "Füllen");
-    tool(p, ui, TOOL_PICKER, IC_EYEDROPPER, "Farbauswahl");
+    tool(p, ui, TOOL_FILL, IC_DROP, i18n::t("Füllen"));
+    tool(p, ui, TOOL_PICKER, IC_EYEDROPPER, i18n::t("Farbauswahl"));
     ui.box_end();
     col_begin(ui);
-    tool(p, ui, TOOL_TEXT, IC_FONT, "Text");
-    tool(p, ui, TOOL_ZOOM, IC_ZOOM, "Lupe");
+    tool(p, ui, TOOL_TEXT, IC_FONT, i18n::t("Text"));
+    tool(p, ui, TOOL_ZOOM, IC_ZOOM, i18n::t("Lupe"));
     ui.box_end();
-    group_end(ui, "Tools");
+    group_end(ui, i18n::t("Tools"));
     // ---- Pinsel
     group_begin(ui);
     ui.next_flags(ST_LARGE);
     tool(p, ui, TOOL_BRUSH, IC_BRUSH, "");
     brushes::brush_ribbon(p, ui);
-    group_end(ui, "Pinsel");
+    group_end(ui, i18n::t("Pinsel"));
     // ---- Formen
     group_begin(ui);
     shapes::shape_ribbon(p, ui);
-    group_end(ui, "Formen");
+    group_end(ui, i18n::t("Formen"));
     // ---- Farbe
     group_begin(ui);
     colors_group(p, ui);
-    group_end(ui, "Farbe");
+    group_end(ui, i18n::t("Farbe"));
     // ---- Ebenen
     group_begin(ui);
     ui.next_flags(ST_LARGE);
@@ -404,7 +404,7 @@ fn ribbon(p: &mut Kritzel, ui: &mut Ui) {
     if ui.icon_button(ID_LAYERS, IC_LAYERS, "") & EV_ACT != 0 {
         layers_ui::layers_toggle(&mut p.lay);
     }
-    group_end(ui, "Ebenen");
+    group_end(ui, i18n::t("Ebenen"));
     textool::text_ribbon(p, ui); // contextual text options (text tool)
     ui.box_end();
 }
@@ -593,13 +593,13 @@ fn status_bar(p: &mut Kritzel, ui: &mut Ui) {
     let s2 = format!("{} × {}px", doc::doc_w(&p.doc), doc::doc_h(&p.doc));
     ui.text(TS_CAPTION, &s2);
     ui.spacer(-1);
-    if ui.icon_button(ID_ZOOM_FIT, IC_FIT_PAGE, "An Fenster anpassen") & EV_ACT != 0 {
+    if ui.icon_button(ID_ZOOM_FIT, IC_FIT_PAGE, i18n::t("An Fenster anpassen")) & EV_ACT != 0 {
         ui.cmd_run(CMD_ZOOM_FIT, 0);
     }
-    let s3 = format!("{} %", p.view.zoom as u32 / 10);
+    let s3 = i18n::tf("{} %", &[&format!("{}", p.view.zoom as u32 / 10)]);
     ui.next_size(48, 0);
     ui.text(TS_CAPTION | TX_RIGHT, &s3);
-    if ui.icon_button(ID_ZOOM_OUT, IC_ZOOM_OUT, "Verkleinern") & EV_ACT != 0 {
+    if ui.icon_button(ID_ZOOM_OUT, IC_ZOOM_OUT, i18n::t("Verkleinern")) & EV_ACT != 0 {
         ui.cmd_run(CMD_ZOOM_OUT, 0);
     }
     // zoom slider works on the zoom in percent
@@ -611,7 +611,7 @@ fn status_bar(p: &mut Kritzel, ui: &mut Ui) {
         let ay = cr[1] + (cr[3] as u32 >> 1) as i32;
         view::view_set_zoom(p, ui, p.zoom_pct.wrapping_mul(10), ax, ay);
     }
-    if ui.icon_button(ID_ZOOM_IN, IC_ZOOM_IN, "Vergrößern") & EV_ACT != 0 {
+    if ui.icon_button(ID_ZOOM_IN, IC_ZOOM_IN, i18n::t("Vergrößern")) & EV_ACT != 0 {
         ui.cmd_run(CMD_ZOOM_IN, 0);
     }
     ui.box_end();
@@ -726,4 +726,9 @@ fn zoom_100(p: &mut Kritzel, ui: &mut Ui) {
     view::view_set_zoom(p, ui, 1000, ax, ay);
 }
 
-ui::main!(ui::launch(&DESC, Kritzel::default(), &style::STYLE));
+// no with_library_languages: the canvas is not ready for a mirrored window (the image stays, the
+// handles and overlays flip); Arabic and Hebrew get English
+ui::main!({
+    i18n::set_catalog(i18n::Catalog::from_tsv(include_str!("locales/ui.tsv")));
+    ui::launch(&DESC.translated(), Kritzel::default(), &style::STYLE)
+});

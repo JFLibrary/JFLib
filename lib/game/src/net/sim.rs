@@ -138,6 +138,14 @@ pub struct SimNet {
     by_stream: BTreeMap<u32, (usize, Which)>,
 }
 
+// a client's 32 random bytes from one draw of the network's generator (the same draws as before
+// the keys came: the sequence of everything after them stays)
+fn random32(x: u64) -> [u8; 32] {
+    let mut r = [0u8; 32];
+    r[..8].copy_from_slice(&x.to_le_bytes());
+    r
+}
+
 fn peer_addr(i: usize) -> SocketAddr {
     SocketAddr::new(IpAddr::V4([10, 1 + (i / 250) as u8, 0, (i % 250) as u8 + 1]), 40000 + (i % 20000) as u16)
 }
@@ -183,7 +191,7 @@ impl SimNet {
     pub fn add_udp(&mut self, cfg: ClientConfig, w: Weather) -> usize {
         let i = self.peers.len();
         let addr = peer_addr(i);
-        let mut core = ClientCore::new(cfg, self.rand(), false);
+        let mut core = ClientCore::new(cfg, random32(self.rand()), false);
         core.start(self.now_us);
         self.peers.push(Peer { weather: w, main: Some(Link { core, kind: Kind::Udp(addr), up_at: 0, down_at: 0, closed: false }), fetch: None, stats: PeerStats::default(), addr });
         self.by_addr.insert(addr, i);
@@ -202,7 +210,7 @@ impl SimNet {
         let at = self.now_us + 4 * w.delay_us;
         self.order += 1;
         self.q.push((at, self.order, Dest::PeerStart(i, which), Vec::new()));
-        Link { core: ClientCore::new(cfg, self.rand(), true), kind: Kind::Stream(s), up_at: 0, down_at: 0, closed: false }
+        Link { core: ClientCore::new(cfg, random32(self.rand()), true), kind: Kind::Stream(s), up_at: 0, down_at: 0, closed: false }
     }
 
     /// a peer whose main channel is a WebSocket -> its index

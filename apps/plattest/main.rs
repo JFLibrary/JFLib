@@ -94,6 +94,16 @@
 //                                          through AppKit's accessibility entry points (a window),
 //                                          iOS through UIAccessibility under UIKit (simapp);
 //                                          a11y-show: the demo by hand, for a screen reader
+//   plattest --test share / share-ui       (t_share.rs) the system's share sheet: the contract and
+//                                          CAP_SHARE; share-ui (Windows, macOS) a real window opens
+//                                          the sheet and closes it again -> SHARE_CANCELLED
+//   plattest --test ios                    (t_ios.rs, iOS under UIKit: tools/apple.py simapp) the screen
+//                                          kept on (the idle timer), the system's text size followed,
+//                                          turning (with jfgui_GPU=1 on the GPU's layer)
+//   plattest --test bookmarks              (t_bookmarks.rs, iOS) the bookmarks that keep files chosen in
+//                                          the picker readable after a new start: kept newest first,
+//                                          a path once, at most 100; a renamed file under its new
+//                                          path, a deleted one dropped
 //   plattest --test ipad                   (t_ipad.rs, iOS on an iPad under UIKit: tools/apple.py simapp
 //                                          in an iPad simulator) the window's sizes (Split View, Slide
 //                                          Over, Stage Manager), the keyboard, turning, the form factor,
@@ -231,6 +241,12 @@ use base::{Args, Ini, f64_format, f64_parse};
 mod t_a11y;
 // the iPad's host: window sizes, iPadOS's menu bar, the pointer (docs/APPLE.md AP9)
 mod t_ipad;
+// iOS: the bookmarks of files chosen in the picker
+mod t_bookmarks;
+// iOS under UIKit: screen on, text size, turning
+mod t_ios;
+// the system's share sheet
+mod t_share;
 // a web page's accessibility tree (apps/a11ytest's page)
 mod t_a11y_rich;
 // what that tree costs per frame
@@ -308,6 +324,7 @@ mod t_kernel;
 mod t_life;
 #[cfg(not(target_vendor = "apple"))]
 mod t_lib;
+mod t_wire;
 #[cfg(target_vendor = "apple")]
 mod t_lib {
     pub fn t_lib(t: &mut crate::T) {
@@ -548,6 +565,7 @@ fn plattest() -> i32 {
         Some("guardlimit") => t_guard::t_guardlimit,   // plat-shared
         Some("lib") => t_lib::t_lib,                   // plat-shared
         Some("libfuzz") => t_lib::t_libfuzz,           // plat-shared
+        Some("wirefuzz") => t_wire::t_wirefuzz,        // plat-shared: the decoders of other programs' data (plat::fuzz)
         Some("portal") => t_portal::t_portal,          // plat-shared
         Some("icc") => t_icc::t_icc,                   // plat-shared
         Some("iccx11") => t_icc::t_iccx11,             // plat-shared
@@ -594,6 +612,10 @@ fn plattest() -> i32 {
         Some("a11y-show") => t_a11y::t_a11y_show,      // by hand: the demo for a screen reader
         Some("a11y-ios") => t_a11y::t_a11y_ios,        // iOS under UIKit (simapp): UIAccessibility (VoiceOver)
         Some("ipad") => t_ipad::t_ipad,                // iOS on an iPad under UIKit (simapp): sizes, menu bar, pointer (AP9)
+        Some("bookmarks") => t_bookmarks::t_bookmarks,  // iOS: the bookmarks of chosen files
+        Some("ios") => t_ios::t_ios,                  // iOS under UIKit (simapp): screen on, text size, turning
+        Some("share") => t_share::t_share,            // plat::share: the contract, CAP_SHARE
+        Some("share-ui") => t_share::t_share_ui,      // Windows, macOS, a real window: the sheet opened and closed
         Some("secret") => t_secret::t_secret,          // the system's secret store (not in "all")
         Some("secret-bus") => t_secret::t_secret_bus,  // Linux: against tools/platshared/secret_bus.py
         Some("power") => t_power::t_power,             // plat::inhibit (Windows: real power requests)

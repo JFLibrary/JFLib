@@ -527,8 +527,17 @@ fn div255(v: u32) -> u32 {
 
 /// jpeg_cmyk_rgb: C, M, Y, K rows -> PARGB.  mode 0: Adobe (inverted) CMYK, R = C * K / 255;
 /// mode 1: plain CMYK, R = (255 - C) * (255 - K) / 255; mode 2: YCCK, dst already holds the
-/// converted YCC part (R', G', B') and R = (255 - R') * K / 255 (Adobe inverted K)
+/// converted YCC part (R', G', B') and R = (255 - R') * K / 255 (Adobe inverted K).  With bit 2
+/// (JDF_RAW_CMYK) the samples as stored go to the bytes R, G, B, A (YCCK: 255 - R', 255 - G',
+/// 255 - B' and K, what libjpeg gives for it)
 pub fn cmyk_rgb(dst: &mut [u8], c: &[u8], m: &[u8], y: &[u8], k: &[u8], n: usize, mode: u32) {
+    if mode & 4 != 0 {
+        for i in 0..n {
+            let (cc, mm, yy) = if mode & 3 == 2 { (255 - dst[i * 4 + 2], 255 - dst[i * 4 + 1], 255 - dst[i * 4]) } else { (c[i], m[i], y[i]) };
+            dst[i * 4..i * 4 + 4].copy_from_slice(&[yy, mm, cc, k[i]]);
+        }
+        return;
+    }
     for i in 0..n {
         let mut kk = k[i] as u32;
         if mode == 1 {

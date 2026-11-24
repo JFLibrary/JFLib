@@ -40,7 +40,13 @@ compound, so `Speller::suggester()` gives a `Suggester` that makes them on anoth
 
 `spell::Dictionary` is the Hunspell dictionary itself. It follows Hunspell 1.7, with its affix
 rules, compounds and case rules, and was compared with real dictionaries (de_DE, en_US, en_GB
-among them). It has no clock limits, so its answers never depend on the machine's speed.
+among them). It has no clock limits, so its answers never depend on the machine's speed. Its
+work is bounded by counts instead, so a crafted dictionary, say one someone put into
+`config://hunspell`, cannot make it hang: a check tries at most 6 million rules and patterns of
+the `.aff`, a search for suggestions 64 million, and the word list keeps every lookup short also
+for words whose hashes collide. Thousands of affix rules on one ending made a check take seconds
+and a suggestion minutes; now they cost at most about 0.15 s and 1.6 s. Twenty real dictionaries
+use a sixth of these bounds or less, and give exactly the answers they gave before.
 Morphology and phonetic suggestions are not supported.
 
 `spell::Hyphenator` hyphenates with libhyphen's dictionaries (`hyph_de_DE.dic`, as LibreOffice

@@ -19,10 +19,10 @@ input and output with `--agent-json` or `--agent-mcp`. The app adds its own acti
 `App::actions` and `App::action`, with the types of this crate. You use the crate directly to
 declare those actions, or to put the dispatcher behind a transport of your own.
 
-It also holds the strict, bounded JSON that other JFLib crates build on (`agent_core::json`), and
-`agent_core::jmap`, which maps records and string enums to JSON and back
-(`record! { pub struct P { pub a: String, pub n: u32 } }`) so that older and newer programs read
-each other's data.
+Its JSON is that of [`jflib-formats`](https://crates.io/crates/jflib-formats): `agent_core::json`
+and `agent_core::jmap` (with `record!` and `wire_enum!`) are re-exports of `formats::json` and
+`formats::jmap`, where the code lived here until 0.2.1. A program that needs only JSON uses
+`jflib-formats` directly.
 
 ## Declaring actions
 

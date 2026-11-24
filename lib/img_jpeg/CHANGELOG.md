@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Added
+
+- JDF_RAW_CMYK: a 4-component JPEG's samples as stored (YCCK after its YCC step, as libjpeg gives them) in the bytes R, G, B and A, for a caller with its own CMYK conversion
+
 ## [0.2.1] - 2026-11-16
 
 ### Fixed

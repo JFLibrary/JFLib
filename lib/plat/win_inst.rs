@@ -1,10 +1,12 @@
 // win_inst -- the Windows calls of the setup (apps/installer): the own exe path, known
 // folders, .lnk shortcuts through COM IShellLinkW, the HKCU registry key of the "installed
-// apps" entry, starting a command line             (r12-inst)  [apps/installer/src/shell.s]
+// apps" entry (HKLM for a setup for all users), starting a command line
+//                                                  (r12-inst)  [apps/installer/src/shell.s]
 //
 //   exe_path() -> Some(path)        GetModuleFileNameW of the running exe as UTF-8 (None when
 //                                   it does not fit PATH_CAP wide chars)  [self_path]
-//   known_folder(which) -> Some(p)  0 = desktop, 1 = start menu "Programs" (SHGetKnownFolderPath,
+//   known_folder(which) -> Some(p)  0 = desktop, 1 = start menu "Programs", 2 / 3 = the same of
+//                                   all users, 4 = "C:\Program Files" (SHGetKnownFolderPath,
 //                                   dirs.rs)
 //   shell_link(lnk, target, dir, desc) -> bool   a shortcut file lnk -> target (working
 //                                   folder dir, icon 0 of the target, comment desc)  [sh_link]
@@ -28,10 +30,16 @@
 //                                   key below Software\Classes or a browser's below
 //                                   Software\Clients\StartMenuInternet; other names are refused)
 //   reg_delete_value(subkey, name) -> bool   RegDeleteKeyValueW (name "" = the default value)
+//   reg_create_in / reg_delete_in / reg_delete_tree_in / reg_delete_value_in(Root, ..)   the
+//                                   same in HKCU (Root::User) or HKLM (Root::Machine: a setup
+//                                   for all users, with administrator rights)
 //   assoc_changed()                 SHChangeNotify(SHCNE_ASSOCCHANGED): Explorer re-reads the
 //                                   file types and URL schemes
 //   run_cmdline(cmdline, dir, hidden) -> bool    CreateProcessW (dir None = the current one,
-//                                   hidden = CREATE_NO_WINDOW)  [sh_run]
+//                                   hidden = CREATE_NO_WINDOW; the whole line, up to 32767
+//                                   wide chars; outside this process's job when it lets go)
+//                                   [sh_run]
+//   run_cmdline_wait(cmdline, dir, hidden) -> Some(exit code)   the same, waited for
 //
 // ole32 / shell32 / advapi32 are loaded with LoadLibraryA on the first use (inst_load, as the
 // asm's sh_load): only kernel32 / user32 / gdi32 are linked.  Paths are converted with the
@@ -52,6 +60,9 @@ unsafe extern "system" {
     fn CreateProcessW(app: *const u16, cmd: *mut u16, pa: usize, ta: usize, inherit: i32, flags: u32, env: usize,
                       dir: *const u16, si: *const StartupInfo, pi: *mut [isize; 3]) -> i32;
     fn CloseHandle(h: isize) -> i32;
+    fn GetLastError() -> u32;
+    fn WaitForSingleObject(h: isize, ms: u32) -> u32;
+    fn GetExitCodeProcess(h: isize, code: *mut u32) -> i32;
 }
 
 /// STARTUPINFOW (x64, 104 bytes)
@@ -92,12 +103,17 @@ struct PropVariant {
 pub const PATH_CAP: usize = 520;
 const NAME_CAP: usize = 64; // w_name
 const HKCU: isize = 0xFFFF_FFFF_8000_0001u64 as isize;
+const HKLM: isize = 0xFFFF_FFFF_8000_0002u64 as isize;
+/// CreateProcessW's limit of a command line (wide chars, with the NUL)
+const CMDLINE_CAP: usize = 32768;
 const KEY_WRITE: u32 = 0x20006;
 const REG_SZ: u32 = 1;
 const REG_DWORD: u32 = 4;
 const CLSCTX_INPROC: u32 = 1;
 const COINIT_APT: u32 = 2;
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x0100_0000;
+const ERROR_ACCESS_DENIED: u32 = 5;
 
 // IShellLinkW / IPersistFile vtable slots
 const VT_QI: usize = 0;
@@ -193,10 +209,18 @@ pub fn exe_path() -> Option<String> {
     Some(utf8_cap(&buf[..n], PATH_CAP))
 }
 
-/// 0 = the desktop, 1 = the start menu's "Programs" folder (dirs.rs; backslashes, at most
-/// PATH_CAP - 1 bytes)  [sh_folder, real mode]
+/// 0 = the desktop, 1 = the start menu's "Programs" folder, 2 = the desktop of all users, 3 =
+/// the start menu's "Programs" of all users, 4 = the programs folder ("C:\Program Files") (dirs.rs;
+/// backslashes, at most PATH_CAP - 1 bytes; None for another number)  [sh_folder, real mode]
 pub fn known_folder(which: u32) -> Option<String> {
-    let k = if which == 0 { crate::DIR_DESKTOP as usize } else { crate::KF_PROGRAMS };
+    let k = match which {
+        0 => crate::DIR_DESKTOP as usize,
+        1 => crate::KF_PROGRAMS,
+        2 => crate::KF_PUBLIC_DESKTOP,
+        3 => crate::KF_COMMON_PROGRAMS,
+        4 => crate::KF_PROGRAM_FILES,
+        _ => return None,
+    };
     let mut s = crate::known_folder(k)?;
     let mut n = s.len().min(PATH_CAP - 1);
     while !s.is_char_boundary(n) {
@@ -447,8 +471,32 @@ pub fn pins_set_app_id(dir: &str, exe: &str, app_id: &str) -> usize {
 /// an open registry key (closed when dropped)
 pub struct RegKey(isize);
 
+/// the part of the registry an installation writes to: the current user's (HKEY_CURRENT_USER,
+/// a setup for one user) or the computer's (HKEY_LOCAL_MACHINE, a setup for all users; writing
+/// there needs administrator rights)
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Root {
+    User,
+    Machine,
+}
+
+impl Root {
+    fn hkey(self) -> isize {
+        match self {
+            Root::User => HKCU,
+            Root::Machine => HKLM,
+        }
+    }
+}
+
 /// HKCU\subkey opened for writing, created when missing  [sh_reg_begin, real mode]
 pub fn reg_create(subkey: &str) -> Option<RegKey> {
+    reg_create_in(Root::User, subkey)
+}
+
+/// root\subkey opened for writing, created when missing (Root::Machine: None without
+/// administrator rights)
+pub fn reg_create_in(root: Root, subkey: &str) -> Option<RegKey> {
     let p = proc_(P_REGCREATE);
     if p == 0 {
         return None;
@@ -459,7 +507,7 @@ pub fn reg_create(subkey: &str) -> Option<RegKey> {
     // LPSECURITY_ATTRIBUTES, PHKEY, LPDWORD) -> LSTATUS; the disposition is not needed.
     let f: unsafe extern "system" fn(isize, *const u16, u32, usize, u32, u32, usize, *mut isize, usize) -> i32 =
         unsafe { core::mem::transmute(p) };
-    if unsafe { f(HKCU, w_key.as_ptr(), 0, 0, 0, KEY_WRITE, 0, &mut hkey, 0) } != 0 || hkey == 0 {
+    if unsafe { f(root.hkey(), w_key.as_ptr(), 0, 0, 0, KEY_WRITE, 0, &mut hkey, 0) } != 0 || hkey == 0 {
         return None;
     }
     Some(RegKey(hkey))
@@ -505,6 +553,11 @@ impl Drop for RegKey {
 
 /// RegDeleteKeyW(HKCU, subkey)  [sh_reg_delete, real mode]
 pub fn reg_delete(subkey: &str) -> bool {
+    reg_delete_in(Root::User, subkey)
+}
+
+/// RegDeleteKeyW(root, subkey): a key without keys below it
+pub fn reg_delete_in(root: Root, subkey: &str) -> bool {
     let p = proc_(P_REGDELETE);
     if p == 0 {
         return false;
@@ -512,7 +565,7 @@ pub fn reg_delete(subkey: &str) -> bool {
     let w_key = wide_cap(subkey, PATH_CAP);
     // SAFETY: RegDeleteKeyW(HKEY, LPCWSTR) -> LSTATUS.
     let f: unsafe extern "system" fn(isize, *const u16) -> i32 = unsafe { core::mem::transmute(p) };
-    unsafe { f(HKCU, w_key.as_ptr()) == 0 }
+    unsafe { f(root.hkey(), w_key.as_ptr()) == 0 }
 }
 
 // subkey names a key an app's registration owns as a whole: "Software\Classes\<name>[\..]" or
@@ -536,6 +589,12 @@ fn own_tree(subkey: &str) -> bool {
 /// refused: an empty one would clear HKCU itself, "Software" every program's settings, and
 /// such a name is what a damaged or cut list of an uninstaller holds
 pub fn reg_delete_tree(subkey: &str) -> bool {
+    reg_delete_tree_in(Root::User, subkey)
+}
+
+/// reg_delete_tree in root: the same names only (Root::Machine: what a setup for all users
+/// added, below HKLM)
+pub fn reg_delete_tree_in(root: Root, subkey: &str) -> bool {
     if !own_tree(subkey) {
         return false;
     }
@@ -546,12 +605,17 @@ pub fn reg_delete_tree(subkey: &str) -> bool {
     let w_key = wide_cap(subkey, PATH_CAP);
     // SAFETY: RegDeleteTreeW(HKEY, LPCWSTR) -> LSTATUS: the key with everything below it.
     let f: unsafe extern "system" fn(isize, *const u16) -> i32 = unsafe { core::mem::transmute(p) };
-    let ok = unsafe { f(HKCU, w_key.as_ptr()) } == 0;
-    ok | reg_delete(subkey) // older systems leave the emptied key itself
+    let ok = unsafe { f(root.hkey(), w_key.as_ptr()) } == 0;
+    ok | reg_delete_in(root, subkey) // older systems leave the emptied key itself
 }
 
 /// one value of HKCU\subkey ("" = its default value)  (RegDeleteKeyValueW)
 pub fn reg_delete_value(subkey: &str, name: &str) -> bool {
+    reg_delete_value_in(Root::User, subkey, name)
+}
+
+/// one value of root\subkey ("" = its default value)
+pub fn reg_delete_value_in(root: Root, subkey: &str, name: &str) -> bool {
     let p = proc_(P_REGDELVAL);
     if p == 0 {
         return false;
@@ -559,7 +623,7 @@ pub fn reg_delete_value(subkey: &str, name: &str) -> bool {
     let (w_key, w_name) = (wide_cap(subkey, PATH_CAP), wide_cap(name, NAME_CAP));
     // SAFETY: RegDeleteKeyValueW(HKEY, LPCWSTR, LPCWSTR) -> LSTATUS.
     let f: unsafe extern "system" fn(isize, *const u16, *const u16) -> i32 = unsafe { core::mem::transmute(p) };
-    unsafe { f(HKCU, w_key.as_ptr(), w_name.as_ptr()) == 0 }
+    unsafe { f(root.hkey(), w_key.as_ptr(), w_name.as_ptr()) == 0 }
 }
 
 /// tell the shell that file types or URL schemes changed (SHCNE_ASSOCCHANGED, SHCNF_IDLIST)
@@ -572,25 +636,55 @@ pub fn assoc_changed() {
     }
 }
 
-/// start a command line (UTF-8, PATH_CAP wide chars) in dir (None = the current folder);
-/// hidden = CREATE_NO_WINDOW  [sh_run]
-pub fn run_cmdline(cmdline: &str, dir: Option<&str>, hidden: bool) -> bool {
-    let mut w_val = wide_cap(cmdline, PATH_CAP); // writable, as CreateProcessW wants
+/// CreateProcessW of a command line -> (process, thread) handles; first outside this process's
+/// job (CREATE_BREAKAWAY_FROM_JOB, as process::launch), inside it when the job refuses that
+fn start_cmdline(cmdline: &str, dir: Option<&str>, hidden: bool) -> Option<(isize, isize)> {
     let w_dir = dir.map(|d| wide_cap(d, PATH_CAP));
     let pdir = w_dir.as_ref().map_or(core::ptr::null(), |d| d.as_ptr());
     let si = StartupInfo { cb: 104, rest: [0; 25] };
-    let mut pi = [0isize; 3]; // hProcess, hThread, ids
-    let flags = if hidden { CREATE_NO_WINDOW } else { 0 };
-    // SAFETY: application from the command line (a writable NUL-terminated buffer), a valid
-    // STARTUPINFOW and PROCESS_INFORMATION (24 bytes); our environment.
-    let ok = unsafe { CreateProcessW(core::ptr::null(), w_val.as_mut_ptr(), 0, 0, 0, flags, 0, pdir, &si, &mut pi) };
-    if ok == 0 {
-        return false;
+    let base = if hidden { CREATE_NO_WINDOW } else { 0 };
+    for flags in [base | CREATE_BREAKAWAY_FROM_JOB, base] {
+        let mut w_val = wide_cap(cmdline, CMDLINE_CAP); // writable, as CreateProcessW wants
+        let mut pi = [0isize; 3]; // hProcess, hThread, ids
+        // SAFETY: application from the command line (a writable NUL-terminated buffer), a valid
+        // STARTUPINFOW and PROCESS_INFORMATION (24 bytes); our environment.
+        let ok = unsafe { CreateProcessW(core::ptr::null(), w_val.as_mut_ptr(), 0, 0, 0, flags, 0, pdir, &si, &mut pi) };
+        if ok != 0 {
+            return Some((pi[0], pi[1]));
+        }
+        // SAFETY: the last error of this thread.
+        if unsafe { GetLastError() } != ERROR_ACCESS_DENIED {
+            break;
+        }
     }
+    None
+}
+
+/// start a command line (UTF-8, at most 32767 wide chars: CreateProcessW's limit; an older
+/// version cut it at PATH_CAP) in dir (None = the current folder); hidden = CREATE_NO_WINDOW.
+/// It outlives a job of this process that lets it go (a tool that ends its children with
+/// itself)  [sh_run]
+pub fn run_cmdline(cmdline: &str, dir: Option<&str>, hidden: bool) -> bool {
+    let Some((process, thread)) = start_cmdline(cmdline, dir, hidden) else { return false };
     // SAFETY: the handles of the new process.
     unsafe {
-        CloseHandle(pi[0]);
-        CloseHandle(pi[1]);
+        CloseHandle(process);
+        CloseHandle(thread);
     }
     true
+}
+
+/// run_cmdline and wait for the process -> its exit code (None: it did not start)
+pub fn run_cmdline_wait(cmdline: &str, dir: Option<&str>, hidden: bool) -> Option<u32> {
+    let (process, thread) = start_cmdline(cmdline, dir, hidden)?;
+    let mut code = 1u32;
+    // SAFETY: the handles of the new process: waited for without a limit, its exit code read,
+    // both closed.
+    unsafe {
+        WaitForSingleObject(process, 0xFFFF_FFFF);
+        GetExitCodeProcess(process, &mut code);
+        CloseHandle(process);
+        CloseHandle(thread);
+    }
+    Some(code)
 }

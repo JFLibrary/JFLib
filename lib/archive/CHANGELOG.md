@@ -31,6 +31,11 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   `parse_relationships` and `relationships_xml`.
 - (JD17) archive::cfb reads compound files ([MS-CFB], Microsoft's open specification; the container of Office's binary formats): File::read(bytes, cfb::Limits) checks header, allocation tables and directory (sector numbers inside the file, every chain without loops, the sibling tree without cycles and each entry once, names as the specification allows, file, stream and directory bounded by Limits) and gives entries, children, find(&[path]) and stream(i); version 3 and 4, read only
 
+### Changed
+
+- DEFLATE and CRC-32 come from jflib-compress instead of img_core; the crate no longer depends on img_core.
+- `archive::opc` reads and writes its XML through jflib-formats (`formats::xml`, `formats::encoding`); the crate no longer depends on jflib-base. `opc::Rules::xml` and `opc::Error::Xml` take `formats::xml::Limits` and `formats::xml::Error`, the same types as before (base's paths are re-exports of them).
+
 ### Fixed
 
 - Archives with many parts: the checks for duplicate names and overlapping records take

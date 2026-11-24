@@ -3,8 +3,8 @@
 The shared part of [JFLib](https://jflib.org)'s image codecs and the place an app goes to open and
 save pictures. It holds the format table that every codec registers in, the functions that load,
 detect and save files of any registered format, the records for metadata and options, and the
-building blocks the codecs share: EXIF and ICC handling, colour management, resampling, colour
-quantization and DEFLATE. It is plain Rust, without the standard library and without a line of
+building blocks the codecs share: EXIF and ICC handling, colour management, resampling and colour
+quantization. It is plain Rust, without the standard library and without a line of
 `unsafe` code.
 
 ## Loading and saving
@@ -86,11 +86,10 @@ may fill at once, and the result does not depend on how the rows were split.
 
 ## Compression
 
-DEFLATE, zlib and gzip in both directions (`inflate`, `deflate`, `gzip`), with CRC-32 and Adler-32
-(`checksum`). The decoders write into a buffer of fixed size and check every write and every back
-reference against it, so corrupt data ends in an error code. The compressor has the familiar
-levels 0 to 9, and both directions can keep a reusable state for callers that handle many small
-pieces.
+DEFLATE, zlib, gzip, CRC-32 and Adler-32 live in [`jflib-compress`](https://crates.io/crates/jflib-compress)
+since 0.3, as `compress::deflate`, `compress::zlib`, `compress::gzip` and `compress::{crc32,
+adler32}`. The modules `inflate`, `deflate`, `gzip` and `checksum` stay here with their calls and
+error codes of before, for the codecs and for code written against them; they give the same bytes.
 
 ## How to get it
 
@@ -130,8 +129,4 @@ same.
 
 ## License
 
-MIT or Apache-2.0, at your choice. The compressor follows zlib's compression levels and miniz's way
-of limiting code lengths, and the decompressor builds its Huffman tables as stb_image does; those
-parts also stand under the licenses of their sources (Zlib, MIT, and MIT or Unlicense), whose texts
-are in the crate's [`licenses/`](https://github.com/JFLibrary/JFLib/tree/main/lib/img_core/licenses)
-folder.
+MIT or Apache-2.0, at your choice.

@@ -22,7 +22,11 @@ later from any thread, which is how the UI renders large windows in parallel.
 **Complex scripts.** With shaping switched on (`Text::set_shaping`), measuring, drawing, hit
 testing and carets follow OpenType's rules: ligatures, combining marks, Arabic joining, Indic
 reordering, and right-to-left runs in their visual order. The shaping itself comes from
-[`jflib-text-shape`](https://crates.io/crates/jflib-text-shape).
+[`jflib-text-shape`](https://crates.io/crates/jflib-text-shape). Without it, a line with
+right-to-left characters (Hebrew, Arabic, ...) is still laid out in its visual order by the Unicode
+bidi algorithm (`Text::set_bidi`, on by default): its right-to-left runs are shaped with their font
+where that is a TrueType or OpenType font, so Arabic is joined, and brackets are mirrored. Lines
+without such characters keep their metrics, pixel for pixel.
 
 **Missing characters.** A character the font lacks, an emoji or a Chinese character in a Latin
 font, is drawn with another font: first the app's own chain (`set_fallback_fonts`), then the

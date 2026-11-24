@@ -6,7 +6,6 @@
 
 use std::collections::BTreeMap;
 
-use crate::lz4;
 
 const BLOCK: usize = 128 * 1024;
 const META: usize = 8192;
@@ -81,7 +80,7 @@ pub(crate) fn image(items: &BTreeMap<String, Item>, mtime: u32) -> Result<Vec<u8
                 let start = out.len() as u64;
                 let mut blocks = Vec::new();
                 for chunk in data.chunks(BLOCK) {
-                    let z = lz4::compress(chunk);
+                    let z = compress::lz4::compress_hc(chunk, compress::lz4::LEVEL_HC_DEFAULT);
                     if z.len() < chunk.len() {
                         blocks.push(z.len() as u32);
                         out.extend(z);

@@ -75,7 +75,8 @@ cross_bins= and unit_<name>=, below; browser=1: a web browser (registered as one
 filetypes= / schemes=: the file types and URL schemes the
 app opens -- the setup registers them under HKCU\\Software\\Classes, the .deb in its .desktop
 file and, for "own" types, a shared-mime-info package), apps/<App>/res/app.ico and
-app_{48,128,256}.png (tools/mkicon.py), styles/<style>/INFO (shown name, description;
+app_{48,128,256}.png (tools/mkicon.py), styles/<style>/INFO (shown name, description; further
+lines name.<lang>= / desc.<lang>= in other languages, for the setup;
 --impl asm: legacy/ASMLIB/styles/<style>/INFO). The .deb uses local dpkg-deb on Linux, or
 WSL on Windows (jfgui_WSL_DISTRO, default Ubuntu-24.04). Payload layout:
 docs/PACKAGING.md (lib/installer/payload.rs reads it).
@@ -135,6 +136,19 @@ def style_info(style, impl="rs"):
     return (lines[0] if lines else style), (lines[1] if len(lines) > 1 else "")
 
 
+def style_translations(style, impl="rs"):
+    """INFO's further lines name.<lang>=... / desc.<lang>=...: the name and description in other
+    languages -> the setup manifest's lines label_<style>.<lang>= / desc_<style>.<lang>="""
+    f = STYLES[impl] / style / "INFO"
+    out = []
+    for line in (f.read_text(encoding="utf-8").splitlines()[2:] if f.exists() else []):
+        key, eq, value = line.partition("=")
+        kind, dot, lang = key.strip().partition(".")
+        if eq and dot and kind in ("name", "desc") and lang.isascii() and lang.replace("-", "").isalnum() and value.strip():
+            out.append(f"{'label' if kind == 'name' else 'desc'}_{style}.{lang.lower()}={value.strip()}")
+    return out
+
+
 def run(cmd, **kw):
     print("  $", " ".join(str(c) for c in cmd))
     # Packaging is noninteractive. A manager worker keeps a blocking read on its
@@ -181,7 +195,10 @@ def build_variants_rs(app, styles, work, targets, rsout, profile, arch="x86_64")
              *rs_mode(profile), "--out", rsout])
     for s in styles:
         for t in targets:
-            src = ROOT / rsout / arch_folder(t, arch) / s if len(styles) > 1 else ROOT / rsout / arch_folder(t, arch)
+            # the Mac's own part is always in "mac" (arch_folder("mac", "x86_64") is the Intel part's
+            # mac-x86_64, joined with it below)
+            folder = "mac" if t == "mac" else arch_folder(t, arch)
+            src = ROOT / rsout / folder / s if len(styles) > 1 else ROOT / rsout / folder
             (ROOT / work / s / t).mkdir(parents=True, exist_ok=True)
             if t == "mac":      # one program for every Mac (lipo), the app's further programs too (no modules)
                 sys.path.insert(0, str(ROOT))
@@ -280,6 +297,7 @@ def make_setup(app, meta, styles, dist, work, impl="asm", rsout=None, profile="s
     for s in styles:
         label, desc = style_info(s, impl)
         man.append(f"desc_{s}={desc}")
+        man += style_translations(s, impl)               # the setup shows them in the user's language
     if filetypes(meta):                                  # checked here, registered by the setup
         man.append(f"filetypes={meta['filetypes']}")
     if schemes(meta):

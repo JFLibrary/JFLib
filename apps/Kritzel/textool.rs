@@ -877,7 +877,7 @@ pub(crate) fn text_ribbon(pt: &mut Kritzel, ui: &mut Ui) {
     // font and size
     ui.box_begin(0, BOX_H | BOX_XCENTER, 4);
     let t = &mut pt.txt;
-    if ui.combobox(ID_TXT_FONT, &mut t.weight, &TX_FONTS) & EV_ACT != 0 {
+    if ui.combobox(ID_TXT_FONT, &mut t.weight, &i18n::list(&TX_FONTS)) & EV_ACT != 0 {
         tx_refocus(t, ui);
     }
     ui.next_size(44, 0);
@@ -887,16 +887,16 @@ pub(crate) fn text_ribbon(pt: &mut Kritzel, ui: &mut Ui) {
     ui.box_end();
     // style toggles
     ui.box_begin(0, BOX_H | BOX_XCENTER, 2);
-    tx_toggle(ui, ID_TXT_BOLD, IC_BOLD, "Fett", &mut t.bold);
-    tx_toggle(ui, ID_TXT_ITALIC, IC_ITALIC, "Kursiv", &mut t.italic);
-    tx_toggle(ui, ID_TXT_UNDER, IC_UNDERLINE, "Unterstrichen", &mut t.under);
-    tx_toggle(ui, ID_TXT_STRIKE, IC_STRIKETHROUGH, "Durchgestrichen", &mut t.strike);
-    tx_toggle(ui, ID_TXT_FILL, IC_DROP, "Hintergrund füllen", &mut t.fill);
+    tx_toggle(ui, ID_TXT_BOLD, IC_BOLD, i18n::t("Fett"), &mut t.bold);
+    tx_toggle(ui, ID_TXT_ITALIC, IC_ITALIC, i18n::t("Kursiv"), &mut t.italic);
+    tx_toggle(ui, ID_TXT_UNDER, IC_UNDERLINE, i18n::t("Unterstrichen"), &mut t.under);
+    tx_toggle(ui, ID_TXT_STRIKE, IC_STRIKETHROUGH, i18n::t("Durchgestrichen"), &mut t.strike);
+    tx_toggle(ui, ID_TXT_FILL, IC_DROP, i18n::t("Hintergrund füllen"), &mut t.fill);
     ui.box_end();
     ui.box_end();
     // caption and divider (like the other ribbon groups)
     ui.box_end();
-    ui.text(TS_CAPTION | TX_SECONDARY, "Text");
+    ui.text(TS_CAPTION | TX_SECONDARY, i18n::t("Text"));
     ui.box_end();
     ui.separator();
 }

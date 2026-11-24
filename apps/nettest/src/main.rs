@@ -2,7 +2,7 @@
 // network; tests, fuzzing, measurements and the server of the browser test
 //
 //   nettest --check [--quick]       every test group (tests/check.uis); exit code 1 when a check fails
-//   nettest --test NAME             one group: codec ws sim udp wschan fuzz
+//   nettest --test NAME             one group: codec ws sim reliable udp wschan fuzz
 //   nettest --bench [--n N]         round-trip time and throughput on loopback: UDP channel, WebSocket,
 //                                   channel over WebSocket (medians, docs/TRANSPORT.md)
 //   nettest --serve DIR [--port P]  the server of the browser test: DIR's files (a web build), /ws an
@@ -34,6 +34,8 @@ mod fuzz;
 mod raw;
 #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 mod serve;
+#[cfg(not(target_arch = "wasm32"))]
+mod reltest;
 #[cfg(not(target_arch = "wasm32"))]
 mod sim;
 #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
@@ -140,7 +142,7 @@ impl Ctx {
 
 /// the test groups in order
 #[cfg(not(target_arch = "wasm32"))]
-const ALL: &[&str] = &["codec", "ws", "sim", "udp", "wschan", "fuzz"];
+const ALL: &[&str] = &["codec", "ws", "sim", "reliable", "udp", "wschan", "fuzz"];
 
 #[cfg(not(target_arch = "wasm32"))]
 fn run_groups(names: &[&str], quick: bool) -> i32 {
@@ -153,6 +155,7 @@ fn run_groups(names: &[&str], quick: bool) -> i32 {
             #[cfg(not(target_os = "android"))]
             "ws" => wstest::run(quick),
             "sim" => sim::run(quick),
+            "reliable" => reltest::run(quick),
             #[cfg(not(target_os = "android"))]
             "udp" => chantest::run_udp(quick),
             #[cfg(not(target_os = "android"))]

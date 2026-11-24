@@ -1,0 +1,3 @@
+#!args --test share
+# (Rust only) plattest --test share: the system's share sheet (lib/plat/share.rs): nothing to share, an
+# empty or missing file -> SHARE_NONE, no answer without a sheet; CAP_SHARE on Windows and macOS, not on Linux.
