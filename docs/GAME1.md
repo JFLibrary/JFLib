@@ -2,7 +2,7 @@
 
 Spiel 1 ist das erste Spiel der Spiel-Engine ([GAME.md](GAME.md), Stufe G7h): ein schneller Mehrspieler-Shooter in
 Cartoon-Grafik, jeder gegen jeden, im Browser und auf dem Desktop. „Spiel 1“ und `game1` sind Arbeitsnamen; den Namen
-wählt der Nutzer (ohne fremde Marken). Name, Figuren, Karte und Waffe sind eigen, nichts ist nachgebaut, nichts
+wählt der Nutzer vor der ersten Veröffentlichung (entschieden am 24.11.2026; ohne fremde Marken). Name, Figuren, Karte und Waffe sind eigen, nichts ist nachgebaut, nichts
 heruntergeladen: Karte und Figur sind JFScript für [`apps/modeltool`](../apps/modeltool/README.md), alles andere ist
 Code.
 
