@@ -1,5 +1,5 @@
 // reports -- (JD19) the group "reports": shape report definitions in VSDX files (DA-09, DA-13)
-// through diagram_core::report
+// through diagram_core::report (model, run, table shape) and diagram_io::report (XML, visPropRptN)
 //
 //   run(h)               a drawing with five devices, two definitions in the document sheet and a
 //                        report table on the page, written and read back: the definitions the
@@ -23,6 +23,7 @@ use alloc::vec::Vec;
 
 use diagram_core::report::{self, Builtin, Condition, Field, Filter, Func, Property, ReportDef, Sort};
 use diagram_core::{DocKind, Document, Owner, PageRef, SheetRef, Text, Value};
+use diagram_io::report as rio;
 use diagram_io::vsdx::{self, Measure};
 
 use crate::pkg::{DECL, NS};
@@ -110,11 +111,11 @@ fn drawing() -> (Document, PageRef) {
         typed(&mut tx, sheet, "Kosten", 7.0);
         typed(&mut tx, sheet, "Auslastung", 2.0);
     }
-    let _ = report::add(&mut tx, &list);
-    let _ = report::add(&mut tx, &inv);
+    let _ = rio::add(&mut tx, &list);
+    let _ = rio::add(&mut tx, &inv);
     let table = report::run(tx.doc(), &list, &report::Ctx { page: Some(page), ..Default::default() });
     let layer = report::report_layer(&mut tx, page, "Bericht", "Report").ok();
-    let p = report::Place { name: list.name.clone(), def_copy: Some(report::to_xml(&list)), link: None, layers: layer.into_iter().collect() };
+    let p = report::Place { name: list.name.clone(), def_copy: Some(rio::to_xml(&list)), link: None, layers: layer.into_iter().collect() };
     let _ = report::place(&mut tx, &mut eng, Owner::Page(page), [1.0, 7.5], &table, &p);
     tx.commit();
     (doc, page)
@@ -126,7 +127,7 @@ pub(crate) fn run(h: &mut H) {
 }
 
 fn defs(doc: &Document) -> Vec<(String, Option<ReportDef>)> {
-    report::stored(doc).into_iter().map(|st| (st.row, st.def.ok())).collect()
+    rio::stored(doc).into_iter().map(|st| (st.row, st.def.ok())).collect()
 }
 
 fn own(h: &mut H) {
@@ -148,7 +149,7 @@ fn own(h: &mut H) {
     let row = &xml[at..xml[at..].find("</Row>").map_or(at, |e| at + e)];
     h.check("reports/own/cell", at > 0 && row.contains("V='&lt;?xml version=\"1.0\"?&gt;&#10;&lt;VisioReportDefinition") && row.contains("U='STR'"), s("visPropRpt1: Value is the escaped XML, U='STR'"));
     let table = back.top_shapes(Owner::Page(back.pages().next().unwrap_or(page))).find_map(|sh| report::report_shape(&back, sh));
-    let ok = table.as_ref().is_some_and(|t| t.name == "Geräteliste" && t.def.as_deref().and_then(|d| report::parse(d).ok()) == before[0].1.clone() && back.layer_members(t.shape).len() == 1);
+    let ok = table.as_ref().is_some_and(|t| t.name == "Geräteliste" && t.def.as_deref().and_then(|d| rio::parse(d).ok()) == before[0].1.clone() && back.layer_members(t.shape).len() == 1);
     h.check("reports/own/table", ok, s("the table shape found again: its name, the copy of its definition, its layer"));
     let layer = table.as_ref().and_then(|t| back.layer_members(t.shape).first().copied());
     let named = back.pages().next().and_then(|p| back.layer_by_name(p, "Report")) == layer;
@@ -200,18 +201,18 @@ fn visio_like(h: &mut H) {
         h.check("reports/visio/read", false, s("the Visio-like file does not read"));
         return;
     };
-    let st = report::stored(&doc);
+    let st = rio::stored(&doc);
     let d = st.first().and_then(|x| x.def.clone().ok());
     let ok = d.as_ref().is_some_and(|d| d.name == "JD19 Bericht" && d.title == "JD19-Test" && d.precision == 1 && d.fields.len() == 2 && d.fields[0].property == Property::Builtin(Builtin::Text) && d.filters[0].condition == Condition::Gt && d.sorts.len() == 1);
     h.check("reports/visio/model", ok, s("visPropRpt1 as Visio writes it: name, title, fields, criterion, sort"));
-    h.check("reports/visio/hostile", st.len() == 2 && st[1].def == Err(report::ReportError::Unsupported), format!("visPropRpt2 with a DOCTYPE refused, the file opens ({:?})", st.get(1).map(|x| &x.def)));
+    h.check("reports/visio/hostile", st.len() == 2 && st[1].def == Err(rio::ReportError::Unsupported), format!("visPropRpt2 with a DOCTYPE refused, the file opens ({:?})", st.get(1).map(|x| &x.def)));
     let t = d.map(|d| report::run(&doc, &d, &report::Ctx { page: doc.pages().next(), ..Default::default() })).unwrap_or_default();
     let rows: Vec<Vec<String>> = t.rows.iter().map(|r| r.cells.iter().map(|c| c.text.clone()).collect()).collect();
     let want = vec![vec![s("Switch"), s("150.0")], vec![s("Router"), s("300.0")], vec![s("Server B"), s("800.5")], vec![s("Server A"), s("1200.0")], vec![s("Total"), s("2450.5")]];
     h.check("reports/visio/run", rows == want, format!("costs above 100, sorted, with the total: {rows:?}"));
     let back = read(&write(&doc));
     let same = back.as_ref().is_some_and(|b| {
-        let a = report::stored(b);
+        let a = rio::stored(b);
         a.len() == 2 && a[0].def == st[0].def && a[1].xml == bad
     });
     h.check("reports/visio/rewrite", same, s("written back: the definition the same, the broken row unchanged"));
@@ -243,7 +244,7 @@ pub(crate) fn write_fixture(dir: &str) -> i32 {
     let out = format!("{dir}/jd19-geraete.vsdx");
     // and the device list as a .vrd file (Durchsuchen...)
     let vrd = format!("{dir}/jd19-geraeteliste.vrd");
-    if !plat::write_file(&vrd, report::to_xml(&definitions().0).as_bytes()) {
+    if !plat::write_file(&vrd, rio::to_xml(&definitions().0).as_bytes()) {
         crate::out(&format!("cannot write {vrd}\n"));
         return 1;
     }

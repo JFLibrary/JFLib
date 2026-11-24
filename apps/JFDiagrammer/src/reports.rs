@@ -6,7 +6,7 @@
 //   dialog(app, ui)           every pass: Berichte, Bericht ausführen, the file dialogs, the
 //                             wizard (reports_wizard.rs) and Daten exportieren (reports_export.rs)
 //   entries(app) -> Vec<Entry>   what the list shows: the drawing's definitions (the document
-//                             sheet, diagram_core::report), the predefined ones
+//                             sheet, diagram_io::report), the predefined ones
 //                             (reports_builtin.rs) and the .vrd files opened by Durchsuchen
 //   run_table(app, def) -> Table   a definition run against the open drawing (the page shown,
 //                             the selection; the words of the summary rows in the window's
@@ -34,6 +34,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use diagram_core::report::{self, Labels, ReportDef, RowKind, Table, Val};
+use diagram_io::report as rio;
 use diagram_core::{Owner, SheetRef};
 use sheet_io::{csv, xlsx, Value};
 use ui::i18n::{t, tf};
@@ -173,7 +174,7 @@ pub(crate) fn entries(app: &Diagrammer) -> Vec<Entry> {
     let mut v = Vec::new();
     let Some(o) = app.opened.as_ref() else { return v };
     let here = o.ed.path.clone().unwrap_or_else(|| String::from(t("In dieser Zeichnung")));
-    for st in report::stored(&o.doc) {
+    for st in rio::stored(&o.doc) {
         if let Ok(def) = st.def {
             v.push(Entry { name: def.name.clone(), place: here.clone(), def, src: Src::Drawing(st.row) });
         }
@@ -387,7 +388,7 @@ fn remove(app: &mut Diagrammer, e: &Entry) {
     match &e.src {
         Src::Drawing(row) => {
             let Some(o) = app.opened.as_mut() else { return };
-            let r = edit_doc::edit(o, t("Bericht entfernen"), true, |tx, _| report::remove(tx, row));
+            let r = edit_doc::edit(o, t("Bericht entfernen"), true, |tx, _| rio::remove(tx, row));
             app.reports.status = Some(match r {
                 Ok(()) => (0, tf("„{}“ wurde aus der Zeichnung entfernt.", &[&e.name])),
                 Err(err) => (3, tf("„{}“ ließ sich nicht entfernen: {}", &[&e.name, &format!("{err:?}")])),
@@ -419,11 +420,11 @@ pub(crate) fn vrd_text(bytes: &[u8]) -> Option<String> {
 pub(crate) fn read_vrd(path: &str) -> Result<ReportDef, String> {
     let name = String::from(plat::display_name(path));
     let bytes = crate::data_source::read_bytes(path).map_err(|_| tf("„{}“ ließ sich nicht lesen.", &[&name]))?;
-    if bytes.len() > report::MAX_BYTES {
+    if bytes.len() > rio::MAX_BYTES {
         return Err(tf("„{}“ ist zu groß für eine Berichtsdefinition.", &[&name]));
     }
     let text = vrd_text(&bytes).ok_or_else(|| tf("„{}“ ist keine Berichtsdefinition.", &[&name]))?;
-    report::parse(&text).map_err(|e| tf("„{}“ ist keine Berichtsdefinition ({}).", &[&name, &format!("{e:?}")]))
+    rio::parse(&text).map_err(|e| tf("„{}“ ist keine Berichtsdefinition ({}).", &[&name, &format!("{e:?}")]))
 }
 
 // Durchsuchen...: a .vrd file into the list
@@ -638,7 +639,7 @@ pub(crate) fn write_file(path: &str, table: &Table, out: Out) -> Result<String, 
 fn put_on_page(app: &mut Diagrammer, ui: &mut Ui, e: &Entry, table: &Table, link: Option<String>) -> (u32, String) {
     let Some(page) = app.model.page else { return (3, String::from(t("Es ist keine Seite zu sehen."))) };
     let Some(o) = app.opened.as_mut() else { return (3, String::from(t("Es ist keine Zeichnung geöffnet."))) };
-    let def_copy = link.is_none().then(|| report::to_xml(&e.def));
+    let def_copy = link.is_none().then(|| rio::to_xml(&e.def));
     let owner = Owner::Page(page);
     let r = edit_doc::edit(o, t("Bericht ausführen"), true, |tx, eng| {
         let layer = report::report_layer(tx, page, t("Bericht"), "Report")?;
@@ -668,7 +669,7 @@ fn put_on_page(app: &mut Diagrammer, ui: &mut Ui, e: &Entry, table: &Table, link
 /// the definition behind a report table: its copy, else its link
 fn definition_of(app: &Diagrammer, rs: &report::ReportShape) -> Result<ReportDef, String> {
     if let Some(xml) = &rs.def {
-        return report::parse(xml).map_err(|e| tf("Die Kopie der Berichtsdefinition ist beschädigt ({}).", &[&format!("{e:?}")]));
+        return rio::parse(xml).map_err(|e| tf("Die Kopie der Berichtsdefinition ist beschädigt ({}).", &[&format!("{e:?}")]));
     }
     let link = rs.link.as_deref().unwrap_or("");
     if let Some(key) = link.strip_prefix("jfd:") {
@@ -676,7 +677,7 @@ fn definition_of(app: &Diagrammer, rs: &report::ReportShape) -> Result<ReportDef
     }
     if link.is_empty() {
         let o = app.opened.as_ref().ok_or_else(String::new)?;
-        return report::find(&o.doc, &rs.name).and_then(|s| s.def.ok()).ok_or_else(|| tf("Die Zeichnung hat keine Berichtsdefinition „{}“ mehr.", &[&rs.name]));
+        return rio::find(&o.doc, &rs.name).and_then(|s| s.def.ok()).ok_or_else(|| tf("Die Zeichnung hat keine Berichtsdefinition „{}“ mehr.", &[&rs.name]));
     }
     read_vrd(link)
 }

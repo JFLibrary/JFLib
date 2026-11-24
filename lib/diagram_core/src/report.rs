@@ -1,16 +1,14 @@
-// report -- (JD19) shape reports (DA-09, DA-13, AS-05, EX-12): Visio's report definitions, kept
-// in the document sheet, run against a drawing into a table, put on a page as a table shape
+// report -- (JD19) shape reports (DA-09, DA-13, AS-05, EX-12): Visio's report definitions as a
+// model, run against a drawing into a table, put on a page as a table shape
 //
 //   ReportDef                     a definition as Visio's VisioReportDefinition describes it:
 //                                 name, title, description, which shapes (Scope), the criteria
 //                                 (Filter), the columns (Field: built-in fields, shape data,
 //                                 user cells; display names and order; summaries), grouping
 //                                 with subtotals, grand summary and duplicates (Grouping),
-//                                 up to three sort keys (Sort), precision, units, case
-//   parse(xml) / to_xml(&def)     the definition's XML, the same text a .vrd file holds
-//                                 (report/xml.rs: the one place that reads and escapes XML)
-//   stored(doc) -> Vec<Stored>    the definitions of the document sheet (User.visPropRptN)
-//   add / replace / rename / remove (tx, ..)   as transactions, undo like every edit
+//                                 up to three sort keys (Sort), precision, units, case; what a
+//                                 file had and the model does not know stays as data (attrs,
+//                                 extra) for the writer
 //   run(doc, &def, &Ctx) -> Table   the result: title, columns, item rows, group headers,
 //                                 subtotal rows, the grand total; every cell as text (in the
 //                                 definition's precision, with units when it says so) and
@@ -18,20 +16,13 @@
 //   place(tx, eng, owner, at, &table, &Place) -> ShapeRef   the table shape: a group of cell
 //                                 shapes (title, header, grid, group and summary rows) on its
 //                                 own layer, marked with User.JFD_Report* (report/shape.rs)
-//   report_shape(doc, shape) / refresh(tx, eng, shape, &table)   find a table shape (a cell
-//                                 of it too) and build it anew in place (DA-13)
+//   report_shape(doc, shape) / refresh(tx, eng, shape, &table) / report_layer(..)   find a table
+//                                 shape (a cell of it too), build it anew in place (DA-13)
 //
-// Where Visio keeps them ([MS-VSDX] says nothing; two files Visio 16 saved, bvisual.net): the
-// DocumentSheet's User rows visPropRpt1, visPropRpt2 ..., the Value cell a string (U="STR")
-// holding the definition's XML -- root VisioReportDefinition in the namespace
-// urn:schemas-microsoft-com:office:visio:reportdefinition with the attributes ReportExists,
-// SelectDrawingDataMethod, Description, Precision, ShowUnits, CaseSensitive, UserCells,
-// HiddenProperties, AdvancedFilter, FilterExpression, Version and the children Name, Title,
-// VisioRptDefField (ID, Display, DisplayOrder, Type, SummaryTypes, Tag; Name, DisplayName),
-// VisioRptDefFilter (ID, Property, Condition, AndOr, PropertyType, PropertyDataType, Value,
-// Unit), VisioRptDefGroup (ID, GroupingField, ItemDisplay, GrandSummary, ExcludeDuplicates),
-// VisioRptDefSort (ID, SortField, Ascending, CaseSensitive).  Unknown attributes and elements
-// are kept and written back.
+// The XML (VisioReportDefinition, .vrd files) and the definitions kept in the document sheet
+// (User.visPropRptN, U="STR") are diagram_io::report: this crate holds no file format.  The
+// codes below (Scope::code, Condition::code, Func::bit, Property::tag, Builtin::key) are the
+// numbers and names that XML carries.
 //
 // Assumptions where no source says (Annahmen; the user's own Visio file will settle them):
 // * SelectDrawingDataMethod: 1 every page, 2 the current page (both seen), 3 the selected
@@ -64,16 +55,9 @@ use alloc::vec::Vec;
 
 mod run;
 mod shape;
-mod store;
-mod xml;
 
 pub use run::{run, Cell as TableCell, Column, Ctx, Labels, Row as TableRow, RowKind, Table, Val};
 pub use shape::{place, refresh, report_layer, report_shape, Place, ReportShape, MARK, MARK_DEF, MARK_LINK, MARK_NAME, MAX_ROWS};
-pub use store::{add, find, remove, rename, replace, stored, Stored, ROW_PREFIX};
-pub use xml::{parse, to_xml, ReportError, MAX_BYTES};
-
-/// the namespace of VisioReportDefinition
-pub const NS: &str = "urn:schemas-microsoft-com:office:visio:reportdefinition";
 
 /// which shapes a report takes (SelectDrawingDataMethod)
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

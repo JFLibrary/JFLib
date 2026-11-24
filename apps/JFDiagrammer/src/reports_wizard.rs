@@ -21,6 +21,7 @@ use alloc::vec::Vec;
 
 use diagram_core::report::{self, Builtin, Condition, Field, Filter, Property, ReportDef, Scope, Sort, BUILTINS, FUNCS};
 use diagram_core::{Document, Owner, SheetRef};
+use diagram_io::report as rio;
 use ui::i18n::{t, tf};
 use ui::*;
 
@@ -416,7 +417,7 @@ fn finish(app: &mut Diagrammer) -> bool {
             w.error = Some(String::from(t("Wählen Sie eine Datei.")));
             return false;
         }
-        if !plat::write_file(&path, report::to_xml(&def).as_bytes()) {
+        if !plat::write_file(&path, rio::to_xml(&def).as_bytes()) {
             w.error = Some(tf("„{}“ ließ sich nicht schreiben.", &[&String::from(plat::display_name(&path))]));
             return false;
         }
@@ -432,15 +433,15 @@ fn finish(app: &mut Diagrammer) -> bool {
         Some(Src::Drawing(r)) => Some(r.clone()),
         _ => None,
     };
-    let clash = report::stored(&o.doc).into_iter().any(|s| Some(&s.row) != row.as_ref() && s.def.as_ref().is_ok_and(|d| d.name.to_lowercase() == name.to_lowercase()));
+    let clash = rio::stored(&o.doc).into_iter().any(|s| Some(&s.row) != row.as_ref() && s.def.as_ref().is_ok_and(|d| d.name.to_lowercase() == name.to_lowercase()));
     if clash {
         app.reports.wizard.error = Some(String::from(t("Die Zeichnung hat schon einen Bericht dieses Namens.")));
         return false;
     }
     let label = if row.is_some() { t("Bericht ändern") } else { t("Neuer Bericht") };
     let r = edit_doc::edit(o, label, true, |tx, _| match &row {
-        Some(r) => report::replace(tx, r, &def).map(|_| r.clone()),
-        None => report::add(tx, &def),
+        Some(r) => rio::replace(tx, r, &def).map(|_| r.clone()),
+        None => rio::add(tx, &def),
     });
     match r {
         Ok(r) => {

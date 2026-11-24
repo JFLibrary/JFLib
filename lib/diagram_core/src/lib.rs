@@ -53,10 +53,11 @@
 //   field::*                      (JD8) text fields: a Field row's value in its format picture,
 //                                 new fields, the text with its fields, the document's
 //                                 properties (Document::fields: the app's locale and clock)
-//   report::*                     (JD19) shape reports: Visio's report definitions (the
-//                                 document sheet's visPropRptN, .vrd files) read and written,
-//                                 run into a table with groups and summaries, the table shape
-//                                 on the page and its refresh (DA-09, DA-13, EX-12)
+//   report::*                     (JD19) shape reports: Visio's report definitions as a model
+//                                 (their XML and the document sheet's visPropRptN rows are
+//                                 diagram_io::report), run into a table with groups and
+//                                 summaries, the table shape on the page and its refresh
+//                                 (DA-09, DA-13, EX-12)
 //
 // What is to come here, by stage of the plan: page layout (CN-13, P2)
 //
@@ -112,11 +113,6 @@ pub use sheet::{CellAddr, Extra, ExtraItem, Extras, Local, Place, Row, RowKey, S
 pub use strings::{Strings, Sym};
 pub use units::{convert, Dimension, Implicit, Unit};
 pub use views::{parse_members, RowView};
-
-// the test binary of the unit tests: plat's start of a std program (base pulls in plat) refers to
-// the jfgui_main a program defines
-#[cfg(test)]
-rt::test_main!();
 
 #[cfg(test)]
 mod tests;

@@ -42,6 +42,10 @@
 //   data::ado(&recordset) -> String
 //                       (JD18) a recordset's rows as an ADO persisted recordset (the recordset
 //                       parts of a .vsdx; Visio's DataAsXML format)
+//   report::parse(xml) / report::to_xml(&def) / report::stored(&doc), add, replace, rename,
+//                       remove   (JD19, DA-09) shape report definitions (diagram_core::report's
+//                       model) as Visio's VisioReportDefinition XML (.vrd files the same) and
+//                       as the document sheet's User rows visPropRptN, as transactions
 //   textdraw::parse(text, &opts, &limits) / textdraw::apply(tx, eng, page, &plan, &masters, &b)
 //                       (JD18, IM-08) a connected drawing from a text file: Shape and Link
 //                       records (Visio's text import) into a plan with problems per line, then
@@ -68,6 +72,8 @@ mod blank;
 pub mod data;
 mod pack;
 pub mod props;
+// (JD19) shape report definitions: their XML, the document sheet's visPropRptN rows
+pub mod report;
 mod read;
 pub mod stencil;
 mod stencil_icon;
