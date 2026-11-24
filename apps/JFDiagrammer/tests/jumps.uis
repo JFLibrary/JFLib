@@ -88,6 +88,8 @@ expect "Der andere Verbinder springt" exists
 click "Nie"
 click button:"OK"
 key esc
+# (JD21 route) nothing selected: a selected connector shows its midpoints
+click 400,600
 expect same apps/JFDiagrammer/tests/golden/jumps_none.png 640 340 120 120
 # always, a square, downwards (its own look)
 rclick 560,392
@@ -101,6 +103,7 @@ click #2032205828
 click "Nach unten"
 click button:"OK"
 key esc
+click 400,600
 expect same apps/JFDiagrammer/tests/golden/jumps_square_down.png 640 340 120 120
 # nothing selected: the page goes out
 click 400,600

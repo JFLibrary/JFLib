@@ -909,6 +909,8 @@ static LIB_TEXTS: &[[&str; 9]] = &[
     ["Endpunkt", "End point", "Point de fin", "Punto final", "Punto finale", "Eindpunt", "Punkt końcowy", "نقطة النهاية", "נקודת סיום"],
     ["Steuerpunkt", "Control handle", "Poignée de contrôle", "Controlador de control", "Maniglia di controllo", "Besturingsgreep", "Uchwyt sterujący", "مقبض التحكم", "ידית בקרה"],
     ["Scheitelpunkt", "Vertex", "Sommet", "Vértice", "Vertice", "Hoekpunt", "Wierzchołek", "رأس", "קודקוד"],
+    // (JD21) the midpoint of a piece of a connector's way (ui.shape_edit, SP_SEGMENT)
+    ["Mittelpunkt", "Midpoint", "Point milieu", "Punto medio", "Punto medio", "Middelpunt", "Punkt środkowy", "نقطة المنتصف", "נקודת אמצע"],
     // (JD10) the connection arrows and insertion marks of ui.shape_edit
     ["Verbindungspfeil rechts", "Connection arrow right", "Flèche de connexion vers la droite", "Flecha de conexión a la derecha", "Freccia di connessione a destra", "Verbindingspijl rechts", "Strzałka połączenia w prawo", "سهم الاتصال لليمين", "חץ חיבור ימינה"],
     ["Verbindungspfeil unten", "Connection arrow down", "Flèche de connexion vers le bas", "Flecha de conexión hacia abajo", "Freccia di connessione in basso", "Verbindingspijl onder", "Strzałka połączenia w dół", "سهم الاتصال للأسفل", "חץ חיבור למטה"],

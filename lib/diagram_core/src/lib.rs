@@ -73,6 +73,11 @@
 //   tools::*                      (JD21) Visio's add-ons as tools (AS-11, RA-09): numbering
 //                                 shapes, arrays of copies, dimension lines glued or tied to
 //                                 the shapes they measure
+//   route_styles::*               (JD21) the routing styles of page and connector with their
+//                                 directions (flowchart, tree, organization chart, simple ...;
+//                                 CN-05, SS-40), shapes connectors may cross (SS-19)
+//   route_edit::*                 (JD21) a connector's way by hand: midpoints and vertices
+//                                 moved, added, removed, the way kept when its shapes move (CN-04)
 //
 // Rules that hold from the start: no std (only alloc), no unsafe code, nothing recalculated on
 // opening a file (connectors, layout and containers move only when something moves), and a
@@ -105,6 +110,8 @@ pub mod pagesetup;
 pub mod render;
 pub mod replace;
 pub mod route;
+pub mod route_edit;
+pub mod route_styles;
 pub mod shapeops;
 mod shape;
 pub mod structure;

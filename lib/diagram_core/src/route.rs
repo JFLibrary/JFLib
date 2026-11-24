@@ -10,6 +10,11 @@
 //   best(&a_ports, &b_ports, &obstacles, &opts) -> (i, j, points)   the cheapest way between
 //                                      any two of the ports (a dynamic end offers one or two
 //                                      per side)
+//   best_through(&a, &b, &obstacles, &pass, &opts)   (JD21, SS-19) the same; pass[k] says
+//                                      which way the way may cross obstacle k (PASS_X across it
+//                                      horizontally: ShapePermeableX; PASS_Y vertically)
+//   hits_pass(p, q, &b, pass)          hits_box, but a horizontal (vertical) segment through a
+//                                      box it may cross does not count
 //   straight(a, b) -> points           the line between the two ends
 //   cost(&points, &opts) / bends(&points) / length(&points)
 //   spline_knots(n) -> (degree, knots) a clamped uniform B-spline over n control points: the
@@ -31,7 +36,9 @@
 // 3. A sparse grid: the x and y lines of the grown boxes, of the exit points and the lines
 //    halfway between the two ends' exits (so a Z bends in the middle, as Visio's do).  Grid
 //    points inside a grown box and grid edges through one are blocked; the lines of a grown box
-//    itself stay open, so a way keeps exactly the clearance.
+//    itself stay open, so a way keeps exactly the clearance.  (JD21) A box the way may cross
+//    horizontally (vertically) blocks only its vertical (horizontal) edges and no grid point, so
+//    a way runs straight through it but cannot turn inside it.
 // 4. A* over (grid point, direction of travel) with the cost length + bend * bends; the
 //    estimate is the Manhattan distance plus the fewest bends any way to a goal needs (from
 //    the direction of travel and the one the goal wants), so the way found is the cheapest.
@@ -161,6 +168,24 @@ pub fn hits_box(p: [f64; 2], q: [f64; 2], b: &[f64; 4]) -> bool {
     } else {
         false
     }
+}
+
+/// (JD21, SS-19) a way may cross the obstacle horizontally (ShapePermeableX)
+pub const PASS_X: u8 = 1;
+/// (JD21, SS-19) a way may cross the obstacle vertically (ShapePermeableY)
+pub const PASS_Y: u8 = 2;
+
+/// (JD21) whether the segment p-q runs through the inside of box b where it may not: a
+/// horizontal segment through a box with PASS_X, a vertical one through a box with PASS_Y do not
+pub fn hits_pass(p: [f64; 2], q: [f64; 2], b: &[f64; 4], pass: u8) -> bool {
+    if pass != 0 {
+        let t = 1e-9 * (1.0 + p[0].abs().max(p[1].abs()) + q[0].abs().max(q[1].abs()));
+        let (flat, upright) = ((p[1] - q[1]).abs() <= t, (p[0] - q[0]).abs() <= t);
+        if (flat && pass & PASS_X != 0) || (upright && pass & PASS_Y != 0) {
+            return false;
+        }
+    }
+    hits_box(p, q, b)
 }
 
 /// the length of a polyline
@@ -412,7 +437,9 @@ const MAX_NODES: usize = 1 << 20;
 // of the cheapest way and the way (the start port's point first, the goal port's last)
 type Found = (usize, usize, Vec<[f64; 2]>);
 
-fn search(a: &[Port], b: &[Port], starts: &[Exit], goals: &[Exit], grown: &[[f64; 4]], opts: &Opts, informed: bool) -> Option<Found> {
+// `pass[k]`: how the way may cross grown[k] (missing: not at all)
+#[allow(clippy::too_many_arguments)]
+fn search(a: &[Port], b: &[Port], starts: &[Exit], goals: &[Exit], grown: &[[f64; 4]], pass: &[u8], opts: &Opts, informed: bool) -> Option<Found> {
     let mut xs = Vec::with_capacity(grown.len() * 2 + 8);
     let mut ys = Vec::with_capacity(grown.len() * 2 + 8);
     for g in grown {
@@ -439,20 +466,26 @@ fn search(a: &[Port], b: &[Port], starts: &[Exit], goals: &[Exit], grown: &[[f64
     let mut inside = alloc::vec![false; n];
     let mut hblk = alloc::vec![false; n];
     let mut vblk = alloc::vec![false; n];
-    for g in grown {
+    for (k, g) in grown.iter().enumerate() {
         let (li, hi) = (index_of(&xs, g[0]), index_of(&xs, g[2]));
         let (lj, hj) = (index_of(&ys, g[1]), index_of(&ys, g[3]));
+        // (JD21) a box the way may cross: no point blocked, only the edges across the way it may run
+        let p = pass.get(k).copied().unwrap_or(0);
         for j in lj..=hj {
             let row = j * w;
             if j > lj && j < hj {
-                for i in li..hi {
-                    hblk[row + i] = true;
+                if p & PASS_X == 0 {
+                    for i in li..hi {
+                        hblk[row + i] = true;
+                    }
                 }
-                for i in li + 1..hi {
-                    inside[row + i] = true;
+                if p == 0 {
+                    for i in li + 1..hi {
+                        inside[row + i] = true;
+                    }
                 }
             }
-            if j < hj {
+            if j < hj && p & PASS_Y == 0 {
                 for i in li + 1..hi {
                     vblk[row + i] = true;
                 }
@@ -579,7 +612,8 @@ fn plain(a: &[Port], b: &[Port], s: &Exit, g: &Exit) -> Found {
 // a Z bends in the middle, as Visio's do: the middle piece of three whose outer pieces run the
 // same way moves halfway between their far ends, when the pieces stay clear of the grown
 // obstacles and of the glued shapes (the middle piece also of their clearance)
-fn centre(mut pts: Vec<[f64; 2]>, others: &[[f64; 4]], own: &[[f64; 4]], c: f64) -> Vec<[f64; 2]> {
+fn centre(mut pts: Vec<[f64; 2]>, others: &[[f64; 4]], pass: &[u8], own: &[[f64; 4]], c: f64) -> Vec<[f64; 2]> {
+    let hit = |s: [f64; 2], e: [f64; 2], k: usize, o: &[f64; 4]| hits_pass(s, e, o, pass.get(k).copied().unwrap_or(0));
     let n = pts.len();
     if n < 4 {
         return pts;
@@ -611,11 +645,12 @@ fn centre(mut pts: Vec<[f64; 2]>, others: &[[f64; 4]], own: &[[f64; 4]], c: f64)
         // the outer pieces may run inside the own box of the end they start at (an end docked
         // on an outline inside its box)
         let free = |s: [f64; 2], e: [f64; 2], end: [f64; 2]| {
-            others.iter().all(|o| !hits_box(s, e, o)) && own.iter().filter(|o| !holds(o, end)).all(|o| !hits_box(s, e, o))
+            others.iter().enumerate().all(|(k, o)| !hit(s, e, k, o)) && own.iter().filter(|o| !holds(o, end)).all(|o| !hits_box(s, e, o))
         };
         let clear = free(p0, q1, p0)
             && free(q2, p3, p3)
-            && others.iter().chain(&own_grown).all(|o| !hits_box(q1, q2, o));
+            && others.iter().enumerate().all(|(k, o)| !hit(q1, q2, k, o))
+            && own_grown.iter().all(|o| !hits_box(q1, q2, o));
         if clear {
             pts[i] = q1;
             pts[i + 1] = q2;
@@ -627,23 +662,29 @@ fn centre(mut pts: Vec<[f64; 2]>, others: &[[f64; 4]], own: &[[f64; 4]], c: f64)
 /// a right-angle route from a.at to b.at around the obstacles (boxes in page coordinates):
 /// the two ends and the corners
 pub fn orthogonal(a: Port, b: Port, obstacles: &[[f64; 4]], opts: &Opts) -> Vec<[f64; 2]> {
-    route_with(&[a], &[b], obstacles, opts, true).2
+    route_with(&[a], &[b], obstacles, &[], opts, true).2
 }
 
 /// the cheapest right-angle route from any of the ports `a` to any of the ports `b` (one
 /// search: a dynamic end offers a port per side) -> the indices of the two ports and the
 /// route; both lists must not be empty
 pub fn best(a: &[Port], b: &[Port], obstacles: &[[f64; 4]], opts: &Opts) -> (usize, usize, Vec<[f64; 2]>) {
-    route_with(a, b, obstacles, opts, true)
+    route_with(a, b, obstacles, &[], opts, true)
+}
+
+/// (JD21, SS-19) best() among obstacles the way may cross: `pass[k]` (PASS_X, PASS_Y; missing:
+/// 0) for obstacles[k]
+pub fn best_through(a: &[Port], b: &[Port], obstacles: &[[f64; 4]], pass: &[u8], opts: &Opts) -> (usize, usize, Vec<[f64; 2]>) {
+    route_with(a, b, obstacles, pass, opts, true)
 }
 
 /// (tests) the same search without the estimate (Dijkstra): the cost must not differ
 #[cfg(test)]
 pub(crate) fn orthogonal_exact(a: Port, b: Port, obstacles: &[[f64; 4]], opts: &Opts) -> Vec<[f64; 2]> {
-    route_with(&[a], &[b], obstacles, opts, false).2
+    route_with(&[a], &[b], obstacles, &[], opts, false).2
 }
 
-fn route_with(a: &[Port], b: &[Port], obstacles: &[[f64; 4]], opts: &Opts, informed: bool) -> Found {
+fn route_with(a: &[Port], b: &[Port], obstacles: &[[f64; 4]], pass: &[u8], opts: &Opts, informed: bool) -> Found {
     if a.is_empty() || b.is_empty() {
         return (0, 0, Vec::new());
     }
@@ -679,10 +720,11 @@ fn route_with(a: &[Port], b: &[Port], obstacles: &[[f64; 4]], opts: &Opts, infor
     }
     // boxes that hold an end are not obstacles (containers, the group of a glued subshape)
     let ends: Vec<[f64; 2]> = a.iter().chain(b).map(|p| p.at).collect();
-    let list: Vec<[f64; 4]> = obstacles
+    let list: Vec<([f64; 4], u8)> = obstacles
         .iter()
-        .map(norm)
-        .filter(|o| o.iter().all(|v| v.is_finite()) && !ends.iter().any(|e| holds(o, *e)))
+        .enumerate()
+        .map(|(k, o)| (norm(o), pass.get(k).copied().unwrap_or(0)))
+        .filter(|(o, _)| o.iter().all(|v| v.is_finite()) && !ends.iter().any(|e| holds(o, *e)))
         .collect();
     let fixed: Vec<[f64; 4]> = own.iter().map(|o| grow(o, co)).collect();
     // the window: the ends with their boxes, grown by a margin
@@ -699,18 +741,20 @@ fn route_with(a: &[Port], b: &[Port], obstacles: &[[f64; 4]], opts: &Opts, infor
     for round in 0..3 {
         let all = round == 2;
         let mut grown = fixed.clone();
-        let mut left_out: Vec<[f64; 4]> = Vec::new();
-        for o in &list {
-            if all || overlaps(o, &win) {
-                grown.push(grow(o, c));
+        let mut gpass = alloc::vec![0u8; fixed.len()];
+        let mut left_out: Vec<([f64; 4], u8)> = Vec::new();
+        for &(o, p) in &list {
+            if all || overlaps(&o, &win) {
+                grown.push(grow(&o, c));
+                gpass.push(p);
             } else {
-                left_out.push(*o);
+                left_out.push((o, p));
             }
         }
-        let Some((pa, pb, path)) = search(a, b, &starts, &goals, &grown, opts, informed) else { break };
-        let crossed = path.windows(2).any(|s| left_out.iter().any(|o| hits_box(s[0], s[1], o)));
+        let Some((pa, pb, path)) = search(a, b, &starts, &goals, &grown, &gpass, opts, informed) else { break };
+        let crossed = path.windows(2).any(|s| left_out.iter().any(|(o, p)| hits_pass(s[0], s[1], o, *p)));
         if !crossed {
-            return (pa, pb, centre(path, &grown[fixed.len()..], &own, co));
+            return (pa, pb, centre(path, &grown[fixed.len()..], &gpass[fixed.len()..], &own, co));
         }
         let mut bb = win;
         for p in &path {
@@ -719,8 +763,8 @@ fn route_with(a: &[Port], b: &[Port], obstacles: &[[f64; 4]], opts: &Opts, infor
         win = grow(&bb, margin);
     }
     // no way among the obstacles: around the glued shapes alone, else a plain L
-    if let Some((pa, pb, p)) = search(a, b, &starts, &goals, &fixed, opts, informed) {
-        return (pa, pb, centre(p, &[], &own, co));
+    if let Some((pa, pb, p)) = search(a, b, &starts, &goals, &fixed, &[], opts, informed) {
+        return (pa, pb, centre(p, &[], &[], &own, co));
     }
     plain(a, b, &starts[0], &goals[0])
 }

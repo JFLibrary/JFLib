@@ -34,10 +34,13 @@
 // löschen), the connector tool draws the master marked in the Shapes panel and gives way to the
 // pointer after one connector when it was chosen "once", the quick shapes bar at the arrows
 // (SeEv::Quick, QuickHover) places and previews (autoconn.rs).
-// Shapes auswählen (ZF-06).  (JD21 groups) While a group is open (Gruppe öffnen) its members are the
+// (JD21 groups) While a group is open (Gruppe öffnen) its members are the
 // edit layer's top-level shapes; the members of "members first" groups and of groups that let shapes
 // snap to their members are listed too, with DontMoveChildren as a move lock; a double click or
 // typing on a group, a move onto a group, a shape drawn in an open group go to groups_view.rs.
+// (JD21 route) A selected dynamic connector shows the midpoints of its pieces and its vertices
+// (route_ui.rs: moved, added, removed by hand); with the page's DynamicsOff a moved shape does not
+// reroute the connectors it now crosses.
 
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -330,7 +333,10 @@ pub(crate) fn model(app: &mut Diagrammer) {
                 m.controls.push(c.row);
                 m.points.push(SePoint { at: geo.world(c.at), kind: SP_CONTROL, tag, dir: [0.0; 2], flags: if c.can_glue { SPF_GLUE } else { 0 } });
             }
-            if tool == SE_LINE && sel.len() == 1 {
+            // (JD21 route) a dynamic connector's midpoints and vertices instead (route_ui.rs; the
+            // pointer and the line tools, not the connector tool that just drew it)
+            let way = sel.len() == 1 && matches!(tool, SE_POINTER | SE_LINE) && crate::route_ui::points(doc, r, &geo, &mut m.points);
+            if tool == SE_LINE && sel.len() == 1 && !way {
                 for v in ops::vertices(doc, r) {
                     m.points.push(SePoint { at: geo.world(v.at), kind: SP_VERTEX, tag: v.section << 16 | (v.row & 0xFFFF), dir: [0.0; 2], flags: 0 });
                 }
@@ -930,6 +936,10 @@ pub(crate) fn apply(app: &mut Diagrammer, ui: &mut Ui, ev: SeEv) {
     if crate::tools_dim::apply(app, ui, &ev) {
         return;
     }
+    // (JD21 route) a connector's midpoint or vertex moved, added, removed
+    if crate::route_ui::apply(app, ui, &ev) {
+        return;
+    }
     // (JD10) a running move (the glow), the Verbindungspfeile, the insert triangles
     crate::structures::track(app, &ev);
     match ev {
@@ -1215,7 +1225,8 @@ pub(crate) fn follow(tx: &mut diagram_core::Transaction, eng: &mut diagram_core:
         }
     }
     let boxes: Vec<[f64; 4]> = shapes.iter().filter(|&&s| !glue::is_one_d(doc, s)).map(|&s| ops::frame(doc, s).bounds()).collect();
-    if !boxes.is_empty() {
+    // (JD21 route) DynamicsOff: connectors do not reroute around shapes moved onto them
+    if !boxes.is_empty() && !diagram_core::route_styles::dynamics_off(doc, owner) {
         for c in doc.top_shapes(owner) {
             if deps.contains(&c) || shapes.contains(&c) || !glue::is_connector(doc, c) {
                 continue;

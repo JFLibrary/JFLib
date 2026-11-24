@@ -1,0 +1,66 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD21 route (CN-04): a selected dynamic connector shows a midpoint on each piece
+# ("Mittelpunkt n", hidden on pieces shorter than 24 DIP) and a vertex at each bend.  The upright
+# piece of an L dragged left moves across only (right angles stay); at the end a stub stays on
+# the shape and a jog carries the piece.  The way is kept when the shape moves (ConFixedCode 1).
+# The first piece dragged up: a stub at the begin and a jog.  Undo takes it back.  The line
+# tool's Ctrl + click adds a vertex on a piece, a click on the vertex and Del removes it again;
+# Verbinder zurücksetzen lays the way anew (as before the edits).
+cmd 4404
+drag 500,330 640,420
+drag 820,530 960,620
+cmd 4401
+drag 560,370 880,570
+cmd 4400
+expect listitem:"Sheet.6" selected
+expect listitem:"Sheet.6" rect 651 374 242 151
+expect button:"Mittelpunkt 1" rect 765 369 10 10
+expect button:"Mittelpunkt 2" rect 885 444 10 10
+expect button:"Scheitelpunkt 1" rect 885 369 10 10
+expect button:"Scheitelpunkt 2" missing
+# the upright piece dragged left: across only, a jog above the second shape
+drag button:"Mittelpunkt 2" 800,470
+expect listitem:"Sheet.6" rect 651 374 242 151
+expect button:"Scheitelpunkt 1" rect 797 369 10 10
+expect button:"Scheitelpunkt 2" rect 797 512 10 10
+expect button:"Scheitelpunkt 3" rect 885 512 10 10
+expect button:"Mittelpunkt 3" rect 841 512 10 10
+expect button:"Mittelpunkt 4" missing
+# the second shape moves down: the upright piece stays where it was dragged
+drag 900,580 900,640
+expect listitem:"Sheet.5" selected
+expect listitem:"Sheet.6" rect 651 374 242 201
+click 700,374
+expect listitem:"Sheet.6" selected
+expect button:"Scheitelpunkt 1" rect 797 369 10 10
+expect button:"Scheitelpunkt 2" rect 797 512 10 10
+expect button:"Mittelpunkt 4" rect 885 541 10 10
+# the first piece dragged up: a stub at the first shape, then a jog
+drag button:"Mittelpunkt 1" 700,340
+expect listitem:"Sheet.6" rect 651 349 242 226
+expect button:"Scheitelpunkt 1" rect 654 369 10 10
+expect button:"Scheitelpunkt 2" rect 654 344 10 10
+expect button:"Scheitelpunkt 3" rect 797 344 10 10
+shot build/JFDiagrammer-route-segment.png
+key ctrl+z
+expect listitem:"Sheet.6" rect 651 374 242 201
+# the line tool: Ctrl + click on the first piece adds a vertex, Del removes it
+cmd 4406
+click 720,374 ctrl
+expect listitem:"Sheet.6" selected
+expect button:"Scheitelpunkt 1" rect 716 369 10 10
+expect button:"Scheitelpunkt 2" rect 797 369 10 10
+expect button:"Mittelpunkt 1" rect 681 369 10 10
+cmd 4400
+click button:"Scheitelpunkt 1"
+key delete
+expect listitem:"Sheet.6" exists
+expect button:"Scheitelpunkt 1" rect 797 369 10 10
+expect button:"Mittelpunkt 1" rect 721 369 10 10
+# Verbinder zurücksetzen: laid anew, an L again
+cmd 5638
+expect listitem:"Sheet.6" rect 651 374 242 201
+expect button:"Scheitelpunkt 1" rect 885 369 10 10
+expect button:"Scheitelpunkt 2" missing
+key ctrl+z
+expect button:"Scheitelpunkt 2" rect 797 512 10 10

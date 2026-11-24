@@ -55,6 +55,9 @@
 //                                         of each page (jumps.rs)
 //   diagramiotest --write-jd21-groups DIR (JD21) jd21-gruppen.vsdx: Shape ändern, a group with its
 //                                         behaviour cells, boundary members (groups.rs)
+//   diagramiotest --write-jd21-route DIR  (JD21) JD21-Gegenprobe-Routing.vsdx (a page per routing
+//                                         style and direction, permeable shapes, a way by hand)
+//                                         and a PNG of each page (route.rs)
 //
 // Groups:
 //   samples   self-built files of all six formats: what lands where in the model (fields,
@@ -113,6 +116,9 @@
 //   groups    (JD21, groups.rs) the Group Properties cells, IsDropSource and the double click
 //             read back, boundary members (Relationships 7 .. 10), Change Shape Behavior cells
 //             and shapes replaced by a master's instances (text, data, copied cells, glue)
+//   route     (JD21, route.rs) routing styles with directions, permeable shapes, a way by hand:
+//             the sides the ways use, the routing cells and ways written and read back, routed
+//             again after reading; the local corpus' connectors (right angles, ConFixedCode 0, 3 .. 6)
 //
 // Why an app of its own and not codectest: codectest is the image codecs' runner (with the
 // assembly-parity protocol and every image codec linked); the diagram codecs grow with JD5
@@ -150,6 +156,8 @@ mod pkg;
 mod pdfreader;
 mod render;
 mod roundtrip;
+// (JD21) routing styles, permeable shapes, a way by hand
+mod route;
 mod samples;
 // (JD21) the shape operations
 mod shapeops;
@@ -306,6 +314,10 @@ fn run() -> i32 {
         // (JD21) groups, boundary members, Shape ändern for the Visio counter-check
         return groups::write(&dir);
     }
+    if let Some(dir) = arg(&args, "--write-jd21-route") {
+        // (JD21) the routing styles drawing for the Visio counter-check, a PNG per page
+        return route::write(&dir);
+    }
     if let Some(dir) = arg(&args, "--write-jd21-ops") {
         // (JD21) the shape operations for the Visio counter-check
         return shapeops::write(&dir);
@@ -383,6 +395,10 @@ fn run() -> i32 {
         // (JD21) line jumps
         if h.on("jumps") {
             jumps::check(&mut h);
+        }
+        // (JD21) routing styles, permeable shapes, a way by hand
+        if h.on("route") {
+            route::check(&mut h, corpus_dir.clone());
         }
     }
     if h.on("corpus") {

@@ -22,8 +22,11 @@
 //
 // The codes are Visio's (learn.microsoft.com, Shape Layout and Page Layout sections; research in
 // jd10-strukturen.md).  The router of diagram_core::glue reads RouteStyle and ShapeRouteStyle
-// (straight for 2 and 16, else right angles), LineToNodeX/Y as its clearance, and leaves shapes
-// with ObjType 4 out of its obstacles; (JD21) the page layout (diagram_core::layout,
+// ((JD21 route) all 23 styles with their directions, diagram_core::route_styles; shown as two
+// rows, style and direction, by route_ui::pick), LineToNodeX/Y as its clearance, ShapePermeableX/Y
+// (Layout-Verhalten: Verbinder dürfen das Shape durchqueren), and leaves shapes with ObjType 4 out
+// of its obstacles; (JD21 route) LineRouteExt, LineAdjustFrom/To in the register, ShapePermeablePlace
+// in Layout-Verhalten (the page layout places shapes on it); (JD21) the page layout (diagram_core::layout,
 // layout_cmds.rs) reads PlaceStyle, PlaceDepth, AvenueSizeX/Y, BlockSizeX/Y, ResizePage, ObjType
 // and ShapeFixedCode; the other codes are kept for Visio.
 
@@ -39,15 +42,6 @@ use crate::edit_doc;
 use crate::Diagrammer;
 
 const ID_DLG: u32 = 0x5C00;
-
-/// the routing styles in RouteStyle / ShapeRouteStyle order (0 .. 16)
-// i18n
-pub(crate) static ROUTE_STYLES: [&str; 17] = [
-    "Standard|Routing", "Rechtwinklig", "Gerade", "Organigramm (von oben nach unten)", "Organigramm (von links nach rechts)", "Flussdiagramm (von oben nach unten)",
-    "Flussdiagramm (von links nach rechts)", "Baum (von oben nach unten)", "Baum (von links nach rechts)", "Netzwerk", "Organigramm (von unten nach oben)",
-    "Organigramm (von rechts nach links)", "Flussdiagramm (von unten nach oben)", "Flussdiagramm (von rechts nach links)", "Baum (von unten nach oben)",
-    "Baum (von rechts nach links)", "Mittig zu Mittig",
-];
 
 /// (JD21 jumps) the line jump size factor of Visio's files (LineJumpFactorX/Y), also for a
 /// page without the cells
@@ -181,12 +175,14 @@ pub(crate) fn run(app: &mut Diagrammer, ui: &mut Ui, _id: u32) -> bool {
     let fixed = num(doc, s, "ShapeFixedCode").unwrap_or(0.0) as i64;
     let st = &mut app.layout;
     st.placement = if obj & 4 != 0 { 2 } else if obj & 1 != 0 { 1 } else { 0 };
-    st.route = (num(doc, s, "ShapeRouteStyle").unwrap_or(0.0) as i32).clamp(0, ROUTE_STYLES.len() as i32 - 1);
+    st.route = (num(doc, s, "ShapeRouteStyle").unwrap_or(0.0) as i32).clamp(0, 22);
     st.plow = (num(doc, s, "ShapePlowCode").unwrap_or(0.0) as i32).clamp(0, 2);
     st.fixed = (fixed & 1 != 0) as i32;
     st.ignore_points = (fixed & 0x20 != 0) as i32;
     st.shapes = shapes;
     st.dlg.set(1);
+    // (JD21 route) connectors may cross it, shapes may be placed on it
+    crate::route_ui::open_shape(app, first);
     ui.repass();
     true
 }
@@ -214,13 +210,11 @@ pub(crate) fn dialog(app: &mut Diagrammer, ui: &mut Ui) {
     ui.next_size(200, 0);
     ui.combobox(ID_DLG + 6, &mut st.plow, &[crate::tc("Standard|Routing"), t("Nein"), t("Ja")]);
     ui.box_end();
+    // (JD21 route) ShapePermeableX/Y, ShapePermeablePlace (route_ui.rs)
+    crate::route_ui::shape_rows(&mut app.route, ui, ID_DLG + 0x20);
     ui.text(TS_BODY_STRONG, t("Verbinder"));
-    ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
-    label(ui, t("Routing-Stil"));
-    let names: Vec<&str> = ROUTE_STYLES.iter().map(|s| crate::tc(s)).collect();
-    ui.next_size(240, 0);
-    ui.combobox(ID_DLG + 7, &mut st.route, &names);
-    ui.box_end();
+    // (JD21 route) the routing style and its direction as two rows
+    crate::route_ui::pick(ui, (ID_DLG + 7, ID_DLG + 0x23), &mut st.route, crate::tc("Standard|Routing"), 200);
     ui.checkbox(ID_DLG + 8, t("Verbindungspunkte beim Routing nicht benutzen"), &mut st.ignore_points);
     ui.box_end();
     let r = ui.dialog_buttons(Some(t("OK")), None, Some(t("Abbrechen")));
@@ -239,6 +233,8 @@ fn apply_shapes(app: &mut Diagrammer, ui: &mut Ui) {
     let st = &app.layout;
     let shapes = st.shapes.clone();
     let (placement, route, plow, fixed, ignore) = (st.placement, st.route, st.plow, st.fixed, st.ignore_points);
+    // (JD21 route) the permeability cells changed in the dialog
+    let perm = crate::route_ui::shape_cells(&app.route);
     let Some(o) = app.opened.as_mut() else { return };
     let _ = edit_doc::edit(o, t("Layout-Verhalten"), true, |tx, eng| {
         for &s in &shapes {
@@ -249,7 +245,7 @@ fn apply_shapes(app: &mut Diagrammer, ui: &mut Ui) {
             };
             let obj = (obj & !5) | [0, 1, 4][placement.clamp(0, 2) as usize];
             let code = (code & !0x21) | if fixed != 0 { 1 } else { 0 } | if ignore != 0 { 0x20 } else { 0 };
-            for (cell, v) in [("ObjType", obj as f64), ("ShapeRouteStyle", route as f64), ("ShapePlowCode", plow as f64), ("ShapeFixedCode", code as f64)] {
+            for (cell, v) in [("ObjType", obj as f64), ("ShapeRouteStyle", route as f64), ("ShapePlowCode", plow as f64), ("ShapeFixedCode", code as f64)].into_iter().chain(perm.iter().copied()) {
                 let a = tx.single(cell);
                 tx.set_constant(sheet, &a, Value::Num(v), None)?;
             }
@@ -275,7 +271,7 @@ pub(crate) fn load(app: &mut Diagrammer, page: PageRef) {
     let mm10 = |v: Option<f64>, d: f64| (v.unwrap_or(d) * 254.0 + 0.5) as i32;
     let st = &mut app.layout;
     st.page = Some(page);
-    st.page_route = (num(doc, s, "RouteStyle").unwrap_or(0.0) as i32).clamp(0, ROUTE_STYLES.len() as i32 - 1);
+    st.page_route = (num(doc, s, "RouteStyle").unwrap_or(0.0) as i32).clamp(0, 22);
     // (JD21 jumps) the six codes, the nine styles (0 is the arc too), size and direction
     st.jumps = (num(doc, s, "LineJumpCode").unwrap_or(1.0) as i32).clamp(0, 5);
     st.jump_style_raw = (num(doc, s, "LineJumpStyle").unwrap_or(0.0) as i32).clamp(0, 9);
@@ -291,6 +287,8 @@ pub(crate) fn load(app: &mut Diagrammer, page: PageRef) {
     (st.place_style, st.place_dir) = place_split(st.place_code);
     st.place_depth = (num(doc, s, "PlaceDepth").unwrap_or(0.0) as i32).clamp(0, 3);
     st.place_flip = (num(doc, s, "PlaceFlip").unwrap_or(0.0) as i32) & 3;
+    // (JD21 route) appearance, separate and overlap
+    crate::route_ui::load_page(app, page);
 }
 
 /// the register Layout und Routing (editable)
@@ -321,12 +319,9 @@ pub(crate) fn tab(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
     ui.next_size(116, 0);
     ui.combobox(id + 11, &mut st.place_flip, &[t("Keine"), t("Horizontal"), t("Vertikal"), t("Beide")]);
     ui.box_end();
-    let names: Vec<&str> = ROUTE_STYLES.iter().map(|s| crate::tc(s)).collect();
-    ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
-    row(ui, t("Routing-Stil"));
-    ui.next_size(240, 0);
-    ui.combobox(id, &mut st.page_route, &names);
-    ui.box_end();
+    // (JD21 route) the routing style with its direction, appearance, separate and overlap
+    crate::route_ui::pick(ui, (id, id + 16), &mut st.page_route, crate::tc("Standard|Routing"), 210);
+    crate::route_ui::page_rows(&mut app.route, ui, id + 17, 210);
     ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
     row(ui, t("Linienübergänge"));
     ui.next_size(240, 0);
@@ -382,6 +377,8 @@ fn absent_default(cell: &str, v: f64) -> bool {
         "LineJumpCode" => 1.0,
         "LineJumpStyle" | "PageLineJumpDirX" | "PageLineJumpDirY" => 0.0,
         "LineJumpFactorX" | "LineJumpFactorY" => JUMP_FACTOR,
+        // (JD21 route) appearance, separate, overlap: 0 is the default
+        "LineRouteExt" | "LineAdjustFrom" | "LineAdjustTo" => 0.0,
         _ => return false,
     };
     (v - d).abs() < 1e-6
@@ -412,11 +409,13 @@ pub(crate) fn commit(app: &mut Diagrammer, ui: &mut Ui) {
         ("PlowCode", if st.page_plow != 0 { 1.0 } else { 0.0 }),
         ("PageShapeSplit", if st.split != 0 { 1.0 } else { 0.0 }),
     ];
+    // (JD21 route) LineRouteExt, LineAdjustFrom, LineAdjustTo
+    let more = crate::route_ui::page_codes(&app.route);
     let Some(o) = app.opened.as_mut() else { return };
     let changes: Vec<(&str, f64, Option<Unit>)> = lengths
         .iter()
         .map(|&(c, v)| (c, v, Some(Unit::Millimeters)))
-        .chain(codes.iter().map(|&(c, v)| (c, v, None)))
+        .chain(codes.iter().chain(more.iter()).map(|&(c, v)| (c, v, None)))
         // (JD15) a placement cell the page lacks counts as 0 (Visio's default); (JD21 jumps) a
         // line jump cell as Visio's value
         .filter(|&(c, v, _)| num(&o.doc, s, c).map_or(!absent_default(c, v), |n| (n - v).abs() > 1e-6))
@@ -426,7 +425,8 @@ pub(crate) fn commit(app: &mut Diagrammer, ui: &mut Ui) {
     }
     let owner = diagram_core::Owner::Page(page);
     // (JD21 jumps) line jumps are drawing only: they route nothing again
-    let reroute = changes.iter().any(|(c, _, _)| !c.starts_with("LineJump") && !c.starts_with("PageLineJump"));
+    // (JD21 route) nor does separating and overlapping lines (kept for Visio)
+    let reroute = changes.iter().any(|(c, _, _)| !c.starts_with("LineJump") && !c.starts_with("PageLineJump") && !c.starts_with("LineAdjust"));
     let _ = edit_doc::edit(o, t("Layout und Routing"), true, |tx, eng| {
         for (cell, v, unit) in &changes {
             let a = tx.single(cell);

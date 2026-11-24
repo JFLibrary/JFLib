@@ -53,7 +53,10 @@
 // between the two ends leaves the outline.  Obstacles are the boxes of the page's top-level
 // shapes that are not 1-D (route.rs keeps the page's LineToNodeX/Y as clearance, else 1/8 in).
 // ConFixedCode 1 and 2 (reroute manually / never) keep the corners and only move the first and
-// last pieces; reset() routes them anew.
+// last pieces; reset() routes them anew.  (JD21) 1 is laid anew when the kept way runs through
+// a shape (route_edit.rs); 3 .. 6 route freely (Visio writes them for the connectors it routes
+// itself); the styles with a direction choose the sides (route_styles.rs); ShapePermeableX/Y let
+// ways cross a shape (route::best_through).
 //
 // Nothing happens on its own: opening a file routes nothing, only the shapes handed to update.
 
@@ -281,7 +284,8 @@ pub fn style(doc: &Document, shape: ShapeRef) -> Style {
         return Style::Curved;
     }
     match get("ShapeRouteStyle", "RouteStyle") {
-        Some(v) if v == 2.0 || v == 16.0 => Style::Straight,
+        // (JD21) network (9) as well (route_styles.rs)
+        Some(v) if v == 2.0 || v == 9.0 || v == 16.0 => Style::Straight,
         _ => Style::RightAngle,
     }
 }
@@ -306,7 +310,7 @@ pub fn path(doc: &Document, shape: ShapeRef) -> Vec<[f64; 2]> {
 }
 
 // the box of a shape on the page
-fn page_box(doc: &Document, s: ShapeRef) -> Option<[f64; 4]> {
+pub(crate) fn page_box(doc: &Document, s: ShapeRef) -> Option<[f64; 4]> {
     let sheet = SheetRef::Shape(s);
     let (w, h) = (num_sym(doc, sheet, names::WIDTH)?, num_sym(doc, sheet, names::HEIGHT).unwrap_or(0.0));
     let m = doc.page_xform(s);
@@ -318,14 +322,14 @@ fn page_box(doc: &Document, s: ShapeRef) -> Option<[f64; 4]> {
     b.iter().all(|v| v.is_finite()).then_some(b)
 }
 
-fn centre(doc: &Document, s: ShapeRef) -> [f64; 2] {
+pub(crate) fn centre(doc: &Document, s: ShapeRef) -> [f64; 2] {
     let sheet = SheetRef::Shape(s);
     let (w, h) = (num_sym(doc, sheet, names::WIDTH).unwrap_or(0.0), num_sym(doc, sheet, names::HEIGHT).unwrap_or(0.0));
     doc.page_xform(s).apply([w * 0.5, h * 0.5])
 }
 
 // the outline of a shape and its subshapes on the page, as segments
-fn outline(doc: &Document, s: ShapeRef) -> Vec<[[f64; 2]; 2]> {
+pub(crate) fn outline(doc: &Document, s: ShapeRef) -> Vec<[[f64; 2]; 2]> {
     let mut segs = Vec::new();
     let mut stack = alloc::vec![s];
     while let Some(r) = stack.pop() {
@@ -369,7 +373,7 @@ fn line_hit(c: [f64; 2], d: [f64; 2], p: [f64; 2], q: [f64; 2]) -> Option<f64> {
 // where a dynamic end docks: the farthest point of the outline in direction d on the line
 // through the middle (also behind the middle: a shape open on that side), else where the line
 // leaves the box
-fn dock(segs: &[[[f64; 2]; 2]], c: [f64; 2], d: [f64; 2], own: Option<[f64; 4]>) -> [f64; 2] {
+pub(crate) fn dock(segs: &[[[f64; 2]; 2]], c: [f64; 2], d: [f64; 2], own: Option<[f64; 4]>) -> [f64; 2] {
     let Some(d) = unit(d) else { return c };
     let far = segs.iter().filter_map(|s| line_hit(c, d, s[0], s[1])).fold(None::<f64>, |m, t| Some(m.map_or(t, |m| m.max(t))));
     let t = match (far, own) {
@@ -790,7 +794,7 @@ fn obstacles(doc: &Document, owner: Owner) -> Vec<(ShapeRef, [f64; 4])> {
 
 // the clearance (LineToNodeX/Y of the page, else 1/8 inch) and the cost of a bend (1/2 inch),
 // both on paper, in drawing units
-fn opts_for(doc: &Document, owner: Owner) -> Opts {
+pub(crate) fn opts_for(doc: &Document, owner: Owner) -> Opts {
     let Owner::Page(p) = owner else { return Opts::default() };
     let sh = SheetRef::Page(p);
     let scale = match (num(doc, sh, "PageScale"), num(doc, sh, "DrawingScale")) {
@@ -804,6 +808,8 @@ fn opts_for(doc: &Document, owner: Owner) -> Opts {
 
 fn run(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef], force: bool) -> Result<(), EditError> {
     let mut cache: Vec<(Owner, Vec<(ShapeRef, [f64; 4])>)> = Vec::new();
+    // (JD21, SS-19) which way connectors may cross each obstacle of an entry of the cache
+    let mut passes: Vec<Vec<u8>> = Vec::new();
     for &c in shapes {
         if !is_one_d(tx.doc(), c) {
             continue;
@@ -816,12 +822,15 @@ fn run(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef], force: bool)
             let i = match cache.iter().position(|(o, _)| *o == c.owner) {
                 Some(i) => i,
                 None => {
-                    cache.push((c.owner, obstacles(tx.doc(), c.owner)));
+                    let list = obstacles(tx.doc(), c.owner);
+                    passes.push(list.iter().map(|(s, _)| crate::route_styles::pass(tx.doc(), *s)).collect());
+                    cache.push((c.owner, list));
                     cache.len() - 1
                 }
             };
             let boxes: Vec<[f64; 4]> = cache[i].1.iter().filter(|(s, _)| *s != c).map(|(_, b)| *b).collect();
-            route_one(tx, eng, c, force, &boxes)?;
+            let pass: Vec<u8> = cache[i].1.iter().zip(&passes[i]).filter(|((s, _), _)| *s != c).map(|(_, p)| *p).collect();
+            route_one(tx, eng, c, force, &boxes, &pass)?;
         } else {
             walk_line(tx, eng, c)?;
         }
@@ -934,7 +943,7 @@ fn candidates(doc: &Document, t: Target, at: [f64; 2], toward: [f64; 2], other: 
 // (JD15, SS-18) WalkPreference with bit 1 (Begin) or 2 (End) set: the end prefers the top and
 // bottom of its shape -- among ways as short and with as few bends as the cheapest one, a way
 // from those sides wins (Visio's sides, the default, need nothing: SIDES puts them first)
-fn prefer_walk(ca: &[Port], cb: &[Port], boxes: &[[f64; 4]], opts: &Opts, walk: i64, found: (usize, usize, Vec<[f64; 2]>)) -> (usize, usize, Vec<[f64; 2]>) {
+fn prefer_walk(ca: &[Port], cb: &[Port], boxes: &[[f64; 4]], pass: &[u8], opts: &Opts, walk: i64, found: (usize, usize, Vec<[f64; 2]>)) -> (usize, usize, Vec<[f64; 2]>) {
     if walk & 3 == 0 || found.2.len() < 2 {
         return found;
     }
@@ -945,7 +954,7 @@ fn prefer_walk(ca: &[Port], cb: &[Port], boxes: &[[f64; 4]], opts: &Opts, walk: 
         return found;
     }
     let (sa, sb): (Vec<Port>, Vec<Port>) = (ia.iter().map(|&k| ca[k]).collect(), ib.iter().map(|&k| cb[k]).collect());
-    let (i, j, way) = route::best(&sa, &sb, boxes, opts);
+    let (i, j, way) = route::best_through(&sa, &sb, boxes, pass, opts);
     let len = |w: &[[f64; 2]]| w.windows(2).map(|s| (s[1][0] - s[0][0]).abs() + (s[1][1] - s[0][1]).abs()).sum::<f64>();
     let (l0, l1) = (len(&found.2), len(&way));
     if way.len() >= 2 && l1 <= l0 + 1e-9 * (1.0 + l0) && route::bends(&way) <= route::bends(&found.2) {
@@ -955,35 +964,17 @@ fn prefer_walk(ca: &[Port], cb: &[Port], boxes: &[[f64; 4]], opts: &Opts, walk: 
     }
 }
 
-// a kept way (ConFixedCode): its corners stay, the first and last piece move with the ends
-fn keep(cur: &[[f64; 2]], b: [f64; 2], e: [f64; 2]) -> Option<Vec<[f64; 2]>> {
-    let n = cur.len();
-    if n < 3 {
-        return None;
-    }
-    let horizontal = |p: [f64; 2], q: [f64; 2]| (p[1] - q[1]).abs() <= (p[0] - q[0]).abs();
-    let mut q = cur.to_vec();
-    if n == 3 {
-        let corner = if horizontal(cur[0], cur[1]) { [e[0], b[1]] } else { [b[0], e[1]] };
-        q = alloc::vec![b, corner, e];
-    } else {
-        let (h0, h1) = (horizontal(cur[0], cur[1]), horizontal(cur[n - 1], cur[n - 2]));
-        q[0] = b;
-        if h0 { q[1][1] = b[1] } else { q[1][0] = b[0] }
-        q[n - 1] = e;
-        if h1 { q[n - 2][1] = e[1] } else { q[n - 2][0] = e[0] }
-    }
-    Some(route::simplify(q))
-}
-
-fn route_one(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef, force: bool, boxes: &[[f64; 4]]) -> Result<(), EditError> {
+fn route_one(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef, force: bool, boxes: &[[f64; 4]], pass: &[u8]) -> Result<(), EditError> {
     let doc = tx.doc();
     let sheet = SheetRef::Shape(c);
     let targets = glued(doc, c);
     let Some((bp, ep)) = ends(doc, c) else { return Ok(()) };
     let style = style(doc, c);
     let opts = opts_for(doc, c.owner);
-    let fixed = !force && matches!(num(doc, sheet, "ConFixedCode").map(|v| v as i64), Some(1 | 2));
+    // (JD21, CN-04) ConFixedCode 1 and 2 keep the way (route_edit::kept; 3 .. 6 are what Visio
+    // writes for the connectors it routes itself: free)
+    let code = num(doc, sheet, "ConFixedCode").map_or(0, |v| v as i64);
+    let fixed = !force && matches!(code, 1 | 2);
     let refs = [reference(doc, targets[0], bp), reference(doc, targets[1], ep)];
     // (JD15, SS-18) WalkPreference: bit 1 Begin, bit 2 End prefer top and bottom
     // (visWalkPrefBegNS, visWalkPrefEndNS), else the sides
@@ -991,12 +982,19 @@ fn route_one(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef, force: bool, b
     let ca = candidates(doc, targets[0], bp, refs[1], facing(doc, targets[1], ep), style);
     let cb = candidates(doc, targets[1], ep, refs[0], facing(doc, targets[0], bp), style);
     let pts = if style == Style::Straight {
-        route::straight(&ca[0], &cb[0])
+        // (JD21, CN-04) a straight way with vertices of its own keeps them
+        match fixed.then(|| crate::route_edit::kept_polyline(doc, c, &targets)).flatten() {
+            Some(p) => p,
+            None => route::straight(&ca[0], &cb[0]),
+        }
     } else {
-        // one search over the ports of both ends: the cheapest pair of sides among the obstacles
-        let found = route::best(&ca, &cb, boxes, &opts);
-        let (i, j, way) = prefer_walk(&ca, &cb, boxes, &opts, walk, found);
-        match fixed.then(|| keep(&path(doc, c), ca[i].at, cb[j].at)).flatten() {
+        // (JD21, CN-05) a style with a direction chooses the sides (route_styles::plan), else one
+        // search over the ports of both ends: the cheapest pair of sides among the obstacles
+        let way = match crate::route_styles::plan(crate::route_styles::of(doc, c), &ca, &cb, boxes, pass, &opts) {
+            Some(found) => found.2,
+            None => prefer_walk(&ca, &cb, boxes, pass, &opts, walk, route::best_through(&ca, &cb, boxes, pass, &opts)).2,
+        };
+        match fixed.then(|| crate::route_edit::kept(doc, c, code, &ca, &cb, boxes, pass, &opts)).flatten() {
             Some(p) => p,
             None => way,
         }
@@ -1032,7 +1030,7 @@ struct GeoRow {
     cells: Vec<(Sym, Cv)>,
 }
 
-fn write_route(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef, targets: &[Target; 2], pts: &[[f64; 2]], style: Style) -> Result<(), EditError> {
+pub(crate) fn write_route(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef, targets: &[Target; 2], pts: &[[f64; 2]], style: Style) -> Result<(), EditError> {
     let (Some(&first), Some(&last)) = (pts.first(), pts.last()) else { return Ok(()) };
     let sheet = SheetRef::Shape(c);
     let pinv = parent_xform(tx.doc(), c).inverse().unwrap_or(Xform::IDENTITY);

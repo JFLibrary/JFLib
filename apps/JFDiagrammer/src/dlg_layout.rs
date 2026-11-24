@@ -27,7 +27,6 @@ use ui::i18n::t;
 use ui::*;
 
 use crate::layout_cmds;
-use crate::layout_ui::ROUTE_STYLES;
 use crate::{edit_canvas, edit_doc, tc, Diagrammer};
 
 const ID_LAYOUT: u32 = 0x7DA0_0000;
@@ -157,7 +156,7 @@ pub(crate) fn open_layout(app: &mut Diagrammer, ui: &mut Ui) {
     let d = &mut app.lay.dlg;
     choose(d, opts.place);
     d.spacing = tenths(opts.spacing[0].max(opts.spacing[1]) * k);
-    d.route = (num(doc, s, "RouteStyle").unwrap_or(0.0) as i32).clamp(0, ROUTE_STYLES.len() as i32 - 1);
+    d.route = (num(doc, s, "RouteStyle").unwrap_or(0.0) as i32).clamp(0, 22);
     d.look = (num(doc, s, "LineRouteExt").unwrap_or(0.0) == 2.0) as i32;
     d.apply_route = 0;
     d.scope = if chosen { 0 } else { 1 };
@@ -285,12 +284,8 @@ fn layout_dialog(app: &mut Diagrammer, ui: &mut Ui) {
     ui.number_box(ID_LAYOUT + 5, &mut d.spacing, &Range::new(0, 2000, 5, 0));
     ui.box_end();
     ui.text(TS_BODY_STRONG, t("Verbinder"));
-    ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
-    row(ui, t("Routing-Stil"));
-    let names: Vec<&str> = ROUTE_STYLES.iter().map(|s| tc(s)).collect();
-    ui.next_size(250, 0);
-    ui.combobox(ID_LAYOUT + 6, &mut d.route, &names);
-    ui.box_end();
+    // (JD21 route) the routing style and its direction as two rows (route_ui.rs)
+    crate::route_ui::pick(ui, (ID_LAYOUT + 6, ID_LAYOUT + 0x30), &mut d.route, tc("Standard|Routing"), 210);
     ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
     row(ui, t("Darstellung"));
     ui.next_size(250, 0);

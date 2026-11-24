@@ -443,18 +443,10 @@ oben	top	arriba	in alto	en haut
 unten	bottom	abajo	in basso	en bas
 kein Versatz	no offset	sin desplazamiento	nessuno spostamento	aucun décalage
 Flussdiagramm (von oben nach unten)	Flowchart (Top to Bottom)	Diagrama de flujo (de arriba abajo)	Diagramma di flusso (dall'alto in basso)	Diagramme de flux (de haut en bas)
-Organigramm (von links nach rechts)	Organization Chart (Left to Right)	Organigrama (de izquierda a derecha)	Organigramma (da sinistra a destra)	Organigramme (de gauche à droite)
-Organigramm (von oben nach unten)	Organization Chart (Top to Bottom)	Organigrama (de arriba abajo)	Organigramma (dall'alto in basso)	Organigramme (de haut en bas)
-Baum (von links nach rechts)	Tree (Left to Right)	Árbol (de izquierda a derecha)	Albero (da sinistra a destra)	Arborescence (de gauche à droite)
-Baum (von oben nach unten)	Tree (Top to Bottom)	Árbol (de arriba abajo)	Albero (dall'alto in basso)	Arborescence (de haut en bas)
 Flussdiagramm (von links nach rechts)	Flowchart (Left to Right)	Diagrama de flujo (de izquierda a derecha)	Diagramma di flusso (da sinistra a destra)	Diagramme de flux (de gauche à droite)
 Netzwerk	Network	Red	Rete	Réseau
-Organigramm (von unten nach oben)	Organization Chart (Bottom to Top)	Organigrama (de abajo arriba)	Organigramma (dal basso in alto)	Organigramme (de bas en haut)
-Baum (von unten nach oben)	Tree (Bottom to Top)	Árbol (de abajo arriba)	Albero (dal basso in alto)	Arborescence (de bas en haut)
 Flussdiagramm (von rechts nach links)	Flowchart (Right to Left)	Diagrama de flujo (de derecha a izquierda)	Diagramma di flusso (da destra a sinistra)	Diagramme de flux (de droite à gauche)
 Flussdiagramm (von unten nach oben)	Flowchart (Bottom to Top)	Diagrama de flujo (de abajo arriba)	Diagramma di flusso (dal basso in alto)	Diagramme de flux (de bas en haut)
-Organigramm (von rechts nach links)	Organization Chart (Right to Left)	Organigrama (de derecha a izquierda)	Organigramma (da destra a sinistra)	Organigramme (de droite à gauche)
-Baum (von rechts nach links)	Tree (Right to Left)	Árbol (de derecha a izquierda)	Albero (da destra a sinistra)	Arborescence (de droite à gauche)
 Mittig zu Mittig	Center to Center	De centro a centro	Da centro a centro	Centre à centre
 Horizontale Linien	Horizontal Lines	Líneas horizontales	Linee orizzontali	Lignes horizontales
 Vertikale Linien	Vertical Lines	Líneas verticales	Linee verticali	Lignes verticales
@@ -1336,3 +1328,23 @@ Schablonen	Stencils	Colecciones de formas	Raccolte di forme	Bibliothèques de fo
 Shape geändert in „{}“	Shape changed to “{}”	Forma cambiada a «{}»	Forma cambiata in «{}»	Forme remplacée par « {} »
 Das Shape lässt sich nicht ändern.	The shape cannot be changed.	No se puede cambiar la forma.	Impossibile cambiare la forma.	Impossible de modifier la forme.
 „{}“ kann die ausgewählten Shapes nicht ersetzen.	“{}” cannot replace the selected shapes.	«{}» no puede reemplazar las formas seleccionadas.	«{}» non può sostituire le forme selezionate.	« {} » ne peut pas remplacer les formes sélectionnées.
+Segment verschieben	Move Segment	Mover el segmento	Sposta il segmento	Déplacer le segment
+Organigramm|Routing	Organization Chart	Organigrama	Organigramma	Organigramme hiérarchique
+Baum|Routing	Tree	Árbol	Albero	Arborescence
+Einfach|Routing	Simple	Simple	Semplice	Simple
+Einfach waagerecht-senkrecht	Simple Horizontal-Vertical	Simple horizontal-vertical	Semplice orizzontale-verticale	Simple horizontal-vertical
+Einfach senkrecht-waagerecht	Simple Vertical-Horizontal	Simple vertical-horizontal	Semplice verticale-orizzontale	Simple vertical-horizontal
+Richtung des Routings	Routing direction	Dirección del enrutamiento	Direzione del routing	Direction du routage
+Weg	Path	Ruta	Percorso	Chemin
+Neu verlegen	Reroute	Volver a enrutar	Reinstrada	Réacheminer
+Frei	Freely	Libremente	Liberamente	Librement
+Nach Bedarf	As needed	Según sea necesario	Se necessario	Si nécessaire
+Bei Überkreuzung	On crossover	Al cruzarse	In caso di incrocio	En cas de croisement
+Verbinder dürfen das Shape waagerecht durchqueren	Connectors may route through the shape horizontally	Los conectores pueden atravesar la forma horizontalmente	I connettori possono attraversare la forma orizzontalmente	Les connecteurs peuvent traverser la forme horizontalement
+Verbinder dürfen das Shape senkrecht durchqueren	Connectors may route through the shape vertically	Los conectores pueden atravesar la forma verticalmente	I connettori possono attraversare la forma verticalmente	Les connecteurs peuvent traverser la forme verticalement
+Andere Shapes dürfen beim Layout darauf platziert werden	Allow other shapes to be placed on top in a layout	Permitir colocar otras formas encima al distribuir	Consenti di posizionare altre forme sopra nel layout	Autoriser le placement d'autres formes dessus lors de la disposition
+Linien trennen und überlappen	Separate and overlap lines	Separar y superponer líneas	Separa e sovrapponi linee	Séparer et superposer les lignes
+Unverbundene	Unrelated	No relacionadas	Non correlate	Non liées
+Wie der Stil	Style default	Según el estilo	Come lo stile	Selon le style
+Benachbarte	Close lines	Cercanas	Vicine	Proches
+Verbundene	Related	Relacionadas	Correlate	Liées

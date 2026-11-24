@@ -109,7 +109,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [doc_io](#doc_io) -- conservative DOCX interchange and bounded file I/O
   <br>[lib.rs](#doc_io-crate-root) · [bibliography.rs](#doc_iobibliographyrs) · [bibtex.rs](#doc_iobibtexrs) · [clipboard.rs](#doc_ioclipboardrs) · [html_import.rs](#doc_iohtml_importrs) · [fragment.rs](#doc_iofragmentrs) · [exchange.rs](#doc_ioexchangers) · [library.rs](#doc_iolibraryrs) · [preservation.rs](#doc_iopreservationrs) · [preserved_text.rs](#doc_iopreserved_textrs) · [ris.rs](#doc_iorisrs) · [preserved_stories.rs](#doc_iopreserved_storiesrs)
 - [diagram_core](#diagram_core) -- the diagram model: ShapeSheet cells, formulas, geometry, routing and layout
-  <br>[src/autoconn.rs](#diagram_coresrcautoconnrs) · [src/cell.rs](#diagram_coresrccellrs) · [src/data.rs](#diagram_coresrcdatars) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/dock.rs](#diagram_coresrcdockrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/field.rs](#diagram_coresrcfieldrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/groups.rs](#diagram_coresrcgroupsrs) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/instance/detach.rs](#diagram_coresrcinstancedetachrs) · [src/layout.rs](#diagram_coresrclayoutrs) · [src/layout/adjust.rs](#diagram_coresrclayoutadjustrs) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/draw.rs](#diagram_coresrcopsdrawrs) · [src/ops/picture.rs](#diagram_coresrcopspicturers) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/pagesetup.rs](#diagram_coresrcpagesetuprs) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/jumps.rs](#diagram_coresrcrenderjumpsrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/replace.rs](#diagram_coresrcreplacers) · [src/route.rs](#diagram_coresrcrouters) · [src/shapeops.rs](#diagram_coresrcshapeopsrs) · [src/shapeops/frame.rs](#diagram_coresrcshapeopsframers) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/edge.rs](#diagram_coresrcstructureedgers) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/tools.rs](#diagram_coresrctoolsrs) · [src/tools/array.rs](#diagram_coresrctoolsarrayrs) · [src/tools/dimension.rs](#diagram_coresrctoolsdimensionrs) · [src/tools/number.rs](#diagram_coresrctoolsnumberrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
+  <br>[src/autoconn.rs](#diagram_coresrcautoconnrs) · [src/cell.rs](#diagram_coresrccellrs) · [src/data.rs](#diagram_coresrcdatars) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/dock.rs](#diagram_coresrcdockrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/field.rs](#diagram_coresrcfieldrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/groups.rs](#diagram_coresrcgroupsrs) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/instance/detach.rs](#diagram_coresrcinstancedetachrs) · [src/layout.rs](#diagram_coresrclayoutrs) · [src/layout/adjust.rs](#diagram_coresrclayoutadjustrs) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/draw.rs](#diagram_coresrcopsdrawrs) · [src/ops/picture.rs](#diagram_coresrcopspicturers) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/pagesetup.rs](#diagram_coresrcpagesetuprs) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/jumps.rs](#diagram_coresrcrenderjumpsrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/replace.rs](#diagram_coresrcreplacers) · [src/route.rs](#diagram_coresrcrouters) · [src/route_edit.rs](#diagram_coresrcroute_editrs) · [src/route_styles.rs](#diagram_coresrcroute_stylesrs) · [src/shapeops.rs](#diagram_coresrcshapeopsrs) · [src/shapeops/frame.rs](#diagram_coresrcshapeopsframers) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/edge.rs](#diagram_coresrcstructureedgers) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/tools.rs](#diagram_coresrctoolsrs) · [src/tools/array.rs](#diagram_coresrctoolsarrayrs) · [src/tools/dimension.rs](#diagram_coresrctoolsdimensionrs) · [src/tools/number.rs](#diagram_coresrctoolsnumberrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
 - [diagram_io](#diagram_io) -- Visio file formats (the VSDX family) and diagram exports
   <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/data.rs](#diagram_iosrcdatars) · [src/props.rs](#diagram_iosrcpropsrs) · [src/stencil.rs](#diagram_iosrcstencilrs) · [src/template.rs](#diagram_iosrctemplaters) · [src/textdraw.rs](#diagram_iosrctextdrawrs) · [src/vdx/mod.rs](#diagram_iosrcvdxmodrs) · [src/vss/mod.rs](#diagram_iosrcvssmodrs) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/windows.rs](#diagram_iosrcwindowsrs) · [src/xml.rs](#diagram_iosrcxmlrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
@@ -7846,7 +7846,11 @@ Model (SeModel, borrowed per call; world units are the canvas's, y down):
   SePoint { at, kind, tag, dir, flags }   SP_CONTROL (yellow), SP_CONN (connection points:
                       shown while connecting, with SeState::show_points those of every
                       visible shape, RA-06; SPF_OUTWARD: shown, no target), SP_VERTEX (shown
-                      for a single selection when the app lists them: vertex editing)
+                      for a single selection when the app lists them: vertex editing),
+                      (JD21) SP_SEGMENT (a midpoint of a connector's piece, a small diamond:
+                      dragged like a vertex, chosen by no click; dir = half the piece; shown
+                      while the piece is at least SEG_MIN DIP long on the screen; the pointer
+                      shows the move across it unless SPF_FREE)
   SeGuide { key, vertical, at }   guides (blue, dashed, across the canvas); moves snap to them
                       (SeState::snap and snap_guides; an app hides guides by leaving them out)
   SeMark { at, dir, tag, owner }  the app's insertion marks (Visio's blue triangle between two
@@ -7985,11 +7989,18 @@ SEF_UP: u32 = 0x8_0000
 SP_CONTROL: u8 = 0
 SP_CONN: u8 = 1
 SP_VERTEX: u8 = 2
+/// (JD21) a midpoint of a piece of a connector's way (Visio's midpoint handle): `dir` is half
+/// the piece (world, from the handle to the piece's end); dragging it reports SeEv::Point like a
+/// vertex; hidden (and not hit) while the piece is shorter than SEG_MIN DIP on the screen
+SP_SEGMENT: u8 = 3
 /// point flags (SePoint::flags)
 SPF_GLUE: u32 = 1  // a control point that glues to connection points (SP-04)
 /// a connection point that points outward only (Visio's Type 1): shown, but no end glues to it
 /// (SS-29)
 SPF_OUTWARD: u32 = 2
+/// (JD21) a midpoint that moves anywhere (a straight way: a new vertex); without it the
+/// pointer shows that the piece moves across
+SPF_FREE: u32 = 4
 ```
 
 - **`struct SeBox`**
@@ -57542,6 +57553,11 @@ a file loses nothing, and the behaviour Visio files carry works without translat
   tools::*                      (JD21) Visio's add-ons as tools (AS-11, RA-09): numbering
                                 shapes, arrays of copies, dimension lines glued or tied to
                                 the shapes they measure
+  route_styles::*               (JD21) the routing styles of page and connector with their
+                                directions (flowchart, tree, organization chart, simple ...;
+                                CN-05, SS-40), shapes connectors may cross (SS-19)
+  route_edit::*                 (JD21) a connector's way by hand: midpoints and vertices
+                                moved, added, removed, the way kept when its shapes move (CN-04)
 
 Rules that hold from the start: no std (only alloc), no unsafe code, nothing recalculated on
 opening a file (connectors, layout and containers move only when something moves), and a
@@ -60192,7 +60208,10 @@ as short and has as few bends as the cheapest one.  The straight style docks whe
 between the two ends leaves the outline.  Obstacles are the boxes of the page's top-level
 shapes that are not 1-D (route.rs keeps the page's LineToNodeX/Y as clearance, else 1/8 in).
 ConFixedCode 1 and 2 (reroute manually / never) keep the corners and only move the first and
-last pieces; reset() routes them anew.
+last pieces; reset() routes them anew.  (JD21) 1 is laid anew when the kept way runs through
+a shape (route_edit.rs); 3 .. 6 route freely (Visio writes them for the connectors it routes
+itself); the styles with a direction choose the sides (route_styles.rs); ShapePermeableX/Y let
+ways cross a shape (route::best_through).
 
 Nothing happens on its own: opening a file routes nothing, only the shapes handed to update.
 ```
@@ -60845,7 +60864,8 @@ Angenommen (no source says it; chosen here, the user's check in Visio may correc
 * Shapes that are not placeable (ObjType 0 without glue), fixed shapes (ShapeFixedCode &H7,
   LockMoveX/Y) and, for a selection, the placeable shapes outside it stay where they are and
   are kept clear: the laid-out drawing is shifted across past them.  A shape that encloses
-  all the moved ones (a frame) is no obstacle.  ObjType 4 shapes are ignored altogether.
+  all the moved ones (a frame) is no obstacle, (JD21) nor is one with ShapePermeablePlace
+  (shapes may be placed on top of it).  ObjType 4 shapes are ignored altogether.
 * The laid-out drawing keeps the corner of the moved shapes' box where the flow starts (top
   left for top to bottom, ...); separate parts (components) follow each other across the
   flow, in the order they had; placeable shapes without connections are parts of their own.
@@ -62450,6 +62470,11 @@ route -- the ways of connectors on the page: right angles around obstacles, stra
   best(&a_ports, &b_ports, &obstacles, &opts) -> (i, j, points)   the cheapest way between
                                      any two of the ports (a dynamic end offers one or two
                                      per side)
+  best_through(&a, &b, &obstacles, &pass, &opts)   (JD21, SS-19) the same; pass[k] says
+                                     which way the way may cross obstacle k (PASS_X across it
+                                     horizontally: ShapePermeableX; PASS_Y vertically)
+  hits_pass(p, q, &b, pass)          hits_box, but a horizontal (vertical) segment through a
+                                     box it may cross does not count
   straight(a, b) -> points           the line between the two ends
   cost(&points, &opts) / bends(&points) / length(&points)
   spline_knots(n) -> (degree, knots) a clamped uniform B-spline over n control points: the
@@ -62471,7 +62496,9 @@ How orthogonal finds its way (deterministic, no state between calls):
 3. A sparse grid: the x and y lines of the grown boxes, of the exit points and the lines
    halfway between the two ends' exits (so a Z bends in the middle, as Visio's do).  Grid
    points inside a grown box and grid edges through one are blocked; the lines of a grown box
-   itself stay open, so a way keeps exactly the clearance.
+   itself stay open, so a way keeps exactly the clearance.  (JD21) A box the way may cross
+   horizontally (vertically) blocks only its vertical (horizontal) edges and no grid point, so
+   a way runs straight through it but cannot turn inside it.
 4. A* over (grid point, direction of travel) with the cost length + bend * bends; the
    estimate is the Manhattan distance plus the fewest bends any way to a goal needs (from
    the direction of travel and the one the goal wants), so the way found is the cheapest.
@@ -62503,6 +62530,17 @@ How orthogonal finds its way (deterministic, no state between calls):
 - **`fn hits_box(p: [f64; 2], q: [f64; 2], b: &[f64; 4]) -> bool`**
   whether the segment p-q runs through the inside of box b (touching its edge is not)
 
+```rust
+/// (JD21, SS-19) a way may cross the obstacle horizontally (ShapePermeableX)
+PASS_X: u8 = 1
+/// (JD21, SS-19) a way may cross the obstacle vertically (ShapePermeableY)
+PASS_Y: u8 = 2
+```
+
+- **`fn hits_pass(p: [f64; 2], q: [f64; 2], b: &[f64; 4], pass: u8) -> bool`**
+  (JD21) whether the segment p-q runs through the inside of box b where it may not: a
+  horizontal segment through a box with PASS_X, a vertical one through a box with PASS_Y do not
+
 - **`fn length(points: &[[f64; 2]]) -> f64`**
   the length of a polyline
 
@@ -62527,6 +62565,244 @@ How orthogonal finds its way (deterministic, no state between calls):
   the cheapest right-angle route from any of the ports `a` to any of the ports `b` (one
   search: a dynamic end offers a port per side) -> the indices of the two ports and the
   route; both lists must not be empty
+
+- **`fn best_through(a: &[Port], b: &[Port], obstacles: &[[f64; 4]], pass: &[u8], opts: &Opts) -> (usize, usize, Vec<[f64; 2]>)`**
+  (JD21, SS-19) best() among obstacles the way may cross: `pass[k]` (PASS_X, PASS_Y; missing:
+  0) for obstacles[k]
+
+### `diagram_core/src/route_edit.rs`
+
+Source: [`lib/diagram_core/src/route_edit.rs`](../lib/diagram_core/src/route_edit.rs)
+
+```text
+route_edit -- (JD21, CN-04) the way of a dynamic connector by hand: the handles of a selected
+connector (a midpoint on every piece, a vertex at every bend), a piece moved across (right
+angles stay right angles; next to an end a jog keeps the end where it is), a bend moved, added
+and removed; the way kept afterwards when its shapes move
+
+  way(doc, c) -> Option<Way>        the corners of the drawn way on the page and whether it is
+                                    right-angled (None: no dynamic connector, curved, LockVtxEdit)
+  handles(doc, c) -> Vec<Handle>    the midpoints and vertices to show (page coordinates)
+  move_piece(&pts, i, to, right, stub, snap) / move_bend(&pts, j, ..) / add_bend(&pts, at)
+  / remove_bend(&pts, j, right, stub) -> new points        pure, the ends stay
+  edit(tx, eng, c, Edit, snap) -> changed   one of them on the connector: the way written,
+                                    ConFixedCode 1 (2 stays)
+  set_way(tx, eng, c, &pts)         a way written as given (ends must be the connector's)
+  reset(tx, eng, &connectors)       Verbinder zurücksetzen: ConFixedCode 1 -> 0, routed anew
+  kept(..) / kept_polyline(..)      (crate, glue::route_one) a kept way after its shapes moved
+
+Visio's rules -- belegt (Visio 2000 user's guide, chapter 6, "Working with routable connectors";
+support.microsoft.com "Edit connector lines, arrows, or points"; Microsoft Learn ConFixedCode):
+routable connectors show midpoints and vertices besides their endpoints; their paths are edited
+"by moving, adding, or deleting endpoints, midpoints, and vertices"; "to reroute a connector,
+select it, and then drag a midpoint to a new location"; vertices are added with Ctrl + click and
+deleted with Del after a click on them (the pencil tool, as for other shapes); ConFixedCode 1 is
+"reroute as needed (manual reroute)", 2 "never reroute", 3 "reroute on crossover", 4 .. 6
+"internal".  The local corpus: the connectors on the pages have 0 (from the style), 3, 4, 5 or 6
+(Visio writes them when it routes), never 1 or 2: they reroute freely here as before.
+
+Angenommen (the user's check in Visio may correct it):
+* A right-angle way: a midpoint moves its piece across only; where the piece meets the end, a
+  short stub (the routing clearance, at most a third of the piece) stays at the end and a jog
+  carries the moved piece (two new bends); a piece next to an end's stub cannot be dragged past
+  it.  A piece that comes within `snap` of the line of a parallel piece two further on, or of an
+  end, snaps to it, and the bends between them go (that is how bends are removed by dragging).
+  A vertex moves the two pieces at it.  Ctrl + click adds a vertex on the piece (a right-angle
+  way: the piece is split; drag the vertex or a half to make a step).  Del removes a vertex: on a
+  right-angle way with its neighbour, the jog between them flattened by moving the piece after
+  (or before) them onto the line of the piece before (after) -- not where that piece ends at an
+  end of the connector.
+* A straight way (straight, network, centre to centre): dragging a midpoint makes a new vertex
+  there; vertices move freely and are removed with Del.  Curved connectors have no handles.
+* A way edited by hand gets ConFixedCode 1 (Visio's "manual reroute"; 2 stays).  Kept ways (1,
+  2) keep their corners when their shapes move: the first and last pieces follow the ends, a
+  dynamic end stays on the side the way leaves by.  1 is laid anew when the kept way now runs
+  through a shape or an end piece would run back into its shape; 2 never.  Verbinder
+  zurücksetzen gives ConFixedCode 1 back as 0 and routes anew.
+```
+
+- **`struct Way`**
+  the drawn way of a connector by hand
+  - `pts: Vec<[f64; 2]>` -- its corners on the page, Begin first
+  - `right: bool` -- right angles (a right-angle style and every piece upright or level); else a polyline
+
+- **`struct Handle`**
+  a handle of a connector's way
+  - `at: [f64; 2]` -- where it is (page)
+  - `bend: bool` -- a vertex (true) or a piece's midpoint (false)
+  - `index: usize` -- the vertex's index into Way::pts, or the piece's (the piece from pts[index])
+  - `half: [f64; 2]` -- a midpoint: half the piece, from the handle to its end (page); a vertex: 0, 0
+  - `free: bool` -- a midpoint that moves anywhere (a straight way: a new vertex), not only across
+
+- **`enum Edit`**
+  one change by hand
+  - `Piece(usize, [f64; 2])` -- the piece from pts[i] moves (across, or a new vertex on a straight way) to `to`
+  - `Bend(usize, [f64; 2])` -- vertex pts[j] moves to `to`
+  - `Add([f64; 2])` -- a vertex on the piece nearest to the point
+  - `Remove(usize)` -- vertex pts[j] goes
+
+- **`fn orthogonal(pts: &[[f64; 2]]) -> bool`**
+  whether every piece is level or upright (pieces without length count as either)
+
+- **`fn way(doc: &Document, c: ShapeRef) -> Option<Way>`**
+  the way of a connector that can be edited by hand: a dynamic connector, not curved, not
+  locked against vertex edits (LockVtxEdit)
+
+- **`fn handles(doc: &Document, c: ShapeRef) -> Vec<Handle>`**
+  the handles a selected connector shows: a vertex at every bend, a midpoint on every piece
+
+- **`fn move_piece(pts: &[[f64; 2]], i: usize, to: [f64; 2], right: bool, stub: f64, snap: f64) -> Vec<[f64; 2]>`**
+  the way with piece i (from pts[i]) dragged to `to`: a right-angle way moves the piece across
+  (snapped within `snap`, jogs at the ends with stubs of `stub`), a straight one gets a vertex
+  at `to`
+
+- **`fn move_bend(pts: &[[f64; 2]], j: usize, to: [f64; 2], right: bool, stub: f64, snap: f64) -> Vec<[f64; 2]>`**
+  the way with vertex pts[j] dragged to `to`: on a right-angle way the two pieces at it move
+  across (at a vertex that only splits a piece: the piece after it), else the vertex moves
+
+- **`fn add_bend(pts: &[[f64; 2]], at: [f64; 2]) -> Option<Vec<[f64; 2]>>`**
+  the way with a new vertex on the piece nearest to `at` (where `at` falls onto it; a right-angle
+  way: the piece is split there) -> None: on a vertex or an end already
+
+- **`fn remove_bend(pts: &[[f64; 2]], j: usize, right: bool, stub: f64) -> Option<Vec<[f64; 2]>>`**
+  the way without vertex pts[j] (see the file header) -> None: it cannot go
+
+- **`fn set_way(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef, pts: &[[f64; 2]]) -> Result<(), EditError>`**
+  write a way into a connector as given (Begin first; the ends must be where the connector's
+  are) and mark it as the user's (ConFixedCode 1, unless it is 1 or 2 already)
+
+- **`fn edit(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef, e: Edit, snap: f64) -> Result<bool, EditError>`**
+  apply one change by hand to a connector's way (`snap`: how near a piece snaps to a line, in
+  drawing units) -> whether the way changed
+
+- **`fn reset(tx: &mut Transaction, eng: &mut Engine, connectors: &[ShapeRef]) -> Result<(), EditError>`**
+  Verbinder zurücksetzen: a way kept because it was edited by hand (ConFixedCode 1) is free
+  again (0); the connectors are routed anew with few bends
+
+### `diagram_core/src/route_styles.rs`
+
+Source: [`lib/diagram_core/src/route_styles.rs`](../lib/diagram_core/src/route_styles.rs)
+
+```text
+route_styles -- (JD21, CN-05, SS-40, SS-19) the routing styles of a page and of a connector with
+their directions, and the shapes connectors may cross
+
+  Kind, RouteStyle { kind, dir }      a style and its direction (organization chart, flowchart,
+                                      tree and simple have one; the others None)
+  RouteStyle::from_code(c) / code()   Visio's RouteStyle / ShapeRouteStyle codes 0 .. 22
+  RouteStyle::new(kind, dir)          (a direction where the style has none is dropped, one
+                                      where it needs one defaults to top to bottom)
+  of(doc, connector) -> RouteStyle    its ShapeRouteStyle, else its page's RouteStyle (0 and
+                                      unknown codes: right angle)
+  pass(doc, shape) -> u8              route::PASS_X | PASS_Y from ShapePermeableX / Y
+  permeable_place(doc, shape)         ShapePermeablePlace: a layout may place shapes on it
+                                      (layout::diagram leaves it out of the obstacles)
+  dynamics_off(doc, owner) -> bool    the page's DynamicsOff
+  plan(style, &a_ports, &b_ports, ..) (crate) the way of a style with a direction: the sides
+                                      the ends may use, the obstacles, where the bends go;
+                                      None: the plain right-angle search (glue::route_one)
+
+Visio's rules -- belegt (Microsoft Learn: the cells RouteStyle, ShapeRouteStyle, ConFixedCode,
+ShapePermeableX/Y/Place, DynamicsOff, CtrlAsInput, LineAdjustFrom/To, LineRouteExt; the archived
+Visio 2002 developer pages "Creating Routable and Other 1-D Connectors" and "Designing Shapes for
+Automatic Layout"; the Visio blog "Improved flowchart routing in Visio 2010"; the Visio 2000
+user's guide, chapter 6):
+* RouteStyle / ShapeRouteStyle: 0 default (right angle), 1 right angle, 2 straight,
+  3/4/10/11 organization chart top to bottom / left to right / bottom to top / right to left,
+  5/6/12/13 flowchart, 7/8/14/15 tree (the same four directions), 9 network, 16 centre to
+  centre, 17/18/19/20 simple (top to bottom, left to right, bottom to top, right to left),
+  21 simple horizontal-vertical, 22 simple vertical-horizontal.  ShapeRouteStyle 0 takes the
+  page's; "setting a connector's ShapeRouteStyle cell to 7 creates a routable connector that
+  always routes as if it's contained in a tree diagram in top-to-bottom orientation".
+* Flowchart top to bottom: connectors generally leave the bottom of the shape they come from and
+  reach the top of the one they go to; since Visio 2010 other sides where the two shapes are
+  close along the direction's axis; static glue keeps its points, only dynamic ends move.
+* ShapePermeableX / Y: TRUE lets connectors route horizontally / vertically through the
+  (placeable) shape.  ShapePermeablePlace: shapes may be placed on top of it by a layout
+  (layout.rs).  ObjType 4: routing behaves as if the shape did not exist (glue.rs).
+* DynamicsOff: TRUE turns off "placeable shapes move and connectors reroute around other shapes
+  and connectors".  CtrlAsInput: which shape is the parent of a control handle's glue -- not
+  routing, kept for Visio.  LineAdjustFrom (0 unrelated lines, 1 all, 2 none, 3 the routing
+  style's default) and LineAdjustTo (0 the routing style's default, 1 lines close to each
+  other, 2 none, 3 related lines): which connectors routed on top of each other are spaced
+  apart / lined up -- kept for Visio and shown in Seite einrichten, connectors here are not
+  spaced apart (open).  LineRouteExt / ConLineRouteExt: 0 default, 1 straight, 2 curved (the
+  appearance, glue.rs).
+* ConFixedCode: 0 reroute freely, 1 reroute as needed (manual reroute), 2 never reroute,
+  3 reroute on crossover, 4 .. 6 internal (route_edit.rs keeps a way by hand).  The local corpus
+  (two Visio drawings, 104 dynamic connectors): every page's RouteStyle and every
+  ShapeRouteStyle 0; ConFixedCode 0 (38, from the style), 3 (15), 4 (4), 5 (44), 6 (3), never 1
+  or 2; one style of each drawing has ShapePermeableX/Y/Place 1; so there are no stored ways of
+  the other styles to compare with (diagramiotest group route counts them).
+
+Angenommen (no source describes the ways; the user's check in Visio may correct it):
+* Straight (2), network (9) and centre to centre (16) draw one straight line, docked where the
+  line between the two shapes' middles leaves their outlines (as straight was before JD21).
+* A style with a direction names the side an end uses: the begin leaves its shape in the
+  direction (the bottom for top to bottom), the end comes into its shape against it (the top).
+  Organization chart and tree keep to these sides always (a way against the flow goes round);
+  flowchart only where the end's shape lies at least two clearances further along the
+  direction than the begin's, else the cheapest sides (Visio 2010's exception).  Static and
+  free ends keep their points whatever the style.
+* Organization chart bends halfway between the shapes (the bus in the middle); tree bends right
+  after the begin's shape (one clearance past it), so that the branches to all children share
+  the line under their parent; flowchart bends halfway.
+* Simple (17 .. 20) keeps to the sides like an organization chart but routes around nothing
+  but the two glued shapes; simple horizontal-vertical leaves the begin's shape on a left or
+  right side and comes into the end's from above or below (an L), vertical-horizontal the
+  other way round.
+* A 2-D shape's ShapeRouteStyle does not change the connectors glued to it (Visio lists the cell
+  for placeable shapes, its effect there is unknown).
+```
+
+- **`enum Kind`**
+  a routing style without its direction
+  - `RightAngle` -- right angles around obstacles (also the page default)
+  - `Straight` -- one straight line
+  - `OrgChart` -- right angles, the bend halfway, the sides of the direction always
+  - `Flowchart` -- right angles, the sides of the direction where the shapes lie along it
+  - `Tree` -- right angles, the bend right after the begin's shape, the sides of the direction always
+  - `Network` -- one straight line
+  - `Simple` -- the sides of the direction, around nothing but the glued shapes
+  - `SimpleHV` -- leave horizontally, arrive vertically, around nothing
+  - `SimpleVH` -- leave vertically, arrive horizontally, around nothing
+  - `CentreToCentre` -- one straight line between the middles
+
+**`impl Kind`**
+
+- **`fn directed(self) -> bool`**
+  whether the style has a direction
+- **`fn straight(self) -> bool`**
+  whether the style draws one straight line
+
+- **`struct RouteStyle`**
+  a routing style and its direction (Visio's RouteStyle / ShapeRouteStyle)
+  - `kind: Kind` -- the style
+  - `dir: Option<Dir>` -- the flow (directed kinds only)
+
+**`impl RouteStyle`**
+
+- **`const RIGHT_ANGLE: RouteStyle = RouteStyle { kind: Kind::RightAngle, dir: None }`**
+  right angles (RouteStyle 1)
+- **`fn new(kind: Kind, dir: Option<Dir>) -> RouteStyle`**
+  a style in a direction (dropped where the style has none; top to bottom where it needs one)
+- **`fn from_code(code: i64) -> Option<RouteStyle>`**
+  a RouteStyle / ShapeRouteStyle code (None: 0, the default, and unknown codes)
+- **`fn code(self) -> i64`**
+  its RouteStyle / ShapeRouteStyle code
+
+- **`fn of(doc: &Document, connector: ShapeRef) -> RouteStyle`**
+  the style a connector routes in: its own ShapeRouteStyle, else its page's RouteStyle
+
+- **`fn pass(doc: &Document, shape: ShapeRef) -> u8`**
+  how connectors may cross a shape: PASS_X (ShapePermeableX), PASS_Y (ShapePermeableY)
+
+- **`fn permeable_place(doc: &Document, shape: ShapeRef) -> bool`**
+  whether a layout may place shapes on top of the shape (ShapePermeablePlace)
+
+- **`fn dynamics_off(doc: &Document, owner: Owner) -> bool`**
+  whether the page turns dynamics off (DynamicsOff): connectors do not reroute around shapes
+  moved onto them
 
 ### `diagram_core/src/shapeops.rs`
 

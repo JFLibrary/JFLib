@@ -57,11 +57,12 @@ expect checkbox:"Gitternetz drucken" unchecked
 click checkbox:"Gitternetz drucken"
 # PG-11: hierarchy from left to right, deep, flipped vertically
 click tab:"Layout und Routing"
-expect combo:"Von oben nach unten" disabled
+# (JD21 route) the placement's direction by its id: the routing's direction shows the same text
+expect #25925 disabled
 click #25924
 click "Hierarchie"
-expect combo:"Von oben nach unten" enabled
-click combo:"Von oben nach unten"
+expect #25925 enabled
+click #25925
 click "Von links nach rechts"
 click #25926
 click "Tief"

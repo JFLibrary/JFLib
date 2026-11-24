@@ -80,7 +80,8 @@
 // * Shapes that are not placeable (ObjType 0 without glue), fixed shapes (ShapeFixedCode &H7,
 //   LockMoveX/Y) and, for a selection, the placeable shapes outside it stay where they are and
 //   are kept clear: the laid-out drawing is shifted across past them.  A shape that encloses
-//   all the moved ones (a frame) is no obstacle.  ObjType 4 shapes are ignored altogether.
+//   all the moved ones (a frame) is no obstacle, (JD21) nor is one with ShapePermeablePlace
+//   (shapes may be placed on top of it).  ObjType 4 shapes are ignored altogether.
 // * The laid-out drawing keeps the corner of the moved shapes' box where the flow starts (top
 //   left for top to bottom, ...); separate parts (components) follow each other across the
 //   flow, in the order they had; placeable shapes without connections are parts of their own.
@@ -518,6 +519,8 @@ pub fn diagram(doc: &Document, owner: Owner, only: &[ShapeRef]) -> Diagram {
                 d.nodes.push(s);
                 d.boxes.push(b);
             }
+            // (JD21, SS-19) ShapePermeablePlace: shapes may be placed on top of it
+            _ if crate::route_styles::permeable_place(doc, s) => {}
             _ => d.obstacles.push(b),
         }
     }
