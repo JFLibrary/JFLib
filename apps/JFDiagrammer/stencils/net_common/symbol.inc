@@ -14,3 +14,4 @@ TxtPinY = 0 mm
 TxtLocPinX = TxtWidth*0.5
 TxtLocPinY = TxtHeight
 VerticalAlign = 0
+ShapeSplit = 1

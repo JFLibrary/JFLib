@@ -1,0 +1,40 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD21: the quick shapes bar at the Verbindungspfeile (CN-07, SL-06, ZF-10) --
+# pointing at an arrow shows the active stencil's first four quick shapes beside it; pointing at
+# one shows the new shape and its connector half transparent at the page's spacing (a preview:
+# no undo step, gone when the pointer leaves); a click puts it there, connected and selected (one
+# undo step)
+click button:"Weitere Shapes"
+click "Allgemein"
+click "Standard-Shapes"
+drag button:"Rechteck" 560,300
+wait 600
+move 560,300
+move button:"Verbindungspfeil rechts"
+expect button:"Schnell-Shape: Rechteck" rect 625 241 28 28
+expect button:"Schnell-Shape: Abgerundetes Rechteck" exists
+expect button:"Schnell-Shape: Ellipse" exists
+expect button:"Schnell-Shape: Dreieck" exists
+expect button:"Schnell-Shape: Raute" missing
+# the live preview
+move button:"Schnell-Shape: Ellipse"
+expect listitem:"Ellipse" rect 629 275 76 50
+expect listitem:"Sheet.6" rect 610 297 19 6
+shot build/JFDiagrammer-autoconn-quick.png
+move 1000,700
+expect listitem:"Ellipse" missing
+expect listitem:"Sheet.6" missing
+expect button:"Schnell-Shape: Ellipse" missing
+# the click
+move 560,300
+move button:"Verbindungspfeil unten"
+expect button:"Schnell-Shape: Dreieck" exists
+move button:"Schnell-Shape: Dreieck"
+click button:"Schnell-Shape: Dreieck"
+a11y expect announced "„Dreieck“ abgelegt"
+expect listitem:"Dreieck" selected
+expect button:"Schnell-Shape: Dreieck" missing
+dump build/autoconn-quick.txt
+key ctrl+z
+expect listitem:"Dreieck" missing
+expect listitem:"Rechteck" exists

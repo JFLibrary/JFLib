@@ -12,7 +12,8 @@
 //   dropped(tx, eng, m, owner, shape)  a shape from the Shapes panel: a callout dropped on a
 //                                    shape takes it as its target; a lane dropped on the page
 //                                    brings its flowchart; then it joins where it lies
-//   delete(o, owner, shapes)         members and callouts go along; lists close the gap
+//   delete(o, owner, shapes)         members and callouts go along; lists close the gap;
+//                                    (JD21 autoconn) delete_healing: connectors too, the flow heals
 //   carried(doc, shapes)             what copies with a selection
 //   pasted(tx, eng, owner, shapes)   relationships to shapes left behind dropped, then settle
 //   click_through(doc, owner, top, p, tol)   a click inside a container's inner box reaches what
@@ -262,13 +263,27 @@ pub(crate) fn attach_callout(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef
 /// delete shapes with what they carry (members, callouts): the survivors let go of them, lists
 /// close the gap, glue to them ends
 pub(crate) fn delete(o: &mut crate::viewer::Opened, owner: Owner, shapes: &[ShapeRef]) -> Result<(), EditError> {
+    delete_healing(o, owner, shapes, false)
+}
+
+/// (JD21 autoconn, CN-09) delete as above; with `heal` (Optionen › Erweitert › Verbinder mit
+/// Shapes löschen) the connectors of the deleted shapes go too and the flow through them heals
+/// (diagram_core::autoconn::heal)
+pub(crate) fn delete_healing(o: &mut crate::viewer::Opened, owner: Owner, shapes: &[ShapeRef], heal: bool) -> Result<(), EditError> {
     if shapes.is_empty() {
         return Ok(());
     }
     let shapes: Vec<ShapeRef> = shapes.to_vec();
     edit_doc::edit(o, t("Löschen"), true, |tx, eng| {
         let all = structure::carried(tx.doc(), &shapes);
-        let keep: Vec<ShapeRef> = all.iter().copied().filter(|&s| !ops::locks(eng, tx.doc(), s).has(ops::Locks::DELETE)).collect();
+        let mut keep: Vec<ShapeRef> = all.iter().copied().filter(|&s| !ops::locks(eng, tx.doc(), s).has(ops::Locks::DELETE)).collect();
+        // (JD21 autoconn) the connectors that go along, the ones that now join the flow
+        let healed = if heal { diagram_core::autoconn::heal(tx, eng, owner, &keep)? } else { diagram_core::autoconn::Healed::default() };
+        for c in healed.gone {
+            if !keep.contains(&c) && !ops::locks(eng, tx.doc(), c).has(ops::Locks::DELETE) {
+                keep.push(c);
+            }
+        }
         // the containers that stay: sized again once the members are gone
         let around: Vec<ShapeRef> = {
             let doc = tx.doc();
@@ -283,6 +298,7 @@ pub(crate) fn delete(o: &mut crate::viewer::Opened, owner: Owner, shapes: &[Shap
         let around: Vec<ShapeRef> = around.into_iter().filter(|&c| tx.doc().shape(c).is_some()).collect();
         let mut more = structure::settle(tx, eng, owner, &around, false)?;
         more.extend(moved.into_iter().filter(|&s| tx.doc().shape(s).is_some()));
+        more.extend(healed.joined.into_iter().filter(|&s| tx.doc().shape(s).is_some()));
         if !more.is_empty() {
             edit_canvas::follow(tx, eng, owner, &more)?;
         }

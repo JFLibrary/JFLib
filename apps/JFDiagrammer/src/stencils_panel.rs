@@ -10,7 +10,10 @@
 //   TILE_MENU(_OWN), TITLE_MENU the context menus: a tile's rows act on Stencils::menu_tile
 //                               (stencils::command), a title's commands on the stencil whose title
 //                               was clicked (it becomes the active one)
+//   tile_draw(app, key, k)      (JD21 autoconn) a tile's preview for the quick shapes bar
 //
+// (JD21 autoconn, SL-03) Ctrl+click marks several tiles (drawn armed; autoconn::mark), a drag of
+// one of them drops them all; the dragged tile is known while it is over the canvas (its glow).
 // The previews are the shapes themselves (SH-G03: "aus dem Shape gerendert"), in the
 // document's colours, the same for the built-in stencils, the user's own and those of other
 // programs; the icons inside the .vssx are for Visio.
@@ -180,6 +183,12 @@ impl Draw for TileDraw {
     }
 }
 
+/// (JD21 autoconn) the preview of tile k of stencil `key` as the panel draws it (the quick
+/// shapes bar at the Verbindungspfeile)
+pub(crate) fn tile_draw(app: &mut Diagrammer, key: u32, k: usize) -> Option<DrawRef> {
+    previews(app, key).and_then(|p| p.draw(k))
+}
+
 // the previews of stencil `key` (made on first use)
 fn previews(app: &mut Diagrammer, key: u32) -> Option<Rc<Previews>> {
     let fonts = &mut app.fonts;
@@ -235,6 +244,8 @@ pub(crate) fn panel(app: &mut Diagrammer, ui: &mut Ui) {
         pv.push((k, previews(app, k)));
     }
     let armed = app.stencils.armed;
+    // (JD21 autoconn, SL-03) the tiles marked with Ctrl show armed too
+    let multi = app.autoconn.multi.clone();
     let tile = |l: &Loaded, k: usize, p: Option<&Rc<Previews>>| -> TileText {
         let e = &l.entries[k];
         TileText {
@@ -242,7 +253,7 @@ pub(crate) fn panel(app: &mut Diagrammer, ui: &mut Ui) {
             k,
             name: String::from(e.texts.name(lang)),
             tip: String::from(e.texts.prompt(lang)),
-            flags: if e.texts.quick { TL_QUICK } else { 0 } | if armed == Some((l.key, k)) { TL_ARMED } else { 0 },
+            flags: if e.texts.quick { TL_QUICK } else { 0 } | if armed == Some((l.key, k)) || multi.contains(&(l.key, k)) { TL_ARMED } else { 0 },
             draw: p.and_then(|p| p.draw(k)),
             ver: l.serial.wrapping_mul(0x9E37_79B9) ^ k as u32,
         }
@@ -312,9 +323,12 @@ fn handle(app: &mut Diagrammer, ui: &mut Ui, ev: StencilEvent) {
     match ev {
         StencilEvent::Activate { stencil, tile } => {
             // click + click (SL-03): the tile is armed until a click on the page, Esc or a
-            // second click on it
+            // second click on it; (JD21 autoconn) Ctrl+click marks several for one drag
             let t = (stencil, tile as usize);
-            st.armed = if st.armed == Some(t) { None } else { Some(t) };
+            if !crate::autoconn::mark(app, ui, stencil, tile as usize) {
+                let st = &mut app.stencils;
+                st.armed = if st.armed == Some(t) { None } else { Some(t) };
+            }
             ui.repass();
         }
         StencilEvent::Place { stencil, tile } => {
@@ -341,10 +355,12 @@ fn handle(app: &mut Diagrammer, ui: &mut Ui, ev: StencilEvent) {
             st.more_at = Some(at);
             ui.menu_popup_at(i18n::menu(&stencils::MORE_MENU), at[0], at[1]);
         }
-        StencilEvent::DragStart { .. } => {
+        StencilEvent::DragStart { stencil, tile } => {
             st.armed = None;
+            // (JD21 autoconn) the dragged tile (the glow on the canvas), marked ones with it
+            crate::autoconn::drag_start(app, stencil, tile as usize);
         }
-        _ => {}
+        StencilEvent::DragEnd => app.autoconn.dragging = None,
     }
 }
 

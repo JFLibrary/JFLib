@@ -29,6 +29,11 @@
 // (ZF-08, Diagrammer::page_views).  Ctrl + Shift + drag copies the selection (SeEv::MoveCopy,
 // KB-09); the marquee takes touched shapes with Optionen › Erweitert › Teilweise umschlossene
 // Shapes auswählen (ZF-06).
+// (JD21 autoconn) A shape moved onto a connector splits it when released (the connector is found
+// with the drawing before the move, it glows meanwhile), Del heals the flow (Verbinder mit Shapes
+// löschen), the connector tool draws the master marked in the Shapes panel and gives way to the
+// pointer after one connector when it was chosen "once", the quick shapes bar at the arrows
+// (SeEv::Quick, QuickHover) places and previews (autoconn.rs).
 
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -119,7 +124,8 @@ pub(crate) struct Model {
 /// the tool of the active command
 pub(crate) fn tool_of(app: &Diagrammer) -> u32 {
     // (JD9) a tile of the Shapes panel armed: the next click places it (stencils_drop.rs)
-    if app.stencils.armed.is_some() {
+    // (JD21 autoconn, CN-16) not a 1-D master with the connector tool: that is what it draws
+    if app.stencils.armed.is_some() && crate::autoconn::tool_master(app).is_none() {
         return SE_PLACE;
     }
     match app.tool {
@@ -470,6 +476,8 @@ pub(crate) fn canvas(app: &mut Diagrammer, ui: &mut Ui, id: u32, menu: impl FnOn
     // the edit layer; (JD10) the insert triangles of the lists
     let marks = crate::structures::marks(app);
     app.se.arrows = app.structs.arrows && app.opts.get(&crate::options::CONNECT_ARROWS);
+    // (JD21 autoconn) the quick shapes bar at the arrows
+    crate::autoconn::quick_tiles(app);
     let tool = tool_of(app);
     let evs = {
         let m = &app.model;
@@ -497,6 +505,8 @@ pub(crate) fn canvas(app: &mut Diagrammer, ui: &mut Ui, id: u32, menu: impl FnOn
     // (JD10) the selection's order, the glow of a container under a dragged shape
     crate::structures::sync_order(app);
     crate::structures::overlay(app, ui);
+    // (JD21 autoconn) the connector a moved shape would split
+    crate::autoconn::overlay(app, ui);
     menu(app, ui);
     // one record per shape and per handle (scripts, screen readers)
     {
@@ -900,6 +910,9 @@ pub(crate) fn apply(app: &mut Diagrammer, ui: &mut Ui, ev: SeEv) {
     match ev {
         SeEv::Arrow { key, dir } => return crate::structures_cmds::arrow(app, ui, key, dir),
         SeEv::Mark { tag } => return crate::structures::insert_at(app, ui, tag),
+        // (JD21 autoconn) the quick shapes bar at an arrow: its preview, its click
+        SeEv::Quick { key, dir, tile } => return crate::autoconn::quick(app, ui, key, dir, tile),
+        SeEv::QuickHover { key, dir, tile } => return crate::autoconn::quick_hover(app, ui, key, dir, tile),
         _ => {}
     }
     let (Some(geo), Some(page)) = (app.model.geo, app.model.page) else { return };
@@ -908,14 +921,29 @@ pub(crate) fn apply(app: &mut Diagrammer, ui: &mut Ui, ev: SeEv) {
     let mut select: Option<Vec<u64>> = None;
     // (JD18, SP-13) the copies of Ctrl + Shift + drag ask for their fields
     let mut copied: Vec<ShapeRef> = Vec::new();
+    // (JD21 autoconn) splitting and healing (the options), the connector tool's master, the
+    // connector a move would split, a connector drawn
+    let (splits, heal, conn_master) = (crate::autoconn::split_on(app), crate::autoconn::heal_on(app), crate::autoconn::tool_master(app));
+    let mut hint: Option<Option<ShapeRef>> = None;
+    let mut drawn = false;
     let Some(o) = app.opened.as_mut() else { return };
     let r: Result<(), diagram_core::EditError> = match ev {
         SeEv::Select => Ok(()),
         SeEv::Move { keys, total, done } => {
             let shapes = refs(&keys);
             let d = geo.page_vec(total);
-            // (JD10) members and callouts come along; released: containers, lists
-            edit_doc::edit(o, t("Verschieben"), done, |tx, eng| crate::structures::move_shapes(tx, eng, owner, &shapes, d, done))
+            // (JD10) members and callouts come along; released: containers, lists; (JD21
+            // autoconn) one shape onto a connector: found with the drawing before the move,
+            // split when released
+            let r = edit_doc::edit(o, t("Verschieben"), done, |tx, eng| {
+                let c = if splits { crate::autoconn::move_target(tx.doc(), owner, &shapes, d) } else { None };
+                crate::structures::move_shapes(tx, eng, owner, &shapes, d, done)?;
+                if done {
+                    crate::autoconn::moved(tx, eng, owner, &shapes, c)?;
+                }
+                Ok(c)
+            });
+            r.map(|c| hint = Some(if done { None } else { c }))
         }
         // (JD15, KB-09) Ctrl + Shift + drag: a copy of the selection (with its members and
         // callouts, as Duplizieren) goes `total` from it.  While dragging, the selection itself
@@ -1030,9 +1058,14 @@ pub(crate) fn apply(app: &mut Diagrammer, ui: &mut Ui, ev: SeEv) {
             let (pa, pb) = (geo.page(a), geo.page(b));
             let (ta, tb) = (target_of(page, ga), target_of(page, gb));
             let label = if tool == SE_CONNECT { t("Verbinder") } else { t("Linie") };
-            match edit_doc::edit(o, label, true, |tx, eng| if tool == SE_CONNECT { glue::new_connector(tx, eng, owner, (pa, ta), (pb, tb)) } else { glue::new_line(tx, eng, owner, (pa, ta), (pb, tb)) }) {
+            // (JD21 autoconn, CN-16) the connector tool draws the connector master marked in the
+            // Shapes panel
+            let st = &app.stencils;
+            let master = conn_master.and_then(|(key, k)| st.entry(key, k)).map(|(l, e)| (&l.doc, e.master));
+            match edit_doc::edit(o, label, true, |tx, eng| if tool == SE_CONNECT { crate::autoconn::connector(tx, eng, owner, (pa, ta), (pb, tb), master) } else { glue::new_line(tx, eng, owner, (pa, ta), (pb, tb)) }) {
                 Ok(s) => {
                     select = Some(alloc::vec![key_of(s)]);
+                    drawn = tool == SE_CONNECT;
                     Ok(())
                 }
                 Err(e) => Err(e),
@@ -1092,7 +1125,9 @@ pub(crate) fn apply(app: &mut Diagrammer, ui: &mut Ui, ev: SeEv) {
         SeEv::Context { .. } => Ok(()),
         SeEv::Delete => {
             let shapes = refs(&app.se.sel.iter().copied().collect::<Vec<_>>());
-            let r = delete(o, owner, &shapes);
+            // (JD21 autoconn, CN-09) Verbinder mit Shapes löschen: the connectors go along, the
+            // flow heals
+            let r = crate::structures::delete_healing(o, owner, &shapes, heal);
             if r.is_ok() {
                 select = Some(Vec::new());
             }
@@ -1103,6 +1138,13 @@ pub(crate) fn apply(app: &mut Diagrammer, ui: &mut Ui, ev: SeEv) {
     if let Err(e) = r {
         // a refused edit (a locked or guarded cell): the drawing stays as it was
         let _ = e;
+    }
+    // (JD21 autoconn) the glow of a move's connector; the tool "once" after its connector
+    if let Some(h) = hint {
+        app.autoconn.hint = h;
+    }
+    if drawn {
+        crate::autoconn::connected(app);
     }
     if let Some(keys) = select {
         app.se.select(&keys);

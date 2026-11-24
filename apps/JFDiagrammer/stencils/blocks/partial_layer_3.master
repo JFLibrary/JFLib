@@ -32,6 +32,7 @@ TxtPinX = Width*(1+User.K)*0.35355339
 TxtPinY = Height*(1+User.K)*0.35355339
 TxtLocPinX = TxtWidth*0.5
 TxtLocPinY = TxtHeight*0.5
+ShapeSplit = 1
 
 [User]
 # der Innenradius als Anteil des Außenradius, die Halbachsen des Innenbogens

@@ -390,6 +390,9 @@ commands! {
     DIAGRAM_ROTATE_RIGHT = 0x1C57, "Diagramm um 90° nach rechts drehen", JD_ROTATE_RIGHT, 0;
     DIAGRAM_FLIP_V = 0x1C58, "Diagramm vertikal spiegeln", JD_FLIP_V, 0;
     DIAGRAM_FLIP_H = 0x1C59, "Diagramm horizontal spiegeln", JD_FLIP_H, 0;
+    // (JD21 autoconn) the connector tool for one connector, then the pointer (CN-11; the
+    // shape's menu, JD22's mini toolbar)
+    CONNECTOR_ONCE = 0x1C60, "Einen Verbinder zeichnen", JD_CONNECTOR, 0;
 }
 
 /// a command's handler: what it does (the function behind it exists)
@@ -652,6 +655,8 @@ static HANDLERS: &[(u32, Handler)] = &[
     (DIAGRAM_ROTATE_RIGHT, |a, ui| crate::layout_cmds::turn(a, ui, diagram_core::layout::Turn::Right)),
     (DIAGRAM_FLIP_V, |a, ui| crate::layout_cmds::turn(a, ui, diagram_core::layout::Turn::FlipV)),
     (DIAGRAM_FLIP_H, |a, ui| crate::layout_cmds::turn(a, ui, diagram_core::layout::Turn::FlipH)),
+    // (JD21 autoconn) Verbinder (einmal) (autoconn.rs)
+    (CONNECTOR_ONCE, crate::autoconn::once),
 ];
 
 // toggles: whether the command is on

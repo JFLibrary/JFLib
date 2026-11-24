@@ -92,8 +92,10 @@ pub(crate) fn cut(app: &mut Diagrammer, ui: &mut Ui) {
     app.clip_offset = 0;
     let shapes = selected(app);
     let ow = owner(app);
+    // (JD21 autoconn, CN-09) Verbinder mit Shapes löschen
+    let heal = crate::autoconn::heal_on(app);
     let (Some(o), Some(ow)) = (app.opened.as_mut(), ow) else { return };
-    if edit_canvas::delete(o, ow, &shapes).is_ok() {
+    if crate::structures::delete_healing(o, ow, &shapes, heal).is_ok() {
         app.se.select(&[]);
     }
     ui.repass();
@@ -111,10 +113,13 @@ pub(crate) fn paste(app: &mut Diagrammer, ui: &mut Ui) {
     let step = if app.canvas.grid > 0.0 { app.canvas.grid } else { 16.0 };
     let n = app.clip_offset as f32;
     let d = geo.page_vec([step * n, step * n]);
+    // (JD21 autoconn, CN-08) one shape pasted onto a connector splits it
+    let rules = crate::autoconn::DropRules { split: crate::autoconn::split_on(app), chain: None };
     let r = match app.opened.as_mut() {
         Some(o) => edit_doc::edit(o, t("Einfügen"), true, |tx, eng| {
             let new = ops::paste(tx, eng, ow, &clip, d)?;
             crate::structures::pasted(tx, eng, ow, &new)?;
+            crate::autoconn::dropped(tx, eng, ow, &new, &rules)?;
             Ok(new)
         }),
         None => Ok(Vec::new()),

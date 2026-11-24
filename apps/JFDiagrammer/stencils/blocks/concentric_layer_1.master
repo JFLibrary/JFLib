@@ -33,6 +33,7 @@ TxtPinX = Width*0.5
 TxtPinY = Height*(3+User.K)*0.25
 TxtLocPinX = TxtWidth*0.5
 TxtLocPinY = TxtHeight*0.5
+ShapeSplit = 1
 
 [User]
 # der Innendurchmesser als Anteil des äußeren

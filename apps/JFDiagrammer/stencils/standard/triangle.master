@@ -22,6 +22,7 @@ Width = 30 mm
 Width.us = 1.25 in
 Height = 26 mm
 Height.us = 1 in
+ShapeSplit = 1
 
 [User]
 Apex:  Value = MIN(MAX(Controls.Row_1, 0), Width)

@@ -9,6 +9,13 @@
 //                               runs SE_PLACE while one is armed (edit_canvas::tool_of)
 //   place_center(app, ui, key, k)   the shape in the middle of the view
 //
+// (JD21 autoconn) A shape dropped on a connector splits it and the shapes after it make room
+// (CN-08), with the connector tool it is connected to the shape selected before (CN-10), the
+// page's PlowCode pushes shapes away (autoconn::dropped, before the connectors follow); several
+// tiles marked with Ctrl are dropped together (autoconn::place_many); while a tile is dragged
+// over the canvas, the containers it would join and the connector it would split glow
+// (autoconn::drag_over).
+//
 // Each drop is one edit of the drawing (edit_doc::edit, JD7: one undo step, the drawing's
 // formula engine): the master is taken into the drawing if it is not there
 // (instance::import_master, matched by UniqueID), the instance goes to the point
@@ -34,18 +41,29 @@ pub(crate) const DT_SHAPE: u32 = DT_USER0 << 2;
 
 /// right after ui.diagram (its rectangle is the last one): drops of tiles; Esc disarms
 pub(crate) fn drop_target(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
-    if ui.drop_target(id, DT_SHAPE) == DS_DROP {
+    let ds = ui.drop_target(id, DT_SHAPE);
+    // (JD21 autoconn, SL-03) a master dragged over the canvas: what it would join or split glows
+    if ds == DS_HOVER {
+        crate::autoconn::drag_over(app, ui);
+    }
+    if ds == DS_DROP {
         let d = ui.drop_data();
         if d.app & DT_SHAPE != 0 {
             if let Some((key, k)) = stencil_drag_decode(&d.bytes) {
                 let (x, y) = ui.drop_pos_px();
                 let at = app.canvas.vp.to_world(x as f32, y as f32);
-                place_world(app, ui, key, k as usize, at);
+                // (JD21 autoconn, SL-03) one of several tiles marked with Ctrl: all of them
+                match crate::autoconn::many(app, key, k as usize) {
+                    Some(tiles) => crate::autoconn::place_many(app, ui, &tiles, at),
+                    None => place_world(app, ui, key, k as usize, at),
+                }
             }
         }
     }
     if app.stencils.armed.is_some() && ui.key(VK_ESCAPE) {
         app.stencils.armed = None;
+        // (JD21 autoconn) the tiles marked with Ctrl too
+        app.autoconn.multi.clear();
         ui.repass();
     }
 }
@@ -53,7 +71,11 @@ pub(crate) fn drop_target(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
 /// the click of an armed tile at world point `at`; Shift keeps the tile armed for the next one
 pub(crate) fn clicked(app: &mut Diagrammer, ui: &mut Ui, at: [f32; 2]) {
     let Some((key, k)) = app.stencils.armed else { return };
-    place_world(app, ui, key, k, at);
+    // (JD21 autoconn, SL-03) several tiles marked with Ctrl: all of them
+    match crate::autoconn::many(app, key, k) {
+        Some(tiles) => crate::autoconn::place_many(app, ui, &tiles, at),
+        None => place_world(app, ui, key, k, at),
+    }
     if ui.mods() & MOD_SHIFT == 0 {
         app.stencils.armed = None;
     }
@@ -71,6 +93,8 @@ pub(crate) fn place_center(app: &mut Diagrammer, ui: &mut Ui, key: u32, k: usize
 fn place_world(app: &mut Diagrammer, ui: &mut Ui, key: u32, k: usize, at: [f32; 2]) {
     let (Some(geo), Some(page)) = (app.model.geo, app.model.page) else { return };
     let [x, y] = geo.page(at);
+    // (JD21 autoconn) on a connector it splits it, the connector tool chains (CN-08, CN-10)
+    let rules = crate::autoconn::drop_rules(app);
     let lang = crate::stencils::lang();
     let st = &app.stencils;
     let Some((l, e)) = st.entry(key, k) else { return };
@@ -85,6 +109,8 @@ fn place_world(app: &mut Diagrammer, ui: &mut Ui, key: u32, k: usize, at: [f32; 
         let mut sheets = Vec::new();
         collect(tx.doc(), shape, &mut sheets);
         eng.recalc(tx, &sheets)?;
+        // (JD21 autoconn) before the connectors follow (they would route around it)
+        crate::autoconn::dropped(tx, eng, Owner::Page(page), &[shape], &rules)?;
         edit_canvas::follow(tx, eng, Owner::Page(page), &[shape])?;
         // (JD10) it joins the containers it lies in, a callout ties to the shape under it
         crate::structures::dropped(tx, eng, &masters, Owner::Page(page), shape)?;

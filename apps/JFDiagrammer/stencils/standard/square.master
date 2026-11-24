@@ -23,6 +23,7 @@ Width.us = 1.25 in
 Height = 30 mm
 Height.us = 1.25 in
 LockAspect = TRUE
+ShapeSplit = 1
 
 [Geometry]
 MoveTo  X = 0; Y = 0
