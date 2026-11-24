@@ -109,7 +109,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [doc_io](#doc_io) -- conservative DOCX interchange and bounded file I/O
   <br>[lib.rs](#doc_io-crate-root) · [bibliography.rs](#doc_iobibliographyrs) · [bibtex.rs](#doc_iobibtexrs) · [clipboard.rs](#doc_ioclipboardrs) · [html_import.rs](#doc_iohtml_importrs) · [fragment.rs](#doc_iofragmentrs) · [exchange.rs](#doc_ioexchangers) · [library.rs](#doc_iolibraryrs) · [preservation.rs](#doc_iopreservationrs) · [preserved_text.rs](#doc_iopreserved_textrs) · [ris.rs](#doc_iorisrs) · [preserved_stories.rs](#doc_iopreserved_storiesrs)
 - [diagram_core](#diagram_core) -- the diagram model: ShapeSheet cells, formulas, geometry, routing and layout
-  <br>[src/autoconn.rs](#diagram_coresrcautoconnrs) · [src/cell.rs](#diagram_coresrccellrs) · [src/data.rs](#diagram_coresrcdatars) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/dock.rs](#diagram_coresrcdockrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/field.rs](#diagram_coresrcfieldrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/layout.rs](#diagram_coresrclayoutrs) · [src/layout/adjust.rs](#diagram_coresrclayoutadjustrs) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/draw.rs](#diagram_coresrcopsdrawrs) · [src/ops/picture.rs](#diagram_coresrcopspicturers) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/pagesetup.rs](#diagram_coresrcpagesetuprs) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/jumps.rs](#diagram_coresrcrenderjumpsrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/route.rs](#diagram_coresrcrouters) · [src/shapeops.rs](#diagram_coresrcshapeopsrs) · [src/shapeops/frame.rs](#diagram_coresrcshapeopsframers) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/tools.rs](#diagram_coresrctoolsrs) · [src/tools/array.rs](#diagram_coresrctoolsarrayrs) · [src/tools/dimension.rs](#diagram_coresrctoolsdimensionrs) · [src/tools/number.rs](#diagram_coresrctoolsnumberrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
+  <br>[src/autoconn.rs](#diagram_coresrcautoconnrs) · [src/cell.rs](#diagram_coresrccellrs) · [src/data.rs](#diagram_coresrcdatars) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/dock.rs](#diagram_coresrcdockrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/field.rs](#diagram_coresrcfieldrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/groups.rs](#diagram_coresrcgroupsrs) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/instance/detach.rs](#diagram_coresrcinstancedetachrs) · [src/layout.rs](#diagram_coresrclayoutrs) · [src/layout/adjust.rs](#diagram_coresrclayoutadjustrs) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/draw.rs](#diagram_coresrcopsdrawrs) · [src/ops/picture.rs](#diagram_coresrcopspicturers) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/pagesetup.rs](#diagram_coresrcpagesetuprs) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/jumps.rs](#diagram_coresrcrenderjumpsrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/replace.rs](#diagram_coresrcreplacers) · [src/route.rs](#diagram_coresrcrouters) · [src/shapeops.rs](#diagram_coresrcshapeopsrs) · [src/shapeops/frame.rs](#diagram_coresrcshapeopsframers) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/edge.rs](#diagram_coresrcstructureedgers) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/tools.rs](#diagram_coresrctoolsrs) · [src/tools/array.rs](#diagram_coresrctoolsarrayrs) · [src/tools/dimension.rs](#diagram_coresrctoolsdimensionrs) · [src/tools/number.rs](#diagram_coresrctoolsnumberrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
 - [diagram_io](#diagram_io) -- Visio file formats (the VSDX family) and diagram exports
   <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/data.rs](#diagram_iosrcdatars) · [src/props.rs](#diagram_iosrcpropsrs) · [src/stencil.rs](#diagram_iosrcstencilrs) · [src/template.rs](#diagram_iosrctemplaters) · [src/textdraw.rs](#diagram_iosrctextdrawrs) · [src/vdx/mod.rs](#diagram_iosrcvdxmodrs) · [src/vss/mod.rs](#diagram_iosrcvssmodrs) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/windows.rs](#diagram_iosrcwindowsrs) · [src/xml.rs](#diagram_iosrcxmlrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
@@ -7875,9 +7875,10 @@ SeEv::Arc; both start and end glued to connection points like the line tool (CN-
 Input (pointer tool): a press on a handle of the selection starts its drag; on a shape it
 selects it (Shift adds, Ctrl toggles) and a drag moves the selection (grid, dynamic grid,
 guides; Alt: free); a second, slow click on a selected group selects the child under the
-pointer; a double click edits the text (SeEv::Text); on the background a drag draws a marquee
-or, with SeState::lasso, a free outline (shapes fully inside, with SeState::partial also those
-it touches, ZF-06; Shift adds, Ctrl toggles).  Corner handles keep the aspect ratio, edge
+pointer, on a selected child with SEF_UP its group (Visio's "members first"); a double click
+edits the text (SeEv::Text); on the background a drag draws a marquee or, with
+SeState::lasso, a free outline (shapes fully inside, with SeState::partial also those it
+touches, ZF-06; Shift adds, Ctrl toggles).  Corner handles keep the aspect ratio, edge
 handles change one side (a locked aspect: both), Ctrl resizes about the middle; locked handles
 are drawn grey and do nothing.  The rotation handle turns about the pin (one shape) or the
 middle of the selection: in 15-degree steps near the shape, in single degrees farther away.
@@ -7977,6 +7978,9 @@ SEF_END_DYN: u32 = 0x8000
 SEF_LOCK_PIN: u32 = 0x1_0000  // no rotation pin handle
 SEF_NOARROWS: u32 = 0x2_0000  // no connection arrows around it (see the file header)
 SEF_NOSNAP: u32 = 0x4_0000  // moves do not snap to it (the dynamic grid leaves it out)
+/// (JD21) a member of a "members first" group: a second, slow click on it selects its group
+/// (SeShape::parent)
+SEF_UP: u32 = 0x8_0000
 /// kinds of SePoint
 SP_CONTROL: u8 = 0
 SP_CONN: u8 = 1
@@ -57519,6 +57523,11 @@ a file loses nothing, and the behaviour Visio files carry works without translat
                                 Fragmentieren, Schneiden, Subtrahieren (SP-08) on geom's plane
                                 Booleans, arcs rebuilt as arcs; fit_frame (the box follows the
                                 geometry after vertex edits, SP-05), update_alignment_box (SP-16)
+  groups::*                     (JD21) group behaviour: SelectMode and the other Group
+                                Properties, Zu Gruppe hinzufügen / Aus Gruppe entfernen,
+                                dropping into a group, the ungroup warning (SS-17, SP-06, RS-27)
+  replace::*                    (JD21) Shape ändern: shapes replaced by a master's instance,
+                                text, data, format, glue kept (SP-11, Change Shape Behavior)
   field::*                      (JD8) text fields: a Field row's value in its format picture,
                                 new fields, the text with its fields, the document's
                                 properties (Document::fields: the app's locale and clock)
@@ -60276,6 +60285,154 @@ Nothing happens on its own: opening a file routes nothing, only the shapes hande
   give these connectors a style (ShapeRouteStyle and ConLineRouteExt: right angle 1/1,
   straight 16/1, curved 1/2) and route them anew
 
+### `diagram_core/src/groups.rs`
+
+Source: [`lib/diagram_core/src/groups.rs`](../lib/diagram_core/src/groups.rs)
+
+```text
+groups -- (JD21) how groups behave (SS-17, SP-06, SP-17, RS-27): the cells of the Group
+Properties section, Zu Gruppe hinzufügen / Aus Gruppe entfernen, shapes dropped into a group,
+the warning before a group is taken apart that formulas or a master bind
+
+  props(doc, g) -> Props               SelectMode, DisplayMode, IsDropTarget, IsSnapTarget,
+                                       IsTextEditTarget, DontMoveChildren (Visio's values when
+                                       a cell is missing)
+  set_props(tx, eng, g, &props)        the six cells written (constants, Behavior dialog)
+  is_drop_source(doc, s) / set_drop_source(tx, eng, s, on)   IsDropSource (Miscellaneous)
+  double_click_opens(doc, g) / set_double_click_opens(tx, eng, g, on)   EventDblClick
+                                       OPENGROUPWIN() (Verhalten › Doppelklicken)
+  text_target(doc, s) -> ShapeRef      where typing into a group goes (IsTextEditTarget)
+  drop_target_at(doc, owner, p, skip)  the group a shape dropped at page point p joins
+  dropped(tx, eng, owner, shapes)      shapes that may (IsDropSource) dropped onto a group
+                                       that takes them (IsDropTarget) join it
+  add_to_group(tx, eng, g, shapes)     Zu Gruppe hinzufügen: the shapes into the group, where
+                                       they are on the page, the group's box around them
+  remove_from_group(tx, eng, shapes)   Aus Gruppe entfernen: members out to the group's parent,
+                                       just above the group, where they are on the page
+  ungroup_warning(doc, g) -> Option<Warning>   what ungrouping loses (a master, formulas)
+  guide_glue(tx, eng, owner, shapes)   (SP-17) glue between a guide and shapes breaks unless
+                                       both go into a group
+  reparent(tx, eng, s, to, pos)        a shape into another parent, its place on the page kept
+
+Visio's rules (belegt: learn.microsoft.com, cells of the Group Properties section, IsDropSource,
+"Controlling the Behavior of Groups" of the Visio 2002 developer reference, the Behavior dialog
+box on support.microsoft.com, Selection.AddToGroup / RemoveFromGroup / ConvertToGroup, the
+Visio User's Guide ch. 4 "Working with shapes in groups"):
+* SelectMode 0: a click selects the group only; 1 (default): the group first, a later click a
+  member; 2: the member under the pointer first, a later click the group ("click the bounding
+  box to select the group itself"); nested groups follow the selected group's mode.
+* DisplayMode 0 hides the group's own geometry and text, 1 draws it behind the members, 2 (the
+  default) in front (render.rs since JD4).
+* IsDropTarget (Accept dropped shapes) takes a dropped shape only when the shape's IsDropSource
+  (Add shape to groups on drop) is set too; both default to FALSE.
+* IsSnapTarget (Snap to member shapes, default TRUE): shapes snap and glue to the members;
+  FALSE: only to the group.  IsTextEditTarget (Edit text of group, default TRUE since Visio
+  2000): typing goes into the group's text; FALSE: into the member on top of the stacking order.
+* DontMoveChildren: members cannot be dragged with the mouse (other ways still move them).
+* AddToGroup: the selection holds the shapes and the group, the group is the primary selection
+  or the only group.  RemoveFromGroup: the subselected members leave the group.
+* Guides: "If you add a guide and the shapes glued to it to a group, be sure to select both ...;
+  otherwise the glue breaks" (UG ch. 4).
+* Bitmaps: the old guide says imported bitmaps do not turn with a group; Visio 2010 and later
+  turn pictures (Bild › Drehen, the rotation handle) -- kept: they turn (not built, on purpose).
+* In Gruppe umwandeln (ConvertToGroup) turns a metafile into shapes; the model keeps metafiles
+  as bytes it does not draw (render Note::Metafile), so there is nothing to convert yet.
+Angenommen (the Gegenprobe checks): the alignment box follows after Zu Gruppe hinzufügen and Aus
+Gruppe entfernen (update_alignment_box; not with LockCalcWH); a group left without members and
+without geometry of its own goes; added shapes go on top of the members in their page order and
+leave containers and lists they were in; members of an instance of a master (subshapes that
+inherit from its master) stay; a dropped shape joins when its middle lies in the frame of the
+topmost top-level shape under it and that shape is a group taking drops.
+```
+
+- **`enum SelectMode`**
+  how a click selects in a group (SelectMode)
+  - `GroupOnly` -- 0: only the group
+  - `GroupFirst` -- 1: the group first, then a member (Visio's default)
+  - `MembersFirst` -- 2: the member under the pointer first, then the group
+
+**`impl SelectMode`**
+
+- **`fn code(self) -> u8`**
+  the cell's value
+- **`fn of(v: i64) -> SelectMode`**
+  the mode of a cell's value (unknown: group first)
+
+- **`struct Props`**
+  the cells of a group's Group Properties section
+  - `select_mode: SelectMode`
+  - `display_mode: u8` -- DisplayMode: 0 the group's own geometry and text hidden, 1 behind the members, 2 in front
+  - `drop_target: bool` -- IsDropTarget: takes shapes dropped onto it (with IsDropSource)
+  - `snap_target: bool` -- IsSnapTarget: shapes snap and glue to the members
+  - `text_edit_target: bool` -- IsTextEditTarget: typing goes into the group's own text
+  - `dont_move_children: bool` -- DontMoveChildren: members cannot be dragged
+
+- **`fn is_group(doc: &Document, s: ShapeRef) -> bool`**
+  whether the shape is a group
+
+- **`fn props(doc: &Document, g: ShapeRef) -> Props`**
+  the Group Properties of a shape (Visio's values for missing cells)
+
+- **`fn set_props(tx: &mut Transaction, eng: &mut Engine, g: ShapeRef, p: &Props) -> Result<(), EditError>`**
+  write a group's Group Properties (only the cells that change; booleans as TRUE/FALSE values)
+
+- **`fn is_drop_source(doc: &Document, s: ShapeRef) -> bool`**
+  IsDropSource: the shape joins a group it is dropped onto (when the group takes drops)
+
+- **`fn set_drop_source(tx: &mut Transaction, eng: &mut Engine, s: ShapeRef, on: bool) -> Result<(), EditError>`**
+  set IsDropSource of a shape
+
+- **`fn double_click_opens(doc: &Document, g: ShapeRef) -> bool`**
+  whether a double click opens the group (its EventDblClick calls OPENGROUPWIN)
+
+- **`fn set_double_click_opens(tx: &mut Transaction, eng: &mut Engine, g: ShapeRef, on: bool) -> Result<(), EditError>`**
+  a double click opens the group (EventDblClick = OPENGROUPWIN()) or does what it did before
+  (off: the cell inherits again, else 0 -- Visio's "Bearbeitet Text des Shapes")
+
+- **`fn text_target(doc: &Document, s: ShapeRef) -> ShapeRef`**
+  where typing into shape `s` goes: a group whose IsTextEditTarget is off hands it to its member
+  on top of the stacking order (and so on down)
+
+- **`fn drop_target_at(doc: &Document, owner: Owner, p: [f64; 2], skip: &[ShapeRef]) -> Option<ShapeRef>`**
+  the group a shape dropped at page point `p` joins: the topmost top-level shape of `owner`
+  (not in `skip`, no guide, no 1-D shape) whose frame holds p, when it is a group that takes
+  drops (IsDropTarget)
+
+- **`fn dropped(tx: &mut Transaction, eng: &mut Engine, owner: Owner, shapes: &[ShapeRef]) -> Result<Vec<ShapeRef>, EditError>`**
+  shapes dropped or moved: each top-level one with IsDropSource whose middle lies on a group
+  that takes drops joins that group (add_to_group) -> the groups that took shapes
+
+- **`fn reparent(tx: &mut Transaction, eng: &mut Engine, s: ShapeRef, to: Option<ShapeRef>, pos: Option<usize>) -> Result<(), EditError>`**
+  put shape `s` into parent `to` (None: the page) at `pos` in its z-order (None: on top),
+  where it is on the page: its pin, angle and flips (1-D: its ends) in the new parent's
+  coordinates; formulas of it and its subshapes that name its old group become their values
+
+- **`fn add_to_group(tx: &mut Transaction, eng: &mut Engine, g: ShapeRef, shapes: &[ShapeRef]) -> Result<Vec<ShapeRef>, EditError>`**
+  Zu Gruppe hinzufügen: `shapes` (not the group, nothing it holds or that holds it, no
+  inheriting subshape of an instance) go into group `g` on top of its members, where they are on
+  the page; they get the formulas of members (PinX "Sheet.&lt;g>!Width\*k" ...), leave the
+  containers and lists they were in, and the group's box fits them all (update_alignment_box).
+  Glue between a guide and shapes breaks unless both are in the group -> the shapes added
+
+- **`fn remove_from_group(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef]) -> Result<Vec<ShapeRef>, EditError>`**
+  Aus Gruppe entfernen: members (not an inheriting subshape of an instance) go to their group's
+  parent just above the group, where they are on the page; the group's box fits the members that
+  stay, a group left without members and without geometry of its own goes -> the shapes moved
+
+- **`enum Warning`**
+  what ungrouping a group loses (the app asks first)
+  - `Master` -- the group is an instance of a master: its link to the master goes (Visio's warning)
+  - `Formulas(usize)` -- this many cells of members name the group in formulas that are not their place or size
+    (Sheet.N!Prop.X, Sheet.N!User.Y ...): they keep their values only
+
+- **`fn ungroup_warning(doc: &Document, g: ShapeRef) -> Option<Warning>`**
+  what ungrouping `g` would lose (None: nothing)
+
+- **`fn guide_glue(tx: &mut Transaction, eng: &mut Engine, owner: Owner, moving: &[ShapeRef], together: &[ShapeRef]) -> Result<(), EditError>`**
+  (SP-17) the glue between a guide and a shape breaks when one of them is among `moving` (what
+  goes into a group or out of it) and the other is not among `together` (what ends up beside
+  it): the glued cells keep their values, the Connect entry goes
+
 ### `diagram_core/src/hit.rs`
 
 Source: [`lib/diagram_core/src/hit.rs`](../lib/diagram_core/src/hit.rs)
@@ -60464,6 +60621,9 @@ instance of it dropped on a page, the texts of masters and stencils in five lang
                                      ColorTrans) and every shape of the instance its own
                                      LayerMember with the page's indices (the master's name
                                      the rows of its own Layer section)
+  detach(&mut tx, shape)             (JD21, SP-06) an instance made plain shapes: what it
+                                     inherits from its master shapes becomes its own, the link
+                                     to the master goes (before it is ungrouped; detach.rs)
 
 The JFD_ cells are JFDiagrammer's own (apps/JFDiagrammer/stencils/README.md); diagram_io's
 stencil builder writes them, the Shapes panel reads them.  Visio keeps them as ordinary User
@@ -60572,6 +60732,31 @@ JFD_TR: &str = "JFD_Tr"
 - **`fn move_master(tx: &mut Transaction, m: MasterRef, pos: usize) -> Result<(), EditError>`**
   move master `m` to position `pos` among the masters (a stencil's order: MS-04, SL-07);
   a master in use by shapes of the document stays where it is (InUse)
+
+### `diagram_core/src/instance/detach.rs`
+
+Source: [`lib/diagram_core/src/instance/detach.rs`](../lib/diagram_core/src/instance/detach.rs)
+
+```text
+instance::detach -- (JD21, SP-06) an instance of a master made plain shapes: what it inherits
+from its master shapes becomes its own, so that it can be taken apart (Visio's "Durch diese
+Aktion wird die Verknüpfung des Objekts mit dem Master getrennt")
+
+  detach(tx, shape)        the instance and its subshapes: every cell, section and row of their
+                           master shapes they lack, the text and the picture they show, the
+                           styles, then no Master / MasterShape any more
+
+Formulas taken from the master name the master's shapes by Sheet.N: they get the IDs of the
+instance's shapes that inherit from them.  Cells the instance has with F="Inh" (the master's
+formula, a value of its own) get the master's formula and keep their value.  Rows and sections
+the instance deletes (Del="1") stay away, and the markers go.  A master shape that is itself an
+instance of another master passes on only what it holds itself (Visio's masters seldom nest).
+```
+
+- **`fn detach(tx: &mut Transaction, shape: ShapeRef) -> Result<(), EditError>`**
+  make the instance `shape` (a shape with a Master) and its subshapes plain shapes: what they
+  inherit from their master shapes becomes their own (see the head of this file); a shape that
+  is no instance is left alone
 
 ### `diagram_core/src/layout.rs`
 
@@ -60933,7 +61118,9 @@ groups, z-order, new shapes, text, copy and paste (JD7: SP-03..07, TX-01, TX-03,
   set_pin(tx, eng, shape, at)         the pin to another place, the shape stays
   controls / set_control              the yellow control points (SP-04)
   vertices / set_vertex / insert_vertex / delete_vertex     Geometry rows (SP-05)
-  group(tx, eng, owner, shapes) / ungroup(tx, eng, group)   (SP-06)
+  group(tx, eng, owner, shapes) / ungroup(tx, eng, group)   (SP-06; JD21: glue between a
+                                      guide and shapes breaks unless both are grouped, SP-17;
+                                      an instance is made plain first: instance::detach)
   reorder(tx, shapes, Z::Front | Back | Forward | Backward) (SP-07)
   new_shape(tx, eng, owner, Basic::Rectangle | Ellipse | TextBox, a, b)   rectangle and
                                       ellipse with the document's default line, fill and text
@@ -62180,6 +62367,72 @@ attributes, nothing else; anything it does not understand is skipped.
 - **`fn no_theme_color(index: u32) -> u32`**
   QuickStyle colours without a theme
 
+### `diagram_core/src/replace.rs`
+
+Source: [`lib/diagram_core/src/replace.rs`](../lib/diagram_core/src/replace.rs)
+
+```text
+replace -- (JD21) Shape ändern (SP-11, RS-28, SH-G05): shapes replaced by instances of a master,
+keeping what the user gave them -- place, size, text, shape data, format, glue, membership
+
+  Behavior::of(doc, shape)            the Change Shape Behavior cells a replacement reads
+  can_replace(doc, shape, master)     whether `shape` can become an instance of `master`
+  replace(tx, eng, shapes, master, lang) -> Vec<ShapeRef>   every shape that can, replaced; the
+                                      new shapes in the order given
+  class(doc, sheet)                   User.msvReplaceClass (the gallery offers the same class)
+
+Visio's rules (belegt: learn.microsoft.com "Change Shape Behavior Section", ReplaceLockFormat,
+ReplaceLockText, ReplaceLockShapeData, ReplaceCopyCells; Visio blog "Insights for developers
+about Change Shape" (2012); support.microsoft.com "Replace one shape with another"):
+* It works like deleting the old shape and dropping the new one (new ID, the master's name);
+  "position, connections, formatting, shape text, and shape data" stay.  Only 2-D for 2-D and
+  1-D for 1-D; a container only by a container (the gallery offers containers only); list
+  shapes (a flowchart's lanes) are never replaced; LockReplace, PageLockReplace and
+  DocLockReplace refuse.  User.msvReplaceClass narrows the gallery to masters of the same class.
+* What moves over are the old shape's LOCAL values: shape data, text, format, and the cells of
+  Hyperlink, Layer, Protection, Alignment, Layout, 1-D Endpoints and Shape Transform.  What it
+  inherits from its master does not.  Actions, User cells, Controls, Geometry never move.
+* The cells of the NEW master decide: ReplaceLockShapeData TRUE keeps the master's shape data,
+  ReplaceLockText TRUE the master's text (and its Character, Paragraph, Tabs, Text Fields and
+  Text Block Format), ReplaceLockFormat TRUE the master's format (Fill, Line, Quick Style, Theme,
+  Gradient, Bevel, Effects, gradient stops).  ReplaceCopyCells = DEPENDSON(cell, ...) names
+  cells that are copied whatever the locks say (formula and value; value only where the new
+  shape lacks a cell the formula names).
+Angenommen (the Gegenprobe checks): connectors glued to a connection point keep it when the new
+shape has a point with that index, else they glue to the whole shape (dynamic) or let go (a
+plain line); the new shape takes the old one's place in the z-order and in its group, its
+container and list memberships, callouts and boundary edges (the Relationships of both sides);
+a container keeps its members; the text's Character/Paragraph/Tabs/Field rows come with the
+text; Text Transform does not move; a group's own styles move when they differ from its
+master's (or it has no master); comments (kept as a raw part, HL-04) and data links (JD18)
+stay with the old ID -- not yet carried over.
+```
+
+- **`struct Behavior`**
+  the cells of the Change Shape Behavior section (read from the new shape's master)
+  - `lock_data: bool` -- ReplaceLockShapeData: the master's shape data stays
+  - `lock_text: bool` -- ReplaceLockText: the master's text stays
+  - `lock_format: bool` -- ReplaceLockFormat: the master's format stays
+  - `copy: Vec<alloc::string::String>` -- ReplaceCopyCells: the cells copied anyway (names as the formula writes them)
+
+**`impl Behavior`**
+
+- **`fn of(doc: &Document, sheet: SheetRef) -> Behavior`**
+  the behaviour cells of a shape sheet (with inheritance)
+
+- **`fn class(doc: &Document, sheet: SheetRef) -> Option<alloc::string::String>`**
+  User.msvReplaceClass of a sheet (None: none)
+
+- **`fn can_replace(doc: &Document, shape: ShapeRef, master: MasterRef) -> bool`**
+  whether `shape` can be replaced by an instance of `master` (a master of the same document):
+  1-D for 1-D, 2-D for 2-D, a container only by a container, no list, no guide, no
+  LockReplace / PageLockReplace / DocLockReplace
+
+- **`fn replace(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef], master: MasterRef, lang: usize) -> Result<Vec<ShapeRef>, EditError>`**
+  replace every shape of `shapes` that can_replace allows by an instance of `master` (a master
+  of this document: instance::import_master first), Name in language `lang` (instance::LANGS);
+  see the head of this file -> the new shapes (the others are left alone)
+
 ### `diagram_core/src/route.rs`
 
 Source: [`lib/diagram_core/src/route.rs`](../lib/diagram_core/src/route.rs)
@@ -62608,6 +62861,8 @@ structure -- containers, lists and callouts (JD10: ST-01, ST-02, ST-04 .. ST-06)
   disband(tx, eng, c)                     the container goes, its members stay
   repair(tx, owner)                       relationships named on one side only are dropped
   aim_callouts(tx, eng, callouts)         a callout's tail back onto its target
+  edge::*                                 (JD21, ST-03) boundary members: on a container's
+                                          edge (Relationships 7 .. 10), they go with the edge
 
 The file keeps the structure in the Relationships cell of both shapes (structure::rel) and
 the settings in User cells named as Visio names them (msvStructureType, msvSDContainer*,
@@ -62637,6 +62892,8 @@ Rules (Visio's, as far as they are documented, else chosen and named here):
 * Moving a container moves its members (nested ones too) and the callouts of everything
   moved; deleting and copying take them along (carried).
 * Nothing is computed when a file opens: settle runs only after a gesture.
+* (JD21, ST-03) A shape dropped across an edge of a container sits on that edge (structure::edge):
+  a member that follows the edge, which the container's automatic size leaves out.
 ```
 
 - **`enum Kind`**
@@ -62977,6 +63234,69 @@ M_PHASE_LIST: &str = "Phase List"
   create with a lane or a phase already on the page (one dropped outside any flowchart) as the
   first lane or phase; the others are new
 
+### `diagram_core/src/structure/edge.rs`
+
+Source: [`lib/diagram_core/src/structure/edge.rs`](../lib/diagram_core/src/structure/edge.rs)
+
+```text
+structure::edge -- (JD21, ST-03) boundary members: shapes that sit on a container's edge (tabs on
+a panel), stay on it and go with it
+
+  REL_LEFT, REL_RIGHT, REL_TOP, REL_BOTTOM    the Relationships types 7 .. 10 (the member names
+                                      the container whose left / right / top / bottom edge it
+                                      sits on; learn.microsoft.com "Relationships Cell")
+  edge_of(doc, s, c) -> Option<Edge>  the edge of container c that member s sits on
+  boundary_members(doc, c)            the members of c on its edges
+  straddles(doc, c, s) -> Option<Edge>   the edge of c shape s lies across where it is now
+  targets(doc, owner, s, moving)      the containers whose edge s lies across (and that take it)
+  align(tx, eng, c) -> moved          every boundary member back onto its edge
+
+Visio (belegt: Visio team blog "Details on Container Behaviors", 2009): "To put a shape on the
+boundary of a container, simply drag it there"; boundary shapes stay members (types 1 and 4 as
+any member) "but they behave differently during resize actions": "it will move with that
+boundary"; the highlight shows along the one edge.  Angenommen (the Gegenprobe checks): a 2-D
+shape is on an edge when the edge's line runs through its box (not wholly inside nor outside)
+and its middle lies within the edge's length, the nearest edge wins at a corner; it then sits
+with its middle on the edge's line (dropped there it is put onto it), slides along the edge and
+stays within its ends; a plain member moved partly out stays a plain member (the container
+grows, JD10) -- only a shape that comes from outside or sits on an edge already takes one;
+boundary members do not count for the container's automatic size; only
+upright containers have boundary members; the container side names them as members (type 1)
+only, the member side has type 4 and its edge type.
+```
+
+```rust
+/// the member names the container whose left edge it sits on
+REL_LEFT: u32 = 7
+/// ... right edge
+REL_RIGHT: u32 = 8
+/// ... top edge
+REL_TOP: u32 = 9
+/// ... bottom edge
+REL_BOTTOM: u32 = 10
+```
+
+- **`fn rel_of(e: Edge) -> Option<u32>`**
+  the type of an edge
+
+- **`fn edge_of(doc: &Document, s: ShapeRef, c: ShapeRef) -> Option<Edge>`**
+  the edge of container `c` that member `s` sits on (its Relationships, types 7 .. 10)
+
+- **`fn boundary_members(doc: &Document, c: ShapeRef) -> Vec<(ShapeRef, Edge)>`**
+  the members of `c` that sit on one of its edges
+
+- **`fn straddles(doc: &Document, c: ShapeRef, s: ShapeRef) -> Option<Edge>`**
+  the edge of container `c` whose line runs through the box of `s` with the middle of `s` within
+  the edge's length (the nearest one at a corner); None: no edge, or `c` is turned
+
+- **`fn targets(doc: &Document, owner: Owner, s: ShapeRef, moving: &[ShapeRef]) -> Vec<(ShapeRef, Edge)>`**
+  the containers on `owner` (not among `moving`) whose edge shape `s` lies across, that take
+  it and are not locked, with the edge
+
+- **`fn align(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef) -> Result<Vec<ShapeRef>, EditError>`**
+  every boundary member of `c` back onto its edge: its middle on the edge's line, within the
+  edge's length -> the members moved (with what they carry)
+
 ### `diagram_core/src/structure/rel.rs`
 
 Source: [`lib/diagram_core/src/structure/rel.rs`](../lib/diagram_core/src/structure/rel.rs)
@@ -62997,7 +63317,8 @@ Section)"; a plain cell under <Shape>, V="0"):
   1 members of this container        4 containers of this shape
   2 items of this list (in order)    5 the list of this item
   3 callouts on this shape           6 the target of this callout
-  7 .. 10 the container on whose left / right / top / bottom edge the shape sits
+  7 .. 10 the container on whose left / right / top / bottom edge the shape sits (JD21:
+          written and read by structure::edge; the container names it as a member, type 1)
   11 the list this list overlaps (a cross-functional flowchart's lanes and phases)
 
 One DEPENDSON per type, the type first, the shapes after it; Visio leaves an empty term

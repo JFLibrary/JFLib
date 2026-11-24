@@ -159,7 +159,11 @@ static BACK_MENU: [It; 2] = [C(SEND_BACK), C(SEND_BACKWARD)];
 // (JD21 ops) the shape operations (Entwicklertools › Shape-Design › Vorgänge in Visio; JD23 brings
 // that register)
 // i18n
-static GROUP_MENU_ITEMS: [It; 4] = [C(GROUP), C(UNGROUP), Sep, Sub("Vorgänge", &OPERATIONS_MENU)];
+// (JD21 groups) Zu Gruppe hinzufügen, Aus Gruppe entfernen, Gruppe öffnen, Verhalten
+static GROUP_MENU_ITEMS: [It; 10] = [
+    C(GROUP), C(UNGROUP), C(ADD_TO_GROUP), C(REMOVE_FROM_GROUP), Sep, C(OPEN_GROUP), C(CLOSE_GROUP), C(GROUP_BEHAVIOR), Sep,
+    Sub("Vorgänge", &OPERATIONS_MENU),
+];
 static OPERATIONS_MENU: [It; 7] = [C(OP_UNION), C(OP_COMBINE), C(OP_FRAGMENT), C(OP_INTERSECT), C(OP_SUBTRACT), Sep, C(UPDATE_ALIGN_BOX)];
 static FIND_MENU_ITEMS: [It; 2] = [C(FIND), C(REPLACE)];
 static LAYER_MENU: [It; 2] = [C(LAYER_ASSIGN), C(LAYER_PROPERTIES)];
@@ -212,7 +216,8 @@ static START: [Group; 7] = [
         Col::BigMenu(POSITION, &POSITION_MENU),
         Col::Small(&[Sm::Split(BRING_FRONT, &FRONT_MENU), Sm::Split(SEND_BACK, &BACK_MENU), Sm::Menu(GROUP_MENU, &GROUP_MENU_ITEMS)]),
     ]),
-    Group("Bearbeiten", 0, &[Col::Small(&[Sm::Menu(FIND_MENU, &FIND_MENU_ITEMS), Sm::Menu(LAYERS, &LAYER_MENU), Sm::Menu(SELECT_MENU, &SELECT_MENU_ITEMS)])]),
+    // (JD21 groups) Shape ändern: its gallery (change_shape::flyout)
+    Group("Bearbeiten", 0, &[Col::Small(&[Sm::Menu(FIND_MENU, &FIND_MENU_ITEMS), Sm::Menu(LAYERS, &LAYER_MENU), Sm::Menu(SELECT_MENU, &SELECT_MENU_ITEMS)]), Col::BigMenu(CHANGE_SHAPE, &[])]),
 ];
 
 // i18n
@@ -391,7 +396,8 @@ pub(crate) fn menu_usable(app: &Diagrammer, id: u32) -> Option<bool> {
     let (_, _, items) = menu_of(id)?;
     // a split button's action is a command of its own (Neue Seite, Zeichentools)
     // (JD18) Alle aktualisieren is a row of its own menu: asking the rows would ask it again
-    if matches!(id, NEW_PAGE | DRAW_TOOLS | PASTE | TEXT_BOX | BRING_FRONT | SEND_BACK | FONT_COLOR | DATA_REFRESH_ALL) {
+    // (JD21 groups) Shape ändern's gallery is drawn by change_shape.rs, its rows are no commands
+    if matches!(id, NEW_PAGE | DRAW_TOOLS | PASTE | TEXT_BOX | BRING_FRONT | SEND_BACK | FONT_COLOR | DATA_REFRESH_ALL | CHANGE_SHAPE) {
         return None;
     }
     Some(any_enabled(app, items))
@@ -664,6 +670,10 @@ fn menu(app: &mut Diagrammer, ui: &mut Ui, pid: u32, items: &[It]) {
     }
     // (JD21 tools) Einfügen › Container and Kopfzeilenstil as pictures
     if container_styles::flyout(app, ui, pid) {
+        return;
+    }
+    // (JD21 groups) Shape ändern's gallery
+    if crate::change_shape::flyout(app, ui, pid) {
         return;
     }
     if ui.flyout_begin(pid, 0) {

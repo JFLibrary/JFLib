@@ -54,6 +54,11 @@
 //                                 Fragmentieren, Schneiden, Subtrahieren (SP-08) on geom's plane
 //                                 Booleans, arcs rebuilt as arcs; fit_frame (the box follows the
 //                                 geometry after vertex edits, SP-05), update_alignment_box (SP-16)
+//   groups::*                     (JD21) group behaviour: SelectMode and the other Group
+//                                 Properties, Zu Gruppe hinzufügen / Aus Gruppe entfernen,
+//                                 dropping into a group, the ungroup warning (SS-17, SP-06, RS-27)
+//   replace::*                    (JD21) Shape ändern: shapes replaced by a master's instance,
+//                                 text, data, format, glue kept (SP-11, Change Shape Behavior)
 //   field::*                      (JD8) text fields: a Field row's value in its format picture,
 //                                 new fields, the text with its fields, the document's
 //                                 properties (Document::fields: the app's locale and clock)
@@ -88,6 +93,7 @@ pub mod field;
 pub mod formula;
 pub mod geometry;
 pub mod glue;
+pub mod groups;
 pub mod hit;
 mod inherit;
 pub mod instance;
@@ -97,6 +103,7 @@ pub mod ops;
 mod page;
 pub mod pagesetup;
 pub mod render;
+pub mod replace;
 pub mod route;
 pub mod shapeops;
 mod shape;

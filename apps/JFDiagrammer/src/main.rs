@@ -96,6 +96,10 @@
 //                     data_textdraw (Zeichnung aus Text)
 //   src/shapeops_cmds.rs  (JD21) the shape operations and Ausrichtungsfeld aktualisieren
 //                     (Start › Anordnen › Gruppieren › Vorgänge until JD23)
+//   src/groups_cmds.rs, groups_view.rs, change_shape.rs  (JD21) Zu Gruppe hinzufügen, Aus Gruppe
+//                     entfernen, Gruppe öffnen (an isolated view on the canvas), the ungroup
+//                     warning, Verhalten, SelectMode and the other group cells on the canvas;
+//                     Start › Bearbeiten › Shape ändern
 //   build.rs, build_steps.rs, stencils/   (JD9) the stencil sources and their build into .vssx
 //                     when the app is built (README there; build_rs.py's derived builds for the
 //                     browser and Android run build_steps.rs too); templates/ (JD13) the
@@ -141,6 +145,8 @@ mod ask_save;
 mod autoconn;
 mod backstage;
 mod cmds_actions;
+// (JD21 groups) Shape ändern
+mod change_shape;
 mod cmds_arrange;
 mod cmds_later;
 mod cmds_myshapes;
@@ -186,6 +192,9 @@ mod format_cells;
 mod format_menus;
 mod format_pane;
 mod format_quick;
+// (JD21 groups) Zu/Aus Gruppe, Gruppe öffnen, Verhalten, the groups on the canvas
+mod groups_cmds;
+mod groups_view;
 mod icons;
 mod lang;
 mod layers;
@@ -370,6 +379,8 @@ pub(crate) struct Diagrammer {
     pub autoconn: autoconn::AutoConn,
     /// (JD21 tools) Add-Ons' dialogs, the container styles' galleries (addons.rs)
     pub addons: addons::Addons,
+    /// (JD21 groups) the open group, the ungroup warning, Verhalten, Shape ändern's gallery
+    pub groups: groups_cmds::GroupsState,
 }
 
 impl Diagrammer {
@@ -447,6 +458,7 @@ impl Diagrammer {
             jumps: jumps_ui::JumpsState::default(),
             autoconn: autoconn::AutoConn::default(),
             addons: addons::Addons::default(),
+            groups: groups_cmds::GroupsState::default(),
             page_views: alloc::vec::Vec::new(),
             view_page: None,
         }
@@ -642,6 +654,8 @@ impl App for Diagrammer {
         // (JD21 tools) a container style's preview goes when its tile is left; the dialogs
         addons::after(self, ui);
         addons::dialogs(self, ui);
+        // (JD21 groups) the ungroup warning, Verhalten
+        groups_cmds::dialogs(self, ui);
     }
 
     fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {

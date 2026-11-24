@@ -53,6 +53,8 @@
 //   diagramiotest --write-jd21-jumps DIR  (JD21) JD21-Gegenprobe-Linienuebergaenge.vsdx (line
 //                                         jumps: a page per style, code, direction ...) and a PNG
 //                                         of each page (jumps.rs)
+//   diagramiotest --write-jd21-groups DIR (JD21) jd21-gruppen.vsdx: Shape ändern, a group with its
+//                                         behaviour cells, boundary members (groups.rs)
 //
 // Groups:
 //   samples   self-built files of all six formats: what lands where in the model (fields,
@@ -108,6 +110,9 @@
 //   jumps     (JD21, jumps.rs) line jumps: crossing connectors per style, code, direction, size;
 //             the jumps in the display list, the cells written and read back (no geometry), the
 //             SVG and PNG export
+//   groups    (JD21, groups.rs) the Group Properties cells, IsDropSource and the double click
+//             read back, boundary members (Relationships 7 .. 10), Change Shape Behavior cells
+//             and shapes replaced by a master's instances (text, data, copied cells, glue)
 //
 // Why an app of its own and not codectest: codectest is the image codecs' runner (with the
 // assembly-parity protocol and every image codec linked); the diagram codecs grow with JD5
@@ -148,6 +153,8 @@ mod roundtrip;
 mod samples;
 // (JD21) the shape operations
 mod shapeops;
+// (JD21) groups, boundary members, Shape ändern
+mod groups;
 mod stencil_business;
 mod stencil_network;
 mod stencil_overview;
@@ -295,6 +302,10 @@ fn run() -> i32 {
         // (JD21) the line jumps drawing for the Visio counter-check, a PNG per page
         return jumps::write(&dir);
     }
+    if let Some(dir) = arg(&args, "--write-jd21-groups") {
+        // (JD21) groups, boundary members, Shape ändern for the Visio counter-check
+        return groups::write(&dir);
+    }
     if let Some(dir) = arg(&args, "--write-jd21-ops") {
         // (JD21) the shape operations for the Visio counter-check
         return shapeops::write(&dir);
@@ -361,6 +372,10 @@ fn run() -> i32 {
         // (JD21) the shape operations
         if h.on("shapeops") {
             shapeops::check(&mut h);
+        }
+        // (JD21) groups, boundary members, Shape ändern
+        if h.on("groups") {
+            groups::check(&mut h);
         }
         // (JD17) the binary stencils of 2003-2010 (subgroups vss/cfb, vss/stream ...)
         vss::run(&mut h);

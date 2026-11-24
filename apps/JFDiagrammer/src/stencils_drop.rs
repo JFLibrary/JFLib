@@ -21,7 +21,9 @@
 // (instance::import_master, matched by UniqueID), the instance goes to the point
 // (instance::place: Name in the current language, NameU the master's), the engine
 // recalculates the new shapes, connectors follow (edit_canvas::follow); then the new shape is
-// selected and viewer::sync draws the page again (a new master: the whole page).
+// selected and viewer::sync draws the page again (a new master: the whole page).  (JD21) While a
+// group is open the shape joins it; else a shape that may be dropped into groups joins a group that
+// takes drops (groups_view::adopt).
 //
 // Coordinates: world points of the canvas (DIP at 100 %, y down) become the page's inches with
 // y up through edit_canvas's Geo (app.model.geo, which knows the drawing scale).
@@ -98,6 +100,8 @@ fn place_world(app: &mut Diagrammer, ui: &mut Ui, key: u32, k: usize, at: [f32; 
     let lang = crate::stencils::lang();
     let st = &app.stencils;
     let Some((l, e)) = st.entry(key, k) else { return };
+    // (JD21 groups) the group open on the canvas
+    let scope = crate::groups_view::scope(app);
     let Some(o) = app.opened.as_mut() else { return };
     let label = tf("{} ablegen", &[e.texts.name(lang)]);
     // (JD10) the structure masters: a dropped lane may bring its flowchart
@@ -114,6 +118,8 @@ fn place_world(app: &mut Diagrammer, ui: &mut Ui, key: u32, k: usize, at: [f32; 
         edit_canvas::follow(tx, eng, Owner::Page(page), &[shape])?;
         // (JD10) it joins the containers it lies in, a callout ties to the shape under it
         crate::structures::dropped(tx, eng, &masters, Owner::Page(page), shape)?;
+        // (JD21 groups) into the open group, onto a group that takes drops
+        crate::groups_view::adopt(tx, eng, Owner::Page(page), scope, &[shape])?;
         Ok(shape)
     });
     match placed {

@@ -34,6 +34,10 @@
 // löschen), the connector tool draws the master marked in the Shapes panel and gives way to the
 // pointer after one connector when it was chosen "once", the quick shapes bar at the arrows
 // (SeEv::Quick, QuickHover) places and previews (autoconn.rs).
+// Shapes auswählen (ZF-06).  (JD21 groups) While a group is open (Gruppe öffnen) its members are the
+// edit layer's top-level shapes; the members of "members first" groups and of groups that let shapes
+// snap to their members are listed too, with DontMoveChildren as a move lock; a double click or
+// typing on a group, a move onto a group, a shape drawn in an open group go to groups_view.rs.
 
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -180,6 +184,8 @@ pub(crate) fn model(app: &mut Diagrammer) {
     let tool = tool_of(app);
     let k = app.page_index();
     let sel: Vec<u64> = app.se.sel.iter().copied().collect();
+    // (JD21 groups) the group open on the canvas
+    let scope = crate::groups_view::scope(app);
     let Some(o) = app.opened.as_mut() else {
         app.model = Model::default();
         return;
@@ -202,6 +208,7 @@ pub(crate) fn model(app: &mut Diagrammer) {
     let owner = Owner::Page(page);
     let mut m = Model { key, geo: Some(geo), page: Some(page), ..Model::default() };
     m.ver = o.serial.wrapping_mul(7919).wrapping_add(o.ed.rev).wrapping_add(k as u32 * 104_729);
+    m.ver ^= crate::groups_view::ver_salt(scope);
     // boxes of what is drawn, per top-level shape
     let boxes: BTreeMap<ShapeRef, [f64; 4]> = hit::top_boxes(d).into_iter().collect();
     // the groups whose children are selectable now: the selected groups (a second click picks a
@@ -281,6 +288,10 @@ pub(crate) fn model(app: &mut Diagrammer) {
         }
         flags |= lock_flags(&ops::locks(eng, doc, r));
         flags |= layered;
+        // (JD21 groups) DontMoveChildren, members first, group only (listed for snapping)
+        if parent != 0 {
+            flags |= crate::groups_view::flags(doc, r, scope);
+        }
         // (JD10) no Verbindungspfeile on containers, lists, callouts
         if crate::structures_cmds::no_arrows(doc, r) {
             flags |= SEF_NOARROWS;
@@ -299,7 +310,8 @@ pub(crate) fn model(app: &mut Diagrammer) {
         let p0 = m.points.len() as u32;
         // connection points (top-level shapes: glue targets); (JD26) also those of 1-D shapes
         // that have some: the causes of a fishbone glue to the bones of its categories
-        if parent == 0 {
+        // (JD21 groups) also those of members of a group that lets shapes snap to them
+        if parent == 0 || crate::groups_view::snaps(doc, r) {
             for c in glue::connection_points(doc, r) {
                 let dir = c.dir.map_or([0.0, 0.0], |d| [d[0] as f32, -(d[1] as f32)]);
                 // (JD15, SS-29) Type 1 points outward only: no target for ends; the Prompt is
@@ -327,7 +339,9 @@ pub(crate) fn model(app: &mut Diagrammer) {
         let p1 = m.points.len() as u32;
         m.shapes.push(SeShape { key: k, parent, bx, ends, pin, bbox, flags, points: p0..p1 });
     };
-    let tops: Vec<ShapeRef> = doc.top_shapes(owner).collect();
+    // (JD21 groups) an open group's members instead of the group; members first and snapping
+    let tops: Vec<ShapeRef> = crate::groups_view::tops(doc, owner, scope);
+    crate::groups_view::extend_open(&mut open, doc, &tops, scope);
     for &r in &tops {
         add(r, 0, &mut m, &mut o.ed.eng);
     }
@@ -481,6 +495,9 @@ pub(crate) fn canvas(app: &mut Diagrammer, ui: &mut Ui, id: u32, menu: impl FnOn
     // (JD21 autoconn) the quick shapes bar at the arrows
     crate::autoconn::quick_tiles(app);
     let tool = tool_of(app);
+    // (JD21 groups) the open group, the selection (members first)
+    let scope = crate::groups_view::scope(app);
+    let sel_now: Vec<u64> = app.se.sel.iter().copied().collect();
     let evs = {
         let m = &app.model;
         let page = m.page;
@@ -491,7 +508,7 @@ pub(crate) fn canvas(app: &mut Diagrammer, ui: &mut Ui, id: u32, menu: impl FnOn
         let doc = opened.map(|o| &o.doc);
         let hitf = |p: [f32; 2], tol: f32, within: u64| -> u64 {
             let (Some(view), Some(geo), Some(page), Some(doc)) = (view.as_ref(), geo, page, doc) else { return 0 };
-            hit_at(doc, view.drawing(), &geo, page, p, tol, within)
+            crate::groups_view::hit(doc, view.drawing(), &geo, page, p, tol, within, scope, &sel_now)
         };
         // (JD15, RA-02) Ansicht › Führungslinien off: the guides neither show nor snap
         let guides: &[SeGuide] = if app.view_guides { &m.guides } else { &[] };
@@ -509,6 +526,8 @@ pub(crate) fn canvas(app: &mut Diagrammer, ui: &mut Ui, id: u32, menu: impl FnOn
     crate::structures::overlay(app, ui);
     // (JD21 autoconn) the connector a moved shape would split
     crate::autoconn::overlay(app, ui);
+    // (JD21 groups) the page dimmed around an open group
+    crate::groups_view::overlay(app, ui);
     menu(app, ui);
     // one record per shape and per handle (scripts, screen readers)
     {
@@ -867,7 +886,7 @@ fn dashed(ui: &mut Ui, a: [f32; 2], b: [f32; 2]) {
 }
 
 // the topmost shape at a world point: a top-level one, or the child of group `within`
-fn hit_at(doc: &Document, d: &diagram_core::render::Drawing, geo: &Geo, page: PageRef, p: [f32; 2], tol: f32, within: u64) -> u64 {
+pub(crate) fn hit_at(doc: &Document, d: &diagram_core::render::Drawing, geo: &Geo, page: PageRef, p: [f32; 2], tol: f32, within: u64) -> u64 {
     let pp = geo.paper(p);
     for h in hit::all_at(d, pp, tol as f64 / DIP) {
         if h.shape.owner != Owner::Page(page) {
@@ -919,8 +938,11 @@ pub(crate) fn apply(app: &mut Diagrammer, ui: &mut Ui, ev: SeEv) {
         // (JD21 autoconn) the quick shapes bar at an arrow: its preview, its click
         SeEv::Quick { key, dir, tile } => return crate::autoconn::quick(app, ui, key, dir, tile),
         SeEv::QuickHover { key, dir, tile } => return crate::autoconn::quick_hover(app, ui, key, dir, tile),
+        // (JD21 groups) a group that opens on a double click, a group that hands its text on
+        SeEv::Text { key, ch } if crate::groups_view::text(app, ui, key, ch) => return,
         _ => {}
     }
+    let scope = crate::groups_view::scope(app);
     let (Some(geo), Some(page)) = (app.model.geo, app.model.page) else { return };
     let owner = Owner::Page(page);
     let refs = |keys: &[u64]| -> Vec<ShapeRef> { keys.iter().map(|&k| shape_of(page, k)).collect() };
@@ -940,13 +962,15 @@ pub(crate) fn apply(app: &mut Diagrammer, ui: &mut Ui, ev: SeEv) {
             let d = geo.page_vec(total);
             // (JD10) members and callouts come along; released: containers, lists; (JD21
             // autoconn) one shape onto a connector: found with the drawing before the move,
-            // split when released
+            // split when released; (JD21 groups) into the open group, onto a group that takes
+            // drops
             let r = edit_doc::edit(o, t("Verschieben"), done, |tx, eng| {
                 let c = if splits { crate::autoconn::move_target(tx.doc(), owner, &shapes, d) } else { None };
                 crate::structures::move_shapes(tx, eng, owner, &shapes, d, done)?;
                 if done {
                     crate::autoconn::moved(tx, eng, owner, &shapes, c)?;
                 }
+                crate::groups_view::moved(tx, eng, owner, scope, &shapes, done)?;
                 Ok(c)
             });
             r.map(|c| hint = Some(if done { None } else { c }))
@@ -1068,7 +1092,14 @@ pub(crate) fn apply(app: &mut Diagrammer, ui: &mut Ui, ev: SeEv) {
             // Shapes panel
             let st = &app.stencils;
             let master = conn_master.and_then(|(key, k)| st.entry(key, k)).map(|(l, e)| (&l.doc, e.master));
-            match edit_doc::edit(o, label, true, |tx, eng| if tool == SE_CONNECT { crate::autoconn::connector(tx, eng, owner, (pa, ta), (pb, tb), master) } else { glue::new_line(tx, eng, owner, (pa, ta), (pb, tb)) }) {
+            match edit_doc::edit(o, label, true, |tx, eng| {
+                let s = if tool == SE_CONNECT { crate::autoconn::connector(tx, eng, owner, (pa, ta), (pb, tb), master)? } else { glue::new_line(tx, eng, owner, (pa, ta), (pb, tb))? };
+                // (JD21 groups) drawn while a group is open: a member of it
+                if scope.is_some() {
+                    crate::groups_view::adopt(tx, eng, owner, scope, &[s])?;
+                }
+                Ok(s)
+            }) {
                 Ok(s) => {
                     select = Some(alloc::vec![key_of(s)]);
                     drawn = tool == SE_CONNECT;
@@ -1111,6 +1142,10 @@ pub(crate) fn apply(app: &mut Diagrammer, ui: &mut Ui, ev: SeEv) {
                     }
                     // (JD10) drawn inside a container: a member
                     crate::structures::joined(tx, eng, owner, &[s])?;
+                    // (JD21 groups) drawn while a group is open: a member of it
+                    if scope.is_some() {
+                        crate::groups_view::adopt(tx, eng, owner, scope, &[s])?;
+                    }
                     Ok(s)
                 }) {
                     Ok(s) => {

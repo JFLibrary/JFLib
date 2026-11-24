@@ -20,6 +20,9 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 
 ### Added
 
+- (JD21) jflib-diagram-core: `groups` (Visio's group behaviour: SelectMode, drops into groups, Zu Gruppe
+  hinzufügen / Aus Gruppe entfernen, the ungroup warning), `replace` (Shape ändern), `instance::detach`,
+  `structure::edge` (boundary members of containers); jflib-ui: `SEF_UP` for "members first" groups
 - **plat:** `fs::fd_path(&File)`: a path that leads a program this one starts to the open file itself, whatever its name has become (Linux `/proc/<pid>/fd/<n>`, valid while the file stays open; None on Windows and macOS)
 - **Tests:** plattest `--test kernel` on Windows: `fs::Dir` against a folder another handle holds with delete access, renamed and replaced by a junction while open (what is done in it stays in the real folder), junctions refused on the way, and links made by the Dir byte for byte as `CreateSymbolicLinkW` makes them; tools/platshared/tray_bus.py plays KDE (watcher and host apart) and GNOME (the panel owns the watcher) and another client that forges a `NameOwnerChanged`, a `ListNames` answer and the panel's calls; BackupCraft's tape_smoke.py (a link planted in `bcctl tape extract`'s target) and vm_smoke.py (a merge into a folder behind a link)
 - **plat:** What a notch of the wheel scrolls as the system says it: `SysSettings::wheel_lines` (Windows `SPI_GETWHEELSCROLLLINES`, `WHEEL_PAGE` for its "one screen at a time"; KDE's `[KDE] WheelScrollLines` of kdeglobals, also while a portal answers; 3 elsewhere) and `wheel_chars` (Windows `SPI_GETWHEELSCROLLCHARS`, else 3), `wheel_amount`; the overrides `jfgui_WHEEL_LINES=N|page` and `jfgui_WHEEL_CHARS=N`; a change of the mouse's settings on Windows is an `E_SETTINGS` with `SET_OTHER`

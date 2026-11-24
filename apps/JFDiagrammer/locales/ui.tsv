@@ -1303,3 +1303,36 @@ Text ersetzen	Replace the text	Reemplazar el texto	Sostituisci il testo	Remplace
 Beispiel: {}	Example: {}	Ejemplo: {}	Esempio: {}	Exemple : {}
 Add-Ons	Add-Ons	Complementos	Componenti aggiuntivi	Compléments
 Maßlinie	Dimension	Cota	Quota	Cote
+Shape ändern	Change Shape	Cambiar forma	Cambia forma	Modifier la forme
+Zu Gruppe hinzufügen	Add to Group	Agregar al grupo	Aggiungi al gruppo	Ajouter au groupe
+Aus Gruppe entfernen	Remove from Group	Quitar del grupo	Rimuovi dal gruppo	Supprimer du groupe
+Gruppe öffnen	Open Group	Abrir grupo	Apri gruppo	Ouvrir le groupe
+Gruppe schließen	Close Group	Cerrar grupo	Chiudi gruppo	Fermer le groupe
+Verhalten...	Behavior...	Comportamiento...	Comportamento...	Comportement...
+Gruppe „{}“ geöffnet	Group “{}” opened	Grupo «{}» abierto	Gruppo «{}» aperto	Groupe « {} » ouvert
+Gruppe „{}“ geöffnet: Shapes hineinziehen oder bearbeiten	Group “{}” is open: drag shapes into it or edit them	Grupo «{}» abierto: arrastre formas a él o edítelas	Gruppo «{}» aperto: trascinare forme al suo interno o modificarle	Groupe « {} » ouvert : faites-y glisser des formes ou modifiez-les
+Durch diese Aktion wird die Verknüpfung des Objekts mit dem Master getrennt. Dadurch kann sich das Objekt anders verhalten.	This action will sever the object's link to its master shape. This can cause the object to behave differently.	Esta acción romperá el vínculo del objeto con su forma maestra. Esto puede hacer que el objeto se comporte de forma diferente.	Questa azione interromperà il collegamento dell'oggetto con la forma master. L'oggetto potrebbe comportarsi in modo diverso.	Cette action rompra le lien de l'objet avec sa forme maître. L'objet risque de se comporter différemment.
+{} Formeln der Elemente beziehen sich auf die Gruppe; sie behalten nur ihre Werte.	{} formulas of the members refer to the group; they keep only their values.	{} fórmulas de los miembros hacen referencia al grupo; solo conservarán sus valores.	{} formule dei membri fanno riferimento al gruppo; manterranno solo i loro valori.	{} formules des membres font référence au groupe ; elles ne gardent que leurs valeurs.
+Möchten Sie den Vorgang fortsetzen?	Do you want to continue?	¿Desea continuar?	Continuare?	Voulez-vous continuer ?
+Nur Gruppe	Group only	Solo grupo	Solo gruppo	Groupe uniquement
+Gruppe zuerst	Group first	Grupo primero	Prima il gruppo	Groupe d'abord
+Elemente zuerst	Members first	Miembros primero	Prima i membri	Membres d'abord
+Ausblenden	Hide	Ocultar	Nascondi	Masquer
+Hinter Elementshapes	Behind member shapes	Detrás de las formas miembro	Dietro le forme membro	Derrière les formes membres
+Vor Elementshapes	In front of member shapes	Delante de las formas miembro	Davanti alle forme membro	Devant les formes membres
+Gruppenverhalten	Group behavior	Comportamiento del grupo	Comportamento del gruppo	Comportement du groupe
+Gruppendaten	Group data	Datos del grupo	Dati del gruppo	Données du groupe
+An Elementshapes ausrichten	Snap to member shapes	Ajustar a formas miembro	Blocca sulle forme membro	Aligner sur les formes membres
+Gruppentext bearbeiten	Edit text of group	Editar texto del grupo	Modifica testo del gruppo	Modifier le texte du groupe
+Abgelegte Shapes übernehmen	Accept dropped shapes	Aceptar formas colocadas	Accetta forme rilasciate	Accepter les formes déposées
+Elemente nicht mit der Maus verschieben	Members cannot be dragged with the mouse	No arrastrar los miembros con el ratón	Non trascinare i membri con il mouse	Ne pas déplacer les membres à la souris
+Doppelklick öffnet die Gruppe	Double-click opens the group	Doble clic abre el grupo	Il doppio clic apre il gruppo	Un double-clic ouvre le groupe
+Verschiedenes	Miscellaneous	Varios	Varie	Divers
+Shape bei Ablage zu Gruppen hinzufügen	Add shape to groups on drop	Agregar forma a grupos al colocarla	Aggiungi forma ai gruppi al rilascio	Ajouter la forme aux groupes lors de la dépose
+Kein ersetzbares Shape ausgewählt	No shape selected that can be replaced	No hay ninguna forma seleccionada que se pueda reemplazar	Nessuna forma sostituibile selezionata	Aucune forme remplaçable sélectionnée
+Schnell-Shapes: {}	Top shapes: {}	Formas principales: {}	Forme principali: {}	Formes principales : {}
+Keine passenden Schnell-Shapes	No matching top shapes	No hay formas principales adecuadas	Forme principali: nessuna adatta	Formes principales : aucune adaptée
+Schablonen	Stencils	Colecciones de formas	Raccolte di forme	Bibliothèques de formes
+Shape geändert in „{}“	Shape changed to “{}”	Forma cambiada a «{}»	Forma cambiata in «{}»	Forme remplacée par « {} »
+Das Shape lässt sich nicht ändern.	The shape cannot be changed.	No se puede cambiar la forma.	Impossibile cambiare la forma.	Impossible de modifier la forme.
+„{}“ kann die ausgewählten Shapes nicht ersetzen.	“{}” cannot replace the selected shapes.	«{}» no puede reemplazar las formas seleccionadas.	«{}» non può sostituire le forme selezionate.	« {} » ne peut pas remplacer les formes sélectionnées.

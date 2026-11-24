@@ -12,6 +12,8 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 - (JD21) `ui.shape_edit`: the quick shapes bar at a hot connection arrow (Visio's mini toolbar of the AutoConnect arrows): `SeState::quick` (`SeQuick`: name, preview, version; the first four show), the arrow stays hot while the pointer is on the bar, `SeEv::QuickHover` (the tile under the pointer, for a live preview), `SeEv::Quick` (a click), `SeState::quick_hover()`; one `K_BUTTON` per tile ("Schnell-Shape: <name>"); nothing changes for apps that list no quick shapes
 
+- (JD21) `ui.shape_edit`: `SEF_UP` -- a second, slow click on a selected member with this flag selects its group
+  (Visio's "members first" groups)
 - (JD8 rest) `ui.shape_edit`: the freeform tool `SE_FREEFORM` (the pointer's way, reported as
   `SeEv::Stroke` with the glue of both ends) and the arc tool `SE_ARC` (a quarter ellipse as the
   rubber band, bowing the way the drag started, reported as `SeEv::Arc`); both glue to connection

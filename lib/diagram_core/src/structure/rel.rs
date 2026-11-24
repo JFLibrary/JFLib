@@ -13,7 +13,8 @@
 //   1 members of this container        4 containers of this shape
 //   2 items of this list (in order)    5 the list of this item
 //   3 callouts on this shape           6 the target of this callout
-//   7 .. 10 the container on whose left / right / top / bottom edge the shape sits
+//   7 .. 10 the container on whose left / right / top / bottom edge the shape sits (JD21:
+//           written and read by structure::edge; the container names it as a member, type 1)
 //   11 the list this list overlaps (a cross-functional flowchart's lanes and phases)
 //
 // One DEPENDSON per type, the type first, the shapes after it; Visio leaves an empty term
