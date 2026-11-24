@@ -206,7 +206,9 @@ pub struct Cert {
     /// where the issuer's certificate is (caIssuers URIs of the authority information access)
     pub ca_issuers: Vec<String>,
     /// the TLS features the certificate demands (RFC 7633): TLS_FEATURE_STATUS_REQUEST is
-    /// "must staple", a TLS client refuses it without a stapled OCSP response
+    /// "must staple", a TLS client that asks for a stapled OCSP response refuses it without one
+    /// (netio: Revocation::Stapled or Required with Trust::Anchors, System or Custom; with
+    /// Revocation::Off, Trust::Pinned or Trust::Any it asks for none and does not look)
     pub tls_features: Vec<u16>,
     /// id-pkix-ocsp-nocheck (RFC 6960 4.2.2.2.1): an OCSP responder's certificate that is not
     /// checked for revocation itself
@@ -674,15 +676,17 @@ impl Cert {
                     if critical {
                         return None;
                     }
-                    let mut k = Der::new(val).seq()?;
-                    if k.is_empty() {
+                    let mut top = Der::new(val);
+                    let mut k = top.seq()?;
+                    if k.is_empty() || !top.is_empty() {
                         return None;
                     }
                     while !k.is_empty() {
                         let mut ad = k.seq()?;
                         let method = ad.read(der::OID)?;
                         let (tag, loc, _) = ad.next()?;
-                        if !ad.is_empty() {
+                        // a GeneralName: [0] to [8] (only URIs are used)
+                        if !ad.is_empty() || !matches!(tag, 0xa0 | 0x81 | 0x82 | 0xa3 | 0xa4 | 0xa5 | 0x86 | 0x87 | 0x88) {
                             return None;
                         }
                         if tag == 0x86 {
@@ -696,7 +700,11 @@ impl Cert {
                     }
                 } else if is(OID_TLS_FEATURE) {
                     // Features ::= SEQUENCE OF INTEGER (RFC 7633 6), each a TLS extension type
-                    let mut k = Der::new(val).seq()?;
+                    let mut top = Der::new(val);
+                    let mut k = top.seq()?;
+                    if !top.is_empty() {
+                        return None;
+                    }
                     while !k.is_empty() {
                         let v = k.u64()?;
                         c.tls_features.push(u16::try_from(v).ok()?);

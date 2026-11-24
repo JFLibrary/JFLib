@@ -43470,7 +43470,9 @@ KU_CRL_SIGN: u8 = 0x02
   - `ocsp_urls: Vec<String>` -- the OCSP responders of the authority information access (URIs, RFC 5280 4.2.2.1)
   - `ca_issuers: Vec<String>` -- where the issuer's certificate is (caIssuers URIs of the authority information access)
   - `tls_features: Vec<u16>` -- the TLS features the certificate demands (RFC 7633): TLS_FEATURE_STATUS_REQUEST is
-    "must staple", a TLS client refuses it without a stapled OCSP response
+    "must staple", a TLS client that asks for a stapled OCSP response refuses it without one
+    (netio: Revocation::Stapled or Required with Trust::Anchors, System or Custom; with
+    Revocation::Off, Trust::Pinned or Trust::Any it asks for none and does not look)
   - `ocsp_nocheck: bool` -- id-pkix-ocsp-nocheck (RFC 6960 4.2.2.2.1): an OCSP responder's certificate that is not
     checked for revocation itself
   - `unknown_critical: bool` -- a critical extension this code does not understand (such a certificate is rejected)
@@ -43584,7 +43586,9 @@ name is optional (ACME's CAs take the names from the extension).
   a request for these DNS names (the first one also the common name when it fits)
 - **`fn sign(&self, key: &PrivateKey) -> Option<Vec<u8>>`**
   the DER request, signed with `key` (ECDSA with its curve's hash, RSA PKCS #1 v1.5 with
-  SHA-256, Ed25519); None when a name is not a DNS name in the preferred syntax
+  SHA-256, Ed25519); None when a name is not a DNS name in the preferred syntax, or an RSA
+  key is shorter than 2048 bits or not a whole number of bytes (as Csr::parse and
+  certificates take them)
 
 - **`struct Csr`**
   a request read and its signature checked
@@ -43807,8 +43811,10 @@ ocsp -- the Online Certificate Status Protocol (RFC 6960, the lightweight profil
 A response is current from thisUpdate (5 minutes of clock skew allowed) to nextUpdate (and
 5 minutes after it); one without nextUpdate for a day after thisUpdate, as browsers take it.
 Delegated responders (RFC 6960 4.2.2.2) must be issued directly by the issuer, carry
-id-kp-OCSPSigning and be valid; their own revocation is not checked (they carry
-id-pkix-ocsp-nocheck as a rule).  Unknown critical extensions refuse a response.
+id-kp-OCSPSigning (and digitalSignature, when they have a key usage) and be valid, and a
+response counts no longer than its responder's certificate; their own revocation is not
+checked (they carry id-pkix-ocsp-nocheck as a rule).  Unknown critical extensions refuse a
+response, and a request.
 ```
 
 ```rust
@@ -43844,6 +43850,8 @@ UNAUTHORIZED: u8 = 6
   the id of `cert` with SHA-1 (RFC 5019 2.1.1: what responders take); None when `issuer` is
   not the one that names it or its key cannot be read
 - **`fn with_hash(cert: &Cert, issuer: &Cert, hash: IdHash) -> Option<CertId>`**
+- **`fn encode(&self) -> Vec<u8>`**
+  the DER CertID (a request's or a response's)
 
 - **`fn request(ids: &[CertId], nonce: Option<&[u8]>) -> Vec<u8>`**
   an OCSPRequest for these certificates, unsigned; `nonce` (1 to 32 bytes) binds the answer
@@ -43873,11 +43881,14 @@ UNAUTHORIZED: u8 = 6
   - `next_update: Option<i64>`
   - `produced_at: i64`
   - `nonce: Option<Vec<u8>>` -- the nonce it carries (compare it with the request's)
+  - `responder_until: Option<i64>` -- the end of the delegated responder's certificate that signed it (None: the issuer
+    signed it); the response counts no longer
 
 **`impl Response`**
 
 - **`fn expires(&self) -> i64`**
-  until when it counts as current (nextUpdate, or a day after thisUpdate)
+  until when it counts as current: nextUpdate (or a day after thisUpdate), at most to the
+  end of a delegated responder's certificate
 - **`fn refresh_at(&self) -> i64`**
   when a server fetches the next one: halfway between thisUpdate and the end (as RFC 5019
   6.2 and the CAs advise), at least an hour before the end
@@ -43886,7 +43897,9 @@ UNAUTHORIZED: u8 = 6
   a response about `cert`, which `issuer` issued, at `now` (Unix seconds): its structure, its
   signature (the issuer, or a responder certificate in it that the issuer issued for OCSP), the
   entry for `cert`, its time.  Ok with the status (a revoked one too: the caller decides);
-  Err why it cannot be used (an unsuccessful response, tryLater among them)
+  Err why it cannot be used (an unsuccessful response, tryLater among them).  That `issuer`
+  signed `cert` is the caller's to know (Cert::signed_by): the response is bound to the
+  issuer's name and key, so one for another CA's certificate does not count
 
 - **`struct ResponseBuilder`**
   a response to build and sign (a private CA's responder, tests)
@@ -43906,7 +43919,7 @@ UNAUTHORIZED: u8 = 6
 - **`fn sign(&self, cert: &Cert, issuer: &Cert, responder: Option<&Cert>, key: &PrivateKey) -> Option<Vec<u8>>`**
   the DER response about `cert`, signed with `key`: the issuer's key (`responder` None), or
   that of a responder certificate the issuer issued for OCSP (it goes into the response);
-  None when the key signs nothing a certificate names
+  None when `key` is not that certificate's, or it signs nothing a certificate names
 
 - **`fn error_response(code: u8) -> Vec<u8>`**
   an unsuccessful OCSPResponse (MALFORMED_REQUEST, INTERNAL_ERROR, TRY_LATER, SIG_REQUIRED,
@@ -45432,9 +45445,12 @@ MAX_CHAIN: usize = 1 << 20
 - **`fn respond(&self, ch: &Challenge) -> Result<(), AcmeError>`**
   tell the CA a challenge is ready to be checked (RFC 8555 7.5.1)
 - **`fn wait_authorization(&self, url: &str) -> Result<Authorization, AcmeError>`**
-  wait until the authorization is decided: Ok when valid
+  wait until the authorization is decided: Ok when valid.  Acme::timeout_ms bounds the
+  waiting: no look starts after it (a request under way runs out under the Client's
+  timeouts)
 - **`fn wait_order(&self, url: &str) -> Result<Order, AcmeError>`**
-  wait until the order is no longer pending or processing
+  wait until the order is no longer pending or processing (Acme::timeout_ms as
+  wait_authorization)
 - **`fn finalize(&self, order: &Order, csr: &[u8]) -> Result<Order, AcmeError>`**
   send the certificate request (DER) of a ready order
 - **`fn certificate(&self, url: &str) -> Result<(Vec<Vec<u8>>, String, Vec<String>), AcmeError>`**
@@ -45493,7 +45509,8 @@ MAX_CHAIN: usize = 1 << 20
 - **`struct TlsAlpn01`**
   tls-alpn-01 (RFC 8737): a certificate for the challenge, shown on port 443 to a client that
   offers only "acme-tls/1".  Clones share the certificates: one goes to the solver, one into
-  the server's config (setup)
+  the server's config (setup).  A name has one challenge at a time: a second one for it fails
+  to be set up until the first is cleaned up
 
 **`impl TlsAlpn01`**
 
@@ -46709,8 +46726,10 @@ FRESH_WINDOW_MS: i64 = 10_000
   a client's tickets (ClientConfig::sessions): per server, a connection takes the newest and
   the server sends new ones.  The key of a server is its name, the trust of the connection and
   its client identity, so a ticket a connection with Trust::Any got is never offered by one that
-  checks certificates, nor one of a client certificate by a connection without it.  Shared by
-  threads; in memory only
+  checks certificates, nor one of a client certificate by a connection without it; and its
+  revocation check, so one of Revocation::Off is never offered by a connection that checks.
+  A ticket whose handshake checked a stapled OCSP response goes when that response does.
+  Shared by threads; in memory only
 
 **`impl Sessions`**
 
@@ -46799,9 +46818,10 @@ MAX_STAPLE: usize = 32 * 1024
   (tests) keep any bytes for a leaf, unchecked, current for a day
 - **`fn set(&self, chain: &[Vec<u8>], issuer: Option<&Cert>, der: Vec<u8>) -> Result<Response, String>`**
   keep `der` for the leaf of `chain` (DER, leaf first): checked against the leaf and its
-  issuer (`issuer`, else the certificate of the chain that signed the leaf) and current
-  now.  A revoked or unknown status is kept too (the server shows what its CA says).
-  -> the response read
+  issuer (`issuer`, which must have signed the leaf, else the certificate of the chain that
+  did) and current now.  A revoked or unknown status is kept too (the server shows what its
+  CA says).  It is stapled until it expires (Response::expires: also the end of a
+  delegated responder's certificate).  -> the response read
 - **`fn get(&self, leaf: &[u8]) -> Option<Arc<Vec<u8>>>`**
   the response to staple for this leaf (DER): None when there is none or it is out of date
   (it is dropped then)

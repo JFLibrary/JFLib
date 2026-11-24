@@ -38,8 +38,14 @@ impl CsrBuilder {
     }
 
     /// the DER request, signed with `key` (ECDSA with its curve's hash, RSA PKCS #1 v1.5 with
-    /// SHA-256, Ed25519); None when a name is not a DNS name in the preferred syntax
+    /// SHA-256, Ed25519); None when a name is not a DNS name in the preferred syntax, or an RSA
+    /// key is shorter than 2048 bits or not a whole number of bytes (as Csr::parse and
+    /// certificates take them)
     pub fn sign(&self, key: &PrivateKey) -> Option<Vec<u8>> {
+        let bits = key.rsa_bits();
+        if bits != 0 && (bits < 2048 || bits % 8 != 0) {
+            return None;
+        }
         let subject = if self.cn.is_empty() { der::seq(&[]) } else { der::seq(&[&der::set(&[&der::seq(&[&der::oid(OID_CN), &der::utf8(&self.cn)])])]) };
         let mut exts: Vec<Vec<u8>> = Vec::new();
         if !self.dns.is_empty() || !self.ips.is_empty() {
@@ -155,9 +161,15 @@ impl Csr {
             if !vals.is_empty() {
                 return None;
             }
+            let mut seen: Vec<&[u8]> = Vec::new();
             while !exts.is_empty() {
                 let mut e = exts.seq()?;
                 let eid = e.read(der::OID)?;
+                // each extension once (RFC 5280 4.2): two SANs would make the names ambiguous
+                if seen.contains(&eid) {
+                    return None;
+                }
+                seen.push(eid);
                 if e.peek_tag() == Some(der::BOOLEAN) {
                     e.bool()?;
                 }
@@ -166,7 +178,12 @@ impl Csr {
                     return None;
                 }
                 if oid_is(eid, OID_SAN) {
-                    let mut k = Der::new(val).seq()?;
+                    // GeneralNames: SIZE (1..MAX)
+                    let mut top = Der::new(val);
+                    let mut k = top.seq()?;
+                    if k.is_empty() || !top.is_empty() {
+                        return None;
+                    }
                     while !k.is_empty() {
                         let (tag, v, _) = k.next()?;
                         match tag {
@@ -187,7 +204,11 @@ impl Csr {
                         }
                     }
                 } else if oid_is(eid, OID_TLS_FEATURE) {
-                    let mut k = Der::new(val).seq()?;
+                    let mut top = Der::new(val);
+                    let mut k = top.seq()?;
+                    if !top.is_empty() {
+                        return None;
+                    }
                     while !k.is_empty() {
                         c.tls_features.push(u16::try_from(k.u64()?).ok()?);
                     }

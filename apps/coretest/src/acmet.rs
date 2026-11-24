@@ -117,6 +117,43 @@ impl Solver for Dns {
 }
 
 /// a solver that shows the wrong key authorization
+/// what a group needs to go on: an Err counts as a failed check by name, so no group ends
+/// without its checks unnoticed
+fn need<X, E: core::fmt::Display>(t: &mut T, what: &str, r: Result<X, E>) -> Option<X> {
+    match r {
+        Ok(x) => Some(x),
+        Err(e) => {
+            t.check(&format!("acme: {}: {}", what, e), false);
+            None
+        }
+    }
+}
+
+/// a test CA with these faults; None (and a failed check) when it does not start
+fn start_rig(t: &mut T, p: &Pki, what: &str, faults: Faults) -> Option<Rig> {
+    let r = Rig::start(p, faults);
+    if r.is_none() {
+        t.check(&format!("acme: the test CA starts ({})", what), false);
+    }
+    r
+}
+
+/// a solver that keeps the tokens of the challenges it set up
+struct Seen<S>(S, Arc<Mutex<Vec<String>>>);
+
+impl<S: Solver> Solver for Seen<S> {
+    fn kinds(&self) -> Vec<&'static str> {
+        self.0.kinds()
+    }
+    fn present(&mut self, id: &Identifier, ch: &Challenge, key_auth: &str) -> Result<(), String> {
+        self.1.lock().push(ch.token.clone());
+        self.0.present(id, ch, key_auth)
+    }
+    fn cleanup(&mut self, id: &Identifier, ch: &Challenge) {
+        self.0.cleanup(id, ch)
+    }
+}
+
 struct Liar(Http01);
 
 impl Solver for Liar {
@@ -145,6 +182,8 @@ fn vectors(t: &mut T) {
     point.extend(crypto::b64::decode_url("4Etl6SRW2YiLUrN5vfvVHuhp7x8PxltmWWlbbM4IFyM").unwrap_or_default());
     let ec = PubKey::Ec { curve: crypto::ecdsa::Curve::P256, point };
     t.check("acme: the JWK thumbprint of a P-256 key (RFC 7517 A.1)", acme::thumbprint(&ec).as_deref() == Some("cn-I_WNMClehiVp51i_0VpOENW1upEerA8sEam5hn-s"));
+    let cut = |point: Vec<u8>| acme::thumbprint(&PubKey::Ec { curve: crypto::ecdsa::Curve::P256, point }).is_none();
+    t.check("acme: ... an EC point that is not uncompressed or of another length has none", cut(alloc::vec![4]) && cut(alloc::vec![2; 33]) && cut(alloc::vec![4; 64]));
     t.check("acme: RFC 3339 times (Z, fractions, offsets)", acme::rfc3339("2026-11-24T08:00:00Z") == Some(1_795_507_200) && acme::rfc3339("2026-11-24T08:00:00.123456Z") == Some(1_795_507_200) && acme::rfc3339("2026-11-24T09:30:00+01:30") == Some(1_795_507_200));
     t.check("acme: ... a malformed one is refused", ["2026-11-24", "2026-13-24T08:00:00Z", "2026-11-24T08:00:00", "2026-11-24T08:00:00.Z", "2026-11-24T08:00:00+0100"].iter().all(|s| acme::rfc3339(s).is_none()));
     t.check("acme: rfc3339_text writes them back", acme::rfc3339_text(1_795_507_200) == "2026-11-24T08:00:00Z");
@@ -164,7 +203,8 @@ fn issuance(t: &mut T, p: &Pki, rig: &Rig) {
     let Ok(acc) = acc else { return };
     // http-01 for two names
     let ck = key(Kind::P256, 112);
-    let mut h = rig.http01.clone();
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let mut h = Seen(rig.http01.clone(), seen.clone());
     let r = acc.issue(&ids(&["a.example.test", "b.example.test"]), &ck, &mut h, &OrderOptions::default());
     let leaf = r.as_ref().ok().and_then(|i| Cert::parse(&i.chain[0]));
     t.check("acme: http-01: issued for both names and the certificate key", leaf.as_ref().is_some_and(|c| c.names("a.example.test") && c.names("b.example.test") && c.key == ck.public_key()));
@@ -173,7 +213,8 @@ fn issuance(t: &mut T, p: &Pki, rig: &Rig) {
     t.check("acme: ... the CSR asked for the names, under the certificate key", csr.is_some_and(|c| c.dns == ["a.example.test", "b.example.test"] && c.spki == ck.spki() && c.cn == "a.example.test"));
     let alt = r.as_ref().ok().and_then(|i| i.alternates.first().cloned()).map(|u| acc.certificate(&u));
     t.check("acme: ... an alternate chain (Link rel=alternate)", alt.is_some_and(|x| x.is_ok_and(|(c, _, _)| c.len() == 1)));
-    t.check("acme: ... the challenge tokens are gone again", rig.http01.answer(&Request::new("GET", "/.well-known/acme-challenge/x")).is_none());
+    let tokens = seen.lock().clone();
+    t.check("acme: ... the challenge tokens are gone again", tokens.len() == 2 && tokens.iter().all(|tk| rig.http01.answer(&Request::new("GET", &format!("/.well-known/acme-challenge/{}", tk))).is_none()));
     // tls-alpn-01, and the site's own certificate for every other client
     let mut alpn = rig.alpn.clone();
     let r = acc.issue(&ids(&["c.example.test"]), &ck, &mut alpn, &OrderOptions::default());
@@ -212,7 +253,15 @@ fn issuance(t: &mut T, p: &Pki, rig: &Rig) {
     t.check("acme: TlsAlpn01::setup on a server without ALPN: a client of h2 is still served (no ALPN)", hs(&["h2", "http/1.1"]) == Some((None, false)));
     t.check("acme: ... \"acme-tls/1\" alone gets it and the challenge certificate", hs(&["acme-tls/1"]) == Some((Some(String::from("acme-tls/1")), true)));
     t.check("acme: ... \"acme-tls/1\" beside others counts as not offered", hs(&["acme-tls/1", "h2"]) == Some((None, false)));
+    // one challenge per name: a second is refused, and its cleanup leaves the first
+    let ch2 = Challenge { token: String::from("an0th3rt0k3nan0th3r"), ..ch.clone() };
+    let mut other = solo.clone();
+    let second = other.present(&id, &ch2, "an0th3r.thumb");
+    other.cleanup(&id, &ch2);
+    t.check("acme: tls-alpn-01: a second challenge for a name is refused, its cleanup leaves the first", second.is_err() && hs(&["acme-tls/1"]) == Some((Some(String::from("acme-tls/1")), true)));
     up.cleanup(&id, &ch);
+    t.check("acme: ... once the first is cleaned up the name is free", other.present(&id, &ch2, "an0th3r.thumb").is_ok());
+    other.cleanup(&id, &ch2);
     // dns-01 with a wildcard, http-01 for the plain name next to it
     let mut both = Solvers(alloc::vec![Box::new(rig.http01.clone()), Box::new(Dns(acme_srv.dns.clone()))]);
     let r = acc.issue(&ids(&["*.example.test", "example.test"]), &ck, &mut both, &OrderOptions::default());
@@ -230,10 +279,11 @@ fn issuance(t: &mut T, p: &Pki, rig: &Rig) {
     t.check("acme: a profile and must-staple asked for", r.as_ref().is_ok_and(|i| i.order.profile.as_deref() == Some("short") && Cert::parse(&i.chain[0]).is_some_and(|c| c.must_staple())) && acme_srv.last_order().1.as_deref() == Some("short"));
     t.check("acme: a profile the CA does not have", matches!(acc.new_order(&ids(&["e.example.test"]), &OrderOptions { profile: Some(String::from("none")), ..OrderOptions::default() }), Err(AcmeError::Problem(ref p)) if p.is("invalidProfile")));
     t.check("acme: the account key is not the certificate key", matches!(acc.issue(&ids(&["f.example.test"]), acc.key(), &mut rig.http01.clone(), &OrderOptions::default()), Err(AcmeError::Protocol(_))));
+    t.check("acme: after finalize the client waits out its Retry-After before it looks", acme_srv.state.lock().early_polls == 0);
 }
 
 fn account_keys(t: &mut T, p: &Pki, rig: &Rig) {
-    let Ok(a) = new_acme(p, &rig.acme) else { return };
+    let Some(a) = need(t, "account keys: the directory", new_acme(p, &rig.acme)) else { return };
     for (kind, alg) in [(Kind::P384, "ES384"), (Kind::Rsa, "RS256"), (Kind::Ed25519, "EdDSA")] {
         let acc = a.account(key(kind, 120), &agreed());
         let r = acc.as_ref().map_err(|e| e.clone()).and_then(|acc| acc.issue(&ids(&["k.example.test"]), &key(Kind::P256, 121), &mut rig.http01.clone(), &OrderOptions::default()));
@@ -242,7 +292,7 @@ fn account_keys(t: &mut T, p: &Pki, rig: &Rig) {
 }
 
 fn accounts(t: &mut T, p: &Pki, rig: &Rig) {
-    let Ok(a) = new_acme(p, &rig.acme) else { return };
+    let Some(a) = need(t, "accounts: the directory", new_acme(p, &rig.acme)) else { return };
     let k = key(Kind::P256, 130);
     let first = a.account(k.clone(), &agreed());
     let again = a.account(k.clone(), &agreed());
@@ -260,8 +310,8 @@ fn accounts(t: &mut T, p: &Pki, rig: &Rig) {
 }
 
 fn failures(t: &mut T, p: &Pki, rig: &Rig) {
-    let Ok(a) = new_acme(p, &rig.acme) else { return };
-    let Ok(acc) = a.account(key(Kind::P256, 140), &agreed()) else { return };
+    let Some(a) = need(t, "failures: the directory", new_acme(p, &rig.acme)) else { return };
+    let Some(acc) = need(t, "failures: the account", a.account(key(Kind::P256, 140), &agreed())) else { return };
     let ck = key(Kind::P256, 141);
     let mut liar = Liar(rig.http01.clone());
     let r = acc.issue(&ids(&["g.example.test"]), &ck, &mut liar, &OrderOptions::default());
@@ -277,8 +327,8 @@ fn failures(t: &mut T, p: &Pki, rig: &Rig) {
 }
 
 fn lifecycle(t: &mut T, p: &Pki, rig: &Rig) {
-    let Ok(a) = new_acme(p, &rig.acme) else { return };
-    let Ok(mut acc) = a.account(key(Kind::P256, 150), &agreed()) else { return };
+    let Some(a) = need(t, "lifecycle: the directory", new_acme(p, &rig.acme)) else { return };
+    let Some(mut acc) = need(t, "lifecycle: the account", a.account(key(Kind::P256, 150), &agreed())) else { return };
     let ck = key(Kind::P256, 151);
     let Ok(issued) = acc.issue(&ids(&["r.example.test"]), &ck, &mut rig.http01.clone(), &OrderOptions::default()) else {
         t.check("acme: lifecycle: issued", false);
@@ -298,7 +348,7 @@ fn lifecycle(t: &mut T, p: &Pki, rig: &Rig) {
     t.check("acme: revoked by the account (superseded)", r.is_ok() && rig.acme.revoked(&issued.chain[0]));
     t.check("acme: ... a second time: alreadyRevoked", matches!(acc.revoke(&issued.chain[0], None), Err(AcmeError::Problem(ref p)) if p.is("alreadyRevoked")));
     t.check("acme: ... reason 7 does not exist", matches!(acc.revoke(&issued.chain[0], Some(7)), Err(AcmeError::Problem(ref p)) if p.is("badRevocationReason")));
-    if let Ok(i2) = acc.issue(&ids(&["s.example.test"]), &ck, &mut rig.http01.clone(), &OrderOptions::default()) {
+    if let Some(i2) = need(t, "revoke_with_key: the certificate to revoke", acc.issue(&ids(&["s.example.test"]), &ck, &mut rig.http01.clone(), &OrderOptions::default())) {
         let other = key(Kind::P256, 152);
         t.check("acme: revoke_with_key: another key may not", acme::revoke_with_key(&a, &i2.chain[0], &other, Some(1)).is_err());
         t.check("acme: ... the certificate's own key may (keyCompromise)", acme::revoke_with_key(&a, &i2.chain[0], &ck, Some(1)).is_ok() && rig.acme.revoked(&i2.chain[0]));
@@ -316,8 +366,11 @@ fn lifecycle(t: &mut T, p: &Pki, rig: &Rig) {
 
 fn eab(t: &mut T, p: &Pki) {
     let mac = alloc::vec![7u8; 32];
-    let Some(rig) = Rig::start(p, Faults { eab: Some((String::from("kid-1"), mac.clone())), ..Faults::default() }) else { return };
-    let Ok(a) = new_acme(p, &rig.acme) else { return };
+    let Some(rig) = start_rig(t, p, "eab", Faults { eab: Some((String::from("kid-1"), mac.clone())), ..Faults::default() }) else { return };
+    let Some(a) = need(t, "eab: the directory", new_acme(p, &rig.acme)) else {
+        rig.stop();
+        return;
+    };
     t.check("acme: the directory asks for an external account binding", a.directory.external_account_required);
     t.check("acme: ... none given: refused before a request", matches!(a.account(key(Kind::P256, 160), &agreed()), Err(AcmeError::Protocol(_))));
     let good = Eab::new("kid-1", &crypto::b64::encode_url(&mac));
@@ -331,24 +384,24 @@ fn eab(t: &mut T, p: &Pki) {
 
 fn faults(t: &mut T, p: &Pki) {
     // the directory names an http URL: refused
-    if let Some(rig) = Rig::start(p, Faults { http_url: true, ..Faults::default() }) {
+    if let Some(rig) = start_rig(t, p, "http_url", Faults { http_url: true, ..Faults::default() }) {
         t.check("acme: a directory with an http URL is refused", matches!(new_acme(p, &rig.acme), Err(AcmeError::Protocol(_))));
         rig.stop();
     }
     // the certificate for another key
-    if let Some(rig) = Rig::start(p, Faults { wrong_key: true, ..Faults::default() }) {
+    if let Some(rig) = start_rig(t, p, "wrong_key", Faults { wrong_key: true, ..Faults::default() }) {
         let r = new_acme(p, &rig.acme).and_then(|a| a.account(key(Kind::P256, 170), &agreed())).and_then(|acc| acc.issue(&ids(&["w.example.test"]), &key(Kind::P256, 171), &mut rig.http01.clone(), &OrderOptions::default()));
         t.check("acme: a certificate the CA issued for another key is refused", matches!(r, Err(AcmeError::Protocol(_))));
         rig.stop();
     }
     // a certificate without one of the names ordered
-    if let Some(rig) = Rig::start(p, Faults { drop_name: true, ..Faults::default() }) {
+    if let Some(rig) = start_rig(t, p, "drop_name", Faults { drop_name: true, ..Faults::default() }) {
         let r = new_acme(p, &rig.acme).and_then(|a| a.account(key(Kind::P256, 175), &agreed())).and_then(|acc| acc.issue(&ids(&["m.example.test", "n.example.test"]), &key(Kind::P256, 176), &mut rig.http01.clone(), &OrderOptions::default()));
         t.check("acme: a certificate that leaves a name out is refused", matches!(r, Err(AcmeError::Protocol(ref s)) if s.contains("n.example.test")));
         rig.stop();
     }
     // Location and Link relative to the request (RFC 9110 10.2.2, RFC 8288 3.2)
-    if let Some(rig) = Rig::start(p, Faults { relative: true, ..Faults::default() }) {
+    if let Some(rig) = start_rig(t, p, "relative", Faults { relative: true, ..Faults::default() }) {
         let r = new_acme(p, &rig.acme).and_then(|a| a.account(key(Kind::P256, 179), &agreed())).and_then(|acc| {
             let i = acc.issue(&ids(&["q.example.test"]), &key(Kind::P256, 180), &mut rig.http01.clone(), &OrderOptions::default())?;
             Ok((acc.url.clone(), i.order.url.clone(), i.alternates.clone()))
@@ -359,19 +412,25 @@ fn faults(t: &mut T, p: &Pki) {
         rig.stop();
     }
     // a token that is not base64url (it goes into a path and a file name)
-    if let Some(rig) = Rig::start(p, Faults { bad_token: true, ..Faults::default() }) {
+    if let Some(rig) = start_rig(t, p, "bad_token", Faults { bad_token: true, ..Faults::default() }) {
         let r = new_acme(p, &rig.acme).and_then(|a| a.account(key(Kind::P256, 177), &agreed())).and_then(|acc| acc.issue(&ids(&["o.example.test"]), &key(Kind::P256, 178), &mut rig.http01.clone(), &OrderOptions::default()));
         t.check("acme: a challenge token outside base64url is refused", matches!(r, Err(AcmeError::Protocol(_))));
         rig.stop();
     }
     // rate limited: the problem with its Retry-After
-    if let Some(rig) = Rig::start(p, Faults { rate_limited: true, ..Faults::default() }) {
+    if let Some(rig) = start_rig(t, p, "rate_limited", Faults { rate_limited: true, ..Faults::default() }) {
         let r = new_acme(p, &rig.acme).and_then(|a| a.account(key(Kind::P256, 172), &agreed())).and_then(|acc| acc.new_order(&ids(&["z.example.test"]), &OrderOptions::default()));
         t.check("acme: rateLimited with Retry-After", matches!(r, Err(AcmeError::Problem(ref p)) if p.is("rateLimited") && p.status == 429 && p.retry_after == Some(30)));
         rig.stop();
     }
+    // a Retry-After date whose year is not four digits (its days would overflow): as if none
+    if let Some(rig) = start_rig(t, p, "retry_after", Faults { rate_limited: true, retry_after: Some("Sun, 06 Nov 9223372036854775807 08:49:37 GMT"), ..Faults::default() }) {
+        let r = new_acme(p, &rig.acme).and_then(|a| a.account(key(Kind::P256, 183), &agreed())).and_then(|acc| acc.new_order(&ids(&["z.example.test"]), &OrderOptions::default()));
+        t.check("acme: ... a Retry-After date with a year of 19 digits counts as none", matches!(r, Err(AcmeError::Problem(ref p)) if p.is("rateLimited") && p.retry_after.is_none()));
+        rig.stop();
+    }
     // a CA that does not decide: the wait ends
-    if let Some(rig) = Rig::start(p, Faults { stall: true, ..Faults::default() }) {
+    if let Some(rig) = start_rig(t, p, "stall", Faults { stall: true, ..Faults::default() }) {
         let r = new_acme(p, &rig.acme).and_then(|mut a| {
             a.timeout_ms = 1500;
             a.account(key(Kind::P256, 173), &agreed())
@@ -380,6 +439,14 @@ fn faults(t: &mut T, p: &Pki) {
         let r = r.and_then(|acc| acc.issue(&ids(&["y.example.test"]), &key(Kind::P256, 174), &mut rig.http01.clone(), &OrderOptions::default()));
         let ms = (plat::time_us() - start) / 1000;
         t.check("acme: an authorization never decided: Timeout after timeout_ms", matches!(r, Err(AcmeError::Timeout(_))) && (1000..10_000).contains(&ms));
+        // a limit on Retry-After under half a second (the CA asks for one): no panic, the limit
+        let r = new_acme(p, &rig.acme).and_then(|mut a| {
+            a.timeout_ms = 800;
+            a.max_poll_ms = 100;
+            a.account(key(Kind::P256, 181), &agreed())
+        });
+        let r = r.and_then(|acc| acc.issue(&ids(&["u.example.test"]), &key(Kind::P256, 182), &mut rig.http01.clone(), &OrderOptions::default()));
+        t.check("acme: ... with max_poll_ms under 500 ms too", matches!(r, Err(AcmeError::Timeout(_))));
         rig.stop();
     }
 }
@@ -499,8 +566,10 @@ pub fn pebble() -> i32 {
     check("pebble: dns-01 for a wildcard (challtestsrv), http-01 beside it", r.as_ref().is_ok_and(|i| chain_ok(i, "x.w.example.test") && chain_ok(i, "w.example.test")), &err(&r));
     let r = acc.issue(&ids(&["127.0.0.1"]), &ck, &mut http01.clone(), &OrderOptions::default());
     check("pebble: an IP address (RFC 8738) by http-01", r.as_ref().is_ok_and(|i| chain_ok(i, "127.0.0.1")), &err(&r));
-    let r = acc.issue(&ids(&["127.0.0.1"]), &key(Kind::P256, 212), &mut alpn.clone(), &OrderOptions::default());
-    check("pebble: ... and by tls-alpn-01 (the reverse name in server_name)", r.as_ref().is_ok_and(|i| chain_ok(i, "127.0.0.1")), &err(&r));
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let r = acc.issue(&ids(&["127.0.0.1"]), &key(Kind::P256, 212), &mut Seen(alpn.clone(), seen.clone()), &OrderOptions::default());
+    let proved = seen.lock().len();
+    check("pebble: ... and by tls-alpn-01 (the reverse name in server_name; proved, not reused)", r.as_ref().is_ok_and(|i| chain_ok(i, "127.0.0.1")) && proved == 1, &format!("{} (challenges set up: {})", err(&r), proved));
     let r = acc.issue(&ids(&["s.example.test"]), &ck, &mut http01.clone(), &OrderOptions { profile: Some(String::from("shortlived")), ..OrderOptions::default() });
     let short = r.as_ref().ok().and_then(|i| Cert::parse(&i.chain[0]));
     check("pebble: the profile shortlived (a shorter validity)", short.is_some_and(|c| c.not_after - c.not_before < 10 * 86_400), &err(&r));
@@ -525,9 +594,12 @@ pub fn pebble() -> i32 {
         let r = acc.revoke(&i.chain[0], None);
         check("pebble: ... again: alreadyRevoked", matches!(r, Err(AcmeError::Problem(ref p)) if p.is("alreadyRevoked")), &err(&r));
     }
-    if let Ok(i) = acc.issue(&ids(&["v.example.test"]), &ck, &mut http01.clone(), &OrderOptions::default()) {
-        let r = acme::revoke_with_key(&a, &i.chain[0], &ck, Some(1));
-        check("pebble: revoked by the certificate's key (keyCompromise)", r.is_ok(), &err(&r));
+    match acc.issue(&ids(&["v.example.test"]), &ck, &mut http01.clone(), &OrderOptions::default()) {
+        Ok(i) => {
+            let r = acme::revoke_with_key(&a, &i.chain[0], &ck, Some(1));
+            check("pebble: revoked by the certificate's key (keyCompromise)", r.is_ok(), &err(&r));
+        }
+        Err(e) => check("pebble: revoked by the certificate's key (keyCompromise)", false, &format!("its certificate: {}", e)),
     }
     let nk = key(Kind::P384, 230);
     let r = acc.change_key(nk.clone());

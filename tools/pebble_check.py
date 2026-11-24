@@ -1,6 +1,6 @@
 """pebble_check.py -- netio::acme against Pebble, Let's Encrypt's ACME test server.
 
-    python tools/pebble_check.py [--version v2.10.1]
+    python tools/pebble_check.py [--version v2.10.1] [--nonce-reject PERCENT] [--keep]
 
 Pebble and pebble-challtestsrv (github.com/letsencrypt/pebble, MPL-2.0) come as release binaries
 into build/pebble/VERSION once (gh release download; nothing installed system-wide).  Pebble
@@ -12,8 +12,12 @@ challenge servers off.  `coretest --acme-pebble` runs the checks: http-01, tls-a
 with a wildcard, an IP address, a profile, an invalid challenge, the account keys ES256, ES384,
 RS256 and EdDSA, renewal information and an order that replaces, revocation by the account and by
 the certificate's key, key change, contact, deactivation; every chain verified to Pebble's root.
-A second Pebble that requires an external account binding checks EAB.  Pebble refuses 5 % of
-nonces on purpose (the client tries again).  Linux; exit code 1 on a failure."""
+A second Pebble that requires an external account binding checks EAB.  Pebble reuses no
+authorization (PEBBLE_AUTHZREUSE=0: every order proves its names with the challenge it is
+about) and refuses 1 % of good nonces (--nonce-reject; Pebble's own default is 5 %, where three
+refusals of one request in a row would fail a run now and then): the client tries again with
+the nonce of the refusal.  The run's folder (PKI, config, logs) goes at the end unless --keep;
+the log of a Pebble whose checks failed is shown before.  Linux; exit code 1 on a failure."""
 import argparse
 import json
 import os
@@ -65,9 +69,19 @@ def fetch(version):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--version", default="v2.10.1")
+    ap.add_argument("--nonce-reject", type=int, default=1, help="the percentage of good nonces Pebble refuses")
+    ap.add_argument("--keep", action="store_true", help="keep the run's folder")
     args = ap.parse_args()
     bins = fetch(args.version)
-    d = Path(tempfile.mkdtemp(prefix="pebble-"))
+    if args.keep:
+        d = Path(tempfile.mkdtemp(prefix="pebble-"))
+        print(f"keeping {d}")
+        return run(args, bins, d)
+    with tempfile.TemporaryDirectory(prefix="pebble-") as td:
+        return run(args, bins, Path(td))
+
+
+def run(args, bins, d):
     subprocess.run([str(EXE), "--tls-pki", str(d), "--key", "p256"], check=True)
     dns, chall = free_port(), free_port()
     cs = subprocess.Popen([bins["pebble-challtestsrv"], "-defaultIPv4", "127.0.0.1", "-defaultIPv6", "", "-dnsserver", f"127.0.0.1:{dns}", "-http01", "", "-https01", "",
@@ -86,7 +100,7 @@ def main():
             if eab:
                 cfg["pebble"]["externalAccountMACKeys"] = {eab[0]: eab[1]}
             (d / "pebble.json").write_text(json.dumps(cfg))
-            env = dict(os.environ, PEBBLE_VA_NOSLEEP="1")
+            env = dict(os.environ, PEBBLE_VA_NOSLEEP="1", PEBBLE_AUTHZREUSE="0", PEBBLE_WFE_NONCEREJECT=str(args.nonce_reject))
             log = open(d / f"pebble-{listen}.log", "wb")
             pb = subprocess.Popen([bins["pebble"], "-config", str(d / "pebble.json"), "-dnsserver", f"127.0.0.1:{dns}"], env=env, stdout=log, stderr=subprocess.STDOUT)
             try:
@@ -103,12 +117,18 @@ def main():
                 print(out, end="")
                 if r.stderr:
                     print(r.stderr.decode(errors="replace")[-500:])
-                results += [line.startswith("ok") for line in out.splitlines() if line[:4] in ("ok  ", "FAIL")]
+                got = [line.startswith("ok") for line in out.splitlines() if line[:4] in ("ok  ", "FAIL")]
+                results += got
                 if r.returncode not in (0, 1):
                     results.append(False)
+                if not all(got) or r.returncode != 0:
+                    log.flush()
+                    print(f"--- the end of Pebble's log ({'EAB' if eab else 'plain'}):")
+                    print((d / f"pebble-{listen}.log").read_text(errors="replace")[-2000:])
             finally:
                 pb.terminate()
                 pb.wait(5)
+                log.close()
     finally:
         cs.terminate()
         cs.wait(5)

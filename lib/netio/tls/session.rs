@@ -21,7 +21,7 @@ use alloc::vec::Vec;
 
 use plat::sync::Mutex;
 
-use super::{ClientConfig, Trust, Verifier};
+use super::{ClientConfig, Revocation, Trust, Verifier};
 use crate::x509::Cert;
 
 /// the longest a ticket is valid and a session lasts from the handshake that authenticated the
@@ -58,6 +58,10 @@ pub(crate) struct Session {
     pub peer: Vec<Cert>,
     /// when that handshake ran (Unix seconds)
     pub auth_s: i64,
+    /// until when the good OCSP response stapled in that handshake counts (Unix seconds);
+    /// None: none was checked.  The session is not offered after it, so a resumption takes the
+    /// certificate's status no longer than a full handshake would
+    pub status_until: Option<i64>,
     /// keeps the check of Trust::Custom alive while its address is part of the key
     pub _pin: Option<Verifier>,
 }
@@ -71,8 +75,10 @@ impl Drop for Session {
 /// a client's tickets (ClientConfig::sessions): per server, a connection takes the newest and
 /// the server sends new ones.  The key of a server is its name, the trust of the connection and
 /// its client identity, so a ticket a connection with Trust::Any got is never offered by one that
-/// checks certificates, nor one of a client certificate by a connection without it.  Shared by
-/// threads; in memory only
+/// checks certificates, nor one of a client certificate by a connection without it; and its
+/// revocation check, so one of Revocation::Off is never offered by a connection that checks.
+/// A ticket whose handshake checked a stapled OCSP response goes when that response does.
+/// Shared by threads; in memory only
 pub struct Sessions {
     inner: Mutex<Vec<([u8; 32], Vec<Session>)>>,
     servers: usize,
@@ -155,18 +161,28 @@ impl Sessions {
 }
 
 /// a session a client may offer: within the ticket's lifetime, 7 days from the handshake that
-/// authenticated the server, the server's certificate not expired
+/// authenticated the server, the server's certificate not expired, the OCSP response checked in
+/// that handshake (if one was) still current
 fn valid(s: &Session, now_ms: i64) -> bool {
     let now_s = now_ms.div_euclid(1000);
-    now_ms - s.received_ms < s.lifetime_ms && now_s - s.auth_s < MAX_LIFETIME as i64 && s.peer.first().is_none_or(|c| now_s <= c.not_after)
+    now_ms - s.received_ms < s.lifetime_ms
+        && now_s - s.auth_s < MAX_LIFETIME as i64
+        && s.peer.first().is_none_or(|c| now_s <= c.not_after)
+        && s.status_until.is_none_or(|u| now_s <= u)
 }
 
-/// what a client's tickets are kept by: the server name, the trust and the client identity
+/// what a client's tickets are kept by: the server name, the trust, the revocation check and
+/// the client identity
 pub(crate) fn session_key(cfg: &ClientConfig) -> [u8; 32] {
     let mut m = Vec::new();
     m.extend_from_slice(cfg.server_name.to_ascii_lowercase().as_bytes());
     m.push(0);
     trust_print(&cfg.trust, &mut m);
+    m.push(match cfg.revocation {
+        Revocation::Off => b'o',
+        Revocation::Stapled => b's',
+        Revocation::Required => b'r',
+    });
     match cfg.identity.as_ref() {
         Some(id) => {
             m.push(1);

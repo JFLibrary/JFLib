@@ -55,14 +55,15 @@ impl Staples {
     #[doc(hidden)]
     pub fn test_insert(&self, leaf: &[u8], der: Vec<u8>) {
         let now = self.now();
-        let response = Response { status: ocsp::Status::Good, this_update: now, next_update: Some(now + 86_400), produced_at: now, nonce: None };
+        let response = Response { status: ocsp::Status::Good, this_update: now, next_update: Some(now + 86_400), produced_at: now, nonce: None, responder_until: None };
         self.map.lock().insert(crypto::sha256(leaf), Entry { der: Arc::new(der), response });
     }
 
     /// keep `der` for the leaf of `chain` (DER, leaf first): checked against the leaf and its
-    /// issuer (`issuer`, else the certificate of the chain that signed the leaf) and current
-    /// now.  A revoked or unknown status is kept too (the server shows what its CA says).
-    /// -> the response read
+    /// issuer (`issuer`, which must have signed the leaf, else the certificate of the chain that
+    /// did) and current now.  A revoked or unknown status is kept too (the server shows what its
+    /// CA says).  It is stapled until it expires (Response::expires: also the end of a
+    /// delegated responder's certificate).  -> the response read
     pub fn set(&self, chain: &[Vec<u8>], issuer: Option<&Cert>, der: Vec<u8>) -> Result<Response, String> {
         if der.len() > MAX_STAPLE {
             return Err(String::from("the OCSP response is too long to staple"));
@@ -70,7 +71,8 @@ impl Staples {
         let leaf = chain.first().and_then(|c| Cert::parse(c)).ok_or_else(|| String::from("no certificate"))?;
         let found;
         let issuer = match issuer {
-            Some(i) => i,
+            Some(i) if leaf.signed_by(i) => i,
+            Some(_) => return Err(String::from("the issuer given did not sign the certificate")),
             None => {
                 found = chain[1..].iter().filter_map(|c| Cert::parse(c)).find(|c| leaf.signed_by(c)).ok_or_else(|| String::from("the chain holds no issuer of the certificate"))?;
                 &found

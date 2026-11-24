@@ -15,8 +15,10 @@
 // A response is current from thisUpdate (5 minutes of clock skew allowed) to nextUpdate (and
 // 5 minutes after it); one without nextUpdate for a day after thisUpdate, as browsers take it.
 // Delegated responders (RFC 6960 4.2.2.2) must be issued directly by the issuer, carry
-// id-kp-OCSPSigning and be valid; their own revocation is not checked (they carry
-// id-pkix-ocsp-nocheck as a rule).  Unknown critical extensions refuse a response.
+// id-kp-OCSPSigning (and digitalSignature, when they have a key usage) and be valid, and a
+// response counts no longer than its responder's certificate; their own revocation is not
+// checked (they carry id-pkix-ocsp-nocheck as a rule).  Unknown critical extensions refuse a
+// response, and a request.
 
 use alloc::format;
 use alloc::string::String;
@@ -112,7 +114,8 @@ impl CertId {
         Some(CertId { hash, name_hash: hash.digest(&issuer.subject), key_hash: hash.digest(key), serial: cert.serial.clone() })
     }
 
-    fn encode(&self) -> Vec<u8> {
+    /// the DER CertID (a request's or a response's)
+    pub fn encode(&self) -> Vec<u8> {
         der::seq(&[
             &der::seq(&[&der::oid(self.hash.arcs()), &[der::NULL, 0]]),
             &der::octets(&self.name_hash),
@@ -179,7 +182,10 @@ impl Request {
         while !list.is_empty() {
             let mut one = list.seq()?;
             ids.push(CertId::parse(&mut one)?);
-            one.optional(0xa0);
+            // singleRequestExtensions: an unknown critical one refuses the request
+            if let Some(e) = one.optional(0xa0) {
+                find_nonce(e)?;
+            }
             if !one.is_empty() || ids.len() > 64 {
                 return None;
             }
@@ -236,12 +242,17 @@ pub struct Response {
     pub produced_at: i64,
     /// the nonce it carries (compare it with the request's)
     pub nonce: Option<Vec<u8>>,
+    /// the end of the delegated responder's certificate that signed it (None: the issuer
+    /// signed it); the response counts no longer
+    pub responder_until: Option<i64>,
 }
 
 impl Response {
-    /// until when it counts as current (nextUpdate, or a day after thisUpdate)
+    /// until when it counts as current: nextUpdate (or a day after thisUpdate), at most to the
+    /// end of a delegated responder's certificate
     pub fn expires(&self) -> i64 {
-        self.next_update.unwrap_or(self.this_update + NO_NEXT_UPDATE)
+        let end = self.next_update.unwrap_or(self.this_update + NO_NEXT_UPDATE);
+        self.responder_until.map_or(end, |r| end.min(r))
     }
 
     /// when a server fetches the next one: halfway between thisUpdate and the end (as RFC 5019
@@ -282,7 +293,9 @@ fn names_responder(rid: (u8, &[u8]), c: &Cert) -> bool {
 /// a response about `cert`, which `issuer` issued, at `now` (Unix seconds): its structure, its
 /// signature (the issuer, or a responder certificate in it that the issuer issued for OCSP), the
 /// entry for `cert`, its time.  Ok with the status (a revoked one too: the caller decides);
-/// Err why it cannot be used (an unsuccessful response, tryLater among them)
+/// Err why it cannot be used (an unsuccessful response, tryLater among them).  That `issuer`
+/// signed `cert` is the caller's to know (Cert::signed_by): the response is bound to the
+/// issuer's name and key, so one for another CA's certificate does not count
 pub fn check(b: &[u8], cert: &Cert, issuer: &Cert, now: i64) -> Result<Response, String> {
     let bad = || String::from("malformed OCSP response");
     let mut top = Der::new(b);
@@ -355,13 +368,18 @@ pub fn check(b: &[u8], cert: &Cert, issuer: &Cert, now: i64) -> Result<Response,
     if !t.is_empty() {
         return Err(bad());
     }
-    // the signer: the issuer, or a responder it issued for OCSP and named by the ResponderID
-    let delegated = |c: &&Cert| c.signed_by(issuer) && c.ocsp_signer() && !c.unknown_critical && now >= c.not_before && now <= c.not_after;
-    let signer = core::iter::once(issuer).chain(certs.iter().filter(delegated)).find(|c| names_responder(rid, c));
-    let signer = signer.ok_or_else(|| String::from("the OCSP response is not signed by the certificate's issuer or a responder it named"))?;
-    if !signer.verify(alg, tbs_raw, sig) {
-        return Err(String::from("the OCSP response's signature does not verify"));
+    // the signer: the issuer, or a responder it issued for OCSP (a key usage, when there is
+    // one, with digitalSignature) and named by the ResponderID; each that the ResponderID
+    // names is tried (a responder may bear its CA's name)
+    let delegated = |c: &&Cert| {
+        c.signed_by(issuer) && c.ocsp_signer() && c.key_usage.is_none_or(|k| k & crate::KU_DIGITAL_SIGNATURE != 0) && !c.unknown_critical && now >= c.not_before && now <= c.not_after
+    };
+    let named: Vec<&Cert> = core::iter::once(issuer).chain(certs.iter().filter(delegated)).filter(|c| names_responder(rid, c)).collect();
+    if named.is_empty() {
+        return Err(String::from("the OCSP response is not signed by the certificate's issuer or a responder it named"));
     }
+    let signer = named.into_iter().find(|c| c.verify(alg, tbs_raw, sig)).ok_or_else(|| String::from("the OCSP response's signature does not verify"))?;
+    let responder_until = (!core::ptr::eq(signer, issuer)).then_some(signer.not_after);
     // the entry of this certificate
     if cert.issuer != issuer.subject {
         return Err(String::from("the issuer given is not the certificate's"));
@@ -417,7 +435,7 @@ pub fn check(b: &[u8], cert: &Cert, issuer: &Cert, now: i64) -> Result<Response,
     if next_update.is_some_and(|n| n < this_update) {
         return Err(bad());
     }
-    let r = Response { status, this_update, next_update, produced_at, nonce };
+    let r = Response { status, this_update, next_update, produced_at, nonce, responder_until };
     if this_update > now + SKEW {
         return Err(String::from("the OCSP response is not valid yet"));
     }
@@ -452,10 +470,13 @@ impl ResponseBuilder {
 
     /// the DER response about `cert`, signed with `key`: the issuer's key (`responder` None), or
     /// that of a responder certificate the issuer issued for OCSP (it goes into the response);
-    /// None when the key signs nothing a certificate names
+    /// None when `key` is not that certificate's, or it signs nothing a certificate names
     pub fn sign(&self, cert: &Cert, issuer: &Cert, responder: Option<&Cert>, key: &PrivateKey) -> Option<Vec<u8>> {
         let id = CertId::with_hash(cert, issuer, self.hash)?;
         let signer = responder.unwrap_or(issuer);
+        if key.public_key() != signer.key {
+            return None;
+        }
         let rid = if self.by_key {
             let (_, k) = signer.spki_parts()?;
             der::explicit(2, &der::octets(&crypto::sha1(k)))

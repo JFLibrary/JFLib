@@ -453,10 +453,14 @@ def ocsp(exe, check):
     _, out = run(["openssl", "req", "-inform", "DER", "-in", str(d / "csr.der"), "-noout", "-verify", "-text"])
     check("csr: openssl req verifies ours (names, address, must-staple)", "verify OK" in out and "DNS:a.example.test" in out and "IP Address:127.0.0.1" in out and "status_request" in out, out[-300:])
     for alg, gen in (("P-256", ["-algorithm", "EC", "-pkeyopt", "ec_paramgen_curve:P-256"]), ("RSA", ["-algorithm", "RSA", "-pkeyopt", "rsa_keygen_bits:2048"]), ("Ed25519", ["-algorithm", "ED25519"])):
-        k = d / f"csr-{alg}.key"
-        run(["openssl", "genpkey", *gen, "-out", str(k)])
-        run(["openssl", "req", "-new", "-key", str(k), "-subj", "/CN=x.example.test", "-addext", "subjectAltName=DNS:x.example.test,IP:127.0.0.1", "-outform", "DER", "-out", str(d / "o.der")])
-        out = tool("csr", str(d / "o.der"))
+        k, o = d / f"csr-{alg}.key", d / f"csr-{alg}.der"
+        rc, out = run(["openssl", "genpkey", *gen, "-out", str(k)])
+        if rc == 0:
+            rc, out = run(["openssl", "req", "-new", "-key", str(k), "-subj", "/CN=x.example.test", "-addext", "subjectAltName=DNS:x.example.test,IP:127.0.0.1", "-outform", "DER", "-out", str(o)])
+        if rc != 0:
+            check(f"csr: we read openssl's ({alg})", False, f"openssl made no request: {out[-300:]}")
+            continue
+        out = tool("csr", str(o))
         check(f"csr: we read openssl's ({alg})", out.startswith("dns=x.example.test ips=127.0.0.1") and "cn=x.example.test" in out, out)
     # stapling: our server -> openssl s_client -status
     req = b"GET / HTTP/1.0\r\nHost: localhost\r\n\r\n"

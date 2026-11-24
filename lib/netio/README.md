@@ -103,7 +103,7 @@ use jflib::netio::tls::{self, ClientConfig, Identity, ServerConfig, Trust};
 
 // a certificate chain and its key as a CA hands them out (PEM), HTTP/1.1 by ALPN
 let identity = Identity::from_pem(&chain_pem, &key_pem)?; // Result<Identity, String>
-let cfg = ServerConfig { alpn: vec![String::from("http/1.1")], ..ServerConfig::new(identity) };
+let cfg = ServerConfig { alpn: vec![String::from("http/1.1")], ..ServerConfig::new(identity.clone()) };
 let tls = tls::accept(Box::new(tcp), cfg.clone()); // Result<TlsStream, TlsError>
 
 // resumption: one Tickets for all connections of the server, one Sessions for a client's

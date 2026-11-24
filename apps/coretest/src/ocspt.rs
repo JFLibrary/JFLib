@@ -100,6 +100,12 @@ fn extensions(t: &mut T, p: &Pki) {
     t.check("x509: an empty authority information access is refused", with(&[pkix::extension(OID_AIA, false, &pkix::der::seq(&[]))]).is_none());
     t.check("x509: a TLS feature that is not a list of integers is refused", with(&[pkix::extension(OID_TLS_FEATURE, false, &pkix::der::seq(&[&pkix::der::utf8("5")]))]).is_none());
     t.check("x509: a TLS feature over 65535 is refused", with(&[pkix::extension(OID_TLS_FEATURE, false, &pkix::der::seq(&[&pkix::der::small_int(70_000)]))]).is_none());
+    // bytes after the value's SEQUENCE; an access location that is no GeneralName (NULL)
+    let five = pkix::der::seq(&[&pkix::der::small_int(5)]);
+    t.check("x509: a TLS feature with bytes after its list is refused", with(&[pkix::extension(OID_TLS_FEATURE, false, &[five.clone(), five.clone()].concat())]).is_none() && with(&[pkix::extension(OID_TLS_FEATURE, false, &five)]).is_some_and(|c| c.must_staple()));
+    t.check("x509: an authority information access with bytes after its list is refused", with(&[pkix::extension(OID_AIA, false, &[aia.clone(), pkix::der::seq(&[])].concat())]).is_none());
+    let null_loc = pkix::der::seq(&[&ad(1, &[pkix::der::NULL, 0])]);
+    t.check("x509: an access location that is no GeneralName is refused", with(&[pkix::extension(OID_AIA, false, &null_loc)]).is_none());
     let (r, _) = responder(4, true, now() + 86_400, (&p.ca, &p.ca_key));
     t.check("x509: a responder certificate signs OCSP and carries ocsp-nocheck", r.ocsp_signer() && r.ocsp_nocheck);
 }
@@ -156,6 +162,24 @@ fn delegated(t: &mut T, p: &Pki) {
     t.check("ocsp: a responder of another CA may not answer", ocsp::check(&by(&foreign), &c, &p.ca, n).is_err());
     let expired = responder(24, true, n - 60, (&p.ca, &p.ca_key));
     t.check("ocsp: an expired responder may not answer", ocsp::check(&by(&expired), &c, &p.ca, n).is_err());
+    // a responder whose key usage lacks digitalSignature (a CA's: keyCertSign, cRLSign)
+    let kr = key(Kind::P256, 25);
+    let eku = pkix::extension(&[2, 5, 29, 37], false, &pkix::der::seq(&[&pkix::der::oid(&[1, 3, 6, 1, 5, 5, 7, 3, 9])]));
+    let b = CertBuilder { serial: [25; 16], cn: String::from("OCSP responder"), not_before: n - 3600, not_after: n + 30 * 86_400, is_ca: true, spki: kr.spki(), ..CertBuilder::default() };
+    let ku = (Cert::parse(&b.sign_key(Some(&p.ca), &p.ca_key, &[eku]).unwrap_or_default()).unwrap_or_default(), kr);
+    t.check("ocsp: a responder without digitalSignature in its key usage may not answer", ku.0.ocsp_signer() && ocsp::check(&by(&ku), &c, &p.ca, n).is_err());
+    // a responder with its CA's name: byName names both, the one whose key verifies counts
+    let kn = key(Kind::P256, 26);
+    let b = CertBuilder { serial: [26; 16], cn: p.ca.subject_cn.clone(), org: p.ca.subject_org.clone(), not_before: n - 3600, not_after: n + 30 * 86_400, ocsp_signing: true, spki: kn.spki(), ..CertBuilder::default() };
+    let twin = (Cert::parse(&b.sign_key(Some(&p.ca), &p.ca_key, &[]).unwrap_or_default()).unwrap_or_default(), kn);
+    let by_name = ResponseBuilder { by_key: false, ..ResponseBuilder::good(n) }.sign(&c, &p.ca, Some(&twin.0), &twin.1).unwrap_or_default();
+    t.check("ocsp: a responder named like its CA (byName) is found", twin.0.subject == p.ca.subject && ocsp::check(&by_name, &c, &p.ca, n).is_ok());
+    // a response counts no longer than its delegated responder's certificate
+    let soon = responder(27, true, n + 600, (&p.ca, &p.ca_key));
+    let r = ocsp::check(&by(&soon), &c, &p.ca, n);
+    t.check("ocsp: a response expires with its delegated responder", r.is_ok_and(|r| r.responder_until == Some(soon.0.not_after) && r.expires() == soon.0.not_after && r.refresh_at() <= n));
+    t.check("ocsp: ... one signed by the issuer has no such end", ocsp::check(&good(p, &c), &c, &p.ca, n).is_ok_and(|r| r.responder_until.is_none()));
+    t.check("ocsp: ResponseBuilder::sign refuses a key that is not the signer's", ResponseBuilder::good(n).sign(&c, &p.ca, None, &ok.1).is_none() && ResponseBuilder::good(n).sign(&c, &p.ca, Some(&ok.0), &p.ca_key).is_none());
 }
 
 fn times(t: &mut T, p: &Pki) {
@@ -194,6 +218,14 @@ fn malformed(t: &mut T, p: &Pki) {
     }
     t.check("ocsp: a changed byte never makes another status", same);
     t.check("ocsp: a request with a requestor name (signed) is not read", ocsp::Request::parse(&pkix::der::seq(&[&pkix::der::seq(&[&pkix::der::explicit(1, &[]), &pkix::der::seq(&[])])])).is_none());
+    let single_ext = |critical: bool| {
+        let id = CertId::new(&c, &p.ca).map(|i| i.encode()).unwrap_or_default();
+        let e = pkix::extension(&[1, 3, 6, 1, 4, 1, 99999, 1], critical, &pkix::der::octets(&[]));
+        let one = pkix::der::seq(&[&id, &pkix::der::explicit(0, &pkix::der::seq(&[&e]))]);
+        pkix::der::seq(&[&pkix::der::seq(&[&pkix::der::seq(&[&one])])])
+    };
+    t.check("ocsp: a request with an unknown critical singleRequestExtension is not read", ocsp::Request::parse(&single_ext(true)).is_none());
+    t.check("ocsp: ... a non-critical one is skipped", ocsp::Request::parse(&single_ext(false)).is_some_and(|r| r.ids.len() == 1));
 }
 
 fn csr(t: &mut T, p: &Pki) {
@@ -211,6 +243,24 @@ fn csr(t: &mut T, p: &Pki) {
     let none = CsrBuilder::default().sign(&k).as_deref().and_then(Csr::parse);
     t.check("csr: one without names or attributes", none.is_some_and(|r| r.dns.is_empty() && r.ips.is_empty()));
     t.check("csr: a name not in the preferred syntax is not put in", CsrBuilder::for_names(&["not a name"]).sign(&k).is_none());
+    let short = crypto::rsa::PrivateKey::generate(1024, &mut crate::tlsweb::xorshift(52)).and_then(PrivateKey::rsa);
+    t.check("csr: an RSA key under 2048 bits signs none (none would be read)", short.is_some_and(|s| CsrBuilder::for_names(&["a.example.test"]).sign(&s).is_none()));
+    // requests with extensions of our choosing, signed with k (ECDSA P-256 with SHA-256)
+    let custom = |exts: &[Vec<u8>]| {
+        use pkix::der;
+        let parts: Vec<&[u8]> = exts.iter().map(|v| v.as_slice()).collect();
+        let attrs = der::explicit(0, &der::seq(&[&der::oid(&[1, 2, 840, 113549, 1, 9, 14]), &der::set(&[&der::seq(&parts)])]));
+        let info = der::seq(&[&der::small_int(0), &der::seq(&[]), &k.spki(), &attrs]);
+        let sig = k.sign(k.cert_alg(), &info, &[]).unwrap_or_default();
+        Csr::parse(&der::seq(&[&info, &der::seq(&[&der::oid(&[1, 2, 840, 10045, 4, 3, 2])]), &der::bits(&sig)]))
+    };
+    let san = |n: &[u8]| pkix::extension(&[2, 5, 29, 17], false, &pkix::der::seq(&[&pkix::der::tlv(0x82, n)]));
+    let five = pkix::der::seq(&[&pkix::der::small_int(5)]);
+    let feature = |v: &[u8]| pkix::extension(OID_TLS_FEATURE, false, v);
+    t.check("csr: a name and a TLS feature are read (the requests below are well signed)", custom(&[san(b"a.example.test"), feature(&five)]).is_some_and(|r| r.dns == ["a.example.test"] && r.tls_features == [5]));
+    t.check("csr: two subject alternative names are refused", custom(&[san(b"a.example.test"), san(b"b.example.test")]).is_none());
+    t.check("csr: an empty subject alternative name is refused", custom(&[pkix::extension(&[2, 5, 29, 17], false, &pkix::der::seq(&[]))]).is_none());
+    t.check("csr: a TLS feature with bytes after its list is refused", custom(&[feature(&[five.clone(), five.clone()].concat())]).is_none());
     let der = CsrBuilder::for_names(&["a.example.test"]).sign(&k).unwrap_or_default();
     let mut sig = der.clone();
     let l = sig.len();
@@ -260,6 +310,7 @@ fn stapling(t: &mut T, p: &Pki) {
     t.check("stapling: the server keeps a good response for its certificate", set.is_ok_and(|r| r.status == Status::Good) && st.len() == 1);
     t.check("stapling: without the issuer (a chain of the leaf alone) it cannot be checked", st.set(&id.chain, None, g.clone()).is_err());
     let (other, _, _) = leaf(p, 61, |_| {});
+    t.check("stapling: an issuer given that did not sign the leaf is refused", st.set(&id.chain, Some(&other), g.clone()).is_err_and(|e| e.contains("did not sign")));
     t.check("stapling: a response about another certificate is not kept", st.set(&id.chain, Some(&p.ca), good(p, &other)).is_err());
     t.check("stapling: one too long is not kept", st.set(&id.chain, Some(&p.ca), alloc::vec![0; tls::staple::MAX_STAPLE + 1]).is_err());
     let r = go(ccfg(p, Revocation::Stapled), scfg(&id, Some(&st)));
@@ -333,6 +384,29 @@ fn stapling(t: &mut T, p: &Pki) {
     let first = resume(&ss);
     let second = resume(&ss);
     t.check("stapling: a resumption (Required) needs none: its first handshake had one", first.as_ref().is_ok_and(|c| c.ocsp_response().is_some()) && second.as_ref().is_ok_and(|c| c.resumed() && c.ocsp_response().is_none()));
+    let with = |ss: &Arc<tls::Sessions>, rev: Revocation, staples: Option<&Arc<Staples>>| {
+        let c = ClientConfig { sessions: Some(ss.clone()), ..ccfg(p, rev) };
+        let s = ServerConfig { tickets: Some(tk.clone()), ..scfg(&id, staples) };
+        go(c, s)
+    };
+    // a session of Revocation::Off is never offered by Required: it checks in full (and stays)
+    let ss = Arc::new(tls::Sessions::default());
+    let off = with(&ss, Revocation::Off, None);
+    let n = ss.len();
+    let req = with(&ss, Revocation::Required, None);
+    t.check("stapling: Required does not resume a session of Revocation::Off (no staple: refused)", off.is_ok() && n > 0 && alert(&req) == Some(BAD_STATUS) && ss.len() == n);
+    // a session goes when the staple its handshake checked does (here after an hour)
+    let short = ResponseBuilder { next_update: Some(now() + 3600), ..ResponseBuilder::good(now()) }.sign(&c, &p.ca, None, &p.ca_key).unwrap_or_default();
+    let sst = Arc::new(Staples::new());
+    let _ = sst.set(&id.chain, Some(&p.ca), short);
+    let ss = Arc::new(tls::Sessions::default());
+    let a = with(&ss, Revocation::Stapled, Some(&sst));
+    ss.test_shift(30 * 60 * 1000);
+    let b = with(&ss, Revocation::Stapled, Some(&sst));
+    ss.test_shift(2 * 3600 * 1000);
+    let c2 = with(&ss, Revocation::Stapled, Some(&sst));
+    t.check("stapling: a session is resumed while the staple its handshake checked is current", a.is_ok() && b.as_ref().is_ok_and(|c| c.resumed()));
+    t.check("stapling: ... and not after it (a full handshake checks a new one)", c2.as_ref().is_ok_and(|c| !c.resumed() && c.ocsp_response().is_some()));
 }
 
 /// status_request in a ClientHello as it comes (RFC 6066 8), and where a client takes none

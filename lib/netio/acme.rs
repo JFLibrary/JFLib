@@ -265,18 +265,57 @@ impl Answer {
 }
 
 /// a URL of a Location or Link header against the URL of the request (RFC 9110 10.2.2,
-/// RFC 8288 3.2): absolute as it is, "/path" on the request's origin, else beside its path
+/// RFC 8288 3.2), as RFC 3986 5.2 resolves a reference: absolute as it is, "//host/path" on the
+/// request's scheme, "/path" on its origin, else beside its path ("." and ".." taken out)
 fn resolve(base: &str, r: &str) -> String {
-    if r.contains("://") {
+    // a scheme: an absolute URL
+    let scheme_end = r.find(':').filter(|&i| i > 0 && !r[..i].contains(['/', '?', '#']));
+    if scheme_end.is_some() {
         return String::from(r);
     }
     let Some(u) = Url::parse(base) else { return String::from(r) };
-    if r.starts_with('/') {
-        return format!("{}{}", u.origin(), r);
+    let scheme = base.split_once(':').map_or("https", |(s, _)| s);
+    if r.starts_with("//") {
+        return format!("{}:{}", scheme, r);
     }
     let path = u.target.split(['?', '#']).next().unwrap_or("");
-    let dir = path.rsplit_once('/').map_or("", |(d, _)| d);
-    format!("{}{}/{}", u.origin(), dir, r)
+    if r.is_empty() || r.starts_with('#') {
+        let no_frag = u.target.split('#').next().unwrap_or("");
+        return format!("{}{}{}", u.origin(), no_frag, r);
+    }
+    if r.starts_with('?') {
+        return format!("{}{}{}", u.origin(), path, r);
+    }
+    let merged = if r.starts_with('/') { String::from(r) } else { format!("{}/{}", path.rsplit_once('/').map_or("", |(d, _)| d), r) };
+    format!("{}{}", u.origin(), remove_dots(&merged))
+}
+
+/// a path without its "." and ".." segments (RFC 3986 5.2.4); the query stays as it is
+fn remove_dots(p: &str) -> String {
+    let (path, rest) = match p.find(['?', '#']) {
+        Some(i) => p.split_at(i),
+        None => (p, ""),
+    };
+    let mut out: Vec<&str> = Vec::new();
+    let segs: Vec<&str> = path.split('/').skip(1).collect();
+    for (i, seg) in segs.iter().enumerate() {
+        let last = i + 1 == segs.len();
+        match *seg {
+            "." => {
+                if last {
+                    out.push("");
+                }
+            }
+            ".." => {
+                out.pop();
+                if last {
+                    out.push("");
+                }
+            }
+            s => out.push(s),
+        }
+    }
+    format!("/{}{}", out.join("/"), rest)
 }
 
 /// an https URL of the CA (RFC 8555 6.1: every ACME URL is https)
@@ -324,12 +363,18 @@ fn http_date(s: &str) -> Option<i64> {
     if p.len() != 6 || p[5] != "GMT" {
         return None;
     }
+    // IMF-fixdate (RFC 9110 5.6.7): "Sun, 06 Nov 1994 08:49:37 GMT", every number of its digits
+    let digits = |x: &str, n: usize| x.len() == n && x.bytes().all(|c| c.is_ascii_digit());
     let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     let m = months.iter().position(|x| *x == p[2])? as i64 + 1;
+    let hms: Vec<&str> = p[4].split(':').collect();
+    if !digits(p[1], 2) || !digits(p[3], 4) || hms.len() != 3 || !hms.iter().all(|x| digits(x, 2)) {
+        return None;
+    }
     let d: i64 = p[1].parse().ok()?;
     let y: i64 = p[3].parse().ok()?;
-    let hms: Vec<i64> = p[4].split(':').map(|x| x.parse().ok()).collect::<Option<Vec<i64>>>()?;
-    if hms.len() != 3 || !(1..=31).contains(&d) || hms[0] > 23 || hms[1] > 59 || hms[2] > 60 {
+    let hms: Vec<i64> = hms.iter().map(|x| x.parse().ok()).collect::<Option<Vec<i64>>>()?;
+    if !(1..=31).contains(&d) || hms[0] > 23 || hms[1] > 59 || hms[2] > 60 {
         return None;
     }
     Some(days_from_civil(y, m, d) * 86_400 + hms[0] * 3600 + hms[1] * 60 + hms[2])
@@ -405,6 +450,10 @@ fn jwk_text(key: &PubKey) -> Result<String, AcmeError> {
         PubKey::Ec { curve, point } => {
             let n = curve.bytes();
             let crv = if *curve == Curve::P256 { "P-256" } else { "P-384" };
+            // the uncompressed point: 0x04 x y
+            if point.len() != 1 + 2 * n || point[0] != 4 {
+                return Err(proto("an EC key that is not an uncompressed point"));
+            }
             Ok(format!(r#"{{"crv":"{}","kty":"EC","x":"{}","y":"{}"}}"#, crv, u(&point[1..1 + n]), u(&point[1 + n..])))
         }
         PubKey::Rsa { n, e } => Ok(format!(r#"{{"e":"{}","kty":"RSA","n":"{}"}}"#, u(e), u(n))),
@@ -691,23 +740,26 @@ impl Acme {
         let mut c = self.client.clone();
         c.max_body = max;
         let r = c.request(method, &u, headers, body)?;
-        if let Some(n) = r.headers.get("Replay-Nonce") {
-            self.keep_nonce(n);
-        }
         Ok(Answer { status: r.status, headers: r.headers.clone(), body: Vec::from(r.body_bytes()), url: String::from(url) })
     }
 
-    /// a nonce of the CA's answer: base64url (RFC 8555 6.5.1), kept for the next request
-    fn keep_nonce(&self, n: &str) {
-        if !n.is_empty() && n.len() <= 256 && n.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-' || c == b'_') {
+    /// the nonce of an answer: base64url (RFC 8555 6.5.1)
+    fn nonce_of(a: &Answer) -> Option<String> {
+        a.headers.get("Replay-Nonce").filter(|n| !n.is_empty() && n.len() <= 256 && n.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-' || c == b'_')).map(String::from)
+    }
+
+    /// keep the nonce of an answer for the next request (of this client or a clone)
+    fn keep_nonce(&self, a: &Answer) {
+        if let Some(n) = Self::nonce_of(a) {
             let mut v = self.nonces.lock();
             if v.len() >= 16 {
                 v.remove(0);
             }
-            v.push(String::from(n));
+            v.push(n);
         }
     }
 
+    /// a nonce kept, else a new one from newNonce (that one is this request's alone)
     fn nonce(&self) -> Result<String, AcmeError> {
         if let Some(n) = self.nonces.lock().pop() {
             return Ok(n);
@@ -717,15 +769,21 @@ impl Acme {
         if !(a.status == 200 || a.status == 204) {
             return Err(AcmeError::Protocol(format!("newNonce answered HTTP {}", a.status)));
         }
-        self.nonces.lock().pop().ok_or_else(|| proto("newNonce gave no Replay-Nonce"))
+        Self::nonce_of(&a).ok_or_else(|| proto("newNonce gave no Replay-Nonce"))
     }
 
     /// a signed POST: kid (an account's URL) or the key's JWK in the header; a badNonce is
-    /// tried again with the nonce of that answer (RFC 8555 6.5)
+    /// tried again with the nonce of that answer (RFC 8555 6.5: the retry's own, not shared
+    /// with the clones); the nonces of other answers are kept for the next requests
     fn post(&self, key: &PrivateKey, kid: Option<&str>, url: &str, payload: Option<&Value>, max: usize) -> Result<Answer, AcmeError> {
         let (alg, _) = jws_alg(key)?;
+        let mut next: Option<String> = None;
         for attempt in 0..3 {
-            let mut protected = Value::object([("alg", Value::string(alg)), ("nonce", Value::string(self.nonce()?)), ("url", Value::string(url))]);
+            let nonce = match next.take() {
+                Some(n) => n,
+                None => self.nonce()?,
+            };
+            let mut protected = Value::object([("alg", Value::string(alg)), ("nonce", Value::string(nonce)), ("url", Value::string(url))]);
             match kid {
                 Some(k) => protected.insert("kid", Value::string(k)),
                 None => protected.insert("jwk", jwk(&key.public_key())?),
@@ -735,12 +793,15 @@ impl Acme {
             h.set("Content-Type", "application/jose+json");
             let a = self.send("POST", url, &h, body.as_bytes(), max)?;
             if a.status < 400 {
+                self.keep_nonce(&a);
                 return Ok(a);
             }
             let p = self.problem(&a);
             if p.is("badNonce") && attempt < 2 {
+                next = Self::nonce_of(&a);
                 continue;
             }
+            self.keep_nonce(&a);
             return Err(AcmeError::Problem(p));
         }
         Err(proto("the CA refused every nonce"))
@@ -915,17 +976,24 @@ impl Account {
     }
 
     /// the pause before the next look: the CA's Retry-After within limits, else poll_ms
+    /// the pause before the next look (Retry-After: half a second to max_poll_ms; else
+    /// poll_ms), at most to the deadline; Timeout when that is reached (no look after it)
     fn pause(&self, retry: Option<u64>, deadline: u64) -> Result<(), AcmeError> {
+        let max = self.acme.max_poll_ms as u64;
+        let want = retry.map_or(self.acme.poll_ms as u64, |s| s.saturating_mul(1000).clamp(500.min(max), max));
         let now = plat::time_us() / 1000;
-        if now >= deadline {
+        if now < deadline {
+            plat::sleep_ms(want.min(deadline - now) as u32);
+        }
+        if plat::time_us() / 1000 >= deadline {
             return Err(AcmeError::Timeout(String::from("the CA did not decide in time")));
         }
-        let want = retry.map_or(self.acme.poll_ms as u64, |s| (s * 1000).clamp(500, self.acme.max_poll_ms as u64));
-        plat::sleep_ms(want.min(deadline - now) as u32);
         Ok(())
     }
 
-    /// wait until the authorization is decided: Ok when valid
+    /// wait until the authorization is decided: Ok when valid.  Acme::timeout_ms bounds the
+    /// waiting: no look starts after it (a request under way runs out under the Client's
+    /// timeouts)
     pub fn wait_authorization(&self, url: &str) -> Result<Authorization, AcmeError> {
         let deadline = (plat::time_us() / 1000) + self.acme.timeout_ms;
         loop {
@@ -940,9 +1008,18 @@ impl Account {
         }
     }
 
-    /// wait until the order is no longer pending or processing
+    /// wait until the order is no longer pending or processing (Acme::timeout_ms as
+    /// wait_authorization)
     pub fn wait_order(&self, url: &str) -> Result<Order, AcmeError> {
+        self.wait_order_after(url, None)
+    }
+
+    /// wait_order, after a pause first when an answer said "processing" (with its Retry-After)
+    fn wait_order_after(&self, url: &str, first: Option<Option<u64>>) -> Result<Order, AcmeError> {
         let deadline = (plat::time_us() / 1000) + self.acme.timeout_ms;
+        if let Some(retry) = first {
+            self.pause(retry, deadline)?;
+        }
         loop {
             let a = self.post(url, None)?;
             let retry = a.retry_after();
@@ -957,9 +1034,14 @@ impl Account {
 
     /// send the certificate request (DER) of a ready order
     pub fn finalize(&self, order: &Order, csr: &[u8]) -> Result<Order, AcmeError> {
+        self.finalize_retry(order, csr).map(|(o, _)| o)
+    }
+
+    /// finalize -> the order and the answer's Retry-After
+    fn finalize_retry(&self, order: &Order, csr: &[u8]) -> Result<(Order, Option<u64>), AcmeError> {
         let payload = Value::object([("csr", Value::string(b64::encode_url(csr)))]);
         let a = self.post(&order.finalize, Some(&payload))?;
-        Order::from_json(order.url.clone(), &a.json()?)
+        Ok((Order::from_json(order.url.clone(), &a.json()?)?, a.retry_after()))
     }
 
     /// the chain at a certificate URL (an order's, or an alternate one) -> (DER chain, PEM,
@@ -1009,8 +1091,8 @@ impl Account {
             }
             b.cn = b.dns.first().filter(|d| d.len() <= 64).cloned().unwrap_or_default();
             let csr = b.sign(cert_key).ok_or_else(|| proto("the certificate request cannot be made (a name, the key)"))?;
-            let o = self.finalize(&order, &csr)?;
-            if o.status == "valid" { o } else { self.wait_order(&o.url)? }
+            let (o, retry) = self.finalize_retry(&order, &csr)?;
+            if o.status == "valid" { o } else { self.wait_order_after(&o.url, Some(retry))? }
         } else {
             order
         };
@@ -1158,10 +1240,12 @@ impl Solver for Http01 {
 
 /// tls-alpn-01 (RFC 8737): a certificate for the challenge, shown on port 443 to a client that
 /// offers only "acme-tls/1".  Clones share the certificates: one goes to the solver, one into
-/// the server's config (setup)
+/// the server's config (setup).  A name has one challenge at a time: a second one for it fails
+/// to be set up until the first is cleaned up
 #[derive(Clone, Default)]
 pub struct TlsAlpn01 {
-    ids: Arc<Mutex<BTreeMap<String, Identity>>>,
+    /// the server name -> the challenge's token and certificate
+    ids: Arc<Mutex<BTreeMap<String, (String, Identity)>>>,
 }
 
 impl TlsAlpn01 {
@@ -1181,7 +1265,7 @@ impl TlsAlpn01 {
         let next = cfg.select.take();
         let sel: Select = Arc::new(move |h: &Hello| {
             if h.alpn.len() == 1 && h.alpn[0] == ACME_TLS_ALPN.as_bytes() {
-                if let Some(id) = me.ids.lock().get(&h.server_name).cloned() {
+                if let Some((_, id)) = me.ids.lock().get(&h.server_name).cloned() {
                     return Some(id);
                 }
             }
@@ -1211,13 +1295,22 @@ impl Solver for TlsAlpn01 {
     fn kinds(&self) -> Vec<&'static str> {
         alloc::vec!["tls-alpn-01"]
     }
-    fn present(&mut self, id: &Identifier, _ch: &Challenge, key_auth: &str) -> Result<(), String> {
+    fn present(&mut self, id: &Identifier, ch: &Challenge, key_auth: &str) -> Result<(), String> {
         let identity = TlsAlpn01::certificate(id, key_auth).ok_or_else(|| String::from("the challenge certificate cannot be made"))?;
-        self.ids.lock().insert(id.tls_name(), identity);
-        Ok(())
+        let mut ids = self.ids.lock();
+        match ids.get(&id.tls_name()) {
+            Some((token, _)) if *token != ch.token => Err(format!("a tls-alpn-01 challenge for {} is set up already", id.value())),
+            _ => {
+                ids.insert(id.tls_name(), (ch.token.clone(), identity));
+                Ok(())
+            }
+        }
     }
-    fn cleanup(&mut self, id: &Identifier, _ch: &Challenge) {
-        self.ids.lock().remove(&id.tls_name());
+    fn cleanup(&mut self, id: &Identifier, ch: &Challenge) {
+        let mut ids = self.ids.lock();
+        if ids.get(&id.tls_name()).is_some_and(|(token, _)| *token == ch.token) {
+            ids.remove(&id.tls_name());
+        }
     }
 }
 

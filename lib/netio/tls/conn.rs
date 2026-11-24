@@ -460,6 +460,9 @@ pub struct Conn {
     /// server said it may send one (status_request in its ServerHello)
     staple: Option<Vec<u8>>,
     status_acked: bool,
+    /// a client: until when the good stapled response checked counts (this handshake's, or the
+    /// session's on a resumption); tickets carry it on
+    staple_until: Option<i64>,
     /// a server: the client asked for a stapled OCSP response
     status_wanted: bool,
 }
@@ -545,6 +548,7 @@ impl Conn {
             test_suites: Vec::new(),
             test_groups: Vec::new(),
             staple: None,
+            staple_until: None,
             status_acked: false,
             status_wanted: false,
         }
@@ -586,7 +590,9 @@ impl Conn {
         c.web = matches!(cfg.trust, Trust::System(_) | Trust::Custom(_));
         if let Some(cache) = cfg.sessions.as_ref() {
             c.session_key = session::session_key(&cfg);
-            c.offer = cache.take(&c.session_key);
+            // Required takes no session whose handshake checked no good staple
+            let checks = cfg.revocation == Revocation::Required && matches!(cfg.trust, Trust::Anchors(_) | Trust::System(_) | Trust::Custom(_));
+            c.offer = cache.take(&c.session_key).filter(|s| !checks || s.status_until.is_some());
         }
         c.early_out = Vec::from(early);
         c.ccfg = Some(cfg);
@@ -1445,6 +1451,7 @@ impl Conn {
             alpn: self.alpn.clone(),
             peer: self.peer.clone(),
             auth_s: self.auth_s,
+            status_until: self.staple_until,
             _pin: pin,
         };
         cache.put(self.session_key, s);
@@ -1580,6 +1587,7 @@ impl Conn {
             if let Some(s) = self.offer.as_ref() {
                 self.peer = s.peer.clone();
                 self.auth_s = s.auth_s;
+                self.staple_until = s.status_until;
             }
         } else {
             if let Some(p) = self.psk.as_mut() {
@@ -1658,10 +1666,13 @@ impl Conn {
         };
         let issuer = self.peer[1..].iter().chain(a).chain(b).find(|c| leaf.signed_by(c));
         let now = plat::unix_time_ns().div_euclid(1_000_000_000);
-        let status = issuer.ok_or(()).and_then(|i| ocsp::check(der, leaf, i, now).map_err(|_| ())).map(|r| r.status);
-        match status {
+        let r = issuer.ok_or(()).and_then(|i| ocsp::check(der, leaf, i, now).map_err(|_| ()));
+        match r.as_ref().map(|r| r.status) {
             Ok(ocsp::Status::Revoked { .. }) => Err(fail(AL_CERTIFICATE_REVOKED, "the certificate is revoked (OCSP)")),
-            Ok(ocsp::Status::Good) => Ok(()),
+            Ok(ocsp::Status::Good) => {
+                self.staple_until = r.ok().map(|r| r.expires() + ocsp::SKEW);
+                Ok(())
+            }
             _ if required => Err(fail(AL_BAD_CERTIFICATE_STATUS_RESPONSE, "no usable stapled OCSP response")),
             _ => Ok(()),
         }

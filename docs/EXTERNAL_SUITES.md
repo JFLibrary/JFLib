@@ -356,7 +356,11 @@ kind of key besides.
 `tools/pebble_check.py` runs netio's ACME client (`coretest --acme-pebble`) against
 [Pebble](https://github.com/letsencrypt/pebble), the small ACME server Let's Encrypt keeps for
 client tests: the same protocol as its production CA, with its checks made stricter on purpose
-(it refuses 5 % of nonces at random, reuses authorizations, sends Retry-After). The release
+(it refuses good nonces at random, sends Retry-After). The run sets the refusals to 1 %
+(`--nonce-reject`; Pebble's own 5 % would now and then refuse one request three times in a row)
+and turns off the reuse of authorizations (`PEBBLE_AUTHZREUSE=0`), so each order proves its names
+by the challenge it is about; the check of an IP address by tls-alpn-01 also counts the
+challenges the solver set up. The release
 binaries of Pebble and pebble-challtestsrv come into `build/pebble/v2.10.1` once (`gh release
 download`). The tool writes Pebble a config of the run: its https certificate is the server
 certificate of `coretest --tls-pki DIR --key p256` (the client trusts that CA), the challenge

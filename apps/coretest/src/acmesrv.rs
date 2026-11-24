@@ -30,15 +30,18 @@ use crate::tlsweb::Pki;
 pub struct Faults {
     /// answer the next signed request with badNonce
     pub bad_nonce: u32,
-    /// newOrder answers 429 rateLimited
+    /// newOrder answers 429 rateLimited (Retry-After: retry_after, else 30 seconds)
     pub rate_limited: bool,
+    pub retry_after: Option<&'static str>,
     /// the certificate is issued for another key
     pub wrong_key: bool,
     /// the certificate leaves the order's last name out
     pub drop_name: bool,
     /// challenge tokens with characters outside base64url
     pub bad_token: bool,
-    /// Location headers relative to the request ("/order/1")
+    /// Location and Link headers relative to the request: the account's with its own host
+    /// ("//127.0.0.1:N/acct/1"), the order's with a dot segment ("../order/1"), the alternate
+    /// chain's beside the certificate ("1/alt")
     pub relative: bool,
     /// challenges are never decided (an authorization stays pending)
     pub stall: bool,
@@ -79,6 +82,8 @@ struct Order {
     status: String,
     cert: Option<usize>,
     lag: u32,
+    /// (ms) when the Retry-After of the finalize answer is over
+    retry_at_ms: u64,
     profile: Option<String>,
     replaces: Option<String>,
 }
@@ -102,6 +107,8 @@ pub struct State {
     pub tls_port: u16,
     /// the CSRs finalize got
     pub csrs: Vec<Csr>,
+    /// looks at an order before the Retry-After of its finalize answer was over
+    pub early_polls: u32,
 }
 
 pub struct AcmeServer {
@@ -219,45 +226,54 @@ fn acme_identifier(c: &Cert) -> Option<(bool, Vec<u8>)> {
 
 /// check a challenge as a CA does -> None when it passes, else the problem
 fn validate(kind: &str, ty: &str, value: &str, token: &str, ka: &str, http_port: u16, tls_port: u16, dns: &Mutex<BTreeMap<String, Vec<String>>>) -> Option<Value> {
-    let fail = |detail: String| Some(Value::object([("type", Value::string("urn:ietf:params:acme:error:incorrectResponse")), ("detail", Value::string(detail))]));
+    challenge(kind, ty, value, token, ka, http_port, tls_port, dns)
+        .err()
+        .map(|detail| Value::object([("type", Value::string("urn:ietf:params:acme:error:incorrectResponse")), ("detail", Value::string(detail))]))
+}
+
+/// a challenge checked: every way it can go wrong is an Err (a connection refused among them)
+fn challenge(kind: &str, ty: &str, value: &str, token: &str, ka: &str, http_port: u16, tls_port: u16, dns: &Mutex<BTreeMap<String, Vec<String>>>) -> Result<(), String> {
+    let e = |s: &str| String::from(s);
     match kind {
         "http-01" => {
-            let url = netio::Url::parse(&format!("http://127.0.0.1:{}/.well-known/acme-challenge/{}", http_port, token))?;
+            let url = netio::Url::parse(&format!("http://127.0.0.1:{}/.well-known/acme-challenge/{}", http_port, token)).ok_or_else(|| e("http-01: the URL"))?;
             match netio::Client::new().get(&url, &netio::Headers::new()) {
-                Ok(r) if r.status == 200 && r.body_bytes() == ka.as_bytes() => None,
-                Ok(r) => fail(format!("http-01: HTTP {}, {} bytes", r.status, r.body_bytes().len())),
-                Err(e) => fail(format!("http-01: {}", e)),
+                Ok(r) if r.status == 200 && r.body_bytes() == ka.as_bytes() => Ok(()),
+                Ok(r) => Err(format!("http-01: HTTP {}, {} bytes", r.status, r.body_bytes().len())),
+                Err(x) => Err(format!("http-01: {}", x)),
             }
         }
         "tls-alpn-01" => {
-            let id = if ty == "ip" { netio::acme::Identifier::Ip(IpAddr::parse(value)?) } else { netio::acme::Identifier::Dns(String::from(value)) };
-            let tcp = TcpStream::connect(&SocketAddr::new(plat::net::IpAddr::LOCALHOST_V4, tls_port), 3000).ok()?;
+            let ip = if ty == "ip" { Some(IpAddr::parse(value).ok_or_else(|| e("tls-alpn-01: not an address"))?) } else { None };
+            let id = match ip {
+                Some(a) => netio::acme::Identifier::Ip(a),
+                None => netio::acme::Identifier::Dns(String::from(value)),
+            };
+            let tcp = TcpStream::connect(&SocketAddr::new(plat::net::IpAddr::LOCALHOST_V4, tls_port), 3000).map_err(|_| e("tls-alpn-01: no connection to the challenge port"))?;
             tcp.set_read_timeout(Some(5000));
             let cfg = ClientConfig { alpn: alloc::vec![String::from("acme-tls/1")], ..ClientConfig::new(Trust::Any, &id.tls_name()) };
-            let s = match tls::connect(Box::new(tcp), cfg) {
-                Ok(s) => s,
-                Err(e) => return fail(format!("tls-alpn-01: {}", e)),
-            };
+            let s = tls::connect(Box::new(tcp), cfg).map_err(|x| format!("tls-alpn-01: {}", x))?;
             let certs = s.peer_certs();
+            let alpn = s.alpn();
             s.shutdown();
-            let c = certs.first()?;
-            let names_ok = match ty {
-                "ip" => c.ips == [IpAddr::parse(value)?] && c.dns.is_empty(),
-                _ => c.dns == [String::from(value)] && c.ips.is_empty(),
+            let c = certs.first().ok_or_else(|| e("tls-alpn-01: no certificate"))?;
+            let names_ok = match ip {
+                Some(a) => c.ips == [a] && c.dns.is_empty(),
+                None => c.dns == [String::from(value)] && c.ips.is_empty(),
             };
             let ext = acme_identifier(c);
             let want = crypto::sha256(ka.as_bytes());
-            if s.alpn().as_deref() == Some("acme-tls/1") && names_ok && ext.is_some_and(|(crit, v)| crit && v == want) && c.self_signed() {
-                None
+            if alpn.as_deref() == Some("acme-tls/1") && names_ok && ext.is_some_and(|(crit, v)| crit && v == want) && c.self_signed() {
+                Ok(())
             } else {
-                fail(String::from("tls-alpn-01: not the challenge's certificate"))
+                Err(e("tls-alpn-01: not the challenge's certificate"))
             }
         }
         "dns-01" => {
             let want = b64::encode_url(&crypto::sha256(ka.as_bytes()));
-            if dns.lock().get(&format!("_acme-challenge.{}", value)).is_some_and(|v| v.contains(&want)) { None } else { fail(String::from("dns-01: no such TXT record")) }
+            if dns.lock().get(&format!("_acme-challenge.{}", value)).is_some_and(|v| v.contains(&want)) { Ok(()) } else { Err(e("dns-01: no such TXT record")) }
         }
-        _ => fail(String::from("unknown challenge")),
+        _ => Err(e("unknown challenge")),
     }
 }
 
@@ -343,6 +359,7 @@ pub fn start(p: &Pki, faults: Faults) -> Option<AcmeServer> {
         http_port: 0,
         tls_port: 0,
         csrs: Vec::new(),
+        early_polls: 0,
     }));
     let dns: Arc<Mutex<BTreeMap<String, Vec<String>>>> = Arc::new(Mutex::new(BTreeMap::new()));
     let (st, dn, ca, ca_key) = (state.clone(), dns.clone(), p.ca.clone(), p.ca_key.clone());
@@ -470,14 +487,14 @@ fn handle(st: &Mutex<State>, dns: &Mutex<BTreeMap<String, Vec<String>>>, ca: &Ce
             s.accts.push(Acct { key: jwk, status: String::from("valid"), contact });
             let i = s.accts.len() - 1;
             let v = Value::object([("status", Value::string("valid")), ("orders", Value::string(format!("{}/acct/{}/orders", base, i)))]);
-            let loc = if s.faults.relative { format!("/acct/{}", i) } else { format!("{}/acct/{}", base, i) };
+            let loc = if s.faults.relative { format!("//{}/acct/{}", base.trim_start_matches("https://"), i) } else { format!("{}/acct/{}", base, i) };
             ok_json(201, &v).header("Location", &loc)
         }
         "/new-order" => {
             let a = acct.unwrap_or(0);
             let mut s = st.lock();
             if s.faults.rate_limited {
-                return err(429, "rateLimited", "too many orders").header("Retry-After", "30");
+                return err(429, "rateLimited", "too many orders").header("Retry-After", s.faults.retry_after.unwrap_or("30"));
             }
             let profile = pl.get("profile").and_then(|x| x.as_str()).map(String::from);
             if profile.as_deref().is_some_and(|p| p != "classic" && p != "short") {
@@ -510,9 +527,9 @@ fn handle(st: &Mutex<State>, dns: &Mutex<BTreeMap<String, Vec<String>>>, ca: &Ce
                 az.push(s.authz.len() - 1);
             }
             let replaces = pl.get("replaces").and_then(|x| x.as_str()).map(String::from);
-            s.orders.push(Order { acct: a, ids: list, authz: az, status: String::from("pending"), cert: None, lag: 0, profile, replaces });
+            s.orders.push(Order { acct: a, ids: list, authz: az, status: String::from("pending"), cert: None, lag: 0, retry_at_ms: 0, profile, replaces });
             let i = s.orders.len() - 1;
-            let loc = if s.faults.relative { format!("order/{}", i) } else { format!("{}/order/{}", base, i) };
+            let loc = if s.faults.relative { format!("../order/{}", i) } else { format!("{}/order/{}", base, i) };
             ok_json(201, &s.order_json(i)).header("Location", &loc)
         }
         p if p.starts_with("/acct/") => {
@@ -531,12 +548,15 @@ fn handle(st: &Mutex<State>, dns: &Mutex<BTreeMap<String, Vec<String>>>, ca: &Ce
             let mut s = st.lock();
             let Some(i) = p[7..].parse::<usize>().ok().filter(|i| *i < s.orders.len() && Some(s.orders[*i].acct) == acct) else { return err(404, "malformed", "order") };
             s.order_status(i);
-            let o = &mut s.orders[i];
-            if o.status == "valid" && o.lag > 0 {
-                o.lag -= 1;
-                let mut v = s.order_json(i);
-                v.insert("status", Value::string("processing"));
-                return ok_json(200, &v).header("Retry-After", "1");
+            // processing until the finalize answer's Retry-After is over (a look before it counts)
+            if s.orders[i].status == "valid" && s.orders[i].lag > 0 {
+                if plat::time_us() / 1000 < s.orders[i].retry_at_ms {
+                    s.early_polls += 1;
+                    let mut v = s.order_json(i);
+                    v.insert("status", Value::string("processing"));
+                    return ok_json(200, &v).header("Retry-After", "1");
+                }
+                s.orders[i].lag = 0;
             }
             ok_json(200, &s.order_json(i))
         }
@@ -549,7 +569,8 @@ fn handle(st: &Mutex<State>, dns: &Mutex<BTreeMap<String, Vec<String>>>, ca: &Ce
                 return ok_json(200, &s.authz_json(i, "pending")).header("Retry-After", "1");
             }
             let status = s.authz[i].status.clone();
-            ok_json(200, &s.authz_json(i, &status))
+            let r = ok_json(200, &s.authz_json(i, &status));
+            if status == "pending" { r.header("Retry-After", "1") } else { r }
         }
         p if p.starts_with("/chall/") => {
             let parts: Vec<usize> = p[7..].split('/').filter_map(|x| x.parse().ok()).collect();
@@ -566,10 +587,13 @@ fn handle(st: &Mutex<State>, dns: &Mutex<BTreeMap<String, Vec<String>>>, ca: &Ce
                 let c = &a.challenges[k];
                 (c.kind, a.ty.clone(), a.value.clone(), c.token.clone(), s.accts[a.acct].key.clone(), (s.http_port, s.tls_port), s.faults.stall)
             };
-            if payload.is_none() {
+            // a look (POST-as-GET), or an answer to an authorization that is decided: as it is
+            {
                 let s = st.lock();
-                let c = &s.authz[i].challenges[k];
-                return ok_json(200, &Value::object([("type", Value::string(c.kind)), ("status", Value::string(c.status.as_str())), ("token", Value::string(c.token.as_str()))]));
+                if payload.is_none() || s.authz[i].status != "pending" {
+                    let c = &s.authz[i].challenges[k];
+                    return ok_json(200, &Value::object([("type", Value::string(c.kind)), ("status", Value::string(c.status.as_str())), ("token", Value::string(c.token.as_str()))]));
+                }
             }
             if stall {
                 return ok_json(200, &Value::object([("type", Value::string(kind)), ("status", Value::string("processing")), ("token", Value::string(token))]));
@@ -580,10 +604,13 @@ fn handle(st: &Mutex<State>, dns: &Mutex<BTreeMap<String, Vec<String>>>, ca: &Ce
             let problem = validate(kind, &ty, &value, &token, &ka, ports.0, ports.1, dns);
             let mut s = st.lock();
             let a = &mut s.authz[i];
-            a.challenges[k].status = String::from(if problem.is_none() { "valid" } else { "invalid" });
-            a.challenges[k].error = problem.clone();
-            a.status = String::from(if problem.is_none() { "valid" } else { "invalid" });
-            a.lag = 1;
+            // (another answer may have decided it meanwhile: that decision stays)
+            if a.status == "pending" {
+                a.challenges[k].status = String::from(if problem.is_none() { "valid" } else { "invalid" });
+                a.challenges[k].error = problem.clone();
+                a.status = String::from(if problem.is_none() { "valid" } else { "invalid" });
+                a.lag = 1;
+            }
             ok_json(200, &Value::object([("type", Value::string(kind)), ("status", Value::string("processing")), ("token", Value::string(token))])).header("Link", &format!("<{}/authz/{}>;rel=\"up\"", base, i))
         }
         p if p.starts_with("/finalize/") => {
@@ -632,6 +659,7 @@ fn handle(st: &Mutex<State>, dns: &Mutex<BTreeMap<String, Vec<String>>>, ca: &Ce
             o.status = String::from("valid");
             o.cert = Some(c);
             o.lag = 1;
+            o.retry_at_ms = plat::time_us() / 1000 + 1000;
             let mut v = s.order_json(i);
             v.insert("status", Value::string("processing"));
             ok_json(200, &v).header("Retry-After", "1")
