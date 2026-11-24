@@ -2819,6 +2819,23 @@ crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)
   `Trust::System(extra)` connects to public servers: TLS 1.3 or TLS 1.2 with ECDHE, the chain built and checked
   against the system's authorities (Windows CryptoAPI, Linux CA bundle) and extra CAs;
   `netio::trust::system_connector(extra)` gives the connector for `Client`.
+  OCSP stapling: `ServerConfig::ocsp` (`Arc<tls::Staples>`, kept current by
+  `netio::ocsp::refresh(&staples, &client, &chain, issuer)`, which says when to call it again)
+  staples the CA's response; a client checking against CAs asks for one
+  (`ClientConfig::revocation`: `Stapled` by default refuses a certificate the response calls
+  revoked, `Required` one without a good response, `Off`); a must-staple certificate (RFC 7633)
+  needs one. `x509::ocsp` checks and builds responses, `x509::CsrBuilder` / `Csr` write and read
+  certificate requests.
+* `netio::acme` -- certificates from Let's Encrypt or another ACME CA (RFC 8555):
+  `Acme::new(client, acme::LETS_ENCRYPT)`, `acme.account(key, &NewAccount { terms_agreed: true,
+  .. })`, `account.issue(&[Identifier::parse("example.org")], &cert_key, &mut solver,
+  &OrderOptions::default())` -> the chain (`Issued::identity(&cert_key)` for `ServerConfig`, or
+  `select` for one renewed while the server runs). Solvers: `acme::Http01` (its `handler(site)`
+  on port 80), `acme::TlsAlpn01` (`setup(&mut tls_cfg)` on port 443), dns-01 by the program's own
+  `Solver` for its DNS provider (`dns01_name`, `dns01_value`; wildcards need it), `Solvers` to
+  combine. When to renew: `acme.renewal_info(&cert)` (ARI), the new order with
+  `OrderOptions::replaces: acme::ari_id(&cert)`. Keep the account key (`PrivateKey::to_pkcs8`);
+  test against `acme::LETS_ENCRYPT_STAGING` first, Let's Encrypt's rate limits are strict.
 * `netio::smtp::send(&SmtpConfig, &Mail)` -- e-mail (STARTTLS, TLS, or plain to any server
   with `Security::None`, e.g. a relay on port 25 inside a network; AUTH PLAIN / LOGIN only over
   TLS, a plain connection with a user name is refused; text and HTML parts, RFC 2047 subjects).

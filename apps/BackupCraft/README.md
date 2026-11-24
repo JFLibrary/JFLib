@@ -292,7 +292,8 @@ python3 ...`).
 * Volume backups need administrator (VSS) or root (LVM) rights and read the whole volume each
   time (dedupe keeps the storage small); they are restored as an image file.
 * Tapes are virtual (files); real tape drives are not driven.
-* TLS to public servers: no revocation checks (CRL / OCSP); name constraints cover DNS names
+* TLS to public servers: revocation only by stapled OCSP responses (no CRLs, no OCSP fetched by
+  the client); name constraints cover DNS names
   and IP addresses; P-384 certificates are verified, P-384 key exchange is not offered;
   AES-GCM runs in portable code (about 33 MB/s).
 * Failback writes the replica's state back but deletes nothing at the original; CDP on files a

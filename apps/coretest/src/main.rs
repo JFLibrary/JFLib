@@ -61,6 +61,12 @@ mod tlst;
 #[cfg(not(target_os = "android"))]
 mod tlsweb;
 #[cfg(not(target_os = "android"))]
+mod ocspt;
+#[cfg(not(target_os = "android"))]
+mod acmesrv;
+#[cfg(not(target_os = "android"))]
+mod acmet;
+#[cfg(not(target_os = "android"))]
 mod tlsres;
 #[cfg(not(target_os = "android"))]
 mod suitevec;
@@ -182,6 +188,8 @@ fn run() -> i32 {
         native!("tls", tlst::run),
         native!("tlsweb", tlsweb::run),
         native!("tlsres", tlsres::run),
+        native!("ocsp", ocspt::run),
+        native!("acme", acmet::run),
         native!("ssh", sshd::run),
         native!("dns", dnst::run),
         ("netpkt", Some(netpktt::run)),
@@ -251,6 +259,12 @@ fn server_modes(args: &[String]) -> Option<i32> {
     }
     if let Some(p) = plat::arg_value("--tls-anvil-client").and_then(|p| p.parse().ok()) {
         return Some(tlst::anvil_client(p));
+    }
+    if plat::arg_value("--acme-pebble").is_some() {
+        return Some(acmet::pebble());
+    }
+    if args.iter().any(|a| a == "--ocsp-tool") {
+        return Some(ocspt::tool(args));
     }
     if let Some(u) = plat::arg_value("--tls-web") {
         return Some(tlst::web(&u, plat::arg_value("--ca").as_deref()));

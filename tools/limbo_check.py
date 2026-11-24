@@ -13,7 +13,7 @@ more than 20 certificates is judged by verify_chain and marked: tls/conn.rs refu
 Certificate message that long.
 
 Skipped, with the reason: testcases whose features netio states it lacks (lib/x509/lib.rs,
-header: revocation / CRLs, certificate policies; also ML-DSA keys,
+header: CRLs, certificate policies; also ML-DSA keys,
 a caller-chosen chain depth, e-mail peer names, extended key usages other than serverAuth /
 clientAuth).  Optional behaviour (the pedantic-* features, rfc5280-incompatible-with-webpki) is
 run, and its failures are counted apart.  PASS / FAIL / SKIP per testcase id with --list;
@@ -38,10 +38,10 @@ ROOT = Path(__file__).resolve().parent.parent
 REPO = "C2SP/x509-limbo"
 COMMIT = "b12423782a88abead01141fa6582254e3eb49e74"
 
-# features netio does not have (lib/x509/lib.rs: "Not checked: revocation (CRL / OCSP),
+# features netio does not have (lib/x509/lib.rs: "Not checked: CRLs,
 # certificate policies"); name constraints on directory names it processes
 LACKS = {
-    "has-crl": "revocation (CRL / OCSP) is not checked (lib/x509/lib.rs header)",
+    "has-crl": "CRLs are not checked (lib/x509/lib.rs header; OCSP is x509::ocsp, which limbo does not test)",
     "has-policy-constraints": "certificate policies are not checked (lib/x509/lib.rs header)",
     "has-cert-policies": "certificate policies are not checked (lib/x509/lib.rs header)",
     "no-cert-policies": "certificate policies are not checked (lib/x509/lib.rs header)",

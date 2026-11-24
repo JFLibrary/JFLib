@@ -23,6 +23,14 @@ It has no I/O and no clock; the caller passes the time.
 - **A private CA:** `CertBuilder` builds and signs certificates, CAs and leaves with names, key
   usages and further extensions: Ed25519 ones with `sign` / `sign_ext`, ones of any key with
   `sign_key` (the subject's key as `spki`, signed with Ed25519, ECDSA or RSA).
+- **OCSP:** `ocsp::check` takes a response (RFC 6960) about a certificate only when its issuer or
+  a responder the issuer delegated to signed it, it names that certificate and it is current;
+  `ocsp::request` and `CertId` ask a responder, `ResponseBuilder` and `Request::parse` make a
+  private CA's responder. `Cert` reads the responders and the CA's address of the authority
+  information access and the TLS features (must-staple, RFC 7633).
+- **Certificate requests:** `CsrBuilder` writes and signs a PKCS #10 request with names,
+  addresses and must-staple (what an ACME CA wants); `Csr::parse` reads one and checks its
+  signature, for a private CA that signs it with `CertBuilder`.
 - **Private keys:** `PrivateKey` holds an Ed25519, ECDSA (P-256 / P-384) or RSA key, reads PKCS #8,
   SEC 1 and PKCS #1 (the DER inside the PEM files of OpenSSL and the CAs), writes PKCS #8, gives
   the public key and its SubjectPublicKeyInfo and signs; netio's TLS signs its handshakes with it.
@@ -43,7 +51,8 @@ names and non-minimal ECDSA signatures. Everything is in the
 
 ## Not here
 
-Revocation (CRL, OCSP), certificate policies, fetching missing intermediates (AIA).
+CRLs, certificate policies, fetching missing intermediates (AIA); fetching OCSP responses is
+netio's (`netio::ocsp`).
 
 ## How to get it
 

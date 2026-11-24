@@ -16,8 +16,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   names, `fingerprint_bytes`, `fingerprint_text`, `self_signed`, `ed25519_key`, `name_list`,
   `bytes`. netpkt's own certificate parser is gone; `netpkt::x509` is this crate.
 - `PrivateKey`: Ed25519, ECDSA (P-256 / P-384) and RSA keys from PKCS #8, SEC 1 and PKCS #1 DER (ECDSA without a branch on the secret, checked to be in [1, n - 1] and against a stored public key), written as PKCS #8; `public_key`, `spki`, `sign(alg, data, random)` (ECDSA as DER with RFC 6979 and `random` mixed in, RSA PKCS #1 v1.5 or PSS), `cert_alg`, `can`; `spki_of(&PubKey)`. `CertBuilder::spki` and `CertBuilder::sign_key`: certificates of any of these keys, signed with any of them (ECDSA with SHA-256 / SHA-384, RSA PKCS #1 v1.5 with SHA-256, Ed25519)
+- `ocsp`: OCSP of RFC 6960 and RFC 5019 -- `CertId` (SHA-1, or SHA-256 and longer), `request`, `Request::parse` (for a responder), `check(der, &cert, &issuer, now)` (signed by the issuer or a responder it delegated to with id-kp-OCSPSigning, about this certificate, current within 5 minutes of clock skew; a response without nextUpdate for a day; unknown critical extensions refused) -> `Response` (`Status::Good` / `Revoked { time, reason }` / `Unknown`, `expires`, `refresh_at`), `ResponseBuilder` (a private CA's responder), `error_response`. `csr`: certificate requests (PKCS #10, RFC 2986) -- `CsrBuilder` (DNS names, addresses, must-staple; signed with any `PrivateKey`), `Csr::parse` (the signature checked). `Cert`: `aki`, `ocsp_urls`, `ca_issuers`, `tls_features` (RFC 7633), `ocsp_nocheck`, `spki()`, `must_staple()`, `ocsp_signer()`; `CertBuilder`: `ocsp_urls`, `must_staple`, `ocsp_signing`; `der::ENUMERATED`
 
 ### Changed
 
 - `PubKey::Rsa` holds n and e without leading zero bytes, as `PrivateKey::public_key` gives them (a certificate's INTEGER kept its sign byte)
+- A certificate with a critical or malformed authority information access, a malformed TLS feature extension or an id-pkix-ocsp-nocheck that is not NULL is refused (x509-limbo webpki::malformed-aia now passes)
 

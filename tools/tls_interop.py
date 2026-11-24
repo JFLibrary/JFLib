@@ -19,7 +19,14 @@ Resumption and 0-RTT (`--tickets [--early N]`, `--resume N [--early]`):
                  (taken; not sent with a ticket of a server without 0-RTT), curl and Python ssl
                  reusing their session
   our client  -> openssl s_server (each suite, a HelloRetryRequest, a client certificate),
-                 -early_data (the request taken as 0-RTT; refused after a HelloRetryRequest)"""
+                 -early_data (the request taken as 0-RTT; refused after a HelloRetryRequest)
+OCSP (`--ocsp-tool`, `--ocsp FILE`, `--revocation`, `--show-ocsp`; a P-256 PKI):
+  openssl ocsp reads our responses (good, revoked, unknown); its responder answers
+  netio::ocsp::fetch (good, revoked, a serial it does not know); we read its requests;
+  openssl req verifies our CSR, we read its CSRs (P-256, RSA, Ed25519)
+  stapling    our server -> openssl s_client -status (good; none without a response)
+              openssl s_server -status_file -> our client, TLS 1.3 and 1.2 (good taken; revoked
+              refused; none refused with --revocation required, taken without)"""
 import os
 import socket
 import ssl
@@ -223,6 +230,7 @@ def main():
         srv.wait(5)
     server_matrix(exe, check)
     resumption(exe, d, check)
+    ocsp(exe, check)
     n = len(results)
     print(f"tls_interop: {sum(results)} of {n} passed")
     return 0 if all(results) else 1
@@ -390,6 +398,102 @@ def resumption(exe, d, check):
         finally:
             srv.terminate()
             srv.wait(5)
+
+
+def ocsp(exe, check):
+    """OCSP responses, certificate requests and stapling against OpenSSL"""
+    d = Path(tempfile.mkdtemp(prefix="tls-ocsp-"))
+    key = ["--key", "p256"]
+    subprocess.run([exe, "--tls-pki", str(d), *key], check=True)
+    rport = free_port()
+    subprocess.run([exe, "--ocsp-tool", "pki", str(d), f"http://127.0.0.1:{rport}/", *key], check=True)
+    ca, server, leaf = str(d / "ca.pem"), str(d / "server.pem"), str(d / "leaf.pem")
+
+    def tool(*a):
+        r = subprocess.run([exe, "--ocsp-tool", *a, *key], capture_output=True, timeout=30)
+        return (r.stdout + r.stderr).decode(errors="replace").strip()
+
+    def run(cmd, **kw):
+        r = subprocess.run(cmd, capture_output=True, timeout=30, **kw)
+        return r.returncode, (r.stdout + r.stderr).decode(errors="replace")
+
+    # openssl reads our responses
+    for name in ("good", "revoked", "unknown"):
+        _, out = run(["openssl", "ocsp", "-respin", str(d / f"{name}.der"), "-issuer", ca, "-cert", server, "-CAfile", ca])
+        check(f"ocsp: openssl ocsp verifies our {name} response", "Response verify OK" in out and f"server.pem: {name}" in out, out[-300:])
+    # OpenSSL's responder answers netio::ocsp::fetch
+    _, serial = run(["openssl", "x509", "-in", leaf, "-noout", "-serial"])
+    serial = serial.strip().split("=", 1)[-1]
+    idx = d / "index.txt"
+    for line, want in ((f"V\t991231235959Z\t\t{serial}\tunknown\t/CN=localhost\n", "good"),
+                       (f"R\t991231235959Z\t250101000000Z,keyCompromise\t{serial}\tunknown\t/CN=localhost\n", "revoked"),
+                       ("", "unknown")):
+        idx.write_text(line)
+        (d / "index.txt.attr").write_text("unique_subject = no\n")
+        resp = subprocess.Popen(["openssl", "ocsp", "-index", str(idx), "-port", str(rport), "-rsigner", ca, "-rkey", str(d / "ca.key"), "-CA", ca, "-ndays", "1"],
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            # (no wait_port: the one-connection-at-a-time responder would wait on the probe)
+            out = ""
+            for _ in range(40):
+                time.sleep(0.25)
+                out = tool("fetch", leaf, ca)
+                if "connection refused" not in out:
+                    break
+            check(f"ocsp: openssl's responder -> netio::ocsp::fetch: {want}", out == want, out)
+        finally:
+            resp.terminate()
+            resp.wait(5)
+    # OpenSSL's requests read by us
+    for nonce, want in ((["-no_nonce"], "ids=1 nonce=no"), ([], "ids=1 nonce=yes")):
+        run(["openssl", "ocsp", "-issuer", ca, "-cert", server, "-reqout", str(d / "req.der"), *nonce])
+        out = tool("req", str(d / "req.der"))
+        check(f"ocsp: we read openssl's request ({want})", out == want, out)
+    # certificate requests both ways
+    _, out = run(["openssl", "req", "-inform", "DER", "-in", str(d / "csr.der"), "-noout", "-verify", "-text"])
+    check("csr: openssl req verifies ours (names, address, must-staple)", "verify OK" in out and "DNS:a.example.test" in out and "IP Address:127.0.0.1" in out and "status_request" in out, out[-300:])
+    for alg, gen in (("P-256", ["-algorithm", "EC", "-pkeyopt", "ec_paramgen_curve:P-256"]), ("RSA", ["-algorithm", "RSA", "-pkeyopt", "rsa_keygen_bits:2048"]), ("Ed25519", ["-algorithm", "ED25519"])):
+        k = d / f"csr-{alg}.key"
+        run(["openssl", "genpkey", *gen, "-out", str(k)])
+        run(["openssl", "req", "-new", "-key", str(k), "-subj", "/CN=x.example.test", "-addext", "subjectAltName=DNS:x.example.test,IP:127.0.0.1", "-outform", "DER", "-out", str(d / "o.der")])
+        out = tool("csr", str(d / "o.der"))
+        check(f"csr: we read openssl's ({alg})", out.startswith("dns=x.example.test ips=127.0.0.1") and "cn=x.example.test" in out, out)
+    # stapling: our server -> openssl s_client -status
+    req = b"GET / HTTP/1.0\r\nHost: localhost\r\n\r\n"
+    for staple in (True, False):
+        port = free_port()
+        srv = subprocess.Popen([exe, "--tls-serve", str(port), *key] + (["--ocsp", str(d / "good.der")] if staple else []), stderr=subprocess.PIPE)
+        try:
+            wait_port(port)
+            _, out = run(["openssl", "s_client", "-connect", f"127.0.0.1:{port}", "-servername", "localhost", "-CAfile", ca, "-tls1_3", "-status", "-ign_eof"], input=req)
+            if staple:
+                check("stapling: our server -> openssl s_client -status (TLS 1.3)", "OCSP Response Status: successful" in out and "Cert Status: good" in out and "JFLib tls ok" in out, out[-400:])
+            else:
+                check("stapling: our server without a response staples none", "OCSP response: no response sent" in out and "JFLib tls ok" in out, out[-400:])
+        finally:
+            srv.terminate()
+            srv.wait(5)
+    # openssl s_server -status_file -> our client, TLS 1.3 and 1.2
+    for version, extra in (("-tls1_3", []), ("-tls1_2", ["--web"])):
+        for status_file, opts, ok_want, what in (("good.der", ["--revocation", "required"], True, "a good response taken"),
+                                                 ("revoked.der", [], False, "revoked: refused"),
+                                                 (None, ["--revocation", "required"], False, "none, required: refused"),
+                                                 (None, [], True, "none: taken (Stapled)")):
+            port = free_port()
+            cmd = ["openssl", "s_server", "-accept", str(port), "-cert", server, "-key", str(d / "server.key"), version, "-www"]
+            if status_file:
+                cmd += ["-status_file", str(d / status_file)]
+            srv = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            try:
+                wait_port(port)
+                code, out = run([exe, "--tls-get", str(port), "--host", "localhost", "--show-ocsp", *key, *extra, *opts])
+                tag = "TLS 1.3" if version == "-tls1_3" else "TLS 1.2"
+                stapled = status_file is not None
+                good = code == 0 and f"bytes stapled, {tag}" in out and (("--- ocsp: 0 bytes" in out) != stapled)
+                check(f"stapling: openssl s_server -status_file -> our client, {tag}: {what}", good if ok_want else code != 0 and "Cipher" not in out, out[-300:])
+            finally:
+                srv.terminate()
+                srv.wait(5)
 
 
 if __name__ == "__main__":

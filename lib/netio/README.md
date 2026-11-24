@@ -1,8 +1,9 @@
 # jflib-netio
 
 The network protocols of [JFLib](https://jflib.org): an HTTP/1.1 server and client, TLS 1.3 (and
-TLS 1.2 towards public servers), X.509 certificates, name lookups, an SSH client for running
-commands on another machine, and sending mail. It sits on the sockets of JFLib's platform layer
+TLS 1.2 towards public servers), X.509 certificates, OCSP, certificates from ACME CAs such as
+Let's Encrypt, name lookups, an SSH client for running commands on another machine, and sending
+mail. It sits on the sockets of JFLib's platform layer
 and is plain Rust, without the standard library and without a line of `unsafe` code. The
 handshakes and ciphers are its own, built on `jflib-crypto`; no OpenSSL or other TLS library is
 involved. Only the question which certificate authorities to trust goes to the operating system.
@@ -83,10 +84,17 @@ that authenticated it, and a resumed server keeps the client's certificate. http
 itself (`trust::system_connector`, `trust::connector` with a CA). 0-RTT is the server's choice
 (`ServerConfig::early_data`): `tls::connect_early` sends a request with the ClientHello, the
 server takes it only fresh and the first time it sees it, and hands it apart (`read_early`),
-since early data can be replayed. Not here yet: OCSP stapling; not here at all: renegotiation,
-external PSKs, TLS 1.2 resumption. The server is checked against tlsfuzzer with RSA, ECDSA and
-Ed25519 certificates and against OpenSSL's client, curl and Python, the client against TLS-Anvil
-and OpenSSL's server
+since early data can be replayed.
+
+OCSP stapling works both ways. A server with `ServerConfig::ocsp` (`Staples`) sends the response
+of its CA's responder to a client that asks; `ocsp::refresh` fetches it and keeps it current. A
+client that checks certificates against CAs asks for one by default (`ClientConfig::revocation`):
+a certificate the response calls revoked is refused, and with `Revocation::Required`, or for a
+certificate that must be stapled (RFC 7633), so is one without a good response. The client fetches
+no OCSP and no CRLs itself. Not here at all: renegotiation, external PSKs, TLS 1.2 resumption. The
+server is checked against tlsfuzzer with RSA, ECDSA and Ed25519 certificates and against OpenSSL's
+client, curl and Python, the client against TLS-Anvil and OpenSSL's server, OCSP against OpenSSL's
+responder
 ([docs/EXTERNAL_SUITES.md](https://github.com/JFLibrary/JFLib/blob/main/docs/EXTERNAL_SUITES.md)).
 
 ```rust
@@ -101,16 +109,50 @@ let tls = tls::accept(Box::new(tcp), cfg.clone()); // Result<TlsStream, TlsError
 // resumption: one Tickets for all connections of the server, one Sessions for a client's
 let cfg = ServerConfig { tickets: Some(Arc::new(tls::Tickets::new())), ..cfg };
 let client = ClientConfig { sessions: Some(Arc::new(tls::Sessions::default())), ..ClientConfig::new(Trust::System(Vec::new()), "example.org") };
+
+// OCSP stapling: the CA's response for the chain, kept current (again at the time it returns)
+let staples = Arc::new(tls::Staples::new());
+let next = jflib::netio::ocsp::refresh(&staples, &jflib::netio::Client::new(), &identity.chain, None)?;
+let cfg = ServerConfig { ocsp: Some(staples.clone()), ..cfg };
 ```
 
 `netio::x509` (the crate [`jflib-x509`](https://docs.rs/jflib-x509), which netpkt shares) parses
-certificates strictly, builds and signs certificates of a private CA with any of these keys, and
-verifies chains up to a trusted anchor, name constraints included. For https to a server with
+certificates strictly, builds and signs certificates of a private CA with any of these keys,
+verifies chains up to a trusted anchor, name constraints included, checks and builds OCSP
+responses and writes and reads certificate requests. For https to a server with
 its own CA, `trust::connector` trusts a CA the app knows or one with a pinned fingerprint, or
 learns the CA on the first connection and hands it back for the user to decide, the way SSH
 treats host keys. The
 system's certificate authorities are those of CryptoAPI on Windows, of the Security framework on
 macOS and iOS, and the distribution's CA bundle on Linux.
+
+## Certificates from Let's Encrypt (ACME)
+
+`netio::acme` gets certificates from a CA that speaks ACME (RFC 8555): Let's Encrypt, ZeroSSL,
+Google Trust Services, a company's step-ca. `Account::issue` runs the whole issuance: the order,
+proof of each name, the certificate request for a key of the program's, the chain, checked to be
+for that key and every name. The proof is http-01 (`Http01`, a handler in front of the program's
+own on port 80), tls-alpn-01 (`TlsAlpn01`, which lets the TLS server on port 443 answer the CA
+itself) or dns-01 through code of the program's for its DNS provider (wildcards need it). DNS
+names, wildcards and IP addresses; renewal information (ARI), so the CA says when to renew;
+external account binding for CAs that require one; profiles; revocation and key change. Every
+request is signed with the account key (ES256, ES384, RS256 or EdDSA), every URL of the CA must be
+https, and every wait ends after a limit. The client is checked against an ACME server in the
+test program that validates each challenge for real.
+
+```rust
+use jflib::netio::acme::{self, Acme, Http01, Identifier, NewAccount, OrderOptions};
+use jflib::netio::{trust, x509::PrivateKey, Client};
+
+// account_key: a PrivateKey the program keeps (PrivateKey::to_pkcs8) for its account
+let ca = Acme::new(Client::new().with_connector(trust::system_connector(Vec::new())), acme::LETS_ENCRYPT)?;
+let account = ca.account(account_key, &NewAccount { terms_agreed: true, ..NewAccount::default() })?;
+// the port-80 server answers the challenges: Server::start(&addr80, cfg, http01.handler(site))
+let mut http01 = Http01::new();
+let cert_key = PrivateKey::generate_ecdsa(jflib::crypto::ecdsa::Curve::P256, &mut |b| jflib::plat::fill_random(b));
+let issued = account.issue(&[Identifier::parse("example.org")], &cert_key, &mut http01, &OrderOptions::default())?;
+let identity = issued.identity(&cert_key); // for tls::ServerConfig; issued.pem for a file
+```
 
 ## WebSocket
 

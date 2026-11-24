@@ -1,4 +1,4 @@
-# External test suites -- Wycheproof, ACVP, x509-limbo, tlsfuzzer, TLS-Anvil
+# External test suites -- Wycheproof, ACVP, x509-limbo, tlsfuzzer, TLS-Anvil, Pebble
 
 Four adversarial suites that found bugs in OpenSSL, Go, Java, BouncyCastle, GnuTLS, NSS and
 others, and NIST's conformance vectors (ACVP, which FIPS validations are tested with), run
@@ -15,6 +15,7 @@ python tools/limbo_check.py           # C2SP/x509-limbo @ b12423782a88: limbo.js
 python tools/tlsfuzzer_check.py       # tlsfuzzer @ 51aad6e9ae42, tlslite-ng @ 7e95ea1a86c0: netio's TLS 1.3 server
 python tools/tlsanvil_check.py        # TLS-Anvil @ c1762f4 (Temurin 21, Maven 3.9.9; 850 MB): netio's TLS client
 python tools/tlsanvil_check.py --server   # ... netio's TLS 1.3 server (RSA certificate)
+python tools/pebble_check.py          # Pebble v2.10.1 (Let's Encrypt's ACME test server; 7 MB): netio::acme
 ```
 
 Wycheproof, ACVP and limbo turn each case into a `coretest --vectors` line (the operations are
@@ -22,16 +23,17 @@ in `apps/coretest/src/suitevec.rs` and `crypto.rs`) and exit with 1 on a failure
 filter, `--acceptable` (Wycheproof), `--list` and `--show ID` (limbo), `--target win`.
 tlsfuzzer and TLS-Anvil talk to `coretest` over TCP (sections below).
 
-## Results (2026-11-23; Linux x86-64)
+## Results (2026-11-24; Linux x86-64)
 
 | Suite | Cases | Pass | Fail | Skipped | Time |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Wycheproof | 18 813 | 18 532 | 0 | 281 | 15 s |
 | ACVP | 13 199 | 3 608 | 0 | 9 591 | 2 s |
-| x509-limbo | 9 807 | 9 720 | 28 (+14 optional) | 45 | 10 s |
+| x509-limbo | 9 807 | 9 721 | 27 (+14 optional) | 45 | 10 s |
 | tlsfuzzer | 57 scripts | 43 scripts (2 903 probes, 530 failing as expected) | 0 | 14 scripts | 63 s |
 | TLS-Anvil (client) | 232 tests | 192 | 2 (TLS-Anvil's own) | 38 | 85 s |
 | TLS-Anvil (server) | 289 tests | 123 | 0 | 166 | 9 min |
+| Pebble (ACME) | 29 checks | 29 | 0 | 0 | 40 s |
 
 Not one primitive in `lib/crypto` failed. The 15 Wycheproof failures of the first run were all
 in netio's DER decoding of ECDSA signatures and are fixed (below). The limbo failures that changed what netio accepts (17 in
@@ -140,7 +142,7 @@ validation_time, expected_peer_name, Server | Client)`, and `verify_chain` check
 | --- | ---: | ---: | ---: |
 | bettertls | 9 572 | 0 | 0 |
 | rfc5280 | 86 | 12 | 11 |
-| webpki | 29 | 27 | 0 |
+| webpki | 30 | 26 | 0 |
 | pathlen, pathological, cve, online, invalid | 33 | 3 | 6 |
 | crl, rfc9881 | 0 | 0 | 28 |
 
@@ -158,6 +160,7 @@ Fail counts include the 14 optional failures.
 | Name constraints checked against the leaf's names only | rfc5280::nc::intermediate-with-san-rejected-by-intermediate-nc, -by-root-nc | they apply to the leaf and every intermediate below the CA that is not self-issued (`ca_admits`) |
 | NameConstraints without subtrees taken as "no constraint" | webpki::nc::intermediate-permitted-excluded-subtrees-both-null, -both-empty-sequences | refused: one of the two must be present, and present ones must not be empty |
 | Self-issued intermediates counted against pathLenConstraint | pathlen::self-issued-certs-pathlen | not counted (RFC 5280 6.1.4 (l)) |
+| A malformed authority information access taken (it was not read; phase 2b, part 3) | webpki::malformed-aia | `Cert::parse` reads it (the OCSP responders and caIssuers URIs) and refuses one that is malformed, empty or critical |
 
 Also: a TLS Certificate message may hold 20 certificates (it was 10), and an intermediate in it
 that cannot be read is left out instead of failing the handshake (`tls/conn.rs`, `push_cert`);
@@ -181,7 +184,6 @@ change which names or keys netio trusts:
 | DNS name constraint with a leading period | rfc5280::nc::invalid-dnsname-leading-period | netio reads `.example.com` as "subdomains only" on purpose, as other verifiers do |
 | Subject / SAN consistency | rfc5280::san::noncritical-with-empty-subject, webpki::san::san-critical-with-nonempty-subject | the SAN's criticality changes no name netio matches |
 | CN is a copy of a SAN entry | webpki::cn::* (9) | `Cert::names` uses the SAN only, so the CN cannot make a name match |
-| Malformed AIA | webpki::malformed-aia | AIA is not used (no fetching of intermediates, no OCSP) |
 
 ### Not defects
 
@@ -208,7 +210,7 @@ change which names or keys netio trusts:
 
 | Count | Reason |
 | ---: | --- |
-| 22 | CRLs: revocation is not checked (`lib/x509/lib.rs` header) |
+| 22 | CRLs are not checked (`lib/x509/lib.rs` header; OCSP is `x509::ocsp`, which limbo does not test) |
 | 10 | `expected_peer_names` (a server checking a client's names): `verify_chain` has no such check |
 | 6 | `max_chain_depth`: `verify_chain` has a fixed limit of its own |
 | 6 | ML-DSA keys |
@@ -346,5 +348,34 @@ KeyUpdate.appDataUnderNewKeysSucceeds); it now ends with `shutdown()`, as a prog
 
 `--server` points TLS-Anvil at `coretest --tls-serve --key rsa` (an RSA-2048 certificate; `--key
 p256`, `p384` and `rsa` all work, Ed25519 does not, since TLS-Scanner's probes offer none). Its
-results are above: all 110 server tests that apply pass, and tlsfuzzer tests the server with every
+results are above: all 123 server tests that apply pass, and tlsfuzzer tests the server with every
 kind of key besides.
+
+## Pebble
+
+`tools/pebble_check.py` runs netio's ACME client (`coretest --acme-pebble`) against
+[Pebble](https://github.com/letsencrypt/pebble), the small ACME server Let's Encrypt keeps for
+client tests: the same protocol as its production CA, with its checks made stricter on purpose
+(it refuses 5 % of nonces at random, reuses authorizations, sends Retry-After). The release
+binaries of Pebble and pebble-challtestsrv come into `build/pebble/v2.10.1` once (`gh release
+download`). The tool writes Pebble a config of the run: its https certificate is the server
+certificate of `coretest --tls-pki DIR --key p256` (the client trusts that CA), the challenge
+ports are those of the client's own servers in coretest (an HTTP server with `acme::Http01`, a TLS
+server set up with `acme::TlsAlpn01`), Retry-After is a second. challtestsrv is Pebble's DNS
+server: every name is 127.0.0.1, and the client sets the dns-01 TXT records through its management
+API. A second Pebble that requires an external account binding checks EAB.
+
+| Checked | Result |
+| --- | --- |
+| http-01 (two names), tls-alpn-01, dns-01 with a wildcard and http-01 beside it, an IP address by http-01 and by tls-alpn-01 (RFC 8738's reverse name) | issued; every chain verifies to Pebble's root (its management API) for every name |
+| the profile shortlived | a certificate of under 10 days |
+| a wrong key authorization | the authorization ends invalid, with Pebble's problem |
+| account keys ES256, ES384, RS256 | accounts and certificates; EdDSA: badSignatureAlgorithm (Pebble, like Let's Encrypt, takes RS256 and ES256 to ES512 only) |
+| renewal information (RFC 9773) | a window within the certificate's validity; an order with `replaces` is issued |
+| revocation | by the account (superseded), again: alreadyRevoked; by the certificate's own key (keyCompromise) |
+| key change, contact, deactivation | the new key orders, the old one finds no account; a deactivated account orders nothing |
+| external account binding | the directory asks for it; refused before a request without one; HS256 with the key id and MAC key; a wrong MAC key refused |
+
+The client's checks of what a CA sends back (a chain for another key or without a name, a token
+outside base64url, an http URL, rate limits, a CA that never decides) cannot be made with Pebble,
+which behaves; coretest's ACME server (`apps/coretest/src/acmesrv.rs`, suite `acme`) makes them.
