@@ -29,6 +29,7 @@
 
 use alloc::format;
 use alloc::rc::Rc;
+use core::cell::RefCell;
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -55,7 +56,61 @@ pub(crate) struct DgState {
     pub thumbs: Vec<(u64, Rc<Surface>)>,
     /// the dialogs (data_graphics_dlg.rs)
     pub dlg: crate::data_graphics_dlg::Dialogs,
+    /// what the commands' states, the pane and the gallery read every pass, kept for one state
+    /// of the drawing, the page, the selection and the chosen field (a drawing of thousands of
+    /// shapes is not searched again for each of them)
+    view: RefCell<Option<(ViewKey, Rc<View>)>>,
 }
+
+// the state a View was made for: drawing serial, revision, page, selection, chosen field
+type ViewKey = (u32, u32, Option<PageRef>, Vec<u64>, Option<String>);
+
+/// the shapes and the graphic the commands work on now
+pub(crate) struct View {
+    pub targets: Vec<ShapeRef>,
+    pub graphic: Option<MasterRef>,
+    pub model: Option<DataGraphic>,
+    pub fields: Vec<PaneField>,
+    /// the page shows some data graphic
+    pub page_graphic: bool,
+    /// one of the targets shows a data graphic
+    pub any_applied: bool,
+    /// the drawing has data graphics
+    pub has_graphics: bool,
+}
+
+/// the View of the app's state now (made once per state)
+pub(crate) fn view(app: &Diagrammer) -> Rc<View> {
+    let key: ViewKey = (
+        app.opened.as_ref().map_or(0, |o| o.serial),
+        app.opened.as_ref().map_or(0, |o| o.ed.rev),
+        page(app),
+        app.se.sel.iter().copied().collect(),
+        app.dg.field.clone(),
+    );
+    if let Some((k, v)) = app.dg.view.borrow().as_ref() {
+        if *k == key {
+            return v.clone();
+        }
+    }
+    let v = Rc::new(make_view(app));
+    *app.dg.view.borrow_mut() = Some((key, v.clone()));
+    v
+}
+
+fn make_view(app: &Diagrammer) -> View {
+    let empty = View { targets: Vec::new(), graphic: None, model: None, fields: Vec::new(), page_graphic: false, any_applied: false, has_graphics: false };
+    let Some(o) = app.opened.as_ref() else { return empty };
+    let doc = &o.doc;
+    let ts = find_targets(app);
+    let graphic = ts.iter().find_map(|&s| dg::applied(doc, s));
+    let model = graphic.and_then(|m| dg::read(doc, m));
+    let fields = find_fields(doc, &ts, model.as_ref());
+    let page_graphic = page(app).is_some_and(|p| doc.all_shapes(Owner::Page(p)).any(|s| dg::applied(doc, s).is_some()));
+    let any_applied = ts.iter().any(|&s| dg::applied(doc, s).is_some());
+    View { targets: ts, graphic, model, fields, page_graphic, any_applied, has_graphics: !dg::graphics(doc).is_empty() }
+}
+
 
 // ---------------------------------------------------------------- where things are
 
@@ -90,6 +145,10 @@ fn owner_of(doc: &Document, s: ShapeRef) -> ShapeRef {
 /// the shapes an action works on: the selection (with data or a graphic), else every shape of
 /// the page with linked data
 pub(crate) fn targets(app: &Diagrammer) -> Vec<ShapeRef> {
+    view(app).targets.clone()
+}
+
+fn find_targets(app: &Diagrammer) -> Vec<ShapeRef> {
     let (Some(o), Some(p)) = (app.opened.as_ref(), page(app)) else { return Vec::new() };
     let doc = &o.doc;
     let sel: Vec<ShapeRef> = edit_canvas::selected(app).into_iter().map(|s| owner_of(doc, s)).collect();
@@ -110,11 +169,11 @@ pub(crate) fn targets(app: &Diagrammer) -> Vec<ShapeRef> {
 
 /// the graphic the targets show (the first one that shows one)
 pub(crate) fn graphic_of(app: &Diagrammer) -> Option<MasterRef> {
-    let doc = &app.opened.as_ref()?.doc;
-    targets(app).into_iter().find_map(|s| dg::applied(doc, s))
+    view(app).graphic
 }
 
 /// a field of the pane: its label, whether the graphic has an item for it
+#[derive(Clone)]
 pub(crate) struct PaneField {
     pub label: String,
     pub on: bool,
@@ -125,14 +184,14 @@ pub(crate) struct PaneField {
 /// the pane's fields: the columns of the data linked to the targets in their order, else the
 /// shape data the targets have
 pub(crate) fn fields(app: &Diagrammer) -> Vec<PaneField> {
-    let Some(o) = app.opened.as_ref() else { return Vec::new() };
-    let doc = &o.doc;
-    let ts = targets(app);
-    let g = graphic_of(app).and_then(|m| dg::read(doc, m));
-    let on = |label: &str| g.as_ref().is_some_and(|g| g.item_of(&dg::field_expr(label)).is_some());
+    view(app).fields.clone()
+}
+
+fn find_fields(doc: &Document, ts: &[ShapeRef], g: Option<&DataGraphic>) -> Vec<PaneField> {
+    let on = |label: &str| g.is_some_and(|g| g.item_of(&dg::field_expr(label)).is_some());
     let mut out: Vec<PaneField> = Vec::new();
     let mut sets: Vec<u32> = Vec::new();
-    for &s in &ts {
+    for &s in ts {
         for (rs, _) in doc.data_links(s) {
             if !sets.contains(&rs) {
                 sets.push(rs);
@@ -152,7 +211,7 @@ pub(crate) fn fields(app: &Diagrammer) -> Vec<PaneField> {
         }
     }
     if out.is_empty() {
-        for f in dg::fields(doc, &ts) {
+        for f in dg::fields(doc, ts) {
             out.push(PaneField { on: on(&f.label), label: f.label, numeric: false });
         }
     }
@@ -162,14 +221,14 @@ pub(crate) fn fields(app: &Diagrammer) -> Vec<PaneField> {
 /// the chosen field when the pane lists it
 pub(crate) fn chosen(app: &Diagrammer) -> Option<String> {
     let f = app.dg.field.clone()?;
-    fields(app).iter().any(|x| x.label == f).then_some(f)
+    view(app).fields.iter().any(|x| x.label == f).then_some(f)
 }
 
 /// the item of the chosen field in the targets' graphic
 pub(crate) fn chosen_item(app: &Diagrammer) -> Option<Item> {
     let f = chosen(app)?;
-    let m = graphic_of(app)?;
-    let g = dg::read(&app.opened.as_ref()?.doc, m)?;
+    let v = view(app);
+    let g = v.model.as_ref()?;
     let k = g.item_of(&dg::field_expr(&f))?;
     Some(g.items[k].clone())
 }
@@ -395,24 +454,24 @@ pub(crate) fn kind_name(kind: Kind) -> &'static str {
 
 /// whether command `id` of this file can run now (other commands: true)
 pub(crate) fn available(app: &Diagrammer, id: u32) -> bool {
+    let commands = [DATA_GRAPHICS, DG_POSITION, DG_CONFIGURE, DATA_LEGEND, DG_LEGEND_H, DG_LEGEND_V, PANE_DG_FIELDS, DATA_ADVANCED_DG, DG_NEW, DG_EDIT_GRAPHIC, DG_RENAME, DG_DUPLICATE, DG_DELETE, DG_SELECT_SHAPES, DG_NONE];
+    if !commands.contains(&id) && !(DG_POS_H0..=DG_POS_V6).contains(&id) {
+        return true;
+    }
     let doc = app.opened.as_ref().map(|o| &o.doc);
-    let has_dg = doc.is_some_and(|d| !dg::graphics(d).is_empty());
+    let v = view(app);
+    let has_dg = v.has_graphics;
     match id {
         DATA_GRAPHICS => doc.is_some(),
         DG_POSITION | DG_CONFIGURE => chosen_item(app).is_some(),
         _ if (DG_POS_H0..=DG_POS_V6).contains(&id) => chosen_item(app).is_some(),
-        DATA_LEGEND | DG_LEGEND_H | DG_LEGEND_V => page_has_graphic(app),
+        DATA_LEGEND | DG_LEGEND_H | DG_LEGEND_V => v.page_graphic,
         PANE_DG_FIELDS | DATA_ADVANCED_DG | DG_NEW => doc.is_some(),
-        DG_EDIT_GRAPHIC => doc.is_some() && (has_dg || !targets(app).is_empty()),
-        DG_RENAME | DG_DUPLICATE | DG_DELETE | DG_SELECT_SHAPES => current(app).is_some(),
-        DG_NONE => !targets(app).is_empty() && targets(app).iter().any(|&s| doc.is_some_and(|d| dg::applied(d, s).is_some())),
+        DG_EDIT_GRAPHIC => doc.is_some() && (has_dg || !v.targets.is_empty()),
+        DG_RENAME | DG_DUPLICATE | DG_DELETE | DG_SELECT_SHAPES => has_dg,
+        DG_NONE => v.any_applied,
         _ => true,
     }
-}
-
-fn page_has_graphic(app: &Diagrammer) -> bool {
-    let (Some(o), Some(p)) = (app.opened.as_ref(), page(app)) else { return false };
-    o.doc.all_shapes(Owner::Page(p)).any(|s| dg::applied(&o.doc, s).is_some())
 }
 
 /// the graphic the advanced menu's commands act on: a tile's (its menu; the command clears it),
@@ -439,7 +498,7 @@ pub(crate) fn position(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
 /// whether a position command is the chosen item's place
 pub(crate) fn position_on(app: &Diagrammer, id: u32) -> bool {
     let Some(it) = chosen_item(app) else { return false };
-    let def = app.opened.as_ref().and_then(|o| graphic_of(app).and_then(|m| dg::read(&o.doc, m))).map_or(Pos::DEFAULT, |g| g.default_pos);
+    let def = view(app).model.as_ref().map_or(Pos::DEFAULT, |g| g.default_pos);
     let p = it.pos.unwrap_or(def);
     if (DG_POS_H0..=DG_POS_H6).contains(&id) { p.h as u32 == id - DG_POS_H0 } else { p.v as u32 == id - DG_POS_V0 }
 }

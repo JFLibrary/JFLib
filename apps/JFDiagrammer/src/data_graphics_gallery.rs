@@ -222,7 +222,13 @@ pub(crate) fn preset_label(app: &Diagrammer, k: Option<usize>) -> String {
     if kind == Kind::ColorByValue {
         return String::from(kind_name(kind));
     }
-    dgs::styles(app, kind).into_iter().find(|(n, _)| n == callout).map_or_else(|| String::from(callout), |(_, shown)| shown)
+    // the name in the current language from the built-in stencil (every pass: not the drawing's masters)
+    let shown = dgs::source(app).and_then(|doc| {
+        let m = dg::find_master(doc, callout)?;
+        let n = diagram_core::instance::MasterTexts::of(doc, m);
+        Some(String::from(n.name(crate::stencils::lang())))
+    });
+    shown.filter(|n| !n.is_empty()).unwrap_or_else(|| String::from(callout))
 }
 
 /// a click on preset k: the chosen field gets this style (None: Keine, the field's item goes)
