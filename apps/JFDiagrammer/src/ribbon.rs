@@ -211,15 +211,20 @@ static DESIGN: [Group; 4] = [
     Group("Layout", LAYOUT_ROUTING, &[Col::BigMenu(CONNECTORS, &CONN_MENU)]),
 ];
 
-// (JD18) Daten, as Visio's register (FEATURES 3.7); the data graphics wait for JD19
+// (JD18) Daten, as Visio's register (FEATURES 3.7); (JD19) the data graphics: the gallery,
+// Position ▾, Legende einfügen ▾, Erweiterte Datengrafiken ▾ (data_graphics*.rs)
 static REFRESH_MENU: [It; 4] = [C(DATA_REFRESH_ALL), C(DATA_REFRESH), Sep, C(DATA_AUTO_LINK_REFRESH)];
+// i18n
+static DG_POS_MENU: [It; 2] = [Sub("Horizontal", &[C(DG_POS_H0), C(DG_POS_H1), C(DG_POS_H2), C(DG_POS_H3), C(DG_POS_H4), C(DG_POS_H5), C(DG_POS_H6)]), Sub("Vertikal", &[C(DG_POS_V6), C(DG_POS_V5), C(DG_POS_V4), C(DG_POS_V3), C(DG_POS_V2), C(DG_POS_V1), C(DG_POS_V0)])];
+static LEGEND_MENU: [It; 2] = [C(DG_LEGEND_H), C(DG_LEGEND_V)];
+static ADVANCED_DG_MENU: [It; 8] = [C(DG_NONE), Sep, C(DG_NEW), C(DG_EDIT_GRAPHIC), C(DG_RENAME), C(DG_DUPLICATE), C(DG_DELETE), C(DG_SELECT_SHAPES)];
 // i18n
 static DATA: [Group; 5] = [
     Group("Externe Daten", 0, &[Col::Big(DATA_QUICK_IMPORT), Col::Big(DATA_CUSTOM_IMPORT), Col::BigSplit(DATA_REFRESH_ALL, &REFRESH_MENU), Col::Big(DATA_TEXT_DRAWING)]),
-    Group("Datengrafiken", 0, &[Col::Big(DATA_GRAPHICS), Col::Small(&[Sm::Btn(DG_POSITION), Sm::Btn(DG_CONFIGURE), Sm::Btn(DG_AUTO_SPACE)])]),
-    Group("Daten anzeigen", 0, &[Col::Big(DATA_LEGEND)]),
+    Group("Datengrafiken", 0, &[Col::Gallery(DATA_GRAPHICS, 5, 0), Col::Small(&[Sm::Menu(DG_POSITION, &DG_POS_MENU), Sm::Btn(DG_CONFIGURE), Sm::Btn(DG_AUTO_SPACE)])]),
+    Group("Daten anzeigen", 0, &[Col::BigMenu(DATA_LEGEND, &LEGEND_MENU)]),
     Group("Einblenden/Ausblenden", 0, &[Col::Small(&[Sm::Check(PANE_SHAPE_DATA_WINDOW), Sm::Check(PANE_EXTERNAL_DATA), Sm::Check(PANE_DG_FIELDS)])]),
-    Group("Erweiterte Datenverknüpfung", 0, &[Col::Small(&[Sm::Btn(DATA_LINK), Sm::Btn(DATA_ADVANCED_DG)])]),
+    Group("Erweiterte Datenverknüpfung", 0, &[Col::Small(&[Sm::Btn(DATA_LINK), Sm::Menu(DATA_ADVANCED_DG, &ADVANCED_DG_MENU)])]),
 ];
 
 // i18n
@@ -318,6 +323,10 @@ fn menu_of(id: u32) -> Option<(Reg, u32, &'static [It])> {
 pub(crate) fn menu_place(id: u32) -> Option<(Reg, u32)> {
     if id == THEMES {
         return Some((Reg::Design, crate::design_gallery::ID_ALL));
+    }
+    // (JD19) Daten › Datengrafiken: the gallery's flyout with every style
+    if id == DATA_GRAPHICS {
+        return Some((Reg::Data, crate::data_graphics_gallery::ID_ALL));
     }
     menu_of(id).map(|(reg, pid, _)| (reg, pid))
 }
@@ -493,6 +502,11 @@ fn column(app: &mut Diagrammer, ui: &mut Ui, col: &Col, width: i32, tiles: u32, 
             ui.next_size(width, CONTENT_H);
             crate::design_gallery::variants(app, ui, CONTENT_H);
         }
+        // (JD19) the data graphics' gallery
+        Col::Gallery(DATA_GRAPHICS, ..) => {
+            ui.next_size(width, CONTENT_H);
+            crate::data_graphics_gallery::gallery(app, ui, CONTENT_H);
+        }
         Col::Gallery(id, n, color) => {
             ui.next_size(width, CONTENT_H);
             ui.box_begin(0, BOX_H | BOX_FIXED, 2);
@@ -592,6 +606,10 @@ fn small(app: &mut Diagrammer, ui: &mut Ui, s: &Sm, compact: bool) {
 fn menu(app: &mut Diagrammer, ui: &mut Ui, pid: u32, items: &[It]) {
     // (JD11) Füllung, Linie and Schriftfarbe bring their colour menus
     if crate::format_menus::flyout(app, ui, pid) {
+        return;
+    }
+    // (JD19) Erweiterte Datengrafiken: the document's graphics as tiles above the rows
+    if crate::data_graphics_gallery::flyout(app, ui, pid) {
         return;
     }
     if ui.flyout_begin(pid, 0) {

@@ -1,0 +1,17 @@
+# Datengrafiken (JD19, PLAN.md; DA-07): die Elemente, die eine Datengrafik an ein Shape setzt --
+# Text, Datenleisten, Symbolsätze.  Alle Master sind verborgen: die App (src/data_graphics*.rs,
+# diagram_core::datagraphic) setzt Instanzen als Untershapes an die Shapes und schreibt ihre Zellen;
+# die Seitenleiste und "Weitere Shapes" zeigen die Schablone nicht.  Die Zellnamen sind Visios
+# (User.msvCalloutType, Prop.msvCalloutField, Prop.msvCalloutProp*, User.msvCalloutIconCount,
+# User.msvCalloutIconNumber), damit Visio die Elemente erkennt; Zeichnungen, Formeln und Farben
+# sind eigene Arbeit.  NameU mit "DG " vorn, damit sie nicht mit Visios Mastern gleichen Namens in
+# einer Datei zusammenfallen.
+stencil: Data Graphics
+file: datagraphics
+name.de: Datengrafiken
+name.en: Data graphics
+name.es: Gráficos de datos
+name.it: Grafiche dati
+name.fr: Graphiques de données
+category: extras
+masters: dg_text, dg_text_box, dg_text_bar, dg_progress, dg_stars, dg_thermometer, dg_gauge, dg_traffic, dg_arrows, dg_flags, dg_rating

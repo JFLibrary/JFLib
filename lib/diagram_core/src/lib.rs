@@ -50,6 +50,10 @@
 //   data::*                       (JD18) external data: connections, recordsets with their
 //                                 cached rows, rows bound to shapes (Prop rows, DataLinked),
 //                                 refresh with conflicts, automatic linking (DA-04, DA-05)
+//   datagraphic::*                (JD19) data graphics: callouts, data bars, icon sets and
+//                                 colour by value from a shape's data as Visio keeps them (a
+//                                 hidden master per graphic, callout instances as subshapes),
+//                                 the legend of lists and containers (DA-07, DA-08, ST-08)
 //   field::*                      (JD8) text fields: a Field row's value in its format picture,
 //                                 new fields, the text with its fields, the document's
 //                                 properties (Document::fields: the app's locale and clock)
@@ -66,6 +70,7 @@ extern crate alloc;
 
 mod cell;
 pub mod data;
+pub mod datagraphic;
 pub mod design;
 pub mod dock;
 mod document;

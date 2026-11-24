@@ -422,6 +422,34 @@ Acht Schablonen: `decorative` (SH-003), `charting` (SH-004), `venn` (SH-007) in 
   `diagramiotest --write-stencil-previews DIR` (`probeblatt-jd26.png`, `<ordner>-alle.png` und
   `<ordner>-alle-kontrast.png`).
 
+## Datengrafiken (JD19)
+
+Die verborgene Schablone `datagraphics` (Kategorie `extras`, in „Weitere Shapes“ nicht angeboten)
+liefert die Elemente, die eine Datengrafik an ein Shape setzt (DA-07): drei Text-Elemente (`DG Text`,
+`DG Text box`, `DG Text underlined`), vier Datenleisten (`DG Progress bar`, `DG Star rating`,
+`DG Thermometer`, `DG Speedometer`) und vier Symbolsätze (`DG Traffic lights`, `DG Arrows`,
+`DG Flags`, `DG Rating`). Alle Master sind `hidden: true`; die App setzt Instanzen als Untershapes an
+die Shapes (`diagram_core::datagraphic`). Die Zellnamen sind Visios, damit Visio die Elemente erkennt
+und bearbeiten kann; Zeichnungen, Formeln und Farben sind eigene Arbeit. Der NameU beginnt mit `DG `,
+damit er nicht mit Visios Mastern gleichen Namens in einer Datei zusammenfällt.
+
+| Zelle | Inhalt |
+|---|---|
+| `User.msvCalloutType` | `"Text Callout"`, `"Data Bar"` oder `"Icon Set"` |
+| `Prop.msvCalloutField` | der Wert, den das Element zeigt (die App schreibt eine Formel auf die Shape-Daten des Shapes; `SortKey` = Bezeichnung des Felds) |
+| `Prop.msvCalloutProp*` | die Optionen; `Prompt` = Art des Eingabefelds wie bei Visio (`Number`, `Bool`, `Format`, `String`, `List`): `Min`, `Max`, `ShowValue`, `ValueFormat`, `Label`, `LabelPosition`, `Border`, `Fill` |
+| `User.msvCalloutIconCount`, `User.msvCalloutIconNumber` | Symbolsätze: Anzahl der Symbole, das gezeigte (-1 keins); die App schreibt dort die aus den Regeln übersetzte Formel |
+
+- Datenleisten rechnen den Anteil `User.F` = (Wert - Minimum) / (Maximum - Minimum), begrenzt auf 0 bis 1;
+  Breite, Säule, Sterne und Zeiger folgen ihm. Gefüllte Teile in der Linienfarbe (`FillForegnd =
+  LineColor`).
+- Symbolsätze schalten ihre Geometrieabschnitte mit `NoShow`/`NoFill` nach `User.msvCalloutIconNumber`.
+  Die Farben der Ampel, Pfeile und Flaggen sind die Bedeutung der Symbole und deshalb fest
+  (begründete Ausnahme der Stilregeln).
+- Text-Elemente zeigen ein Textfeld: Bezeichnung und Wert (`FORMAT` im Wertformat) nach
+  `LabelPosition`; Rahmen und Füllung nach `Border` und `Fill`.
+- Prüfen: `diagramiotest --check --only datagraphics`, Gegenprobe `diagramiotest --write-dg DIR`.
+
 ## Was in der `.vssx` steht
 
 Visio-Attribute je Master: `ID`, `NameU`, `Name` und `Prompt` in der Bausprache,

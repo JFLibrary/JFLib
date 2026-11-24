@@ -30,15 +30,9 @@ pub(crate) static LATER: &[(u32, &str)] = &[
     (VAR_FONTS, "RW-06, TH-05: Schriftsätze sind P2"),
     (VAR_EMBELLISHMENT, "RW-06, TH-05: Verzierungsgrad ist P2"),
     (LINE_JUMPS, "CN-06: Linienübergänge sind P2 (PLAN JD7); der Renderer zeichnet noch keine"),
-    // (JD18) Register Daten: was erst die Datengrafiken (JD19) brauchen, und P3
+    // (JD18) Register Daten: was P3 ist (die Datengrafiken kamen mit JD19)
     (DATA_QUICK_IMPORT, "RD-01, DA-06: Schnellimport ist P3 (Benutzerdefinierter Import geht)"),
-    (DATA_GRAPHICS, "RD-04, DA-07: Datengrafiken kommen mit JD19"),
-    (DG_POSITION, "RD-05: Position der Datengrafik kommt mit JD19"),
-    (DG_CONFIGURE, "RD-05: Datengrafik konfigurieren kommt mit JD19"),
     (DG_AUTO_SPACE, "RD-06: Automatischer Abstand ist P3"),
-    (DATA_LEGEND, "RD-07, ST-08: Legende für Datengrafiken kommt mit JD19"),
-    (PANE_DG_FIELDS, "RD-08, AB-12, DA-08: Bereich Datengrafikfelder kommt mit JD19"),
-    (DATA_ADVANCED_DG, "RD-10: Erweiterte Datengrafiken kommen mit JD19"),
 ];
 
 /// what check() found

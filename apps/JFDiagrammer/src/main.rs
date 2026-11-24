@@ -86,6 +86,12 @@
 //                     (Externe Daten), data_refresh (aktualisieren, Intervall, Konflikte),
 //                     data_link (Daten verknüpfen), data_ask (Abfrage beim Ablegen),
 //                     data_textdraw (Zeichnung aus Text)
+//   src/data_graphics*.rs  (JD19) data graphics (diagram_core::datagraphic, the callout masters of
+//                     stencils/datagraphics): data_graphics (the commands, the shapes and fields
+//                     they work on, changes in one undo step), data_graphics_gallery (Daten ›
+//                     Datengrafiken and Erweiterte Datengrafiken with rendered tiles),
+//                     data_graphics_pane (Datengrafikfelder), data_graphics_dlg (Datengrafik
+//                     bearbeiten, Element bearbeiten, Umbenennen)
 //   build.rs, build_steps.rs, stencils/   (JD9) the stencil sources and their build into .vssx
 //                     when the app is built (README there; build_rs.py's derived builds for the
 //                     browser and Android run build_steps.rs too); templates/ (JD13) the
@@ -141,6 +147,11 @@ mod commands;
 // (JD18) data: the register Daten, the pane Externe Daten, import, link, refresh, drawing from text
 mod data_ask;
 mod data_cmds;
+// (JD19) data graphics: the gallery, the pane Datengrafikfelder, the dialogs, the legend
+mod data_graphics;
+mod data_graphics_dlg;
+mod data_graphics_gallery;
+mod data_graphics_pane;
 mod data_import;
 mod data_link;
 mod data_pane;
@@ -334,6 +345,8 @@ pub(crate) struct Diagrammer {
     pub dlink: data_link::LinkState,
     pub dask: data_ask::AskState,
     pub textdraw: data_textdraw::TextDrawState,
+    /// (JD19) data graphics: the field chosen, the tiles, the dialogs
+    pub dg: data_graphics::DgState,
 }
 
 impl Diagrammer {
@@ -407,6 +420,7 @@ impl Diagrammer {
             dlink: data_link::LinkState::default(),
             dask: data_ask::AskState::default(),
             textdraw: data_textdraw::TextDrawState::default(),
+            dg: data_graphics::DgState::default(),
             page_views: alloc::vec::Vec::new(),
             view_page: None,
         }
@@ -590,6 +604,8 @@ impl App for Diagrammer {
         data_link::dialog(self, ui);
         data_ask::dialog(self, ui);
         data_textdraw::dialog(self, ui);
+        // (JD19) Datengrafik bearbeiten, Element bearbeiten, Umbenennen
+        data_graphics_dlg::dialogs(self, ui);
     }
 
     fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {

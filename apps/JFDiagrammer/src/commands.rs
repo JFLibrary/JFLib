@@ -361,6 +361,31 @@ commands! {
     DATA_AUTO_LINK_REFRESH = 0x1920, "Nach Aktualisierung automatisch verknüpfen", 0, 0;
     // (JD18, AB-11) the pane Externe Daten's Verknüpfung aufheben: the selected rows' shapes
     DATA_UNLINK_ROWS = 0x1960, "Verknüpfung aufheben", 0, 0;
+    // (JD19) data graphics (data_graphics*.rs): Legende einfügen ▾, Erweiterte Datengrafiken ▾,
+    // the shape's menu Daten ▸ Datengrafik bearbeiten, Position ▾
+    DG_LEGEND_H = 0x1980, "Horizontal|Legende", 0, 0;
+    DG_LEGEND_V = 0x1981, "Vertikal|Legende", 0, 0;
+    DG_NEW = 0x1982, "Neue Datengrafik erstellen ...", 0, 0;
+    DG_EDIT_GRAPHIC = 0x1983, "Datengrafik bearbeiten ...", 0, 0;
+    DG_RENAME = 0x1984, "Umbenennen|Datengrafik", 0, 0;
+    DG_DUPLICATE = 0x1985, "Duplizieren|Datengrafik", 0, 0;
+    DG_DELETE = 0x1986, "Löschen|Datengrafik", 0, 0;
+    DG_SELECT_SHAPES = 0x1987, "Shapes mit dieser Grafik auswählen", 0, 0;
+    DG_NONE = 0x1988, "Keine Datengrafik", 0, 0;
+    DG_POS_H0 = 0x1990, "Weit links|Position", 0, 0;
+    DG_POS_H1 = 0x1991, "Linker Rand|Position", 0, 0;
+    DG_POS_H2 = 0x1992, "Links|Position", 0, 0;
+    DG_POS_H3 = 0x1993, "Zentriert|Position", 0, 0;
+    DG_POS_H4 = 0x1994, "Rechts|Position", 0, 0;
+    DG_POS_H5 = 0x1995, "Rechter Rand|Position", 0, 0;
+    DG_POS_H6 = 0x1996, "Weit rechts|Position", 0, 0;
+    DG_POS_V0 = 0x1998, "Unterhalb|Position", 0, 0;
+    DG_POS_V1 = 0x1999, "Unterer Rand|Position", 0, 0;
+    DG_POS_V2 = 0x199A, "Unten|Position", 0, 0;
+    DG_POS_V3 = 0x199B, "Mittig|Position", 0, 0;
+    DG_POS_V4 = 0x199C, "Oben|Position", 0, 0;
+    DG_POS_V5 = 0x199D, "Oberer Rand|Position", 0, 0;
+    DG_POS_V6 = 0x199E, "Oberhalb|Position", 0, 0;
 }
 
 /// a command's handler: what it does (the function behind it exists)
@@ -596,6 +621,36 @@ static HANDLERS: &[(u32, Handler)] = &[
     (DATA_CONFLICTS, crate::data_refresh::conflicts_open),
     (DATA_AUTO_LINK_REFRESH, crate::data_refresh::toggle_auto_link),
     (DATA_UNLINK_ROWS, crate::data_pane::unlink_rows),
+    // (JD19) data graphics (data_graphics*.rs)
+    (DATA_GRAPHICS, |a, ui| crate::cmds_shell::open_menu(a, ui, DATA_GRAPHICS)),
+    (DG_POSITION, |a, ui| crate::cmds_shell::open_menu(a, ui, DG_POSITION)),
+    (DG_CONFIGURE, crate::data_graphics::configure),
+    (DATA_LEGEND, |a, ui| crate::cmds_shell::open_menu(a, ui, DATA_LEGEND)),
+    (PANE_DG_FIELDS, |a, _| a.panes.toggle(crate::panes::P_DG_FIELDS)),
+    (DATA_ADVANCED_DG, |a, ui| crate::cmds_shell::open_menu(a, ui, DATA_ADVANCED_DG)),
+    (DG_LEGEND_H, |a, ui| crate::data_graphics::insert_legend(a, ui, true)),
+    (DG_LEGEND_V, |a, ui| crate::data_graphics::insert_legend(a, ui, false)),
+    (DG_NEW, crate::data_graphics_dlg::new_graphic),
+    (DG_EDIT_GRAPHIC, crate::data_graphics_dlg::edit_graphic),
+    (DG_RENAME, crate::data_graphics_dlg::open_rename),
+    (DG_DUPLICATE, crate::data_graphics::duplicate),
+    (DG_DELETE, crate::data_graphics::delete),
+    (DG_SELECT_SHAPES, crate::data_graphics::select_shapes),
+    (DG_NONE, crate::data_graphics::none),
+    (DG_POS_H0, |a, ui| crate::data_graphics::position(a, ui, DG_POS_H0)),
+    (DG_POS_H1, |a, ui| crate::data_graphics::position(a, ui, DG_POS_H1)),
+    (DG_POS_H2, |a, ui| crate::data_graphics::position(a, ui, DG_POS_H2)),
+    (DG_POS_H3, |a, ui| crate::data_graphics::position(a, ui, DG_POS_H3)),
+    (DG_POS_H4, |a, ui| crate::data_graphics::position(a, ui, DG_POS_H4)),
+    (DG_POS_H5, |a, ui| crate::data_graphics::position(a, ui, DG_POS_H5)),
+    (DG_POS_H6, |a, ui| crate::data_graphics::position(a, ui, DG_POS_H6)),
+    (DG_POS_V0, |a, ui| crate::data_graphics::position(a, ui, DG_POS_V0)),
+    (DG_POS_V1, |a, ui| crate::data_graphics::position(a, ui, DG_POS_V1)),
+    (DG_POS_V2, |a, ui| crate::data_graphics::position(a, ui, DG_POS_V2)),
+    (DG_POS_V3, |a, ui| crate::data_graphics::position(a, ui, DG_POS_V3)),
+    (DG_POS_V4, |a, ui| crate::data_graphics::position(a, ui, DG_POS_V4)),
+    (DG_POS_V5, |a, ui| crate::data_graphics::position(a, ui, DG_POS_V5)),
+    (DG_POS_V6, |a, ui| crate::data_graphics::position(a, ui, DG_POS_V6)),
 ];
 
 // toggles: whether the command is on
@@ -668,6 +723,22 @@ static CHECKED: &[(u32, fn(&Diagrammer) -> bool)] = &[
     (PANE_SHAPE_DATA_WINDOW, |a| a.panes.visible(crate::panes::P_DATA)),
     (PANE_EXTERNAL_DATA, |a| a.panes.visible(crate::panes::P_EXTERNAL)),
     (DATA_AUTO_LINK_REFRESH, crate::data_refresh::auto_link_on),
+    // (JD19) the pane Datengrafikfelder, the chosen field's position
+    (PANE_DG_FIELDS, |a| a.panes.visible(crate::panes::P_DG_FIELDS)),
+    (DG_POS_H0, |a| crate::data_graphics::position_on(a, DG_POS_H0)),
+    (DG_POS_H1, |a| crate::data_graphics::position_on(a, DG_POS_H1)),
+    (DG_POS_H2, |a| crate::data_graphics::position_on(a, DG_POS_H2)),
+    (DG_POS_H3, |a| crate::data_graphics::position_on(a, DG_POS_H3)),
+    (DG_POS_H4, |a| crate::data_graphics::position_on(a, DG_POS_H4)),
+    (DG_POS_H5, |a| crate::data_graphics::position_on(a, DG_POS_H5)),
+    (DG_POS_H6, |a| crate::data_graphics::position_on(a, DG_POS_H6)),
+    (DG_POS_V0, |a| crate::data_graphics::position_on(a, DG_POS_V0)),
+    (DG_POS_V1, |a| crate::data_graphics::position_on(a, DG_POS_V1)),
+    (DG_POS_V2, |a| crate::data_graphics::position_on(a, DG_POS_V2)),
+    (DG_POS_V3, |a| crate::data_graphics::position_on(a, DG_POS_V3)),
+    (DG_POS_V4, |a| crate::data_graphics::position_on(a, DG_POS_V4)),
+    (DG_POS_V5, |a| crate::data_graphics::position_on(a, DG_POS_V5)),
+    (DG_POS_V6, |a| crate::data_graphics::position_on(a, DG_POS_V6)),
 ];
 
 /// the handler of a command (None: not available yet)
@@ -695,6 +766,8 @@ pub(crate) fn usable(app: &Diagrammer, id: u32) -> bool {
         // (JD18) the data commands
         && crate::data_cmds::available(app, id)
         && crate::data_pane::available(app, id)
+        // (JD19) data graphics
+        && crate::data_graphics::available(app, id)
 }
 
 /// the toggle is on
