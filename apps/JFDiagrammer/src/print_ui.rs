@@ -588,8 +588,9 @@ pub(crate) fn dialogs(app: &mut Diagrammer, ui: &mut Ui) {
     ui.next_size(500, 0);
     ui.tabs(ID_DLG + 1, &mut app.print.tab, &regs);
     // (JD15) 340 high: Layout und Routing has the placement's rows too; (JD21 jumps) 410: and
-    // the line jumps' size and direction
-    ui.next_size(500, 410);
+    // the line jumps' size and direction; (JD21 route) 520: the routing's direction, appearance,
+    // separating and overlapping
+    ui.next_size(500, 520);
     ui.box_begin(ID_DLG + 2, BOX_V, 8);
     match app.print.tab {
         0 => tab_print(app, ui, &mut e),

@@ -14,7 +14,10 @@
 //   open(app, ui) / dialog(app, ui)   Verbinder-Verhalten (Visio: Entwicklertools › Verhalten ›
 //                             Verbinder › Linienübergänge): add (ConLineJumpCode), style
 //                             (ConLineJumpStyle), horizontal and vertical direction
-//                             (ConLineJumpDirX / Y) for every selected connector, one undo step
+//                             (ConLineJumpDirX / Y) for every selected connector, one undo step;
+//                             (JD21 route) before them the rows Weg (route_ui.rs: ShapeRouteStyle
+//                             with its direction, ConFixedCode, ConLineRouteExt; a new style or
+//                             appearance routes the connectors anew)
 //   style_names(page)         the jump styles' names: the page's (Bogen .. 7 Seiten, LineJumpStyle
 //                             1 .. 9) or the connector's (Seitenvorgabe first, 0 .. 9)
 //
@@ -144,6 +147,8 @@ pub(crate) fn open(app: &mut Diagrammer, ui: &mut Ui) {
     st.dir = [code("ConLineJumpDirX", 2.0), code("ConLineJumpDirY", 2.0)];
     st.conns = conns;
     st.open.set(1);
+    // (JD21 route) the rows Weg: style, direction, rerouting, appearance
+    crate::route_ui::open_conn(app, first);
     ui.repass();
 }
 
@@ -160,6 +165,8 @@ pub(crate) fn dialog(app: &mut Diagrammer, ui: &mut Ui) {
     };
     ui.next_size(460, 0);
     ui.box_begin(ID + 1, BOX_V, 8);
+    // (JD21 route) Weg: style, direction, rerouting, appearance (route_ui.rs)
+    crate::route_ui::conn_rows(&mut app.route, ui, ID + 0x10);
     ui.text(TS_BODY_STRONG, t("Linienübergänge"));
     ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
     row(ui, t("Linienübergänge hinzufügen"));
@@ -199,7 +206,11 @@ pub(crate) fn dialog(app: &mut Diagrammer, ui: &mut Ui) {
 fn apply(app: &mut Diagrammer) {
     let st = &app.jumps;
     let conns = st.conns.clone();
-    let want = [("ConLineJumpCode", st.code), ("ConLineJumpStyle", st.style), ("ConLineJumpDirX", st.dir[0]), ("ConLineJumpDirY", st.dir[1])];
+    let mut want: Vec<(&str, i32)> = alloc::vec![("ConLineJumpCode", st.code), ("ConLineJumpStyle", st.style), ("ConLineJumpDirX", st.dir[0]), ("ConLineJumpDirY", st.dir[1])];
+    // (JD21 route) the rows Weg: the cells changed in the dialog; a new style or appearance
+    // routes the connectors anew
+    let (path, reroute) = crate::route_ui::conn_cells(&app.route);
+    want.extend(path.iter().filter(|p| p.2).map(|p| (p.0, p.1)));
     let Some(o) = app.opened.as_mut() else { return };
     let conns: Vec<ShapeRef> = conns.into_iter().filter(|&s| o.doc.shape(s).is_some()).collect();
     let differs = conns.iter().any(|&s| want.iter().any(|&(c, v)| num(&o.doc, SheetRef::Shape(s), c).unwrap_or(0.0) != v as f64));
@@ -214,6 +225,9 @@ fn apply(app: &mut Diagrammer) {
                 tx.set_constant(sheet, &a, Value::Num(v as f64), None)?;
             }
             eng.recalc(tx, &[sheet])?;
+        }
+        if reroute {
+            diagram_core::glue::reset(tx, eng, &conns)?;
         }
         Ok(())
     });

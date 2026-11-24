@@ -354,7 +354,8 @@ pub(crate) fn conn_style(app: &mut Diagrammer, ui: &mut Ui, style: diagram_core:
 pub(crate) fn conn_reset(app: &mut Diagrammer, ui: &mut Ui) {
     change(app, ui, t("Verbinder zurücksetzen"), |tx, eng, _, shapes| {
         let conns: Vec<ShapeRef> = shapes.iter().copied().filter(|&s| diagram_core::glue::is_connector(tx.doc(), s)).collect();
-        diagram_core::glue::reset(tx, eng, &conns)
+        // (JD21 route) a way by hand is free again (ConFixedCode 1 -> 0)
+        diagram_core::route_edit::reset(tx, eng, &conns)
     });
 }
 

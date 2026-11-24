@@ -38,7 +38,8 @@ expect listitem:"Sheet.9" rect 500 346 201 229
 cmd 7247
 expect dialog:"Layout konfigurieren" exists
 expect combo:"Flussdiagramm" exists
-expect combo:"Von oben nach unten" exists
+# (JD21 route) the placement's direction by its id: the routing's direction shows the same text
+expect #2107637763 text "Von oben nach unten"
 expect #2107637764 disabled
 expect textbox:"75" exists
 expect radio:"Auswahl" disabled

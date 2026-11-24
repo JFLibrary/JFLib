@@ -47,6 +47,8 @@
 //   src/structures_cff.rs   (JD10) the register Funktionsübergreifendes Flussdiagramm
 //   src/layout_ui.rs  (JD10) Layout-Verhalten per shape, Seite einrichten › Layout und Routing
 //   src/jumps_ui.rs   (JD21) line jumps: Linienübergänge anzeigen, the dialog Verbinder-Verhalten
+//   src/route_ui.rs   (JD21) a connector's midpoints and vertices on the canvas, routing styles
+//                     with their directions in the dialogs, shapes connectors may cross
 //   src/addons.rs     (JD21) Ansicht › Add-Ons: Shapes nummerieren (dlg_number.rs), vervielfältigen
 //                     (dlg_array.rs), Maßlinien (tools_dim.rs); the container styles as galleries
 //                     (container_styles.rs) and Kategorien (dlg_categories.rs)
@@ -195,6 +197,8 @@ mod layout_cmds;
 mod layout_ui;
 // (JD21 jumps) Linienübergänge anzeigen, Verbinder-Verhalten
 mod jumps_ui;
+// (JD21 route) a connector's way by hand, routing styles with directions, permeable shapes
+mod route_ui;
 // (JD13) the legend of a network plan counts its devices
 mod legend;
 mod options;
@@ -370,6 +374,9 @@ pub(crate) struct Diagrammer {
     pub autoconn: autoconn::AutoConn,
     /// (JD21 tools) Add-Ons' dialogs, the container styles' galleries (addons.rs)
     pub addons: addons::Addons,
+    /// (JD21 route) the routing rows of Verbinder-Verhalten, Layout-Verhalten and Seite
+    /// einrichten (route_ui.rs)
+    pub route: route_ui::RouteState,
 }
 
 impl Diagrammer {
@@ -447,6 +454,7 @@ impl Diagrammer {
             jumps: jumps_ui::JumpsState::default(),
             autoconn: autoconn::AutoConn::default(),
             addons: addons::Addons::default(),
+            route: route_ui::RouteState::default(),
             page_views: alloc::vec::Vec::new(),
             view_page: None,
         }
