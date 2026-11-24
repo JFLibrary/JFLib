@@ -1,0 +1,83 @@
+# Linienzug (SH-004, JD26; in Visio „Mehrzeilig“, eine Fehlübersetzung von „multi-line“): eine
+# Linie von der linken unteren zur rechten oberen Ecke mit drei Knickpunkten, etwa als Verlauf in
+# einem Diagramm.  Jeder Knick ist ein Steuerpunkt (Row_1 bis Row_3, frei ziehbar, anteilig),
+# begrenzt auf den Kasten.  Reines Linien-Shape: Formatvorlage Connector (sichtbar auch in einem
+# Design ohne Shape-Linien), QuickStyleType 3, ohne deren Pfeilspitzen.  Verbindungspunkte an den
+# Enden und an den Knicken (dort setzen Beschriftungen an).
+master: Polyline
+style: Connector
+name.de: Linienzug
+name.en: Polyline
+name.es: Polilínea
+name.it: Polilinea
+name.fr: Polyligne
+prompt.de: Linie mit drei Knickpunkten, etwa für einen Verlauf. Ziehen Sie die gelben Steuerpunkte, um die Knicke zu verschieben.
+prompt.en: Line with three bends, for example for a trend. Drag the yellow control handles to move the bends.
+prompt.es: Línea con tres quiebros, por ejemplo para una tendencia. Arrastre los controladores amarillos para mover los quiebros.
+prompt.it: Linea con tre punti di flesso, ad esempio per un andamento. Trascina le maniglie di controllo gialle per spostare i punti.
+prompt.fr: Ligne à trois coudes, par exemple pour une tendance. Faites glisser les poignées de contrôle jaunes pour déplacer les coudes.
+keywords.de: Linienzug, Polylinie, mehrzeilig, Verlauf, Kurve, Liniendiagramm, Trend
+keywords.en: polyline, multi-line, line, trend, line chart, curve
+keywords.es: polilínea, línea, tendencia, gráfico de líneas, curva, evolución
+keywords.it: polilinea, linea, andamento, grafico a linee, curva, tendenza
+keywords.fr: polyligne, ligne, tendance, graphique en courbes, courbe, évolution
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 25 mm
+Height.us = 1 in
+BeginArrow = 0
+EndArrow = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
+QuickStyleType = 3
+
+[User]
+# die Knicke, begrenzt auf den Kasten
+X1:  Value = MIN(MAX(Controls.Row_1, 0), Width)
+Y1:  Value = MIN(MAX(Controls.Row_1.Y, 0), Height)
+X2:  Value = MIN(MAX(Controls.Row_2, 0), Width)
+Y2:  Value = MIN(MAX(Controls.Row_2.Y, 0), Height)
+X3:  Value = MIN(MAX(Controls.Row_3, 0), Width)
+Y3:  Value = MIN(MAX(Controls.Row_3.Y, 0), Height)
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = User.X1; Y = User.Y1
+LineTo  X = User.X2; Y = User.Y2
+LineTo  X = User.X3; Y = User.Y3
+LineTo  X = Width; Y = Height
+
+[Controls]
+Row_1:  X = Width*0.25; Y = Height*0.55
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 0; YCon = 0; CanGlue = FALSE
+        Tip.de = "Ersten Knick verschieben"
+        Tip.en = "Move the first bend"
+        Tip.es = "Mover el primer quiebro"
+        Tip.it = "Sposta il primo punto"
+        Tip.fr = "Déplacer le premier coude"
+Row_2:  X = Width*0.5; Y = Height*0.3
+        XDyn = Controls.Row_2; YDyn = Controls.Row_2.Y
+        XCon = 0; YCon = 0; CanGlue = FALSE
+        Tip.de = "Zweiten Knick verschieben"
+        Tip.en = "Move the second bend"
+        Tip.es = "Mover el segundo quiebro"
+        Tip.it = "Sposta il secondo punto"
+        Tip.fr = "Déplacer le deuxième coude"
+Row_3:  X = Width*0.75; Y = Height*0.8
+        XDyn = Controls.Row_3; YDyn = Controls.Row_3.Y
+        XCon = 0; YCon = 0; CanGlue = FALSE
+        Tip.de = "Dritten Knick verschieben"
+        Tip.en = "Move the third bend"
+        Tip.es = "Mover el tercer quiebro"
+        Tip.it = "Sposta il terzo punto"
+        Tip.fr = "Déplacer le troisième coude"
+
+[Connection]
+Row  X = 0; Y = 0; DirX = 0; DirY = 0
+Row  X = User.X1; Y = User.Y1; DirX = 0; DirY = 0
+Row  X = User.X2; Y = User.Y2; DirX = 0; DirY = 0
+Row  X = User.X3; Y = User.Y3; DirX = 0; DirY = 0
+Row  X = Width; Y = Height; DirX = 0; DirY = 0

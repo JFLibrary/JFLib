@@ -282,6 +282,9 @@ commands! {
     CFF_TITLE = 0x1535, "Titelleiste anzeigen", JD_CFF_TITLE_BAR, 0;
     CFF_SEPARATORS = 0x1536, "Trennlinien anzeigen", JD_CFF_SEPARATORS, 0;
     CFF_ROTATE = 0x1537, "Bahnbeschriftungen waagerecht", JD_CFF_ROTATE_LABELS, 0;
+    // (JD15, ST-05) a lane's context menu (structures_cff.rs)
+    CFF_LANE_BEFORE = 0x1538, "Bahn davor einfügen", JD_CFF_SWIMLANE, 0;
+    CFF_LANE_AFTER = 0x1539, "Bahn danach einfügen", JD_CFF_SWIMLANE, 0;
     // the shape's context menu
     SHAPE_DATA_DEFINE = 0x1600, "Shape-Daten definieren", 0, 0;
     HYPERLINK = 0x1601, "Hyperlink", 0, 0;
@@ -292,6 +295,8 @@ commands! {
     CONN_RESET = 0x1606, "Verbinder zurücksetzen", 0, 0;
     ADD_TO_MY_SHAPES = 0x1607, "Zu meinen Shapes hinzufügen", 0, 0;
     COMMENT_NEW = 0x1608, "Neuer Kommentar", 0, 0;
+    // (JD15, SP-01) the dialog Shape-Name (dlg_shape_name.rs)
+    SHAPE_NAME = 0x1609, "Shape-Name", 0, 0;
     // the stencil's menu (Shapes sidebar)
     STENCIL_CLOSE = 0x1700, "Schablone schließen", 0, 0;
     STENCIL_SAVE = 0x1701, "Schablone speichern", 0, 0;
@@ -317,6 +322,45 @@ commands! {
     SIZE_A3 = 0x1806, "A3", 0, 0;
     SIZE_B5 = 0x1807, "B5 (JIS)", 0, 0;
     SIZE_B4 = 0x1808, "B4 (JIS)", 0, 0;
+    // (JD15, RW-02) envelopes and the US government sizes
+    SIZE_ENV_10 = 0x1809, "Umschlag #10", 0, 0;
+    SIZE_ENV_DL = 0x180A, "Umschlag DL", 0, 0;
+    SIZE_ENV_C4 = 0x180B, "Umschlag C4", 0, 0;
+    SIZE_ENV_C5 = 0x180C, "Umschlag C5", 0, 0;
+    SIZE_ENV_C6 = 0x180D, "Umschlag C6", 0, 0;
+    SIZE_ENV_MONARCH = 0x180E, "Umschlag Monarch", 0, 0;
+    SIZE_GOV_LETTER = 0x180F, "Government Letter", 0, 0;
+    SIZE_GOV_LEGAL = 0x1810, "Government Legal", 0, 0;
+    // (JD18) Daten: Externe Daten, Datengrafiken (JD19), Daten anzeigen, Einblenden/Ausblenden,
+    // Erweiterte Datenverknüpfung (FEATURES 3.7); data_cmds.rs says when they can run
+    DATA_QUICK_IMPORT = 0x1900, "Schnellimport", 0, JD_QUICK_IMPORT_L;
+    DATA_CUSTOM_IMPORT = 0x1901, "Benutzerdefinierter Import", 0, JD_CUSTOM_IMPORT_L;
+    DATA_REFRESH_ALL = 0x1902, "Alle aktualisieren", JD_REFRESH_ALL, JD_REFRESH_ALL_L;
+    DATA_REFRESH = 0x1903, "Daten aktualisieren...", JD_REFRESH_ALL, 0;
+    DATA_TEXT_DRAWING = 0x1904, "Zeichnung aus Text", 0, JD_CUSTOM_IMPORT_L;
+    DATA_GRAPHICS = 0x1905, "Datengrafiken", 0, JD_ADVANCED_DG;
+    DG_POSITION = 0x1906, "Position|Datengrafik", JD_DG_POSITION, 0;
+    DG_CONFIGURE = 0x1907, "Konfigurieren|Datengrafik", JD_DG_CONFIGURE, 0;
+    DG_AUTO_SPACE = 0x1908, "Automatischer Abstand", JD_AUTO_SPACE, 0;
+    DATA_LEGEND = 0x1909, "Legende einfügen", 0, JD_LEGEND_L;
+    PANE_SHAPE_DATA_WINDOW = 0x190A, "Fenster „Shape-Daten“", JD_SHAPE_DATA, 0;
+    PANE_EXTERNAL_DATA = 0x190B, "Fenster „Externe Daten“", JD_EXTERNAL_DATA, 0;
+    PANE_DG_FIELDS = 0x190C, "Datengrafikfelder", JD_DG_FIELDS, 0;
+    DATA_LINK = 0x190D, "Daten verknüpfen", JD_LINK_DATA, 0;
+    DATA_ADVANCED_DG = 0x190E, "Erweiterte Datengrafiken", JD_ADVANCED_DG, 0;
+    // (JD18) the menus of the pane Externe Daten (AB-11) and of a linked shape
+    DATA_SOURCE_REMOVE = 0x1910, "Datenquelle entfernen", 0, 0;
+    DATA_SOURCE_RENAME = 0x1911, "Datenquelle umbenennen", 0, 0;
+    DATA_COLUMNS = 0x1912, "Spalteneinstellungen...", 0, 0;
+    DATA_SELECT_LINKED = 0x1913, "Verknüpfte Shapes auswählen", 0, 0;
+    DATA_UNLINK = 0x1914, "Verknüpfung mit Zeile aufheben", 0, 0;
+    DATA_REFRESH_SETTINGS = 0x1915, "Aktualisierung konfigurieren...", 0, 0;
+    DATA_CONFLICTS = 0x1916, "Aktualisierungskonflikte", 0, 0;
+    // (JD18, RD-03) Alle aktualisieren's menu: new rows linked by the comparisons of Daten
+    // verknüpfen (data_refresh.rs)
+    DATA_AUTO_LINK_REFRESH = 0x1920, "Nach Aktualisierung automatisch verknüpfen", 0, 0;
+    // (JD18, AB-11) the pane Externe Daten's Verknüpfung aufheben: the selected rows' shapes
+    DATA_UNLINK_ROWS = 0x1960, "Verknüpfung aufheben", 0, 0;
 }
 
 /// a command's handler: what it does (the function behind it exists)
@@ -394,10 +438,8 @@ static HANDLERS: &[(u32, Handler)] = &[
     (GUIDES, |a, _| a.view_guides = !a.view_guides),
     (DYN_GRID, |a, _| a.se.dyn_grid = !a.se.dyn_grid),
     (CONN_POINTS, |a, _| a.se.show_points = !a.se.show_points),
-    (SNAP_GLUE, |a, _| {
-        a.snap = !a.snap;
-        a.se.glue = a.snap;
-    }),
+    // (JD15, RA-07) the dialog, no silent toggle
+    (SNAP_GLUE, crate::dlg_snap::open),
     (CONN_RIGHT_ANGLE, |a, ui| crate::edit_cmds::conn_style(a, ui, diagram_core::glue::Style::RightAngle)),
     (CONN_STRAIGHT, |a, ui| crate::edit_cmds::conn_style(a, ui, diagram_core::glue::Style::Straight)),
     (CONN_CURVED, |a, ui| crate::edit_cmds::conn_style(a, ui, diagram_core::glue::Style::Curved)),
@@ -508,6 +550,14 @@ static HANDLERS: &[(u32, Handler)] = &[
     (SIZE_A3, |a, ui| crate::page_size::size(a, ui, SIZE_A3)),
     (SIZE_B5, |a, ui| crate::page_size::size(a, ui, SIZE_B5)),
     (SIZE_B4, |a, ui| crate::page_size::size(a, ui, SIZE_B4)),
+    (SIZE_ENV_10, |a, ui| crate::page_size::size(a, ui, SIZE_ENV_10)),
+    (SIZE_ENV_DL, |a, ui| crate::page_size::size(a, ui, SIZE_ENV_DL)),
+    (SIZE_ENV_C4, |a, ui| crate::page_size::size(a, ui, SIZE_ENV_C4)),
+    (SIZE_ENV_C5, |a, ui| crate::page_size::size(a, ui, SIZE_ENV_C5)),
+    (SIZE_ENV_C6, |a, ui| crate::page_size::size(a, ui, SIZE_ENV_C6)),
+    (SIZE_ENV_MONARCH, |a, ui| crate::page_size::size(a, ui, SIZE_ENV_MONARCH)),
+    (SIZE_GOV_LETTER, |a, ui| crate::page_size::size(a, ui, SIZE_GOV_LETTER)),
+    (SIZE_GOV_LEGAL, |a, ui| crate::page_size::size(a, ui, SIZE_GOV_LEGAL)),
     // (JD8 rest: Zeichentools, Bilder, Inhalte einfügen, Ebenen, Nach Typ auswählen)
     (DRAW_TOOLS, crate::cmds_draw::draw_tools),
     (FREEFORM, |a, _| crate::edit_cmds::tool(a, FREEFORM)),
@@ -527,6 +577,25 @@ static HANDLERS: &[(u32, Handler)] = &[
     (HYPERLINK, crate::dlg_link::open),
     (FIND, |a, ui| crate::dlg_find::open(a, ui, false)),
     (REPLACE, |a, ui| crate::dlg_find::open(a, ui, true)),
+    // (JD15, SP-01) Shape-Name
+    (SHAPE_NAME, crate::dlg_shape_name::open),
+    // (JD18) Daten (data_*.rs; DATA_QUICK_IMPORT and the data graphics wait, cmds_later.rs)
+    (DATA_CUSTOM_IMPORT, crate::data_import::open),
+    (DATA_REFRESH_ALL, crate::data_refresh::refresh_all),
+    (DATA_REFRESH, crate::data_refresh::open),
+    (DATA_TEXT_DRAWING, crate::data_textdraw::open),
+    (PANE_SHAPE_DATA_WINDOW, |a, _| a.panes.toggle(crate::panes::P_DATA)),
+    (PANE_EXTERNAL_DATA, |a, _| a.panes.toggle(crate::panes::P_EXTERNAL)),
+    (DATA_LINK, crate::data_link::open),
+    (DATA_SOURCE_REMOVE, crate::data_pane::remove_source),
+    (DATA_SOURCE_RENAME, crate::data_pane::rename_source),
+    (DATA_COLUMNS, crate::data_pane::columns_open),
+    (DATA_SELECT_LINKED, crate::data_pane::select_linked),
+    (DATA_UNLINK, crate::data_pane::unlink),
+    (DATA_REFRESH_SETTINGS, crate::data_refresh::settings_open),
+    (DATA_CONFLICTS, crate::data_refresh::conflicts_open),
+    (DATA_AUTO_LINK_REFRESH, crate::data_refresh::toggle_auto_link),
+    (DATA_UNLINK_ROWS, crate::data_pane::unlink_rows),
 ];
 
 // toggles: whether the command is on
@@ -543,7 +612,6 @@ static CHECKED: &[(u32, fn(&Diagrammer) -> bool)] = &[
     (GUIDES, |a| a.view_guides),
     (DYN_GRID, |a| a.se.dyn_grid),
     (CONN_POINTS, |a| a.se.show_points),
-    (SNAP_GLUE, |a| a.snap),
     (LASSO, |a| a.se.lasso),
     (SELECT_AREA, |a| !a.se.lasso),
     (GRID, |a| a.view_grid),
@@ -582,12 +650,24 @@ static CHECKED: &[(u32, fn(&Diagrammer) -> bool)] = &[
     (SIZE_A3, |a| crate::page_size::checked(a, SIZE_A3)),
     (SIZE_B5, |a| crate::page_size::checked(a, SIZE_B5)),
     (SIZE_B4, |a| crate::page_size::checked(a, SIZE_B4)),
+    (SIZE_ENV_10, |a| crate::page_size::checked(a, SIZE_ENV_10)),
+    (SIZE_ENV_DL, |a| crate::page_size::checked(a, SIZE_ENV_DL)),
+    (SIZE_ENV_C4, |a| crate::page_size::checked(a, SIZE_ENV_C4)),
+    (SIZE_ENV_C5, |a| crate::page_size::checked(a, SIZE_ENV_C5)),
+    (SIZE_ENV_C6, |a| crate::page_size::checked(a, SIZE_ENV_C6)),
+    (SIZE_ENV_MONARCH, |a| crate::page_size::checked(a, SIZE_ENV_MONARCH)),
+    (SIZE_GOV_LETTER, |a| crate::page_size::checked(a, SIZE_GOV_LETTER)),
+    (SIZE_GOV_LEGAL, |a| crate::page_size::checked(a, SIZE_GOV_LEGAL)),
     // (JD8 rest: Zeichentools)
     (DRAW_TOOLS, crate::cmds_draw::any_tool),
     (FREEFORM, |a| a.tool == FREEFORM),
     (ARC, |a| a.tool == ARC),
     // (JD8 rest: Text, Felder, Links, Suchen)
     (TEXT_BOX_V, |a| a.tool == TEXT_BOX_V),
+    // (JD18) Daten › Einblenden/Ausblenden
+    (PANE_SHAPE_DATA_WINDOW, |a| a.panes.visible(crate::panes::P_DATA)),
+    (PANE_EXTERNAL_DATA, |a| a.panes.visible(crate::panes::P_EXTERNAL)),
+    (DATA_AUTO_LINK_REFRESH, crate::data_refresh::auto_link_on),
 ];
 
 /// the handler of a command (None: not available yet)
@@ -612,6 +692,9 @@ pub(crate) fn usable(app: &Diagrammer, id: u32) -> bool {
         && crate::cmds_paste::available(app, id)
         && crate::layers::available(app, id)
         && crate::cmds_text::available(app, id)
+        // (JD18) the data commands
+        && crate::data_cmds::available(app, id)
+        && crate::data_pane::available(app, id)
 }
 
 /// the toggle is on

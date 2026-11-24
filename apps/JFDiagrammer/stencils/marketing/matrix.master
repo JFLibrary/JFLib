@@ -1,0 +1,118 @@
+# Matrix (SH-030, JD26): eine Vierfeldermatrix aus vier Feldern als Teile einer Gruppe, mit 2 mm
+# Abstand; jedes Feld trägt seinen Text in der Mitte und die Füllung der Formatvorlage (eine Farbe
+# für alle Felder, anders als SWOT).  Die Felder folgen der Größe der Gruppe.
+master: Matrix
+name.de: Matrix
+name.en: Matrix
+name.es: Matriz
+name.it: Matrice
+name.fr: Matrice
+prompt.de: Vierfeldermatrix für Einordnungen und Portfolios. Klicken Sie ein Feld zweimal an, um seinen Text zu ändern.
+prompt.en: Four-field matrix for classifications and portfolios. Click a field twice to change its text.
+prompt.es: Matriz de cuatro campos para clasificaciones y carteras. Haga clic dos veces en un campo para cambiar su texto.
+prompt.it: Matrice a quattro campi per classificazioni e portafogli. Fai clic due volte su un campo per cambiarne il testo.
+prompt.fr: Matrice à quatre champs pour les classements et les portefeuilles. Cliquez deux fois sur un champ pour modifier son texte.
+keywords.de: Matrix, Vierfeldermatrix, Quadrant, Portfolio, Einordnung, Felder, Raster
+keywords.en: matrix, four-field matrix, quadrant, portfolio, classification, fields, grid
+keywords.es: matriz, cuatro campos, cuadrante, cartera, clasificación, campos, cuadrícula
+keywords.it: matrice, quattro campi, quadrante, portafoglio, classificazione, campi, griglia
+keywords.fr: matrice, quatre champs, quadrant, portefeuille, classement, champs, grille
+
+[Shape]
+Width = 60 mm
+Width.us = 2.25 in
+Height = 50 mm
+Height.us = 2 in
+
+[User]
+# der Abstand der Felder, Breite und Höhe eines Felds
+G:   Value = 2 mm
+     Value.us = 0.08 in
+QW:  Value = (Width-User.G)*0.5
+QH:  Value = (Height-User.G)*0.5
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+
+[Part Q1]
+text.de: Feld 1
+text.en: Field 1
+text.es: Campo 1
+text.it: Campo 1
+text.fr: Champ 1
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD(Width*0.5)
+PinY = GUARD(Sheet.1!Height-Height*0.5)
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part Q2]
+text.de: Feld 2
+text.en: Field 2
+text.es: Campo 2
+text.it: Campo 2
+text.fr: Champ 2
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD(Sheet.1!Width-Width*0.5)
+PinY = GUARD(Sheet.1!Height-Height*0.5)
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part Q3]
+text.de: Feld 3
+text.en: Field 3
+text.es: Campo 3
+text.it: Campo 3
+text.fr: Champ 3
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD(Width*0.5)
+PinY = GUARD(Height*0.5)
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part Q4]
+text.de: Feld 4
+text.en: Field 4
+text.es: Campo 4
+text.it: Campo 4
+text.fr: Champ 4
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD(Sheet.1!Width-Width*0.5)
+PinY = GUARD(Height*0.5)
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0

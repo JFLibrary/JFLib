@@ -1125,6 +1125,28 @@ fn new_shapes_of_the_drawing_tools_and_text() {
 }
 
 #[test]
+fn new_shapes_take_the_documents_default_styles() {
+    // (DM-04) DefaultLineStyle / FillStyle / TextStyle of the DocumentSettings, as a line drawn
+    // with the line tool takes them; a style the document lacks falls back to "Normal"
+    let mut f = fx();
+    style(&mut f.doc, 7, "Eigene Linie", Some(1));
+    style(&mut f.doc, 8, "Eigene Füllung", Some(1));
+    f.doc.settings.default_line_style = Some(7);
+    f.doc.settings.default_fill_style = Some(8);
+    f.doc.settings.default_text_style = Some(42);
+    let mut eng = Engine::new();
+    let owner = Owner::Page(f.page);
+    let r = gesture(&mut f, &mut eng, "Rechteck", |tx, eng| new_shape(tx, eng, owner, Basic::Rectangle, [1.0, 1.0], [3.0, 2.0]));
+    let e = gesture(&mut f, &mut eng, "Ellipse", |tx, eng| new_shape(tx, eng, owner, Basic::Ellipse, [4.0, 4.0], [6.0, 5.0]));
+    let t = gesture(&mut f, &mut eng, "Text", |tx, eng| new_shape(tx, eng, owner, Basic::TextBox, [1.0, 6.0], [3.0, 6.5]));
+    let want = StyleRefs { line: Some(7), fill: Some(8), text: Some(1) };
+    assert_eq!(f.doc.shape(r).unwrap().header().styles, want);
+    assert_eq!(f.doc.shape(e).unwrap().header().styles, want);
+    // the text tool keeps "Text Only"
+    assert_eq!(f.doc.shape(t).unwrap().header().styles, StyleRefs::all(4));
+}
+
+#[test]
 fn text_block_frame_moves_and_sizes() {
     let mut f = fx();
     let s = add_box(&mut f, None, 1, [4.0, 4.0], [2.0, 1.0], 30.0, (false, false));

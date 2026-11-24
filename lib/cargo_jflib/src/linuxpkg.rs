@@ -535,6 +535,10 @@ pub(crate) fn finish_args(perms: Option<&[(String, Vec<String>)]>, extra: Vec<St
             "fs.user" => notes.push("fs.user: files through the portals (file dialog, document portal)".into()),
             "url" | "print" | "autostart" | "input.global" | "screen.capture" => notes.push(format!("{key}: through the portal, no hole needed")),
             "recent" => push(&mut args, "--filesystem=xdg-data/recently-used.xbel"),
+            "gamepad" if !args.iter().any(|a| a == "--device=input") => {
+                push(&mut args, "--device=input");
+                notes.push("gamepad: --device=input (every input device in /dev/input, keyboards too; Flatpak 1.15.6 and newer: older ones refuse to build it and run an installed app without /dev/input)".into());
+            }
             _ => {}
         }
     }
@@ -557,6 +561,11 @@ mod tests {
         assert_eq!(args, ["--share=ipc", "--socket=wayland", "--socket=fallback-x11", "--share=network",
                           "--filesystem=xdg-documents/Notes", "--filesystem=xdg-pictures:ro", "--device=dri"]);
         assert!(finish_args(None, vec![]).0.contains(&"--filesystem=host".to_string()));
+        let pads = vec![("gamepad".to_string(), vec![]), ("gamepad".to_string(), vec![])];
+        let (args, notes) = finish_args(Some(&pads), vec![]);
+        assert_eq!(args.iter().filter(|a| *a == "--device=input").count(), 1);
+        assert!(notes.iter().any(|n| n.starts_with("gamepad")));
+        assert!(!finish_args(None, vec![]).0.contains(&"--device=input".to_string()));
     }
 
     #[test]

@@ -1,0 +1,100 @@
+# Marktanteil (SH-030, JD26): der Markt als Ellipse, darin der Anteil als Tortenstück ab oben im
+# Uhrzeigersinn; der Anteil in Prozent steht in den Shape-Daten (Prop.Share, begrenzt auf 0,1 bis
+# 99,9 %, bei 0 verborgen).  Eine Gruppe aus zwei Teilen: die Ellipse in der Füllung der
+# Formatvorlage mit dem Text „Markt“ in der Mitte des Rests, das Stück in der dritten
+# Variantenfarbe (Schnellformatvorlage 102) mit dem Text „Anteil“ in seiner Mitte; beide Texte
+# wandern mit dem Anteil.  Den Prozentwert als Text zeigt das Shape nicht selbst (das
+# Bauwerkzeug schreibt keine Textfelder).
+master: Market share
+name.de: Marktanteil
+name.en: Market share
+name.es: Cuota de mercado
+name.it: Quota di mercato
+name.fr: Part de marché
+prompt.de: Markt als Ellipse mit dem eigenen Anteil als Tortenstück. Den Anteil in Prozent stellen Sie in den Shape-Daten ein.
+prompt.en: Market as an ellipse with your own share as a pie slice. Set the share in percent in the shape data.
+prompt.es: Mercado como elipse con la cuota propia como porción. Defina la cuota en porcentaje en los datos de la forma.
+prompt.it: Mercato come ellisse con la propria quota come fetta. Imposta la quota in percentuale nei dati della forma.
+prompt.fr: Marché sous forme d'ellipse avec votre part en secteur. Définissez la part en pourcentage dans les données de la forme.
+keywords.de: Marktanteil, Markt, Anteil, Prozent, Torte, Kreisdiagramm, Wettbewerb
+keywords.en: market share, market, share, percent, pie, pie chart, competition
+keywords.es: cuota de mercado, mercado, cuota, porcentaje, gráfico circular, competencia
+keywords.it: quota di mercato, mercato, quota, percentuale, torta, grafico a torta, concorrenza
+keywords.fr: part de marché, marché, part, pourcentage, camembert, secteurs, concurrence
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 30 mm
+Height.us = 1.125 in
+
+[User]
+# Ende des Stücks im Bogenmaß (im Uhrzeigersinn von oben), seine Mitte und die Mitte des Rests
+A1:  Value = MIN(MAX(Prop.Share,0.1),99.9)*0.02*PI()
+Am:  Value = User.A1*0.5
+Ar:  Value = User.A1*0.5+PI()
+
+[Property]
+Share:  Type = 2; Format = "0.0"; Value = 25
+        Label.de = Anteil (%)
+        Label.en = Share (%)
+        Label.es = Cuota (%)
+        Label.it = Quota (%)
+        Label.fr = Part (%)
+        Prompt.de = Marktanteil in Prozent (0 bis 100)
+        Prompt.en = Market share in percent (0 to 100)
+        Prompt.es = Cuota de mercado en porcentaje (de 0 a 100)
+        Prompt.it = Quota di mercato in percentuale (da 0 a 100)
+        Prompt.fr = Part de marché en pourcentage (de 0 à 100)
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+
+# der Markt; der Text in der Mitte des Rests
+[Part Market]
+text.de: Markt
+text.en: Market
+text.es: Mercado
+text.it: Mercato
+text.fr: Marché
+
+[Shape]
+TxtPinX = Width*0.5*(1+0.5*SIN(Sheet.1!User.Ar))
+TxtPinY = Height*0.5*(1+0.5*COS(Sheet.1!User.Ar))
+TxtWidth = Width*0.45
+TxtHeight = Height*0.2
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# der Anteil; verborgen bei 0 %
+[Part Share]
+text.de: Anteil
+text.en: Share
+text.es: Cuota
+text.it: Quota
+text.fr: Part
+
+[Shape]
+QuickStyleLineColor = 102
+QuickStyleFillColor = 102
+HideText = Sheet.1!Prop.Share<=0
+TxtPinX = Width*0.5*(1+0.55*SIN(Sheet.1!User.Am))
+TxtPinY = Height*0.5*(1+0.55*COS(Sheet.1!User.Am))
+TxtWidth = Width*0.4
+TxtHeight = Height*0.2
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoShow = Sheet.1!Prop.Share<=0
+MoveTo           X = Width*0.5; Y = Height*0.5
+LineTo           X = Width*0.5; Y = Height
+EllipticalArcTo  X = Width*0.5*(1+SIN(Sheet.1!User.A1)); Y = Height*0.5*(1+COS(Sheet.1!User.A1))
+                 A = Width*0.5*(1+SIN(Sheet.1!User.Am)); B = Height*0.5*(1+COS(Sheet.1!User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5; Y = Height*0.5

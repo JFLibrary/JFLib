@@ -77,9 +77,31 @@ fn file(dir: &str, path: &str) -> Option<(Vec<u8>, &'static str)> {
     plat::read_file(&full).map(|b| (b, content_type(rel)))
 }
 
-/// the netchan server: UDP on addr, the WebSocket on the same port (with the web files when dir is set) -> (server,
-/// the HTTP server that holds the WebSocket when it serves files, the UDP address, the WebSocket's port)
-fn bind(addr: SocketAddr, web: Option<&str>) -> Result<(netchan::Server, Option<netio::Server>, SocketAddr, u16), String> {
+/// what bind gives: the netchan server, the HTTP server that holds the WebSocket when it serves files, the UDP
+/// address, the WebSocket's port
+type Bound = (netchan::Server, Option<netio::Server>, SocketAddr, u16);
+
+/// the netchan server: UDP on addr, the WebSocket on the same port (with the web files when dir is set).  Port 0
+/// takes a free port of one protocol and asks the other for the same number; Windows excludes ranges of ports for
+/// one protocol only (os error 10013) and hands out free ports in order, so the next free one would likely fail
+/// too: after a failure a few random ports of the dynamic range (49152..65535) instead
+fn bind(addr: SocketAddr, web: Option<&str>) -> Result<Bound, String> {
+    let mut r = bind_on(addr, web);
+    if addr.port != 0 {
+        return r;
+    }
+    for _ in 0..16 {
+        if r.is_ok() {
+            break;
+        }
+        let port = 49152 + (plat::random_u64() % 16384) as u16;
+        r = bind_on(SocketAddr::new(addr.ip, port), web);
+    }
+    r
+}
+
+/// bind on one address (its port 0: a free one for the first protocol)
+fn bind_on(addr: SocketAddr, web: Option<&str>) -> Result<Bound, String> {
     let mut chan = netchan::Server::new(ServerConfig { protocol: PROTOCOL, ..ServerConfig::default() });
     match web {
         Some(dir) => {

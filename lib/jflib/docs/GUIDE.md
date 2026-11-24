@@ -6061,13 +6061,16 @@ for p in ui.gamepads() {
 | Platform | How | Which pads |
 | --- | --- | --- |
 | Windows | XInput (`xinput1_4.dll`, else `xinput9_1_0.dll`; the guide button through `XInputGetStateEx`), polled every 4 ms while a pad is connected, an empty slot every 250 ms | Xbox-compatible pads, at most four (`index` = XInput's slot) |
-| Linux | evdev: the `/dev/input/event*` nodes with a game pad's buttons the user may read, inotify for new ones; inside a Flatpak with `--device=input` | Xbox (xpad), PlayStation (hid-playstation, hid-sony), Nintendo, simple HID pads |
+| Linux | evdev: the `/dev/input/event*` nodes with a game pad's buttons the user may read, inotify for new ones; inside a Flatpak with `--device=input` (from the manifest's `gamepad`) | Xbox (xpad), PlayStation (hid-playstation, hid-sony), Nintendo, simple HID pads |
 | macOS | GameController: `GCController`'s `extendedGamepad`, its connect and disconnect notifications | Xbox, PlayStation, Switch Pro, MFi pads |
 | Browser | the Gamepad API, polled by the page every animation frame; a pad appears only after one of its buttons was pressed in the page | pads with the "standard" mapping; others come with `mapped` false, their buttons as the browser numbers them |
 | Android, iOS | none yet (touch controls come later): `ui.gamepads_watching()` says false | – |
 
 Pads speak only to the app that has the focus, as the keyboard does: while none of its windows is
-active every pad reports nothing held. They need no line in `PERMISSIONS`. Rumble is not built. A game
+active every pad reports nothing held. An app with a `PERMISSIONS` file needs the line `gamepad`
+(else `ui.gamepads` stays empty and stderr says `PERMDENY gamepad`; `ask gamepad` asks at the first
+call, watching starts in the frame after a yes); the pads of a test script need nothing
+([PERMISSIONS.md](PERMISSIONS.md)). Rumble is not built. A game
 without `ui` has the same at the platform's level: `plat::pad_watch(true)`, `plat::pads()` once a
 frame (it takes the edges) and the event `E_GAMEPAD`. `lib/game`'s input actions take pads as sources
 with a radial dead zone, looking at a turn rate with a curve, and pad play without the pointer lock

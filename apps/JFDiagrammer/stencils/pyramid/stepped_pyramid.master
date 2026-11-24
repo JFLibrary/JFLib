@@ -1,0 +1,296 @@
+# Gestufte Pyramide (SH-032, JD26): eine Pyramide aus zwei bis acht gestapelten Stufen
+# (Rechtecken), jede ein Teil der Gruppe mit eigenem Text, in der Füllung der Formatvorlage, 1 mm
+# Fuge zwischen den Stufen.  Stufe 1 ist oben; Stufe k von N ist (k+1)/(N+1) der Breite breit, die
+# Absätze sind also gleich tief.  Die Zahl steht in den Shape-Daten (Prop.Levels); Row_1 in der
+# Mitte der oberen Kante ändert sie beim Ziehen nach oben oder unten: jede Stufe ist User.LH hoch,
+# die Höhe Stufen x LH; zieht man die Höhe selbst, schickt SETATREF die neue Stufenhöhe nach
+# User.LH.  Stufen über der Zahl liegen verborgen auf der untersten (die Teile stehen von unten
+# nach oben in der Datei).  Gezeichnet wird nach Height/N (User.H1).
+master: Stepped pyramid
+name.de: Gestufte Pyramide
+name.en: Stepped pyramid
+name.es: Pirámide escalonada
+name.it: Piramide a gradoni
+name.fr: Pyramide à degrés
+prompt.de: Pyramide aus gestapelten Stufen für Aufbauten und Reifegrade. Ziehen Sie den gelben Steuerpunkt oben nach oben oder unten, um Stufen hinzuzufügen oder zu entfernen.
+prompt.en: Pyramid of stacked steps for structures and maturity levels. Drag the yellow control handle at the top up or down to add or remove steps.
+prompt.es: Pirámide de escalones apilados para estructuras y niveles de madurez. Arrastre el controlador amarillo de arriba hacia arriba o hacia abajo para agregar o quitar escalones.
+prompt.it: Piramide di gradini sovrapposti per strutture e livelli di maturità. Trascina la maniglia di controllo gialla in alto verso l'alto o il basso per aggiungere o togliere gradini.
+prompt.fr: Pyramide de marches empilées pour les structures et les niveaux de maturité. Faites glisser la poignée de contrôle jaune du haut vers le haut ou le bas pour ajouter ou supprimer des marches.
+keywords.de: Pyramide, Stufen, gestuft, Stufenpyramide, Ebenen, Aufbau, Reifegrad
+keywords.en: pyramid, steps, stepped, ziggurat, levels, structure, maturity
+keywords.es: pirámide, escalones, escalonada, niveles, estructura, madurez
+keywords.it: piramide, gradini, gradoni, livelli, struttura, maturità
+keywords.fr: pyramide, marches, degrés, niveaux, structure, maturité
+
+[Shape]
+Width = 80 mm
+Width.us = 3.25 in
+Height = SETATREF(User.LH,SETATREFEVAL(SETATREFEXPR()/User.N))*User.N
+
+[User]
+# die Zahl der Stufen (2 bis 8), die Höhe einer Stufe, die Fuge
+N:   Value = MIN(MAX(ROUND(Prop.Levels,0),2),8)
+LH:  Value = 12.5 mm
+     Value.us = 0.5 in
+Gp:  Value = 1 mm
+     Value.us = 0.04 in
+# die Höhe einer Stufe, wie die Teile sie zeichnen
+H1:  Value = Height/User.N
+
+[Property]
+Levels:  Type = 2; Format = "0"; Value = 4
+         Label.de = Stufen
+         Label.en = Steps
+         Label.es = Escalones
+         Label.it = Gradini
+         Label.fr = Marches
+         Prompt.de = Anzahl der Stufen (2 bis 8)
+         Prompt.en = Number of steps (2 to 8)
+         Prompt.es = Número de escalones (de 2 a 8)
+         Prompt.it = Numero di gradini (da 2 a 8)
+         Prompt.fr = Nombre de marches (de 2 à 8)
+
+[Controls]
+Row_1:  X = Width*0.5; Y = SETATREF(Prop.Levels,SETATREFEVAL(MIN(MAX(ROUND(SETATREFEXPR()/User.LH,0),2),8)))*User.LH
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 1; YCon = 0; CanGlue = FALSE
+        Tip.de = "Stufen hinzufügen oder entfernen"
+        Tip.en = "Add or remove steps"
+        Tip.es = "Agregar o quitar escalones"
+        Tip.it = "Aggiungi o togli gradini"
+        Tip.fr = "Ajouter ou supprimer des marches"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = User.H1*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = User.H1*0.5; DirX = 1; DirY = 0
+
+# Stufe 8 (von oben): sichtbar ab 8 Stufen; sonst deckungsgleich mit der untersten, verborgen
+[Part S8]
+text.de: Stufe 8
+text.en: Step 8
+text.es: Paso 8
+text.it: Passo 8
+text.fr: Étape 8
+
+[User]
+# die Stufe, an deren Stelle das Teil liegt, ihre Unter- und Oberkante
+K:   Value = MIN(8,Sheet.1!User.N)
+Y0:  Value = IF(User.K>=Sheet.1!User.N,0,Sheet.1!Height-User.K*Sheet.1!User.H1+Sheet.1!User.Gp*0.5)
+Y1:  Value = IF(User.K<=1,Sheet.1!Height,Sheet.1!Height-(User.K-1)*Sheet.1!User.H1-Sheet.1!User.Gp*0.5)
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.5)
+PinY = GUARD((User.Y0+User.Y1)*0.5)
+Width = GUARD(Sheet.1!Width*(User.K+1)/(Sheet.1!User.N+1))
+Height = GUARD(User.Y1-User.Y0)
+HideText = 8>Sheet.1!User.N
+
+[Geometry]
+NoShow = 8>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# Stufe 7 (von oben): sichtbar ab 7 Stufen; sonst deckungsgleich mit der untersten, verborgen
+[Part S7]
+text.de: Stufe 7
+text.en: Step 7
+text.es: Paso 7
+text.it: Passo 7
+text.fr: Étape 7
+
+[User]
+# die Stufe, an deren Stelle das Teil liegt, ihre Unter- und Oberkante
+K:   Value = MIN(7,Sheet.1!User.N)
+Y0:  Value = IF(User.K>=Sheet.1!User.N,0,Sheet.1!Height-User.K*Sheet.1!User.H1+Sheet.1!User.Gp*0.5)
+Y1:  Value = IF(User.K<=1,Sheet.1!Height,Sheet.1!Height-(User.K-1)*Sheet.1!User.H1-Sheet.1!User.Gp*0.5)
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.5)
+PinY = GUARD((User.Y0+User.Y1)*0.5)
+Width = GUARD(Sheet.1!Width*(User.K+1)/(Sheet.1!User.N+1))
+Height = GUARD(User.Y1-User.Y0)
+HideText = 7>Sheet.1!User.N
+
+[Geometry]
+NoShow = 7>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# Stufe 6 (von oben): sichtbar ab 6 Stufen; sonst deckungsgleich mit der untersten, verborgen
+[Part S6]
+text.de: Stufe 6
+text.en: Step 6
+text.es: Paso 6
+text.it: Passo 6
+text.fr: Étape 6
+
+[User]
+# die Stufe, an deren Stelle das Teil liegt, ihre Unter- und Oberkante
+K:   Value = MIN(6,Sheet.1!User.N)
+Y0:  Value = IF(User.K>=Sheet.1!User.N,0,Sheet.1!Height-User.K*Sheet.1!User.H1+Sheet.1!User.Gp*0.5)
+Y1:  Value = IF(User.K<=1,Sheet.1!Height,Sheet.1!Height-(User.K-1)*Sheet.1!User.H1-Sheet.1!User.Gp*0.5)
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.5)
+PinY = GUARD((User.Y0+User.Y1)*0.5)
+Width = GUARD(Sheet.1!Width*(User.K+1)/(Sheet.1!User.N+1))
+Height = GUARD(User.Y1-User.Y0)
+HideText = 6>Sheet.1!User.N
+
+[Geometry]
+NoShow = 6>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# Stufe 5 (von oben): sichtbar ab 5 Stufen; sonst deckungsgleich mit der untersten, verborgen
+[Part S5]
+text.de: Stufe 5
+text.en: Step 5
+text.es: Paso 5
+text.it: Passo 5
+text.fr: Étape 5
+
+[User]
+# die Stufe, an deren Stelle das Teil liegt, ihre Unter- und Oberkante
+K:   Value = MIN(5,Sheet.1!User.N)
+Y0:  Value = IF(User.K>=Sheet.1!User.N,0,Sheet.1!Height-User.K*Sheet.1!User.H1+Sheet.1!User.Gp*0.5)
+Y1:  Value = IF(User.K<=1,Sheet.1!Height,Sheet.1!Height-(User.K-1)*Sheet.1!User.H1-Sheet.1!User.Gp*0.5)
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.5)
+PinY = GUARD((User.Y0+User.Y1)*0.5)
+Width = GUARD(Sheet.1!Width*(User.K+1)/(Sheet.1!User.N+1))
+Height = GUARD(User.Y1-User.Y0)
+HideText = 5>Sheet.1!User.N
+
+[Geometry]
+NoShow = 5>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# Stufe 4 (von oben): sichtbar ab 4 Stufen; sonst deckungsgleich mit der untersten, verborgen
+[Part S4]
+text.de: Stufe 4
+text.en: Step 4
+text.es: Paso 4
+text.it: Passo 4
+text.fr: Étape 4
+
+[User]
+# die Stufe, an deren Stelle das Teil liegt, ihre Unter- und Oberkante
+K:   Value = MIN(4,Sheet.1!User.N)
+Y0:  Value = IF(User.K>=Sheet.1!User.N,0,Sheet.1!Height-User.K*Sheet.1!User.H1+Sheet.1!User.Gp*0.5)
+Y1:  Value = IF(User.K<=1,Sheet.1!Height,Sheet.1!Height-(User.K-1)*Sheet.1!User.H1-Sheet.1!User.Gp*0.5)
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.5)
+PinY = GUARD((User.Y0+User.Y1)*0.5)
+Width = GUARD(Sheet.1!Width*(User.K+1)/(Sheet.1!User.N+1))
+Height = GUARD(User.Y1-User.Y0)
+HideText = 4>Sheet.1!User.N
+
+[Geometry]
+NoShow = 4>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# Stufe 3 (von oben): sichtbar ab 3 Stufen; sonst deckungsgleich mit der untersten, verborgen
+[Part S3]
+text.de: Stufe 3
+text.en: Step 3
+text.es: Paso 3
+text.it: Passo 3
+text.fr: Étape 3
+
+[User]
+# die Stufe, an deren Stelle das Teil liegt, ihre Unter- und Oberkante
+K:   Value = MIN(3,Sheet.1!User.N)
+Y0:  Value = IF(User.K>=Sheet.1!User.N,0,Sheet.1!Height-User.K*Sheet.1!User.H1+Sheet.1!User.Gp*0.5)
+Y1:  Value = IF(User.K<=1,Sheet.1!Height,Sheet.1!Height-(User.K-1)*Sheet.1!User.H1-Sheet.1!User.Gp*0.5)
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.5)
+PinY = GUARD((User.Y0+User.Y1)*0.5)
+Width = GUARD(Sheet.1!Width*(User.K+1)/(Sheet.1!User.N+1))
+Height = GUARD(User.Y1-User.Y0)
+HideText = 3>Sheet.1!User.N
+
+[Geometry]
+NoShow = 3>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# Stufe 2 (von oben): immer sichtbar
+[Part S2]
+text.de: Stufe 2
+text.en: Step 2
+text.es: Paso 2
+text.it: Passo 2
+text.fr: Étape 2
+
+[User]
+# die Stufe, an deren Stelle das Teil liegt, ihre Unter- und Oberkante
+K:   Value = MIN(2,Sheet.1!User.N)
+Y0:  Value = IF(User.K>=Sheet.1!User.N,0,Sheet.1!Height-User.K*Sheet.1!User.H1+Sheet.1!User.Gp*0.5)
+Y1:  Value = IF(User.K<=1,Sheet.1!Height,Sheet.1!Height-(User.K-1)*Sheet.1!User.H1-Sheet.1!User.Gp*0.5)
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.5)
+PinY = GUARD((User.Y0+User.Y1)*0.5)
+Width = GUARD(Sheet.1!Width*(User.K+1)/(Sheet.1!User.N+1))
+Height = GUARD(User.Y1-User.Y0)
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# Stufe 1 (von oben): immer sichtbar
+[Part S1]
+text.de: Stufe 1
+text.en: Step 1
+text.es: Paso 1
+text.it: Passo 1
+text.fr: Étape 1
+
+[User]
+# die Stufe, an deren Stelle das Teil liegt, ihre Unter- und Oberkante
+K:   Value = MIN(1,Sheet.1!User.N)
+Y0:  Value = IF(User.K>=Sheet.1!User.N,0,Sheet.1!Height-User.K*Sheet.1!User.H1+Sheet.1!User.Gp*0.5)
+Y1:  Value = IF(User.K<=1,Sheet.1!Height,Sheet.1!Height-(User.K-1)*Sheet.1!User.H1-Sheet.1!User.Gp*0.5)
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.5)
+PinY = GUARD((User.Y0+User.Y1)*0.5)
+Width = GUARD(Sheet.1!Width*(User.K+1)/(Sheet.1!User.N+1))
+Height = GUARD(User.Y1-User.Y0)
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0

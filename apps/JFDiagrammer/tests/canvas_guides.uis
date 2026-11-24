@@ -1,0 +1,56 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD15 (RA-02, RS-31): Ansicht › Führungslinien hides the guides -- they are not
+# drawn, a move does not snap to them, no new one comes out of the ruler -- and shows them again;
+# Start › Markieren › Nach Typ auswählen selects the guides (drawn in the accent colour, no
+# measures in the status bar), Del removes the selected guide, undo brings it back
+cmd 4404
+drag 500,330 640,420
+drag 820,500 960,560
+cmd 4400
+# a guide from the top ruler at y = 614 (dashed blue; a dash lies at x = 700)
+drag #23296 700,614
+expect pixel 700 614 #3D8BFD
+# on: the second shape's bottom snaps to it
+drag 890,530 890,592
+expect listitem:"Sheet.5" rect 827 564 126 51
+key ctrl+z
+expect listitem:"Sheet.5" rect 827 500 126 50
+# off (Ansicht › Führungslinien): the line is gone and the same move snaps to the grid only
+cmd 5123
+expect pixel 700 614 #FFFFFF
+drag 890,530 890,592
+expect listitem:"Sheet.5" rect 827 550 126 50
+key ctrl+z
+# no guide comes out of the ruler while they are off
+drag #23296 700,654
+expect pixel 700 654 #FFFFFF
+# on again: the guide is back and catches the move
+cmd 5123
+expect pixel 700 614 #3D8BFD
+expect pixel 700 654 #FFFFFF
+drag 890,530 890,592
+expect listitem:"Sheet.5" rect 827 564 126 51
+key ctrl+z
+click 1000,700
+# RS-31: Nach Typ auswählen › Führungslinien only
+cmd 4472
+expect checkbox:"Führungslinien" enabled
+expect checkbox:"Führungslinien" unchecked
+click checkbox:"Shapes"
+click checkbox:"Gruppen"
+click checkbox:"Bilder"
+click checkbox:"Verbinder"
+click checkbox:"Führungslinien"
+click button:"OK"
+expect listitem:"Sheet.6" selected
+expect listitem:"Sheet.4" unselected
+expect listitem:"Sheet.5" unselected
+expect pixel 700 614 #6FA3E0
+expect button:"Breite: –  Höhe: –  Winkel: –" exists
+shot build/JFDiagrammer-canvas-guides.png
+# Del removes it, undo brings it back
+key delete
+expect listitem:"Sheet.6" missing
+expect pixel 700 614 #FFFFFF
+key ctrl+z
+expect pixel 700 614 #3D8BFD

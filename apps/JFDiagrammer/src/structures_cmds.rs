@@ -12,7 +12,9 @@
 //   container ops                 fit, automatic size, margins, style, heading style, lock,
 //                                 select the contents, disband, add, remove
 //   connect_shapes(app, ui)       the selected shapes chained by dynamic connectors in the
-//                                 order they were selected
+//                                 order they were selected; (JD15) by instances of the
+//                                 connector master marked in the Shapes panel (the armed tile,
+//                                 a 1-D master), its ends glued dynamically
 //   arrow(app, ui, key, dir)      a click on a Verbindungspfeil: the nearest shape in that
 //                                 direction is connected, else the shape chosen in the Shapes
 //                                 panel (the armed tile, else the first quick shape of the
@@ -358,30 +360,57 @@ fn remove(app: &mut Diagrammer, ui: &mut Ui) {
 
 // ---------------------------------------------------------------- connecting
 
-// a dynamic connector from shape a to shape b, both ends glued to the whole shape (dynamic)
-fn connector(tx: &mut Transaction, eng: &mut Engine, owner: Owner, a: ShapeRef, b: ShapeRef) -> Result<ShapeRef, EditError> {
+// a dynamic connector from shape a to shape b, both ends glued to the whole shape (dynamic);
+// (JD15, CN-16) with `master` (a 1-D master of a stencil) an instance of it instead
+fn connector(tx: &mut Transaction, eng: &mut Engine, owner: Owner, a: ShapeRef, b: ShapeRef, master: Option<(&diagram_core::Document, diagram_core::MasterRef)>) -> Result<ShapeRef, EditError> {
     let (pa, pb) = {
         let doc = tx.doc();
         (ops::frame(doc, a).centre(), ops::frame(doc, b).centre())
     };
-    let c = glue::new_connector(tx, eng, owner, (pa, glue::Target::Shape(a)), (pb, glue::Target::Shape(b)))?;
+    let c = match (master, owner) {
+        (Some((src, m)), Owner::Page(page)) => {
+            let lm = instance::import_master(tx, src, m)?;
+            let c = instance::place(tx, page, lm, (pa[0] + pb[0]) * 0.5, (pa[1] + pb[1]) * 0.5, crate::stencils::lang())?;
+            eng.recalc(tx, &[SheetRef::Shape(c)])?;
+            glue::glue(tx, eng, c, glue::End::Begin, pa, glue::Target::Shape(a))?;
+            glue::glue(tx, eng, c, glue::End::End, pb, glue::Target::Shape(b))?;
+            c
+        }
+        _ => glue::new_connector(tx, eng, owner, (pa, glue::Target::Shape(a)), (pb, glue::Target::Shape(b)))?,
+    };
     glue::update(tx, eng, &[c])?;
     Ok(c)
 }
 
-/// Shapes verbinden: the selection chained in the order it was made (CN-16)
+/// (JD15, CN-16) the connector master of the tile marked in the Shapes panel (the armed one),
+/// when its master is a 1-D shape: (stencil key, tile)
+fn marked_connector(app: &Diagrammer) -> Option<(u32, usize)> {
+    let (key, k) = app.stencils.armed?;
+    let (l, e) = app.stencils.entry(key, k)?;
+    let slot = l.doc.master(e.master)?.master_shape()?;
+    glue::is_one_d(&l.doc, ShapeRef { owner: Owner::Master(e.master), slot }).then_some((key, k))
+}
+
+/// Shapes verbinden: the selection chained in the order it was made (CN-16); (JD15) with the
+/// connector master marked in the Shapes panel, else the dynamic connector
 pub(crate) fn connect_shapes(app: &mut Diagrammer, ui: &mut Ui) {
     let shapes: Vec<ShapeRef> = structures::ordered(app);
     let Some(page) = app.model.page else { return };
+    let marked = marked_connector(app);
+    let st = &app.stencils;
+    let master = marked.and_then(|(key, k)| st.entry(key, k)).map(|(l, e)| (&l.doc, e.master));
     let Some(o) = app.opened.as_mut() else { return };
     let owner = Owner::Page(page);
     let _ = edit_doc::edit(o, t("Shapes verbinden"), true, |tx, eng| {
         let list: Vec<ShapeRef> = shapes.iter().copied().filter(|&s| !glue::is_one_d(tx.doc(), s)).collect();
         for w in list.windows(2) {
-            connector(tx, eng, owner, w[0], w[1])?;
+            connector(tx, eng, owner, w[0], w[1], master)?;
         }
         Ok(())
     });
+    if marked.is_some() {
+        app.stencils.armed = None;
+    }
     ui.repass();
 }
 
@@ -452,7 +481,7 @@ pub(crate) fn arrow(app: &mut Diagrammer, ui: &mut Ui, key: u64, dir: u8) {
     let Some(o) = app.opened.as_mut() else { return };
     let r = edit_doc::edit(o, t("Verbindungspfeil"), true, |tx, eng| {
         if let Some(n) = neighbour(tx.doc(), owner, s, dir) {
-            connector(tx, eng, owner, s, n)?;
+            connector(tx, eng, owner, s, n, None)?;
             return Ok(None);
         }
         let gap = spacing(tx.doc(), page);
@@ -485,7 +514,7 @@ pub(crate) fn arrow(app: &mut Diagrammer, ui: &mut Ui, key: u64, dir: u8) {
         let d = [to_mid[0] - (nb[0] + nb[2]) * 0.5, to_mid[1] - (nb[1] + nb[3]) * 0.5];
         ops::move_shapes(tx, eng, &[new], d)?;
         structures::pasted(tx, eng, owner, &[new])?;
-        connector(tx, eng, owner, s, new)?;
+        connector(tx, eng, owner, s, new, None)?;
         Ok(Some(new))
     });
     if let Ok(Some(n)) = r {

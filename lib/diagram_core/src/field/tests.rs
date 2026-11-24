@@ -294,3 +294,28 @@ fn visio_fields_keep_their_text() {
     f.add(None, &Spec { formula: "PAGENAME()", format: "", unit: None, kind: Kind::Text });
     assert_eq!(f.text(), "Stand: 19.11.2026\nAblauf\n");
 }
+
+#[test]
+fn field_marks_in_written_text() {
+    // (JD15) "{fld N}" is the mark of Field row N; anything else stays characters
+    let t = marked("Länge: {fld 0} / {fld 12}");
+    assert_eq!(
+        t.items,
+        alloc::vec![TextItem::Chars("Länge: ".into()), TextItem::Field(0), TextItem::Chars(" / ".into()), TextItem::Field(12)]
+    );
+    assert_eq!(marks(&t), alloc::vec![0, 12]);
+    assert_eq!(marked("{fld 3}").items, alloc::vec![TextItem::Field(3)]);
+    for plain in ["", "{fld}", "{fld x}", "{fld 1", "a {b} c", "{fld -1}", "{FLD 1}"] {
+        assert_eq!(marked(plain).items, alloc::vec![TextItem::Chars(plain.into())], "{plain}");
+        assert!(marks(&marked(plain)).is_empty());
+    }
+    // a "{" before a mark stays a character
+    assert_eq!(marked("{{fld 2}}").items, alloc::vec![TextItem::Chars("{".into()), TextItem::Field(2), TextItem::Chars("}".into())]);
+    // the mark shows its field's value in the shape
+    let mut f = fx(None);
+    let (ix, _) = f.add(None, &Spec { formula: "PAGENAME()", format: "", unit: None, kind: Kind::Text });
+    let mut tx = f.doc.transaction("Text");
+    crate::ops::set_text(&mut tx, &mut f.eng, f.shape, marked(&alloc::format!("Seite: {{fld {ix}}}"))).unwrap();
+    tx.commit();
+    assert_eq!(f.text(), "Seite: Ablauf");
+}

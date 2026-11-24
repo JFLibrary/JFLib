@@ -1,0 +1,339 @@
+# Sektoren 1 (SH-030, JD26): ein voller Kreis aus zwei bis acht gleichen Sektoren.  Die Zahl steht in
+# den Shape-Daten (Prop.Sectors); Sektor 1 beginnt oben, die übrigen folgen im Uhrzeigersinn.  Jeder
+# Sektor ist ein Teil mit eigenem Text und Variantenfarbe (100 bis 106, der achte 101: Nachbarn
+# nie gleich).  Zwischen den Sektoren 1 mm Fuge: die Kanten sind um die halbe Fuge parallel
+# verschoben (die Spitze rückt um Fuge/SIN(halber Winkel) nach außen, der Bogen beginnt um
+# ASIN(Fuge/Radius) später), so bleibt die Fuge überall gleich breit (sichtbar auch in Designs
+# ohne Shape-Linien).  Sektoren über der Zahl liegen verborgen (NoShow, HideText) deckungsgleich
+# unter dem letzten (die Teile stehen von hinten nach vorn in der Datei).
+master: Sectors 1
+name.de: Sektoren 1
+name.en: Sectors 1
+name.es: Sectores 1
+name.it: Settori 1
+name.fr: Secteurs 1
+prompt.de: Kreis aus Sektoren, jeder mit eigenem Text. Die Zahl der Sektoren stellen Sie in den Shape-Daten ein.
+prompt.en: Circle of sectors, each with its own text. Set the number of sectors in the shape data.
+prompt.es: Círculo de sectores, cada uno con su propio texto. Defina el número de sectores en los datos de la forma.
+prompt.it: Cerchio di settori, ognuno con il proprio testo. Imposta il numero di settori nei dati della forma.
+prompt.fr: Cercle de secteurs, chacun avec son propre texte. Définissez le nombre de secteurs dans les données de la forme.
+keywords.de: Sektoren, Kreis, Torte, Segmente, Anteile, Bestandteile, Kreisdiagramm
+keywords.en: sectors, circle, pie, segments, shares, components, pie chart
+keywords.es: sectores, círculo, segmentos, partes, componentes, gráfico circular
+keywords.it: settori, cerchio, torta, segmenti, parti, componenti
+keywords.fr: secteurs, cercle, camembert, segments, parts, composantes
+
+[Shape]
+Width = 60 mm
+Width.us = 2.5 in
+Height = 60 mm
+Height.us = 2.5 in
+
+[User]
+# die Zahl der Sektoren (2 bis 8), der Winkel je Sektor, die halbe Fuge als Anteil des Radius
+N:   Value = MIN(MAX(ROUND(Prop.Sectors,0),2),8)
+S:   Value = 2*PI()/User.N
+Gp:  Value = 1 mm
+     Value.us = 0.04 in
+Gn:  Value = User.Gp/Width
+# Radius der Texte
+Rt:  Value = 0.58
+
+[Property]
+Sectors:  Type = 2; Format = "0"; Value = 4
+          Label.de = Sektoren
+          Label.en = Sectors
+          Label.es = Sectores
+          Label.it = Settori
+          Label.fr = Secteurs
+          Prompt.de = Anzahl der Sektoren (2 bis 8)
+          Prompt.en = Number of sectors (2 to 8)
+          Prompt.es = Número de sectores (de 2 a 8)
+          Prompt.it = Numero di settori (da 2 a 8)
+          Prompt.fr = Nombre de secteurs (de 2 à 8)
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+
+# Sektor 8: sichtbar ab 8 Sektoren; sonst deckungsgleich mit dem letzten, verborgen
+[Part S8]
+text.de: Sektor 8
+text.en: Sector 8
+text.es: Sector 8
+text.it: Settore 8
+text.fr: Secteur 8
+
+[User]
+# der Sektor, an dessen Stelle das Teil liegt; Anfang, Ende, Mitte und halber Winkel (Bogenmaß)
+K:   Value = MIN(8,Sheet.1!User.N)
+As:  Value = PI()*0.5-(User.K-1)*Sheet.1!User.S
+Ae:  Value = User.As-Sheet.1!User.S
+Am:  Value = (User.As+User.Ae)*0.5
+H:   Value = Sheet.1!User.S*0.5
+
+[Shape]
+HideText = 8>Sheet.1!User.N
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+TxtPinX = Width*0.5*(1+Sheet.1!User.Rt*COS(User.Am))
+TxtPinY = Height*0.5*(1+Sheet.1!User.Rt*SIN(User.Am))
+TxtWidth = Width*0.4
+TxtHeight = Height*0.2
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoShow = 8>Sheet.1!User.N
+MoveTo           X = Width*0.5*(1+Sheet.1!User.Gn/SIN(User.H)*COS(User.Am)); Y = Height*0.5*(1+Sheet.1!User.Gn/SIN(User.H)*SIN(User.Am))
+LineTo           X = Width*0.5*(1+1*COS(User.As-ASIN(Sheet.1!User.Gn))); Y = Height*0.5*(1+1*SIN(User.As-ASIN(Sheet.1!User.Gn)))
+EllipticalArcTo  X = Width*0.5*(1+1*COS(User.Ae+ASIN(Sheet.1!User.Gn))); Y = Height*0.5*(1+1*SIN(User.Ae+ASIN(Sheet.1!User.Gn)))
+                 A = Width*0.5*(1+1*COS(User.Am)); B = Height*0.5*(1+1*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+# Sektor 7: sichtbar ab 7 Sektoren; sonst deckungsgleich mit dem letzten, verborgen
+[Part S7]
+text.de: Sektor 7
+text.en: Sector 7
+text.es: Sector 7
+text.it: Settore 7
+text.fr: Secteur 7
+
+[User]
+# der Sektor, an dessen Stelle das Teil liegt; Anfang, Ende, Mitte und halber Winkel (Bogenmaß)
+K:   Value = MIN(7,Sheet.1!User.N)
+As:  Value = PI()*0.5-(User.K-1)*Sheet.1!User.S
+Ae:  Value = User.As-Sheet.1!User.S
+Am:  Value = (User.As+User.Ae)*0.5
+H:   Value = Sheet.1!User.S*0.5
+
+[Shape]
+HideText = 7>Sheet.1!User.N
+QuickStyleLineColor = 106
+QuickStyleFillColor = 106
+TxtPinX = Width*0.5*(1+Sheet.1!User.Rt*COS(User.Am))
+TxtPinY = Height*0.5*(1+Sheet.1!User.Rt*SIN(User.Am))
+TxtWidth = Width*0.4
+TxtHeight = Height*0.2
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoShow = 7>Sheet.1!User.N
+MoveTo           X = Width*0.5*(1+Sheet.1!User.Gn/SIN(User.H)*COS(User.Am)); Y = Height*0.5*(1+Sheet.1!User.Gn/SIN(User.H)*SIN(User.Am))
+LineTo           X = Width*0.5*(1+1*COS(User.As-ASIN(Sheet.1!User.Gn))); Y = Height*0.5*(1+1*SIN(User.As-ASIN(Sheet.1!User.Gn)))
+EllipticalArcTo  X = Width*0.5*(1+1*COS(User.Ae+ASIN(Sheet.1!User.Gn))); Y = Height*0.5*(1+1*SIN(User.Ae+ASIN(Sheet.1!User.Gn)))
+                 A = Width*0.5*(1+1*COS(User.Am)); B = Height*0.5*(1+1*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+# Sektor 6: sichtbar ab 6 Sektoren; sonst deckungsgleich mit dem letzten, verborgen
+[Part S6]
+text.de: Sektor 6
+text.en: Sector 6
+text.es: Sector 6
+text.it: Settore 6
+text.fr: Secteur 6
+
+[User]
+# der Sektor, an dessen Stelle das Teil liegt; Anfang, Ende, Mitte und halber Winkel (Bogenmaß)
+K:   Value = MIN(6,Sheet.1!User.N)
+As:  Value = PI()*0.5-(User.K-1)*Sheet.1!User.S
+Ae:  Value = User.As-Sheet.1!User.S
+Am:  Value = (User.As+User.Ae)*0.5
+H:   Value = Sheet.1!User.S*0.5
+
+[Shape]
+HideText = 6>Sheet.1!User.N
+QuickStyleLineColor = 105
+QuickStyleFillColor = 105
+TxtPinX = Width*0.5*(1+Sheet.1!User.Rt*COS(User.Am))
+TxtPinY = Height*0.5*(1+Sheet.1!User.Rt*SIN(User.Am))
+TxtWidth = Width*0.4
+TxtHeight = Height*0.2
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoShow = 6>Sheet.1!User.N
+MoveTo           X = Width*0.5*(1+Sheet.1!User.Gn/SIN(User.H)*COS(User.Am)); Y = Height*0.5*(1+Sheet.1!User.Gn/SIN(User.H)*SIN(User.Am))
+LineTo           X = Width*0.5*(1+1*COS(User.As-ASIN(Sheet.1!User.Gn))); Y = Height*0.5*(1+1*SIN(User.As-ASIN(Sheet.1!User.Gn)))
+EllipticalArcTo  X = Width*0.5*(1+1*COS(User.Ae+ASIN(Sheet.1!User.Gn))); Y = Height*0.5*(1+1*SIN(User.Ae+ASIN(Sheet.1!User.Gn)))
+                 A = Width*0.5*(1+1*COS(User.Am)); B = Height*0.5*(1+1*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+# Sektor 5: sichtbar ab 5 Sektoren; sonst deckungsgleich mit dem letzten, verborgen
+[Part S5]
+text.de: Sektor 5
+text.en: Sector 5
+text.es: Sector 5
+text.it: Settore 5
+text.fr: Secteur 5
+
+[User]
+# der Sektor, an dessen Stelle das Teil liegt; Anfang, Ende, Mitte und halber Winkel (Bogenmaß)
+K:   Value = MIN(5,Sheet.1!User.N)
+As:  Value = PI()*0.5-(User.K-1)*Sheet.1!User.S
+Ae:  Value = User.As-Sheet.1!User.S
+Am:  Value = (User.As+User.Ae)*0.5
+H:   Value = Sheet.1!User.S*0.5
+
+[Shape]
+HideText = 5>Sheet.1!User.N
+QuickStyleLineColor = 104
+QuickStyleFillColor = 104
+TxtPinX = Width*0.5*(1+Sheet.1!User.Rt*COS(User.Am))
+TxtPinY = Height*0.5*(1+Sheet.1!User.Rt*SIN(User.Am))
+TxtWidth = Width*0.4
+TxtHeight = Height*0.2
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoShow = 5>Sheet.1!User.N
+MoveTo           X = Width*0.5*(1+Sheet.1!User.Gn/SIN(User.H)*COS(User.Am)); Y = Height*0.5*(1+Sheet.1!User.Gn/SIN(User.H)*SIN(User.Am))
+LineTo           X = Width*0.5*(1+1*COS(User.As-ASIN(Sheet.1!User.Gn))); Y = Height*0.5*(1+1*SIN(User.As-ASIN(Sheet.1!User.Gn)))
+EllipticalArcTo  X = Width*0.5*(1+1*COS(User.Ae+ASIN(Sheet.1!User.Gn))); Y = Height*0.5*(1+1*SIN(User.Ae+ASIN(Sheet.1!User.Gn)))
+                 A = Width*0.5*(1+1*COS(User.Am)); B = Height*0.5*(1+1*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+# Sektor 4: sichtbar ab 4 Sektoren; sonst deckungsgleich mit dem letzten, verborgen
+[Part S4]
+text.de: Sektor 4
+text.en: Sector 4
+text.es: Sector 4
+text.it: Settore 4
+text.fr: Secteur 4
+
+[User]
+# der Sektor, an dessen Stelle das Teil liegt; Anfang, Ende, Mitte und halber Winkel (Bogenmaß)
+K:   Value = MIN(4,Sheet.1!User.N)
+As:  Value = PI()*0.5-(User.K-1)*Sheet.1!User.S
+Ae:  Value = User.As-Sheet.1!User.S
+Am:  Value = (User.As+User.Ae)*0.5
+H:   Value = Sheet.1!User.S*0.5
+
+[Shape]
+HideText = 4>Sheet.1!User.N
+QuickStyleLineColor = 103
+QuickStyleFillColor = 103
+TxtPinX = Width*0.5*(1+Sheet.1!User.Rt*COS(User.Am))
+TxtPinY = Height*0.5*(1+Sheet.1!User.Rt*SIN(User.Am))
+TxtWidth = Width*0.4
+TxtHeight = Height*0.2
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoShow = 4>Sheet.1!User.N
+MoveTo           X = Width*0.5*(1+Sheet.1!User.Gn/SIN(User.H)*COS(User.Am)); Y = Height*0.5*(1+Sheet.1!User.Gn/SIN(User.H)*SIN(User.Am))
+LineTo           X = Width*0.5*(1+1*COS(User.As-ASIN(Sheet.1!User.Gn))); Y = Height*0.5*(1+1*SIN(User.As-ASIN(Sheet.1!User.Gn)))
+EllipticalArcTo  X = Width*0.5*(1+1*COS(User.Ae+ASIN(Sheet.1!User.Gn))); Y = Height*0.5*(1+1*SIN(User.Ae+ASIN(Sheet.1!User.Gn)))
+                 A = Width*0.5*(1+1*COS(User.Am)); B = Height*0.5*(1+1*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+# Sektor 3: sichtbar ab 3 Sektoren; sonst deckungsgleich mit dem letzten, verborgen
+[Part S3]
+text.de: Sektor 3
+text.en: Sector 3
+text.es: Sector 3
+text.it: Settore 3
+text.fr: Secteur 3
+
+[User]
+# der Sektor, an dessen Stelle das Teil liegt; Anfang, Ende, Mitte und halber Winkel (Bogenmaß)
+K:   Value = MIN(3,Sheet.1!User.N)
+As:  Value = PI()*0.5-(User.K-1)*Sheet.1!User.S
+Ae:  Value = User.As-Sheet.1!User.S
+Am:  Value = (User.As+User.Ae)*0.5
+H:   Value = Sheet.1!User.S*0.5
+
+[Shape]
+HideText = 3>Sheet.1!User.N
+QuickStyleLineColor = 102
+QuickStyleFillColor = 102
+TxtPinX = Width*0.5*(1+Sheet.1!User.Rt*COS(User.Am))
+TxtPinY = Height*0.5*(1+Sheet.1!User.Rt*SIN(User.Am))
+TxtWidth = Width*0.4
+TxtHeight = Height*0.2
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoShow = 3>Sheet.1!User.N
+MoveTo           X = Width*0.5*(1+Sheet.1!User.Gn/SIN(User.H)*COS(User.Am)); Y = Height*0.5*(1+Sheet.1!User.Gn/SIN(User.H)*SIN(User.Am))
+LineTo           X = Width*0.5*(1+1*COS(User.As-ASIN(Sheet.1!User.Gn))); Y = Height*0.5*(1+1*SIN(User.As-ASIN(Sheet.1!User.Gn)))
+EllipticalArcTo  X = Width*0.5*(1+1*COS(User.Ae+ASIN(Sheet.1!User.Gn))); Y = Height*0.5*(1+1*SIN(User.Ae+ASIN(Sheet.1!User.Gn)))
+                 A = Width*0.5*(1+1*COS(User.Am)); B = Height*0.5*(1+1*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+# Sektor 2: sichtbar ab 2 Sektoren; sonst deckungsgleich mit dem letzten, verborgen
+[Part S2]
+text.de: Sektor 2
+text.en: Sector 2
+text.es: Sector 2
+text.it: Settore 2
+text.fr: Secteur 2
+
+[User]
+# der Sektor, an dessen Stelle das Teil liegt; Anfang, Ende, Mitte und halber Winkel (Bogenmaß)
+K:   Value = MIN(2,Sheet.1!User.N)
+As:  Value = PI()*0.5-(User.K-1)*Sheet.1!User.S
+Ae:  Value = User.As-Sheet.1!User.S
+Am:  Value = (User.As+User.Ae)*0.5
+H:   Value = Sheet.1!User.S*0.5
+
+[Shape]
+HideText = 2>Sheet.1!User.N
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+TxtPinX = Width*0.5*(1+Sheet.1!User.Rt*COS(User.Am))
+TxtPinY = Height*0.5*(1+Sheet.1!User.Rt*SIN(User.Am))
+TxtWidth = Width*0.4
+TxtHeight = Height*0.2
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoShow = 2>Sheet.1!User.N
+MoveTo           X = Width*0.5*(1+Sheet.1!User.Gn/SIN(User.H)*COS(User.Am)); Y = Height*0.5*(1+Sheet.1!User.Gn/SIN(User.H)*SIN(User.Am))
+LineTo           X = Width*0.5*(1+1*COS(User.As-ASIN(Sheet.1!User.Gn))); Y = Height*0.5*(1+1*SIN(User.As-ASIN(Sheet.1!User.Gn)))
+EllipticalArcTo  X = Width*0.5*(1+1*COS(User.Ae+ASIN(Sheet.1!User.Gn))); Y = Height*0.5*(1+1*SIN(User.Ae+ASIN(Sheet.1!User.Gn)))
+                 A = Width*0.5*(1+1*COS(User.Am)); B = Height*0.5*(1+1*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+# Sektor 1: sichtbar ab 1 Sektoren; sonst deckungsgleich mit dem letzten, verborgen
+[Part S1]
+text.de: Sektor 1
+text.en: Sector 1
+text.es: Sector 1
+text.it: Settore 1
+text.fr: Secteur 1
+
+[User]
+# der Sektor, an dessen Stelle das Teil liegt; Anfang, Ende, Mitte und halber Winkel (Bogenmaß)
+K:   Value = MIN(1,Sheet.1!User.N)
+As:  Value = PI()*0.5-(User.K-1)*Sheet.1!User.S
+Ae:  Value = User.As-Sheet.1!User.S
+Am:  Value = (User.As+User.Ae)*0.5
+H:   Value = Sheet.1!User.S*0.5
+
+[Shape]
+HideText = 1>Sheet.1!User.N
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+TxtPinX = Width*0.5*(1+Sheet.1!User.Rt*COS(User.Am))
+TxtPinY = Height*0.5*(1+Sheet.1!User.Rt*SIN(User.Am))
+TxtWidth = Width*0.4
+TxtHeight = Height*0.2
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Geometry]
+NoShow = 1>Sheet.1!User.N
+MoveTo           X = Width*0.5*(1+Sheet.1!User.Gn/SIN(User.H)*COS(User.Am)); Y = Height*0.5*(1+Sheet.1!User.Gn/SIN(User.H)*SIN(User.Am))
+LineTo           X = Width*0.5*(1+1*COS(User.As-ASIN(Sheet.1!User.Gn))); Y = Height*0.5*(1+1*SIN(User.As-ASIN(Sheet.1!User.Gn)))
+EllipticalArcTo  X = Width*0.5*(1+1*COS(User.Ae+ASIN(Sheet.1!User.Gn))); Y = Height*0.5*(1+1*SIN(User.Ae+ASIN(Sheet.1!User.Gn)))
+                 A = Width*0.5*(1+1*COS(User.Am)); B = Height*0.5*(1+1*SIN(User.Am)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1

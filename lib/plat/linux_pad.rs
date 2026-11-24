@@ -14,7 +14,8 @@
 // ours, and is not opened again until inotify reports it anew.  Nodes are opened read-only and
 // without blocking; their events are read whenever the pads are polled (4 ms), not from the window
 // loop's poll().  Inside a Flatpak /dev/input exists only with --device=input (Flatpak 1.15.6 and
-// newer); without it no pad is found.
+// newer; the manifest's `gamepad` line gives it, tools/pkg_linux.py); without it no pad is found.
+// Older Flatpak refuses to build with it and ignores it in an installed app (no /dev/input).
 
 use alloc::string::String;
 use alloc::vec::Vec;

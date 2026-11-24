@@ -1,6 +1,7 @@
 #!args --no-system-fonts
 # JFDiagrammer, JD8 rest: the dialog Text (RS-09, KB-10) -- F11 opens it for the selected
-# shape: font size, bold, alignment, the text block's vertical alignment and background; OK
+# shape: font size, bold, (JD15) the register Zeichen, alignment, the text block's vertical
+# alignment and background; OK
 # writes what changed in one undo step, the dialog shows the values when it opens again; the
 # launcher of Start › Absatz and Formatieren › Text formatieren open it too
 cmd 4404
@@ -64,3 +65,32 @@ click tab:"Schriftart"
 expect checkbox:"Fett" unchecked
 click button:"Abbrechen"
 expect dialog:"Text" missing
+# (JD15) the register Zeichen (RS-09): superscript, capitals, spacing (Char.Pos, Case,
+# Letterspace), shown again when the dialog opens, one undo step
+key f11
+click tab:"Zeichen"
+expect #2014314536 value 0
+click #2014314536
+click "Hochgestellt"
+click #2014314537
+click "Großbuchstaben"
+click #2014314539
+key ctrl+a
+type "2"
+key tab
+click button:"OK"
+expect dialog:"Text" missing
+shot build/JFDiagrammer-text-dialog-char.png
+key f11
+click tab:"Zeichen"
+expect #2014314536 value 1
+expect #2014314537 value 1
+expect #2014314539 text "2,0"
+expect #2014314538 text "100"
+click button:"Abbrechen"
+key ctrl+z
+key f11
+click tab:"Zeichen"
+expect #2014314536 value 0
+expect #2014314537 value 0
+click button:"Abbrechen"

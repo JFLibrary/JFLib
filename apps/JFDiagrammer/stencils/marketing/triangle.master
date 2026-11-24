@@ -1,0 +1,368 @@
+# Dreieck (SH-030, JD26): ein gleichschenkliges Dreieck aus zwei bis acht gleich hohen Ebenen, jede
+# ein Teil der Gruppe mit eigenem Text, alle in der Füllung der Formatvorlage (eine Farbe, anders
+# als die Pyramide der Schablone pyramid), 1 mm Fuge zwischen den Ebenen (sichtbar auch in Designs
+# ohne Shape-Linien).  Ebene 1 ist die Spitze.  Die Zahl steht in den Shape-Daten (Prop.Levels).
+# Teile über der Zahl liegen verborgen (NoShow, HideText) deckungsgleich unter der untersten
+# Ebene (die Teile stehen von unten nach oben in der Datei).  Gezeichnet wird nach Height/N.  Der
+# Textblock ist mindestens 18 mm breit und steht in der Spitze tiefer: die Spitze ist schmaler als
+# „Ebene 1“ (in Kontrast ragt der weiße Text dort etwas über die Fläche).
+master: Triangle
+name.de: Dreieck
+name.en: Triangle
+name.es: Triángulo
+name.it: Triangolo
+name.fr: Triangle
+prompt.de: Dreieck aus gleich hohen Ebenen mit eigenem Text. Die Zahl der Ebenen stellen Sie in den Shape-Daten ein.
+prompt.en: Triangle of levels of equal height, each with its own text. Set the number of levels in the shape data.
+prompt.es: Triángulo de niveles de igual altura, cada uno con su propio texto. Defina el número de niveles en los datos de la forma.
+prompt.it: Triangolo di livelli di uguale altezza, ognuno con il proprio testo. Imposta il numero di livelli nei dati della forma.
+prompt.fr: Triangle de niveaux de même hauteur, chacun avec son propre texte. Définissez le nombre de niveaux dans les données de la forme.
+keywords.de: Dreieck, Ebenen, Hierarchie, Stufen, Schichten, Pyramide
+keywords.en: triangle, levels, hierarchy, tiers, layers, pyramid
+keywords.es: triángulo, niveles, jerarquía, escalones, capas, pirámide
+keywords.it: triangolo, livelli, gerarchia, gradini, strati, piramide
+keywords.fr: triangle, niveaux, hiérarchie, étages, couches, pyramide
+
+[Shape]
+Width = 60 mm
+Width.us = 2.5 in
+Height = 50 mm
+Height.us = 2 in
+
+[User]
+# die Zahl der Ebenen (2 bis 8), die Fuge, die Höhe einer Ebene
+N:   Value = MIN(MAX(ROUND(Prop.Levels,0),2),8)
+Gp:  Value = 1 mm
+     Value.us = 0.04 in
+H1:  Value = Height/User.N
+
+[Property]
+Levels:  Type = 2; Format = "0"; Value = 4
+         Label.de = Ebenen
+         Label.en = Levels
+         Label.es = Niveles
+         Label.it = Livelli
+         Label.fr = Niveaux
+         Prompt.de = Anzahl der Ebenen (2 bis 8)
+         Prompt.en = Number of levels (2 to 8)
+         Prompt.es = Número de niveles (de 2 a 8)
+         Prompt.it = Numero di livelli (da 2 a 8)
+         Prompt.fr = Nombre de niveaux (de 2 à 8)
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width*0.75; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = Width*0.25; Y = Height*0.5; DirX = 1; DirY = 0
+
+# Ebene 8 (von oben): sichtbar ab 8 Ebenen; sonst deckungsgleich mit der untersten, verborgen
+[Part L8]
+text.de: Ebene 8
+text.en: Level 8
+text.es: Nivel 8
+text.it: Livello 8
+text.fr: Niveau 8
+
+[User]
+# die Ebene, an deren Stelle das Teil liegt, ihre Unter- und Oberkante, die Breite dort
+K:   Value = MIN(8,Sheet.1!User.N)
+Y0:  Value = IF(User.K>=Sheet.1!User.N,0,Sheet.1!Height-User.K*Sheet.1!User.H1+Sheet.1!User.Gp*0.5)
+Y1:  Value = IF(User.K<=1,Sheet.1!Height,Sheet.1!Height-(User.K-1)*Sheet.1!User.H1-Sheet.1!User.Gp*0.5)
+B:   Value = Sheet.1!Width*(1-User.Y0/Sheet.1!Height)
+T:   Value = Sheet.1!Width*(1-User.Y1/Sheet.1!Height)
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.5)
+PinY = GUARD((User.Y0+User.Y1)*0.5)
+Width = GUARD(User.B)
+Height = GUARD(User.Y1-User.Y0)
+HideText = 8>Sheet.1!User.N
+# der Text mindestens 18 mm breit (die Spitze ist schmaler als ein Wort), in der Spitze tiefer
+TxtPinX = Width*0.5
+TxtPinY = IF(User.K<=1,Height*0.35,Height*0.5)
+TxtWidth = MAX(Width,18 mm)
+TxtHeight = Height
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TxtWidth.us = MAX(Width,0.7 in)
+
+[Geometry]
+NoShow = 8>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = (Width+User.T)*0.5; Y = Height
+LineTo  X = (Width-User.T)*0.5; Y = Height
+LineTo  X = 0; Y = 0
+
+# Ebene 7 (von oben): sichtbar ab 7 Ebenen; sonst deckungsgleich mit der untersten, verborgen
+[Part L7]
+text.de: Ebene 7
+text.en: Level 7
+text.es: Nivel 7
+text.it: Livello 7
+text.fr: Niveau 7
+
+[User]
+# die Ebene, an deren Stelle das Teil liegt, ihre Unter- und Oberkante, die Breite dort
+K:   Value = MIN(7,Sheet.1!User.N)
+Y0:  Value = IF(User.K>=Sheet.1!User.N,0,Sheet.1!Height-User.K*Sheet.1!User.H1+Sheet.1!User.Gp*0.5)
+Y1:  Value = IF(User.K<=1,Sheet.1!Height,Sheet.1!Height-(User.K-1)*Sheet.1!User.H1-Sheet.1!User.Gp*0.5)
+B:   Value = Sheet.1!Width*(1-User.Y0/Sheet.1!Height)
+T:   Value = Sheet.1!Width*(1-User.Y1/Sheet.1!Height)
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.5)
+PinY = GUARD((User.Y0+User.Y1)*0.5)
+Width = GUARD(User.B)
+Height = GUARD(User.Y1-User.Y0)
+HideText = 7>Sheet.1!User.N
+# der Text mindestens 18 mm breit (die Spitze ist schmaler als ein Wort), in der Spitze tiefer
+TxtPinX = Width*0.5
+TxtPinY = IF(User.K<=1,Height*0.35,Height*0.5)
+TxtWidth = MAX(Width,18 mm)
+TxtHeight = Height
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TxtWidth.us = MAX(Width,0.7 in)
+
+[Geometry]
+NoShow = 7>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = (Width+User.T)*0.5; Y = Height
+LineTo  X = (Width-User.T)*0.5; Y = Height
+LineTo  X = 0; Y = 0
+
+# Ebene 6 (von oben): sichtbar ab 6 Ebenen; sonst deckungsgleich mit der untersten, verborgen
+[Part L6]
+text.de: Ebene 6
+text.en: Level 6
+text.es: Nivel 6
+text.it: Livello 6
+text.fr: Niveau 6
+
+[User]
+# die Ebene, an deren Stelle das Teil liegt, ihre Unter- und Oberkante, die Breite dort
+K:   Value = MIN(6,Sheet.1!User.N)
+Y0:  Value = IF(User.K>=Sheet.1!User.N,0,Sheet.1!Height-User.K*Sheet.1!User.H1+Sheet.1!User.Gp*0.5)
+Y1:  Value = IF(User.K<=1,Sheet.1!Height,Sheet.1!Height-(User.K-1)*Sheet.1!User.H1-Sheet.1!User.Gp*0.5)
+B:   Value = Sheet.1!Width*(1-User.Y0/Sheet.1!Height)
+T:   Value = Sheet.1!Width*(1-User.Y1/Sheet.1!Height)
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.5)
+PinY = GUARD((User.Y0+User.Y1)*0.5)
+Width = GUARD(User.B)
+Height = GUARD(User.Y1-User.Y0)
+HideText = 6>Sheet.1!User.N
+# der Text mindestens 18 mm breit (die Spitze ist schmaler als ein Wort), in der Spitze tiefer
+TxtPinX = Width*0.5
+TxtPinY = IF(User.K<=1,Height*0.35,Height*0.5)
+TxtWidth = MAX(Width,18 mm)
+TxtHeight = Height
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TxtWidth.us = MAX(Width,0.7 in)
+
+[Geometry]
+NoShow = 6>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = (Width+User.T)*0.5; Y = Height
+LineTo  X = (Width-User.T)*0.5; Y = Height
+LineTo  X = 0; Y = 0
+
+# Ebene 5 (von oben): sichtbar ab 5 Ebenen; sonst deckungsgleich mit der untersten, verborgen
+[Part L5]
+text.de: Ebene 5
+text.en: Level 5
+text.es: Nivel 5
+text.it: Livello 5
+text.fr: Niveau 5
+
+[User]
+# die Ebene, an deren Stelle das Teil liegt, ihre Unter- und Oberkante, die Breite dort
+K:   Value = MIN(5,Sheet.1!User.N)
+Y0:  Value = IF(User.K>=Sheet.1!User.N,0,Sheet.1!Height-User.K*Sheet.1!User.H1+Sheet.1!User.Gp*0.5)
+Y1:  Value = IF(User.K<=1,Sheet.1!Height,Sheet.1!Height-(User.K-1)*Sheet.1!User.H1-Sheet.1!User.Gp*0.5)
+B:   Value = Sheet.1!Width*(1-User.Y0/Sheet.1!Height)
+T:   Value = Sheet.1!Width*(1-User.Y1/Sheet.1!Height)
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.5)
+PinY = GUARD((User.Y0+User.Y1)*0.5)
+Width = GUARD(User.B)
+Height = GUARD(User.Y1-User.Y0)
+HideText = 5>Sheet.1!User.N
+# der Text mindestens 18 mm breit (die Spitze ist schmaler als ein Wort), in der Spitze tiefer
+TxtPinX = Width*0.5
+TxtPinY = IF(User.K<=1,Height*0.35,Height*0.5)
+TxtWidth = MAX(Width,18 mm)
+TxtHeight = Height
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TxtWidth.us = MAX(Width,0.7 in)
+
+[Geometry]
+NoShow = 5>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = (Width+User.T)*0.5; Y = Height
+LineTo  X = (Width-User.T)*0.5; Y = Height
+LineTo  X = 0; Y = 0
+
+# Ebene 4 (von oben): sichtbar ab 4 Ebenen; sonst deckungsgleich mit der untersten, verborgen
+[Part L4]
+text.de: Ebene 4
+text.en: Level 4
+text.es: Nivel 4
+text.it: Livello 4
+text.fr: Niveau 4
+
+[User]
+# die Ebene, an deren Stelle das Teil liegt, ihre Unter- und Oberkante, die Breite dort
+K:   Value = MIN(4,Sheet.1!User.N)
+Y0:  Value = IF(User.K>=Sheet.1!User.N,0,Sheet.1!Height-User.K*Sheet.1!User.H1+Sheet.1!User.Gp*0.5)
+Y1:  Value = IF(User.K<=1,Sheet.1!Height,Sheet.1!Height-(User.K-1)*Sheet.1!User.H1-Sheet.1!User.Gp*0.5)
+B:   Value = Sheet.1!Width*(1-User.Y0/Sheet.1!Height)
+T:   Value = Sheet.1!Width*(1-User.Y1/Sheet.1!Height)
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.5)
+PinY = GUARD((User.Y0+User.Y1)*0.5)
+Width = GUARD(User.B)
+Height = GUARD(User.Y1-User.Y0)
+HideText = 4>Sheet.1!User.N
+# der Text mindestens 18 mm breit (die Spitze ist schmaler als ein Wort), in der Spitze tiefer
+TxtPinX = Width*0.5
+TxtPinY = IF(User.K<=1,Height*0.35,Height*0.5)
+TxtWidth = MAX(Width,18 mm)
+TxtHeight = Height
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TxtWidth.us = MAX(Width,0.7 in)
+
+[Geometry]
+NoShow = 4>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = (Width+User.T)*0.5; Y = Height
+LineTo  X = (Width-User.T)*0.5; Y = Height
+LineTo  X = 0; Y = 0
+
+# Ebene 3 (von oben): sichtbar ab 3 Ebenen; sonst deckungsgleich mit der untersten, verborgen
+[Part L3]
+text.de: Ebene 3
+text.en: Level 3
+text.es: Nivel 3
+text.it: Livello 3
+text.fr: Niveau 3
+
+[User]
+# die Ebene, an deren Stelle das Teil liegt, ihre Unter- und Oberkante, die Breite dort
+K:   Value = MIN(3,Sheet.1!User.N)
+Y0:  Value = IF(User.K>=Sheet.1!User.N,0,Sheet.1!Height-User.K*Sheet.1!User.H1+Sheet.1!User.Gp*0.5)
+Y1:  Value = IF(User.K<=1,Sheet.1!Height,Sheet.1!Height-(User.K-1)*Sheet.1!User.H1-Sheet.1!User.Gp*0.5)
+B:   Value = Sheet.1!Width*(1-User.Y0/Sheet.1!Height)
+T:   Value = Sheet.1!Width*(1-User.Y1/Sheet.1!Height)
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.5)
+PinY = GUARD((User.Y0+User.Y1)*0.5)
+Width = GUARD(User.B)
+Height = GUARD(User.Y1-User.Y0)
+HideText = 3>Sheet.1!User.N
+# der Text mindestens 18 mm breit (die Spitze ist schmaler als ein Wort), in der Spitze tiefer
+TxtPinX = Width*0.5
+TxtPinY = IF(User.K<=1,Height*0.35,Height*0.5)
+TxtWidth = MAX(Width,18 mm)
+TxtHeight = Height
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TxtWidth.us = MAX(Width,0.7 in)
+
+[Geometry]
+NoShow = 3>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = (Width+User.T)*0.5; Y = Height
+LineTo  X = (Width-User.T)*0.5; Y = Height
+LineTo  X = 0; Y = 0
+
+# Ebene 2 (von oben): sichtbar ab 2 Ebenen; sonst deckungsgleich mit der untersten, verborgen
+[Part L2]
+text.de: Ebene 2
+text.en: Level 2
+text.es: Nivel 2
+text.it: Livello 2
+text.fr: Niveau 2
+
+[User]
+# die Ebene, an deren Stelle das Teil liegt, ihre Unter- und Oberkante, die Breite dort
+K:   Value = MIN(2,Sheet.1!User.N)
+Y0:  Value = IF(User.K>=Sheet.1!User.N,0,Sheet.1!Height-User.K*Sheet.1!User.H1+Sheet.1!User.Gp*0.5)
+Y1:  Value = IF(User.K<=1,Sheet.1!Height,Sheet.1!Height-(User.K-1)*Sheet.1!User.H1-Sheet.1!User.Gp*0.5)
+B:   Value = Sheet.1!Width*(1-User.Y0/Sheet.1!Height)
+T:   Value = Sheet.1!Width*(1-User.Y1/Sheet.1!Height)
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.5)
+PinY = GUARD((User.Y0+User.Y1)*0.5)
+Width = GUARD(User.B)
+Height = GUARD(User.Y1-User.Y0)
+HideText = 2>Sheet.1!User.N
+# der Text mindestens 18 mm breit (die Spitze ist schmaler als ein Wort), in der Spitze tiefer
+TxtPinX = Width*0.5
+TxtPinY = IF(User.K<=1,Height*0.35,Height*0.5)
+TxtWidth = MAX(Width,18 mm)
+TxtHeight = Height
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TxtWidth.us = MAX(Width,0.7 in)
+
+[Geometry]
+NoShow = 2>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = (Width+User.T)*0.5; Y = Height
+LineTo  X = (Width-User.T)*0.5; Y = Height
+LineTo  X = 0; Y = 0
+
+# Ebene 1 (von oben): sichtbar ab 1 Ebenen; sonst deckungsgleich mit der untersten, verborgen
+[Part L1]
+text.de: Ebene 1
+text.en: Level 1
+text.es: Nivel 1
+text.it: Livello 1
+text.fr: Niveau 1
+
+[User]
+# die Ebene, an deren Stelle das Teil liegt, ihre Unter- und Oberkante, die Breite dort
+K:   Value = MIN(1,Sheet.1!User.N)
+Y0:  Value = IF(User.K>=Sheet.1!User.N,0,Sheet.1!Height-User.K*Sheet.1!User.H1+Sheet.1!User.Gp*0.5)
+Y1:  Value = IF(User.K<=1,Sheet.1!Height,Sheet.1!Height-(User.K-1)*Sheet.1!User.H1-Sheet.1!User.Gp*0.5)
+B:   Value = Sheet.1!Width*(1-User.Y0/Sheet.1!Height)
+T:   Value = Sheet.1!Width*(1-User.Y1/Sheet.1!Height)
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.5)
+PinY = GUARD((User.Y0+User.Y1)*0.5)
+Width = GUARD(User.B)
+Height = GUARD(User.Y1-User.Y0)
+HideText = 1>Sheet.1!User.N
+# der Text mindestens 18 mm breit (die Spitze ist schmaler als ein Wort), in der Spitze tiefer
+TxtPinX = Width*0.5
+TxtPinY = IF(User.K<=1,Height*0.35,Height*0.5)
+TxtWidth = MAX(Width,18 mm)
+TxtHeight = Height
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TxtWidth.us = MAX(Width,0.7 in)
+
+[Geometry]
+NoShow = 1>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = (Width+User.T)*0.5; Y = Height
+LineTo  X = (Width-User.T)*0.5; Y = Height
+LineTo  X = 0; Y = 0

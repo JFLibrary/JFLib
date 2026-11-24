@@ -157,7 +157,7 @@ pub struct Theme {
 }
 
 /// a package part the model keeps as bytes: media, document properties, windows, comments,
-/// data recordsets, the thumbnail, a macro project
+/// the thumbnail, a macro project (data recordsets are Document::data since JD18)
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Part {
     /// the part name
@@ -341,6 +341,9 @@ pub struct Document {
     pub themes: Vec<Theme>,
     /// the other package parts, as bytes
     pub parts: Vec<Part>,
+    /// (JD18) external data: connections, recordsets, rows bound to shapes (data.rs; changed
+    /// through data::* in transactions)
+    pub data: crate::data::DataSets,
     /// every relationship of the package as read (see Relationship)
     pub rels: Vec<Relationship>,
     /// the attributes of the VisioDocument element
@@ -385,6 +388,7 @@ impl Document {
             styles: Arena::new(0),
             themes: Vec::new(),
             parts: Vec::new(),
+            data: crate::data::DataSets::default(),
             rels: Vec::new(),
             attrs: Vec::new(),
             extras: Extras::new(),

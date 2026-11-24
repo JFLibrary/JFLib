@@ -9,6 +9,9 @@
 # Notizzettel, Etikett, Aufkleber, gezackte Sterne, kein msvStructureType).  Am Ende der
 # verborgene Master "Tip": ein Hinweiskasten ohne Zeiger für die Startdiagramme der Vorlagen,
 # keine Beschriftung im Sinne von msvStructureType.
+# JD15: die Auto-Bemaßung vor dem Tipp (eine Maßlinie mit Textfeld, ebenfalls ohne msvStructureType).
+# JD15 (SH-G04): die vier gängigsten Beschriftungen stehen vorn und sind Schnell-Shapes (Rechteck,
+# abgerundet, Sprechblase, Linie: die ersten Einträge von Einfügen › Beschriftung).
 stencil: Callouts
 file: callouts
 name.de: Beschriftungen
@@ -17,5 +20,5 @@ name.es: Llamadas
 name.it: Richiami
 name.fr: Bulles d'annotation
 category: general
-masters: callout_box, callout_rounded, callout_bubble, callout_line, callout_bracket, callout_circle, callout_side_box, callout_side_line, callout_side_text, callout_center_box, callout_center_line, callout_center_text, callout_center_text_arrow, callout_side_box_90, callout_center_box_90, callout_side_line_90, callout_center_line_90, callout_side_text_90, callout_center_text_90, callout_note, callout_knee, callout_side_brace, callout_brace, callout_bracket_text, callout_half_bracket, callout_brackets, folder, sticky_note, tag, callout_bubble_horizontal, callout_bubble_vertical, sticker, sticker_rounded, jagged_star_1, jagged_star_2, tip
-quick: 0
+masters: callout_box, callout_rounded, callout_bubble, callout_line, callout_bracket, callout_circle, callout_side_box, callout_side_line, callout_side_text, callout_center_box, callout_center_line, callout_center_text, callout_center_text_arrow, callout_side_box_90, callout_center_box_90, callout_side_line_90, callout_center_line_90, callout_side_text_90, callout_center_text_90, callout_note, callout_knee, callout_side_brace, callout_brace, callout_bracket_text, callout_half_bracket, callout_brackets, folder, sticky_note, tag, callout_bubble_horizontal, callout_bubble_vertical, sticker, sticker_rounded, jagged_star_1, jagged_star_2, auto_dimension, tip
+quick: 4

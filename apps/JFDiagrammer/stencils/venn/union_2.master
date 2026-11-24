@@ -1,0 +1,72 @@
+# Vereinigungsmenge von 2 Mengen (SH-007, JD26): zwei Kreise (gestreckt Ellipsen) wie bei der
+# Schnittmenge (intersection_2.master: Mitten bei einem und zwei Dritteln der Breite, je zwei
+# Drittel breit, Schnittpunkte bei halber Breite, ±0,433 der Höhe um die Mitte), gefüllt ist
+# ihre ganze Vereinigung: der äußere Bogen von A von Schnittpunkt zu Schnittpunkt, dann der
+# äußere Bogen von B zurück.  Eine Gruppe aus zwei Teilen wie intersection_2.master: die gefüllte
+# Fläche mit der Füllung von Normal und darüber die Umrisse beider Mengen in der Linie der
+# Formatvorlage Connector (QuickStyleType 3, ohne Pfeilspitzen: sichtbar auch in Designs ohne
+# Shape-Linien, so bleibt die Grenze zwischen den Mengen erkennbar).  Der Text der Gruppe steht
+# in der Mitte.
+master: Union of 2 sets
+name.de: Vereinigungsmenge von 2 Mengen
+name.en: Union of two sets
+name.es: Unión de 2 conjuntos
+name.it: Unione di 2 insiemi
+name.fr: Union de 2 ensembles
+prompt.de: Zwei Mengen, deren Vereinigung hervorgehoben ist.
+prompt.en: Two sets with their union highlighted.
+prompt.es: Dos conjuntos con su unión resaltada.
+prompt.it: Due insiemi con la loro unione evidenziata.
+prompt.fr: Deux ensembles dont l'union est mise en évidence.
+keywords.de: Venn, Vereinigung, Vereinigungsmenge, Menge, oder, Mengenlehre, alle
+keywords.en: Venn, union, set, or, set theory, all
+keywords.es: Venn, unión, conjunto, o, teoría de conjuntos, todos
+keywords.it: Venn, unione, insieme, o, teoria degli insiemi, tutti
+keywords.fr: Venn, union, ensemble, ou, théorie des ensembles, tous
+
+[Shape]
+Width = 60 mm
+Width.us = 2.25 in
+Height = 40 mm
+Height.us = 1.5 in
+# nur die Gruppe (SelectMode 0, ausdrücklich): die Teile sind Fläche und Umriss, keine eigenen
+# Objekte; der Text gehört der Gruppe
+SelectMode = 0
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtWidth = Width*0.3
+TxtHeight = Height*0.4
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+
+# die Vereinigung: linker Bogen von A, rechter Bogen von B
+[Part Union]
+
+[Geometry]
+NoLine = TRUE
+MoveTo           X = Width*0.5; Y = Height*0.933
+EllipticalArcTo  X = Width*0.5; Y = Height*0.067; A = 0; B = Height*0.5; C = 0 deg; D = Width*0.6667/Height
+EllipticalArcTo  X = Width*0.5; Y = Height*0.933; A = Width; B = Height*0.5; C = 0 deg; D = Width*0.6667/Height
+
+# die Mengen als Umriss
+[Part Sets]
+style: Connector
+
+[Shape]
+BeginArrow = 0
+EndArrow = 0
+QuickStyleType = 3
+
+[Geometry]
+NoFill = TRUE
+Ellipse  X = Width*0.3333; Y = Height*0.5; A = Width*0.6667; B = Height*0.5; C = Width*0.3333; D = Height
+
+[Geometry]
+NoFill = TRUE
+Ellipse  X = Width*0.6667; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.6667; D = Height

@@ -23,6 +23,8 @@ use formats::xml;
 
 /// the Visio namespace of the VSDX parts
 pub(crate) const NS_VISIO: &str = "http://schemas.microsoft.com/office/visio/2012/main";
+/// the namespace of the XML formats of Visio 2003-2010 (.vdx, .vsx, .vtx; vdx.rs)
+pub(crate) const NS_VDX: &str = "http://schemas.microsoft.com/visio/2003/core";
 /// the namespace of r:id
 pub(crate) const NS_REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 /// the namespace of r:id in strict OOXML
@@ -51,6 +53,8 @@ pub(crate) enum Ns {
     None,
     /// the Visio namespace
     Visio,
+    /// the namespace of Visio's XML formats of 2003-2010 (DatadiagramML)
+    Vdx,
     /// the relationships namespace (r:id)
     Rel,
     /// the xml prefix (xml:space)
@@ -65,6 +69,7 @@ fn ns_of(uri: &str) -> Ns {
     match uri {
         "" => Ns::None,
         NS_VISIO => Ns::Visio,
+        NS_VDX => Ns::Vdx,
         NS_REL | NS_REL_STRICT => Ns::Rel,
         xml::NS_XML => Ns::Xml,
         _ => Ns::Other,

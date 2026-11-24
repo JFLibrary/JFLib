@@ -1,0 +1,200 @@
+# Boston-Matrix (SH-031, JD26): die Portfolio-Matrix der Boston Consulting Group, eigene
+# Gestaltung für diese Schablone.  Vier Felder als Teile der Gruppe mit 2 mm Abstand: Stars (links
+# oben, Variantenfarbe 102), Fragezeichen (rechts oben, 100), Melkkühe (links unten, 101), Arme
+# Hunde (rechts unten, 106).  Links die Achse Marktwachstum (Pfeil nach oben), unten die Achse
+# relativer Marktanteil; deren Pfeil zeigt nach links, denn der hohe Anteil steht wie üblich links.
+# Der Text der senkrechten Achse ist um 90° gedreht.  Der Rand für die Achsen ist User.M breit; die
+# Teile folgen der Größe der Gruppe.  Die Achsen nehmen die Formatvorlage Connector (sichtbar auch
+# in Designs ohne Shape-Linien) ohne deren Pfeilspitzen.
+master: Boston matrix
+name.de: Boston-Matrix
+name.en: Boston matrix
+name.es: Matriz BCG
+name.it: Matrice BCG
+name.fr: Matrice BCG
+prompt.de: Portfolio-Matrix der Boston Consulting Group mit Marktwachstum und relativem Marktanteil. Klicken Sie ein Feld oder eine Achse zweimal an, um den Text zu ändern.
+prompt.en: Boston Consulting Group portfolio matrix with market growth and relative market share. Click a field or an axis twice to change its text.
+prompt.es: Matriz de cartera del Boston Consulting Group con crecimiento del mercado y cuota de mercado relativa. Haga clic dos veces en un campo o un eje para cambiar el texto.
+prompt.it: Matrice di portafoglio del Boston Consulting Group con crescita del mercato e quota di mercato relativa. Fai clic due volte su un campo o un asse per cambiarne il testo.
+prompt.fr: Matrice de portefeuille du Boston Consulting Group avec la croissance du marché et la part de marché relative. Cliquez deux fois sur un champ ou un axe pour modifier le texte.
+keywords.de: Boston-Matrix, BCG, Portfolio, Stars, Melkkühe, Fragezeichen, Marktanteil
+keywords.en: Boston matrix, BCG, portfolio, stars, cash cows, question marks, market share
+keywords.es: matriz BCG, Boston, cartera, estrellas, vacas lecheras, interrogantes, cuota de mercado
+keywords.it: matrice BCG, Boston, portafoglio, stelle, vacche da mungere, punti interrogativi, quota di mercato
+keywords.fr: matrice BCG, Boston, portefeuille, vedettes, vaches à lait, dilemmes, part de marché
+
+[Shape]
+Width = 90 mm
+Width.us = 3.5 in
+Height = 80 mm
+Height.us = 3.25 in
+
+[User]
+# der Rand für die Achsen, der Abstand der Felder, Breite und Höhe eines Felds
+M:   Value = 12 mm
+     Value.us = 0.5 in
+G:   Value = 2 mm
+     Value.us = 0.08 in
+QW:  Value = (Width-User.M-User.G)*0.5
+QH:  Value = (Height-User.M-User.G)*0.5
+
+[Connection]
+Row  X = User.M+(Width-User.M)*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = User.M+(Height-User.M)*0.5; DirX = -1; DirY = 0
+Row  X = User.M+(Width-User.M)*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = User.M+(Height-User.M)*0.5; DirX = 1; DirY = 0
+
+[Part Stars]
+text.de: Stars
+text.en: Stars
+text.es: Estrellas
+text.it: Stelle
+text.fr: Vedettes
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD(Sheet.1!User.M+Width*0.5)
+PinY = GUARD(Sheet.1!Height-Height*0.5)
+QuickStyleLineColor = 102
+QuickStyleFillColor = 102
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part Question_marks]
+text.de: Fragezeichen
+text.en: Question marks
+text.es: Interrogantes
+text.it: Punti interrogativi
+text.fr: Dilemmes
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD(Sheet.1!Width-Width*0.5)
+PinY = GUARD(Sheet.1!Height-Height*0.5)
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part Cash_cows]
+text.de: Melkkühe
+text.en: Cash cows
+text.es: Vacas lecheras
+text.it: Vacche da mungere
+text.fr: Vaches à lait
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD(Sheet.1!User.M+Width*0.5)
+PinY = GUARD(Sheet.1!User.M+Height*0.5)
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part Dogs]
+text.de: Arme Hunde
+text.en: Dogs
+text.es: Perros
+text.it: Cani
+text.fr: Poids morts
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD(Sheet.1!Width-Width*0.5)
+PinY = GUARD(Sheet.1!User.M+Height*0.5)
+QuickStyleLineColor = 106
+QuickStyleFillColor = 106
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# die waagrechte Achse: der Pfeil oben im Rand, nach links (hoher Anteil links), der Text darunter
+[Part Share]
+text.de: Relativer Marktanteil
+text.en: Relative market share
+text.es: Cuota de mercado relativa
+text.it: Quota di mercato relativa
+text.fr: Part de marché relative
+style: Connector
+
+[Shape]
+Width = GUARD(Sheet.1!Width-Sheet.1!User.M)
+Height = GUARD(Sheet.1!User.M)
+PinX = GUARD(Sheet.1!User.M+Width*0.5)
+PinY = GUARD(Height*0.5)
+TxtPinX = Width*0.5
+TxtPinY = Height*0.35
+TxtWidth = Width
+TxtHeight = Height*0.6
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+BeginArrow = 0
+EndArrow = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
+QuickStyleType = 3
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width; Y = Height*0.8
+LineTo  X = 0; Y = Height*0.8
+MoveTo  X = Height*0.25; Y = Height*0.92
+LineTo  X = 0; Y = Height*0.8
+LineTo  X = Height*0.25; Y = Height*0.68
+
+# die senkrechte Achse: der Pfeil rechts im Rand, nach oben, der Text links davon, um 90° gedreht
+[Part Growth]
+text.de: Marktwachstum
+text.en: Market growth
+text.es: Crecimiento del mercado
+text.it: Crescita del mercato
+text.fr: Croissance du marché
+style: Connector
+
+[Shape]
+Width = GUARD(Sheet.1!User.M)
+Height = GUARD(Sheet.1!Height-Sheet.1!User.M)
+PinX = GUARD(Width*0.5)
+PinY = GUARD(Sheet.1!User.M+Height*0.5)
+TxtPinX = Width*0.35
+TxtPinY = Height*0.5
+TxtWidth = Height
+TxtHeight = Width*0.6
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TxtAngle = 90 deg
+BeginArrow = 0
+EndArrow = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
+QuickStyleType = 3
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*0.8; Y = 0
+LineTo  X = Width*0.8; Y = Height
+MoveTo  X = Width*0.68; Y = Height-Width*0.25
+LineTo  X = Width*0.8; Y = Height
+LineTo  X = Width*0.92; Y = Height-Width*0.25

@@ -37,7 +37,7 @@ use core::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering};
 
 use rt::sync::SpinLock;
 
-use super::super::objc::{Id, NIL, NSPoint, NSRect, Sel, class, msg, nsstring, release, sel, string_of};
+use super::super::objc::{Id, NIL, NSPoint, NSRect, NSSize, Sel, class, msg, nsstring, release, sel, string_of};
 use super::a11y_ios::on_main;
 use super::{KEY_COMMAND, KEY_CONTROL, KEY_OPTION, KEY_SHIFT, host, input_now, mods_of, rnd, time_ms};
 use crate::sysmenu::{SysMenuItem, TI_CHECKED, TI_DISABLED, TI_SEPARATOR};
@@ -658,6 +658,16 @@ pub struct IosPadView {
     pub keyboard: bool,
     /// the last E_WHEEL the wheel or the pinch sent: btn, mods, data
     pub last_wheel: (u8, u8, u32),
+    /// the GPU's layer (apple_ios_gpu.rs): made, shown, its drawable's size (px) and frame (points)
+    pub gpu: Option<IosGpuLayer>,
+}
+
+/// the GPU's layer as the host has it (IosPadView::gpu)
+#[derive(Clone, Copy, Debug, Default)]
+pub struct IosGpuLayer {
+    pub shown: bool,
+    pub drawable: (f64, f64),
+    pub frame: (f64, f64),
 }
 
 /// (tests, any thread) the host's sizes now; None without UIKit's host
@@ -699,6 +709,14 @@ pub fn ios_pad_view() -> Option<IosPadView> {
                 shown: h.shown.get(),
                 keyboard: h.ime_shown.get(),
                 last_wheel: *LAST_WHEEL.lock(),
+                gpu: {
+                    let l = h.gpu.get();
+                    (!l.is_null()).then(|| {
+                        let d: NSSize = msg!(l, c"drawableSize"; NSSize);
+                        let f: NSRect = msg!(l, c"frame"; NSRect);
+                        IosGpuLayer { shown: !msg!(l, c"isHidden"; bool), drawable: (d.w, d.h), frame: (f.size.w, f.size.h) }
+                    })
+                },
             })
         }
     })
@@ -762,6 +780,63 @@ pub fn ios_pad_rotate(landscape: bool) -> bool {
             msg!(scene, c"requestGeometryUpdateWithPreferences:errorHandler:", p => Id, NIL => Id; ());
             release(p);
         }
+        true
+    })
+}
+
+/// (tests, any thread) the text size of the system as the user would set it (Settings, Display &
+/// Text Size): the window's trait override of preferredContentSizeCategory ("XXL": the size after
+/// the default "Large"; None: the override gone, the system's again) -> false without the host or
+/// before iOS 17 (no trait overrides)
+pub fn ios_text_size(category: Option<&str>) -> bool {
+    on_main(|| {
+        let win = host().window.get();
+        if win.is_null() {
+            return false;
+        }
+        // SAFETY: the live window's trait overrides (iOS 17); a string of ours, released after.
+        unsafe {
+            if !msg!(win, c"respondsToSelector:", sel(c"traitOverrides") => Sel; bool) {
+                return false;
+            }
+            let o: Id = msg!(win, c"traitOverrides"; Id);
+            if o.is_null() {
+                return false;
+            }
+            match category {
+                Some(c) => {
+                    let s = nsstring(&alloc::format!("UICTContentSizeCategory{c}"));
+                    msg!(o, c"setPreferredContentSizeCategory:", s => Id; ());
+                    release(s);
+                }
+                None => {
+                    let trait_cls = class(c"UITraitPreferredContentSizeCategory");
+                    if !trait_cls.is_null() {
+                        msg!(o, c"removeTrait:", trait_cls => Id; ());
+                    }
+                }
+            }
+        }
+        true
+    })
+}
+
+/// (tests, any thread) dark (Some(true)) or light for the window, as the user's setting would be
+/// (overrideUserInterfaceStyle); None: the system's again -> false without the host
+pub fn ios_dark(dark: Option<bool>) -> bool {
+    on_main(|| {
+        let win = host().window.get();
+        if win.is_null() {
+            return false;
+        }
+        // UIUserInterfaceStyleUnspecified 0, Light 1, Dark 2
+        let style: isize = match dark {
+            Some(true) => 2,
+            Some(false) => 1,
+            None => 0,
+        };
+        // SAFETY: the live window's property, on the main thread.
+        unsafe { msg!(win, c"setOverrideUserInterfaceStyle:", style => isize; ()) };
         true
     })
 }

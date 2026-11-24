@@ -1,0 +1,37 @@
+# Startdiagramm „Beispiel: Strategie“ der Diagramme und Grafiken: SWOT, eine Pyramide mit Ebenen
+# und ein Kreislauf nebeneinander, Überschrift und Tipp.  Positionen für A4 bzw. Letter quer.
+starter: strategy
+name.de: Beispiel: Strategie
+name.en: Sample: Strategy
+name.es: Ejemplo: estrategia
+name.it: Esempio: strategia
+name.fr: Exemple : stratégie
+description.de: SWOT-Analyse, Zielpyramide und Kreislauf, zum Abwandeln.
+description.en: SWOT analysis, goal pyramid and cycle, to adapt.
+description.es: Análisis DAFO, pirámide de objetivos y ciclo, para adaptar.
+description.it: Analisi SWOT, piramide degli obiettivi e ciclo, da adattare.
+description.fr: Analyse SWOT, pyramide des objectifs et cycle, à adapter.
+
+[Shapes]
+title:  Stencil = "standard"; Master = "Text box"
+        PinX = 148 mm; PinY = 180 mm; Width = 200 mm; Height = 12 mm
+        PinX.us = 5.5 in; PinY.us = 7.6 in; Width.us = 7 in; Height.us = 0.5 in
+        Text.de = "Strategie 2027"; Text.en = "Strategy 2027"; Text.es = "Estrategia 2027"
+        Text.it = "Strategia 2027"; Text.fr = "Stratégie 2027"
+swot:   Stencil = "marketing"; Master = "SWOT"
+        PinX = 65 mm; PinY = 120 mm
+        PinX.us = 2.3 in; PinY.us = 4.7 in
+goals:  Stencil = "pyramid"; Master = "Layered pyramid"
+        PinX = 155 mm; PinY = 120 mm
+        PinX.us = 5.6 in; PinY.us = 4.7 in
+cycle:  Stencil = "cycle"; Master = "Circular motion"
+        PinX = 240 mm; PinY = 120 mm
+        PinX.us = 8.8 in; PinY.us = 4.7 in
+tip:    Stencil = "callouts"; Master = "Tip"; Tip = TRUE
+        PinX = 148 mm; PinY = 45 mm; Width = 150 mm; Height = 22 mm
+        PinX.us = 5.5 in; PinY.us = 1.7 in; Width.us = 5.6 in; Height.us = 0.9 in
+        Text.de = "Tipp: Die Zahl der Ebenen, Stufen und Phasen stellen Sie in den Shape-Daten ein oder ziehen am gelben Steuerpunkt. Diesen Hinweis können Sie löschen."
+        Text.en = "Tip: Set the number of levels, steps and phases in the shape data or drag the yellow control handle. You can delete this note."
+        Text.es = "Consejo: defina el número de niveles, escalones y fases en los datos de la forma o arrastre el controlador amarillo. Puede eliminar esta nota."
+        Text.it = "Suggerimento: impostare il numero di livelli, gradini e fasi nei dati della forma o trascinare la maniglia di controllo gialla. È possibile eliminare questa nota."
+        Text.fr = "Astuce : définissez le nombre de niveaux, de marches et de phases dans les données de la forme ou faites glisser la poignée de contrôle jaune. Vous pouvez supprimer cette note."

@@ -156,6 +156,35 @@ aus dem berechneten Wert. Mit `svg:` geht eine Formel nur zusammen mit `size:` i
 Pin und Masterseite bestimmt (JD13, die Rack-Einschübe: Höhe aus den Höheneinheiten). Ausnahme
 sind 1D-Master (Abschnitt „1D-Shapes“).
 
+### Gruppen aus Teilen (`[Part NAME]`, JD26)
+
+Ein Master mit Teilen wird eine Gruppe: jedes `[Part NAME]` beginnt ein Untershape. Danach folgen
+seine eigenen Kopfzeilen und seine Abschnitte bis zum nächsten `[Part …]` oder zum Dateiende;
+alles vor dem ersten `[Part]` gehört zum Master-Shape (der Gruppe). Die Teile liegen in der
+Reihenfolge der Datei übereinander (ein späteres oben).
+
+| Kopfzeile eines Teils | Bedeutung |
+|---|---|
+| `text.<sprache>` | sein Text, alle fünf oder keiner |
+| `style`, `line_style`, `fill_style`, `text_style` | seine Formatvorlagen (Standard `Normal`) |
+
+- **Bezüge:** In allen Formeln des Masters zählt `Sheet.N!` logisch: `Sheet.1!` ist das
+  Master-Shape (die Gruppe), `Sheet.2!` der erste Teil, `Sheet.3!` der zweite usw. Das Werkzeug
+  schreibt die echten IDs (Zeichenketten in Anführungszeichen bleiben); ein `Sheet.N!` ohne Shape ist
+  ein Baufehler.
+- **Größe und Lage:** Fehlt `PinX`, `PinY`, `Width`, `Height`, `LocPinX` oder `LocPinY`, bekommt
+  das Teil die Größe der Gruppe (`GUARD(Sheet.1!Width)` …). Eigene Transformationen schreiben die
+  Master ebenso mit `GUARD(...)`: Visio skaliert ein Untershape beim Vergrößern der Gruppe sonst
+  selbst, statt die Formel rechnen zu lassen.
+- **Texte:** Der Text des Teils steht in der Bausprache in der Datei, alle fünf in `User.JFD_Text`
+  seines Blatts im Master. Beim Ablegen (`instance::localize_parts`, von `instance::place`
+  gerufen) und in neuen Zeichnungen aus Vorlagen (`template::to_drawing`) bekommt ein Teil den Text
+  der aktuellen Sprache, solange es einen der fünf (oder keinen) zeigt. Instanzen erben
+  `JFD_Text` vom Master, sie schreiben ihn nicht.
+- **Nicht erlaubt:** Zellen mit Sprachendung in Teilen (übersetzte Zellen wie `Tip` oder Shape-Daten
+  gehören ans Master-Shape), Teile zusammen mit `svg:` und Teile an 1D-Mastern.
+- Klicken wählt erst die Gruppe, ein zweiter Klick das Teil (Visios `SelectMode` 1, nicht gesetzt).
+
 ### Eingebundene Dateien (`include:`, JD13)
 
 Eine eingebundene Datei (Endung `.inc`, in einem Ordner ohne `stencil.txt`, z. B.
@@ -169,6 +198,32 @@ Masters gemischt:
   fällt weg, eine benannte Zeile gleichen Namens bekommt nur die eingebundenen Zellen, die der
   Master nicht selbst setzt (`RackUnits: Value = 2` übernimmt Bezeichnung und Typ aus der Datei).
 - Fehler nennen die eingebundene Datei und ihre Zeile; ihr Text gehört zur `UniqueID`.
+
+### Textfelder (`[Field]`, JD15)
+
+Ein Text kann Felder enthalten, die einen berechneten Wert zeigen (TX-06), etwa die Länge einer
+Bemaßung. Im Text (`text.<sprache>`) steht dafür die Marke `{fld N}`; sie zeigt Zeile N (ab 0) des
+Abschnitts `[Field]` (in VSDX `N="Field"`, Visios Textfelder). Jede andere `{`-Folge bleibt Text. Eine
+Marke ohne ihre Zeile ist ein Baufehler. Die Zeilen beginnen wie bei `[Connection]` mit `Row`:
+
+```
+text.de: {fld 0}
+...
+[Field]
+Row  Value = ABS(Width); Unit = mm; Format = "0 u"; Type = 2
+     Unit.us = in
+     Format.us = "0.## u"
+```
+
+- `Value`: die Formel, deren Wert das Feld zeigt; `Format`: das Formatbild (Visios FORMAT, siehe
+  `diagram_core::field`); `Type`: 0 Text, 2 Zahl, 5 Datum oder Uhrzeit, 6 Dauer, 7 Währung.
+- `Unit` ist ein Schlüssel des Werkzeugs, keine Visio-Zelle: die Einheit, in der das Feld den Wert
+  zeigt (`U` von `Value`; `mm`, `cm`, `m`, `in`, `ft`, `pt`, `deg` …). Ohne `Unit` zeigt eine Länge
+  in Zoll.
+- Beim Ablegen bekommt die Instanz den Text mit seinen Feldern; die Feldzeilen erbt sie vom Master,
+  der Wert folgt jeder Änderung (`diagram_core::field::marked`, `instance::place`).
+- Im Einsatz: die Bemaßungen der Rack-Schablone (`rack_equipment/dim_*.master`) und die
+  Auto-Bemaßung der Beschriftungen (`callouts/auto_dimension.master`, zeigt ihre eigene Länge).
 
 ## 1D-Shapes (Verbinder, Linienpfeile)
 
@@ -247,6 +302,27 @@ Schablone alle Master.
 - **Kategorien für Regeln:** Flussdiagramm-Shapes tragen `User.msvShapeCategories`
   (`"Flowchart"`, die Entscheidung `"Flowchart;Decision"`, Start/Ende `"Flowchart;Terminator"`).
 
+Ergänzt mit dem JD26-Probeblatt (vom Nutzer abgenommen, 2026-11-23):
+
+- **Mehrere Farben in einem Shape** (Mengen, Felder, Ebenen, Phasen): Teile mit
+  `QuickStyleFillColor` und `QuickStyleLineColor` 100 bis 106, den sieben Variantenfarben des
+  Designs; schattierte 3D-Flächen über Formeln auf die Designfarbe (`THEMEGUARD(SHADE(THEMEVAL("FillColor"),25))`).
+  Feste Farben bleiben verboten. Durchsicht (`FillForegndTrans`) nur begründet (Venn).
+- **Designs ohne Shape-Linien** (Kontrast): Was nur Linien zeichnet, verschwindet dort. Trennungen
+  zwischen Flächen sind deshalb Fugen (1 mm) statt Innenlinien, kleine Innenformen (Augen, Mund)
+  Löcher. Reine Linien-Shapes (Achsen, Gräten) nehmen `style: Connector` mit
+  `QuickStyleType = 3` (ausdrücklich: Visio wählt die Verbinder-Liste des Designs sonst nach der
+  Art des Shapes, JFDiagrammer nach dem Namen der Formatvorlage) und `BeginArrow`/`EndArrow 0`,
+  wenn das Shape eigene Spitzen zeichnet. Linien und Flächen in einem Shape: `line_style:
+  Connector`, `fill_style`/`text_style: Normal`, `QuickStyleType = 3`, `QuickStyleFillMatrix` und
+  `QuickStyleFontMatrix` 100; oder eine Gruppe mit einem Linien- und einem Flächen-Teil.
+- **Anzahl aus Shape-Daten** (Ebenen, Stufen, Phasen, Segmente): `Prop.<Name>` (Typ 2) mit Label
+  und Prompt in fünf Sprachen, `User.N` begrenzt; Teile oder Abschnitte über N mit `NoShow` und
+  `HideText`, deckungsgleich mit dem letzten sichtbaren und darunter. Wo Ziehen Elemente
+  vermehrt, schreibt ein Steuerpunkt per `SETATREF(Prop.<Name>, SETATREFEVAL(…))` die Zahl und die
+  Größe ist Zahl x Elementgröße (`SETATREF` der Größe schickt das Strecken in die Elementgröße);
+  gezeichnet wird nach der tatsächlichen Größe (Width/N).
+
 ## SVG-Grafik (`svg:`)
 
 Für gestaltete Shapes im JFNetworker-Stil. Die SVG-Datei braucht eine `viewBox`; sie wird auf
@@ -323,6 +399,29 @@ Regeln für die Master:
 - Vorschau aller Master mit allen Stilen: `diagramiotest --write-stencil-previews ORDNER`;
   Prüfungen: `diagramiotest --check --only stencils/structure`.
 
+## Allgemein und Geschäftsgrafiken (JD26)
+
+Acht Schablonen: `decorative` (SH-003), `charting` (SH-004), `venn` (SH-007) in der Kategorie
+`general`, `marketing` (SH-030), `matrix` (SH-031), `pyramid` (SH-032), `cycle` (SH-033) und
+`cause_effect` (SH-041) in `business`.
+
+- **Gruppen aus Teilen:** SWOT, Matrizen, Venn-Diagramme, Pyramiden und Zyklen mit Text je Feld,
+  Menge, Ebene oder Phase (siehe „Gruppen aus Teilen“).
+- **Zahlen und Werte aus Shape-Daten:** Ebenen, Stufen, Phasen, Segmente, Ringe; das
+  Kreisdiagrammsegment nimmt Beginn, Anteil und Farbe (`Prop.Start`, `Prop.Share`, `Prop.Color`).
+  Das Stufendiagramm und die Pyramide mit Ebenen wachsen beim Ziehen am Steuerpunkt.
+- **Fischgräte:** Die Hauptgräte (`Effect`) hat 15 Verbindungspunkte entlang der Gräte. Die
+  Kategorien sind 1D-Shapes mit aufrechtem Kasten; ihr Ende klebt an der Hauptgräte, ihre Gräte
+  hat selbst Punkte für die Ursachen (begründete Ausnahme von „1D-Shapes haben keine
+  Verbindungspunkte“). JFDiagrammer bietet die Verbindungspunkte von 1D-Shapes beim Kleben an
+  (`edit_canvas.rs`).
+- Gemeinsame Master als Kopie mit gleichem NameU: Teil- und Konzentrische Ebenen aus `blocks` in
+  `cycle`, der dynamische Verbinder aus `blocks` in `marketing`, das Venn-Diagramm aus 2 Mengen in
+  `marketing`, das Zwiebeldiagramm aus `venn` in `cycle`.
+- Prüfen: `diagramiotest --check --only stencils/business`, Ansicht
+  `diagramiotest --write-stencil-previews DIR` (`probeblatt-jd26.png`, `<ordner>-alle.png` und
+  `<ordner>-alle-kontrast.png`).
+
 ## Was in der `.vssx` steht
 
 Visio-Attribute je Master: `ID`, `NameU`, `Name` und `Prompt` in der Bausprache,
@@ -385,9 +484,10 @@ Neun Schablonen der Kategorie `network`: `net_computers` (SH-140), `net_detailed
   JFDiagrammer (`diagram_core::dock`, App `rack.rs`) und in Visio auf den HE einrasten.
 - **Besondere Master:** `ethernet` und `ring_network` (acht Steuerpunkte, deren Leitungen zu den
   Geräten führen; in Visio kleben sie), `legend` (JFDiagrammer schreibt die Zählung, App
-  `legend.rs`), `dialup` (Wählverbindung, ein 1D-Shape mit Blitz). Die Bemaßungen der
-  Rack-Schablone fehlen noch: Sie zeigen ihre Länge in einem Textfeld, das das Bauwerkzeug
-  nicht schreibt.
+  `legend.rs`), `dialup` (Wählverbindung, ein 1D-Shape mit Blitz), `dim_horizontal` und
+  `dim_vertical` (JD15: Bemaßungen der Rack-Schablone, 1D mit aufrechtem Kasten; ein Textfeld zeigt
+  den waagerechten bzw. senkrechten Abstand der Enden, der gelbe Punkt verschiebt die Maßlinie;
+  Pfeile und Text in Papiermaß über `ThePage!DrawingScale/ThePage!PageScale`).
 - Vorlagen: `templates/network` (VL-50), `templates/network_detailed` (VL-51), `templates/rack`
   (VL-52, Seite 1:20).
 - Prüfen: `diagramiotest --check --only stencils/network`, Ansicht

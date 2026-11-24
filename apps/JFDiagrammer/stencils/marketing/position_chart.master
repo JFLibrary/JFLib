@@ -1,0 +1,273 @@
+# Positionsgrafik (SH-030, JD26): ein Achsenkreuz durch die Mitte mit offenen Spitzen an allen vier
+# Enden (ein Teil in der Formatvorlage Connector ohne deren Pfeilspitzen, sichtbar auch in Designs
+# ohne Shape-Linien), vier Beschriftungen an den Enden (Teile in Text Only, bis zwei Zeilen: Preis
+# niedrig/hoch unter der waagrechten Achse, Qualität hoch/niedrig rechts der senkrechten, als
+# Beispiel) und drei Kreise A, B, C mit je einer Variantenfarbe, anfangs in den freien Feldern.
+# Ausnahmen, begründet: die Kreise sind zum Positionieren da, ihre Lage und Größe stehen deshalb
+# ohne GUARD in den Teilen (anfangs Formeln auf die Größe der Gruppe, nach dem Verschieben Werte),
+# und die Gruppe hat SelectMode 1 (erst die Gruppe, beim zweiten Klick das Teil), damit sich die
+# Kreise einzeln greifen lassen.
+master: Positioning chart
+name.de: Positionsgrafik
+name.en: Positioning chart
+name.es: Gráfico de posicionamiento
+name.it: Grafico di posizionamento
+name.fr: Graphique de positionnement
+prompt.de: Achsenkreuz mit drei Kreisen, die Sie auf ihre Position ziehen. Klicken Sie einen Kreis zweimal an, um ihn zu verschieben oder seinen Text zu ändern.
+prompt.en: Pair of crossed axes with three circles that you drag to their positions. Click a circle twice to move it or change its text.
+prompt.es: Ejes cruzados con tres círculos que se arrastran a su posición. Haga clic dos veces en un círculo para moverlo o cambiar su texto.
+prompt.it: Assi incrociati con tre cerchi da trascinare nella loro posizione. Fai clic due volte su un cerchio per spostarlo o cambiarne il testo.
+prompt.fr: Axes croisés avec trois cercles à faire glisser à leur position. Cliquez deux fois sur un cercle pour le déplacer ou modifier son texte.
+keywords.de: Positionierung, Positionsgrafik, Achsenkreuz, Wahrnehmung, Wettbewerb, Preis, Qualität, Mapping
+keywords.en: positioning, perceptual map, axes, perception, competition, price, quality, mapping
+keywords.es: posicionamiento, mapa perceptual, ejes, percepción, competencia, precio, calidad
+keywords.it: posizionamento, mappa percettiva, assi, percezione, concorrenza, prezzo, qualità
+keywords.fr: positionnement, carte perceptuelle, axes, perception, concurrence, prix, qualité
+
+[Shape]
+Width = 60 mm
+Width.us = 2.5 in
+Height = 60 mm
+Height.us = 2.5 in
+SelectMode = 1
+
+[User]
+# die Länge der Pfeilspitzen, der Durchmesser der Kreise, die Größe der Beschriftungen
+L:   Value = 3 mm
+     Value.us = 0.12 in
+CD:  Value = 12 mm
+     Value.us = 0.5 in
+LW:  Value = Width*0.42
+LH:  Value = 10 mm
+     Value.us = 0.4 in
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+
+# das Achsenkreuz mit vier offenen Spitzen
+[Part Axes]
+style: Connector
+
+[Shape]
+BeginArrow = 0
+EndArrow = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
+QuickStyleType = 3
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = Height*0.5
+LineTo  X = Width; Y = Height*0.5
+MoveTo  X = Width*0.5; Y = 0
+LineTo  X = Width*0.5; Y = Height
+MoveTo  X = Width-Sheet.1!User.L; Y = Height*0.5+Sheet.1!User.L*0.5
+LineTo  X = Width; Y = Height*0.5
+LineTo  X = Width-Sheet.1!User.L; Y = Height*0.5-Sheet.1!User.L*0.5
+MoveTo  X = Sheet.1!User.L; Y = Height*0.5+Sheet.1!User.L*0.5
+LineTo  X = 0; Y = Height*0.5
+LineTo  X = Sheet.1!User.L; Y = Height*0.5-Sheet.1!User.L*0.5
+MoveTo  X = Width*0.5-Sheet.1!User.L*0.5; Y = Height-Sheet.1!User.L
+LineTo  X = Width*0.5; Y = Height
+LineTo  X = Width*0.5+Sheet.1!User.L*0.5; Y = Height-Sheet.1!User.L
+MoveTo  X = Width*0.5-Sheet.1!User.L*0.5; Y = Sheet.1!User.L
+LineTo  X = Width*0.5; Y = 0
+LineTo  X = Width*0.5+Sheet.1!User.L*0.5; Y = Sheet.1!User.L
+
+# die Beschriftungen: rechts und links unter der waagrechten Achse, oben und unten rechts der senkrechten
+[Part XP]
+text.de: hoher Preis
+text.en: high price
+text.es: precio alto
+text.it: prezzo alto
+text.fr: prix élevé
+style: Text Only
+
+[Shape]
+Width = GUARD(Sheet.1!User.LW)
+Height = GUARD(Sheet.1!User.LH)
+PinX = GUARD(Sheet.1!Width-Width*0.5)
+PinY = GUARD(Sheet.1!Height*0.5-Sheet.1!User.L*0.5-Height*0.5)
+LeftMargin = 0.5 mm
+LeftMargin.us = 0.02 in
+RightMargin = 0.5 mm
+RightMargin.us = 0.02 in
+TopMargin = 0.5 mm
+TopMargin.us = 0.02 in
+BottomMargin = 0.5 mm
+BottomMargin.us = 0.02 in
+VerticalAlign = 0
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Paragraph]
+Row  HorzAlign = 2
+
+[Part XN]
+text.de: niedriger Preis
+text.en: low price
+text.es: precio bajo
+text.it: prezzo basso
+text.fr: prix bas
+style: Text Only
+
+[Shape]
+Width = GUARD(Sheet.1!User.LW)
+Height = GUARD(Sheet.1!User.LH)
+PinX = GUARD(Width*0.5)
+PinY = GUARD(Sheet.1!Height*0.5-Sheet.1!User.L*0.5-Height*0.5)
+LeftMargin = 0.5 mm
+LeftMargin.us = 0.02 in
+RightMargin = 0.5 mm
+RightMargin.us = 0.02 in
+TopMargin = 0.5 mm
+TopMargin.us = 0.02 in
+BottomMargin = 0.5 mm
+BottomMargin.us = 0.02 in
+VerticalAlign = 0
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Paragraph]
+Row  HorzAlign = 0
+
+[Part YP]
+text.de: hohe Qualität
+text.en: high quality
+text.es: calidad alta
+text.it: qualità alta
+text.fr: qualité élevée
+style: Text Only
+
+[Shape]
+Width = GUARD(Sheet.1!User.LW)
+Height = GUARD(Sheet.1!User.LH)
+PinX = GUARD(Sheet.1!Width*0.5+Sheet.1!User.L+Width*0.5)
+PinY = GUARD(Sheet.1!Height-Height*0.5)
+LeftMargin = 0.5 mm
+LeftMargin.us = 0.02 in
+RightMargin = 0.5 mm
+RightMargin.us = 0.02 in
+TopMargin = 0.5 mm
+TopMargin.us = 0.02 in
+BottomMargin = 0.5 mm
+BottomMargin.us = 0.02 in
+VerticalAlign = 0
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Paragraph]
+Row  HorzAlign = 0
+
+[Part YN]
+text.de: niedrige Qualität
+text.en: low quality
+text.es: calidad baja
+text.it: qualità bassa
+text.fr: qualité faible
+style: Text Only
+
+[Shape]
+Width = GUARD(Sheet.1!User.LW)
+Height = GUARD(Sheet.1!User.LH)
+PinX = GUARD(Sheet.1!Width*0.5+Sheet.1!User.L+Width*0.5)
+PinY = GUARD(Height*0.5)
+LeftMargin = 0.5 mm
+LeftMargin.us = 0.02 in
+RightMargin = 0.5 mm
+RightMargin.us = 0.02 in
+TopMargin = 0.5 mm
+TopMargin.us = 0.02 in
+BottomMargin = 0.5 mm
+BottomMargin.us = 0.02 in
+VerticalAlign = 2
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Paragraph]
+Row  HorzAlign = 0
+
+# Kreis A: frei verschiebbar (ohne GUARD)
+[Part C1]
+text.de: A
+text.en: A
+text.es: A
+text.it: A
+text.fr: A
+
+[Shape]
+PinX = Sheet.1!Width*0.27
+PinY = Sheet.1!Height*0.72
+Width = Sheet.1!User.CD
+Height = Sheet.1!User.CD
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+[Part C2]
+text.de: B
+text.en: B
+text.es: B
+text.it: B
+text.fr: B
+
+[Shape]
+PinX = Sheet.1!Width*0.75
+PinY = Sheet.1!Height*0.62
+Width = Sheet.1!User.CD
+Height = Sheet.1!User.CD
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+[Part C3]
+text.de: C
+text.en: C
+text.es: C
+text.it: C
+text.fr: C
+
+[Shape]
+PinX = Sheet.1!Width*0.3
+PinY = Sheet.1!Height*0.19
+Width = Sheet.1!User.CD
+Height = Sheet.1!User.CD
+QuickStyleLineColor = 102
+QuickStyleFillColor = 102
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height

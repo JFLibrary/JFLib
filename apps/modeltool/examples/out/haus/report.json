@@ -1,9 +1,10 @@
 {
   "tool": "modeltool 0.1.0",
   "script": "haus.jfs",
-  "key": "161376e48bbb8b1ad26b90a553e7a05c",
+  "key": "f061afad20c514b523bee74c41379e59",
   "ok": true,
   "errors": [],
+  "warnings": [],
   "findings": [],
   "params": {},
   "model": {
@@ -75,7 +76,8 @@
     {"name": "bodenplatte", "material": "beton", "ok": true, "closed": true, "outward": true, "triangles": 12, "vertices": 24, "min": [-4.2, -0.15, -3.2], "size": [8.4, 0.15, 6.4], "area": 111.96, "volume": 8.064, "degenerate": 0}
   ],
   "expect": [
-    {"rule": "size", "expected": [9, null, 7], "actual": [9, 5.844777532, 7], "tolerance": 0.001, "ok": true}
+    {"rule": "size", "file": "haus.jfs", "line": 71, "expected": [9, null, 7], "actual": [9, 5.844777532, 7], "tolerance": 0.001, "ok": true},
+    {"rule": "budget", "file": "haus.jfs", "line": 70, "expected": 12000, "actual": 952, "ok": true}
   ],
   "materials": [
     {"name": "putz", "color": "#e8e1d3", "roughness": 0.9, "metallic": 0},
@@ -95,5 +97,5 @@
   ],
   "files": {"report": "report.json", "glb": "model.glb", "sheet": "sheet.png", "front": "front.png", "side": "side.png", "top": "top.png", "iso": "iso.png"},
   "views": {"images": true, "size": 512, "grid_on": true, "grid": 1, "sheet": "front | side over top | iso", "cameras": "front: from +Z; side: from +X; top: from +Y, front at the bottom; the three at one scale; iso: from front right above", "adapter": "NVIDIA GeForce RTX 2070 SUPER"},
-  "timing": {"script_ms": 2.324, "geometry_ms": 1.671, "checks_ms": 1.23, "render_ms": 3753.041, "export_ms": 0.705, "total_ms": 3789.698, "fuel": 3837}
+  "timing": {"script_ms": 1.417, "geometry_ms": 1.498, "checks_ms": 1.013, "render_ms": 1156.88, "export_ms": 0.794, "total_ms": 1228.993, "fuel": 3835}
 }

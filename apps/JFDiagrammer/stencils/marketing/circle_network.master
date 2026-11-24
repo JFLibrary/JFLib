@@ -1,0 +1,338 @@
+# Kreis-Netz-Diagramm (SH-030, JD26): ein Kreis in der Mitte und drei bis acht Kreise darum, je mit
+# einer Linie zum Zentrum verbunden.  Die Zahl der äußeren Kreise steht in den Shape-Daten
+# (Prop.Circles); Kreis 1 steht oben, die übrigen folgen im Uhrzeigersinn in gleichen Winkeln.
+# Teile der Gruppe: die Speichen (Formatvorlage Connector ohne Pfeilspitzen, sichtbar auch ohne
+# Shape-Linien; je ein Abschnitt, über der Zahl NoShow), die äußeren Kreise mit eigenem Text und
+# Variantenfarbe (101 bis 106, dann 101, 102: Nachbarn nie gleich), das Zentrum (100) zuoberst.
+# Kreise über der Zahl liegen verborgen (NoShow, HideText) deckungsgleich unter dem letzten (die
+# Teile stehen von hinten nach vorn in der Datei).  Kreise gestreckt zu Ellipsen.
+master: Circle-spoke diagram
+name.de: Kreis-Netz-Diagramm
+name.en: Circle-spoke diagram
+name.es: Diagrama de círculos radial
+name.it: Diagramma a raggiera
+name.fr: Diagramme en étoile
+prompt.de: Kreise um ein Zentrum, mit ihm verbunden. Die Zahl der äußeren Kreise stellen Sie in den Shape-Daten ein; klicken Sie einen Kreis zweimal an, um seinen Text zu ändern.
+prompt.en: Circles around a centre, connected to it. Set the number of outer circles in the shape data; click a circle twice to change its text.
+prompt.es: Círculos alrededor de un centro, unidos a él. Defina el número de círculos exteriores en los datos de la forma; haga clic dos veces en un círculo para cambiar su texto.
+prompt.it: Cerchi attorno a un centro, collegati ad esso. Imposta il numero di cerchi esterni nei dati della forma; fai clic due volte su un cerchio per cambiarne il testo.
+prompt.fr: Cercles autour d'un centre, reliés à lui. Définissez le nombre de cercles extérieurs dans les données de la forme ; cliquez deux fois sur un cercle pour modifier son texte.
+keywords.de: Kreis, Netz, Zentrum, Speichen, Nabe, Beziehungen, Themen, Stern
+keywords.en: circle, spoke, hub, centre, network, relationships, topics, star
+keywords.es: círculo, radial, centro, red, relaciones, temas, estrella
+keywords.it: cerchio, raggiera, centro, rete, relazioni, temi, stella
+keywords.fr: cercle, étoile, centre, rayons, réseau, relations, thèmes
+
+[Shape]
+Width = 75 mm
+Width.us = 3 in
+Height = 75 mm
+Height.us = 3 in
+
+[User]
+# die Zahl der äußeren Kreise (3 bis 8), der Winkel zwischen ihnen, ihr Durchmesser und der Radius
+# ihrer Mitten (Anteil der Breite bzw. der halben Breite), der Durchmesser des Zentrums
+N:   Value = MIN(MAX(ROUND(Prop.Circles,0),3),8)
+S:   Value = 2*PI()/User.N
+Do:  Value = 0.27
+R:   Value = 1-User.Do
+Dc:  Value = 0.34
+
+[Property]
+Circles:  Type = 2; Format = "0"; Value = 6
+          Label.de = Kreise
+          Label.en = Circles
+          Label.es = Círculos
+          Label.it = Cerchi
+          Label.fr = Cercles
+          Prompt.de = Anzahl der äußeren Kreise (3 bis 8)
+          Prompt.en = Number of outer circles (3 to 8)
+          Prompt.es = Número de círculos exteriores (de 3 a 8)
+          Prompt.it = Numero di cerchi esterni (da 3 a 8)
+          Prompt.fr = Nombre de cercles extérieurs (de 3 à 8)
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+
+# die Speichen vom Zentrum zu den Mitten der äußeren Kreise
+[Part Spokes]
+style: Connector
+
+[Shape]
+BeginArrow = 0
+EndArrow = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
+QuickStyleType = 3
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*0.5; Y = Height*0.5
+LineTo  X = Width*0.5*(1+Sheet.1!User.R*COS(PI()*0.5-0*Sheet.1!User.S)); Y = Height*0.5*(1+Sheet.1!User.R*SIN(PI()*0.5-0*Sheet.1!User.S))
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*0.5; Y = Height*0.5
+LineTo  X = Width*0.5*(1+Sheet.1!User.R*COS(PI()*0.5-1*Sheet.1!User.S)); Y = Height*0.5*(1+Sheet.1!User.R*SIN(PI()*0.5-1*Sheet.1!User.S))
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*0.5; Y = Height*0.5
+LineTo  X = Width*0.5*(1+Sheet.1!User.R*COS(PI()*0.5-2*Sheet.1!User.S)); Y = Height*0.5*(1+Sheet.1!User.R*SIN(PI()*0.5-2*Sheet.1!User.S))
+
+[Geometry]
+NoFill = TRUE
+NoShow = 4>Sheet.1!User.N
+MoveTo  X = Width*0.5; Y = Height*0.5
+LineTo  X = Width*0.5*(1+Sheet.1!User.R*COS(PI()*0.5-3*Sheet.1!User.S)); Y = Height*0.5*(1+Sheet.1!User.R*SIN(PI()*0.5-3*Sheet.1!User.S))
+
+[Geometry]
+NoFill = TRUE
+NoShow = 5>Sheet.1!User.N
+MoveTo  X = Width*0.5; Y = Height*0.5
+LineTo  X = Width*0.5*(1+Sheet.1!User.R*COS(PI()*0.5-4*Sheet.1!User.S)); Y = Height*0.5*(1+Sheet.1!User.R*SIN(PI()*0.5-4*Sheet.1!User.S))
+
+[Geometry]
+NoFill = TRUE
+NoShow = 6>Sheet.1!User.N
+MoveTo  X = Width*0.5; Y = Height*0.5
+LineTo  X = Width*0.5*(1+Sheet.1!User.R*COS(PI()*0.5-5*Sheet.1!User.S)); Y = Height*0.5*(1+Sheet.1!User.R*SIN(PI()*0.5-5*Sheet.1!User.S))
+
+[Geometry]
+NoFill = TRUE
+NoShow = 7>Sheet.1!User.N
+MoveTo  X = Width*0.5; Y = Height*0.5
+LineTo  X = Width*0.5*(1+Sheet.1!User.R*COS(PI()*0.5-6*Sheet.1!User.S)); Y = Height*0.5*(1+Sheet.1!User.R*SIN(PI()*0.5-6*Sheet.1!User.S))
+
+[Geometry]
+NoFill = TRUE
+NoShow = 8>Sheet.1!User.N
+MoveTo  X = Width*0.5; Y = Height*0.5
+LineTo  X = Width*0.5*(1+Sheet.1!User.R*COS(PI()*0.5-7*Sheet.1!User.S)); Y = Height*0.5*(1+Sheet.1!User.R*SIN(PI()*0.5-7*Sheet.1!User.S))
+
+# äußerer Kreis 8: sichtbar ab 8 Kreisen; sonst deckungsgleich mit dem letzten, verborgen
+[Part C8]
+text.de: Thema 8
+text.en: Topic 8
+text.es: Tema 8
+text.it: Tema 8
+text.fr: Thème 8
+
+[User]
+# der Kreis, an dessen Stelle das Teil steht, und sein Winkel
+K:   Value = MIN(8,Sheet.1!User.N)
+A:   Value = PI()*0.5-(User.K-1)*Sheet.1!User.S
+
+[Shape]
+Width = GUARD(Sheet.1!Width*Sheet.1!User.Do)
+Height = GUARD(Sheet.1!Height*Sheet.1!User.Do)
+PinX = GUARD(Sheet.1!Width*0.5*(1+Sheet.1!User.R*COS(User.A)))
+PinY = GUARD(Sheet.1!Height*0.5*(1+Sheet.1!User.R*SIN(User.A)))
+HideText = 8>Sheet.1!User.N
+QuickStyleLineColor = 102
+QuickStyleFillColor = 102
+
+[Geometry]
+NoShow = 8>Sheet.1!User.N
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# äußerer Kreis 7: sichtbar ab 7 Kreisen; sonst deckungsgleich mit dem letzten, verborgen
+[Part C7]
+text.de: Thema 7
+text.en: Topic 7
+text.es: Tema 7
+text.it: Tema 7
+text.fr: Thème 7
+
+[User]
+# der Kreis, an dessen Stelle das Teil steht, und sein Winkel
+K:   Value = MIN(7,Sheet.1!User.N)
+A:   Value = PI()*0.5-(User.K-1)*Sheet.1!User.S
+
+[Shape]
+Width = GUARD(Sheet.1!Width*Sheet.1!User.Do)
+Height = GUARD(Sheet.1!Height*Sheet.1!User.Do)
+PinX = GUARD(Sheet.1!Width*0.5*(1+Sheet.1!User.R*COS(User.A)))
+PinY = GUARD(Sheet.1!Height*0.5*(1+Sheet.1!User.R*SIN(User.A)))
+HideText = 7>Sheet.1!User.N
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+
+[Geometry]
+NoShow = 7>Sheet.1!User.N
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# äußerer Kreis 6: sichtbar ab 6 Kreisen; sonst deckungsgleich mit dem letzten, verborgen
+[Part C6]
+text.de: Thema 6
+text.en: Topic 6
+text.es: Tema 6
+text.it: Tema 6
+text.fr: Thème 6
+
+[User]
+# der Kreis, an dessen Stelle das Teil steht, und sein Winkel
+K:   Value = MIN(6,Sheet.1!User.N)
+A:   Value = PI()*0.5-(User.K-1)*Sheet.1!User.S
+
+[Shape]
+Width = GUARD(Sheet.1!Width*Sheet.1!User.Do)
+Height = GUARD(Sheet.1!Height*Sheet.1!User.Do)
+PinX = GUARD(Sheet.1!Width*0.5*(1+Sheet.1!User.R*COS(User.A)))
+PinY = GUARD(Sheet.1!Height*0.5*(1+Sheet.1!User.R*SIN(User.A)))
+HideText = 6>Sheet.1!User.N
+QuickStyleLineColor = 106
+QuickStyleFillColor = 106
+
+[Geometry]
+NoShow = 6>Sheet.1!User.N
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# äußerer Kreis 5: sichtbar ab 5 Kreisen; sonst deckungsgleich mit dem letzten, verborgen
+[Part C5]
+text.de: Thema 5
+text.en: Topic 5
+text.es: Tema 5
+text.it: Tema 5
+text.fr: Thème 5
+
+[User]
+# der Kreis, an dessen Stelle das Teil steht, und sein Winkel
+K:   Value = MIN(5,Sheet.1!User.N)
+A:   Value = PI()*0.5-(User.K-1)*Sheet.1!User.S
+
+[Shape]
+Width = GUARD(Sheet.1!Width*Sheet.1!User.Do)
+Height = GUARD(Sheet.1!Height*Sheet.1!User.Do)
+PinX = GUARD(Sheet.1!Width*0.5*(1+Sheet.1!User.R*COS(User.A)))
+PinY = GUARD(Sheet.1!Height*0.5*(1+Sheet.1!User.R*SIN(User.A)))
+HideText = 5>Sheet.1!User.N
+QuickStyleLineColor = 105
+QuickStyleFillColor = 105
+
+[Geometry]
+NoShow = 5>Sheet.1!User.N
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# äußerer Kreis 4: sichtbar ab 4 Kreisen; sonst deckungsgleich mit dem letzten, verborgen
+[Part C4]
+text.de: Thema 4
+text.en: Topic 4
+text.es: Tema 4
+text.it: Tema 4
+text.fr: Thème 4
+
+[User]
+# der Kreis, an dessen Stelle das Teil steht, und sein Winkel
+K:   Value = MIN(4,Sheet.1!User.N)
+A:   Value = PI()*0.5-(User.K-1)*Sheet.1!User.S
+
+[Shape]
+Width = GUARD(Sheet.1!Width*Sheet.1!User.Do)
+Height = GUARD(Sheet.1!Height*Sheet.1!User.Do)
+PinX = GUARD(Sheet.1!Width*0.5*(1+Sheet.1!User.R*COS(User.A)))
+PinY = GUARD(Sheet.1!Height*0.5*(1+Sheet.1!User.R*SIN(User.A)))
+HideText = 4>Sheet.1!User.N
+QuickStyleLineColor = 104
+QuickStyleFillColor = 104
+
+[Geometry]
+NoShow = 4>Sheet.1!User.N
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# äußerer Kreis 3: sichtbar ab 3 Kreisen; sonst deckungsgleich mit dem letzten, verborgen
+[Part C3]
+text.de: Thema 3
+text.en: Topic 3
+text.es: Tema 3
+text.it: Tema 3
+text.fr: Thème 3
+
+[User]
+# der Kreis, an dessen Stelle das Teil steht, und sein Winkel
+K:   Value = MIN(3,Sheet.1!User.N)
+A:   Value = PI()*0.5-(User.K-1)*Sheet.1!User.S
+
+[Shape]
+Width = GUARD(Sheet.1!Width*Sheet.1!User.Do)
+Height = GUARD(Sheet.1!Height*Sheet.1!User.Do)
+PinX = GUARD(Sheet.1!Width*0.5*(1+Sheet.1!User.R*COS(User.A)))
+PinY = GUARD(Sheet.1!Height*0.5*(1+Sheet.1!User.R*SIN(User.A)))
+HideText = 3>Sheet.1!User.N
+QuickStyleLineColor = 103
+QuickStyleFillColor = 103
+
+[Geometry]
+NoShow = 3>Sheet.1!User.N
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# äußerer Kreis 2: sichtbar ab 2 Kreisen; sonst deckungsgleich mit dem letzten, verborgen
+[Part C2]
+text.de: Thema 2
+text.en: Topic 2
+text.es: Tema 2
+text.it: Tema 2
+text.fr: Thème 2
+
+[User]
+# der Kreis, an dessen Stelle das Teil steht, und sein Winkel
+K:   Value = MIN(2,Sheet.1!User.N)
+A:   Value = PI()*0.5-(User.K-1)*Sheet.1!User.S
+
+[Shape]
+Width = GUARD(Sheet.1!Width*Sheet.1!User.Do)
+Height = GUARD(Sheet.1!Height*Sheet.1!User.Do)
+PinX = GUARD(Sheet.1!Width*0.5*(1+Sheet.1!User.R*COS(User.A)))
+PinY = GUARD(Sheet.1!Height*0.5*(1+Sheet.1!User.R*SIN(User.A)))
+HideText = 2>Sheet.1!User.N
+QuickStyleLineColor = 102
+QuickStyleFillColor = 102
+
+[Geometry]
+NoShow = 2>Sheet.1!User.N
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# äußerer Kreis 1: sichtbar ab 1 Kreisen; sonst deckungsgleich mit dem letzten, verborgen
+[Part C1]
+text.de: Thema 1
+text.en: Topic 1
+text.es: Tema 1
+text.it: Tema 1
+text.fr: Thème 1
+
+[User]
+# der Kreis, an dessen Stelle das Teil steht, und sein Winkel
+K:   Value = MIN(1,Sheet.1!User.N)
+A:   Value = PI()*0.5-(User.K-1)*Sheet.1!User.S
+
+[Shape]
+Width = GUARD(Sheet.1!Width*Sheet.1!User.Do)
+Height = GUARD(Sheet.1!Height*Sheet.1!User.Do)
+PinX = GUARD(Sheet.1!Width*0.5*(1+Sheet.1!User.R*COS(User.A)))
+PinY = GUARD(Sheet.1!Height*0.5*(1+Sheet.1!User.R*SIN(User.A)))
+HideText = 1>Sheet.1!User.N
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+
+[Geometry]
+NoShow = 1>Sheet.1!User.N
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# das Zentrum, zuoberst
+[Part Hub]
+text.de: Zentrum
+text.en: Centre
+text.es: Centro
+text.it: Centro
+text.fr: Centre
+
+[Shape]
+Width = GUARD(Sheet.1!Width*Sheet.1!User.Dc)
+Height = GUARD(Sheet.1!Height*Sheet.1!User.Dc)
+PinX = GUARD(Sheet.1!Width*0.5)
+PinY = GUARD(Sheet.1!Height*0.5)
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height

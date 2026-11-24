@@ -15,7 +15,8 @@
 //   TcpStream::connect(&addr, timeout_ms) / read / write / write_all / read_exact,
 //             set_read_timeout / set_write_timeout (ms, None = block), set_nodelay,
 //             shutdown_write, peer_addr / local_addr, wait_readable(ms)
-//   UdpSocket::bind / send_to / recv_from(buf, timeout_ms)
+//   UdpSocket::bind / send_to / recv_from(buf, timeout_ms); answers_to(addr), answer_peers()
+//             (the answers a socket net.listen allows may send without net.connect, AnswerSet)
 //   UnixListener::bind(path) / accept() / accept_timeout(ms); connect_unix(path, timeout_ms)
 //             (bind removes only a socket file nobody listens on; the drop only its own)
 //             -> UnixStream (the stream calls of TcpStream; addresses and nodelay do not apply)
@@ -33,7 +34,9 @@
 //
 // The app's permissions (policy.rs, net.connect / net.listen) are checked before connect,
 // bind, send_to and a name lookup; Unix sockets follow the file rules (fs.write on the path).
-// A refusal is NetErrorKind::Denied.
+// A refusal is NetErrorKind::Denied.  A UDP socket whose address net.listen allows may answer
+// without net.connect: send_to an address it received a datagram from in the last 60 s
+// (AnswerSet, at most 1024 addresses per socket: forged sources cannot grow it).
 //
 // Timeouts are readiness waits (WSAPoll / poll) before each call, never SO_RCVTIMEO: after a
 // timed-out blocking receive Windows leaves the connection in an undefined state.  Sockets are
@@ -1507,25 +1510,123 @@ impl TcpStream {
 
 // ------------------------------------------------------------------ UDP
 
+/// an answer's address in an [`AnswerSet`]: the IPv6 form of the address (IPv4 as ::ffff:a.b.c.d, so either spelling
+/// matches), the port and the IPv6 zone
+type PeerKey = ([u8; 16], u16, u32);
+
+fn peer_key(a: &SocketAddr) -> PeerKey {
+    let ip = match a.ip {
+        IpAddr::V4(v) => [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, v[0], v[1], v[2], v[3]],
+        IpAddr::V6(v) => v,
+    };
+    (ip, a.port, a.scope)
+}
+
+/// (permissions) the peers a UDP socket that `net.listen` allows may answer without a `net.connect` rule: the
+/// addresses it received a datagram from in the last [`AnswerSet::KEEP_MS`] (a datagram renews its address; sending
+/// to it does not).  At most [`AnswerSet::MAX`] of them: two generations of `MAX / 2`, a full one becomes the old one
+/// and the old one goes (so does a generation older than `KEEP_MS`).  Source addresses are not proven: whoever can
+/// forge one can open the way to that address for this socket -- as any UDP server answers whoever writes -- but not
+/// grow the set past `MAX`; a flood of forged addresses pushes older ones out, and their peers are answered again
+/// after their next datagram.  `UdpSocket` keeps one when a manifest restricts the process ([`UdpSocket::bind`]);
+/// the times are the caller's (ms of a monotonic clock), so tests drive it directly.
+pub struct AnswerSet {
+    cur: alloc::collections::BTreeMap<PeerKey, u64>,
+    old: alloc::collections::BTreeMap<PeerKey, u64>,
+    since_ms: u64,
+}
+
+impl AnswerSet {
+    /// the most addresses kept (two generations of half)
+    pub const MAX: usize = 1024;
+    /// how long an address may be answered after its last datagram (ms)
+    pub const KEEP_MS: u64 = 60_000;
+
+    pub fn new(now_ms: u64) -> AnswerSet {
+        AnswerSet { cur: alloc::collections::BTreeMap::new(), old: alloc::collections::BTreeMap::new(), since_ms: now_ms }
+    }
+
+    // a generation as old as KEEP_MS becomes the old one: every entry of the old one has expired by then
+    fn age(&mut self, now_ms: u64) {
+        if now_ms.saturating_sub(self.since_ms) >= Self::KEEP_MS {
+            self.old = core::mem::take(&mut self.cur);
+            self.since_ms = now_ms;
+        }
+    }
+
+    /// a datagram came from `from` (a port of 0 or an unspecified address is no peer)
+    pub fn heard(&mut self, from: &SocketAddr, now_ms: u64) {
+        if from.port == 0 || from.ip.is_unspecified() {
+            return;
+        }
+        self.age(now_ms);
+        let k = peer_key(from);
+        if let Some(t) = self.cur.get_mut(&k) {
+            *t = now_ms;
+            return;
+        }
+        if self.cur.len() >= Self::MAX / 2 {
+            self.old = core::mem::take(&mut self.cur);
+            self.since_ms = now_ms;
+        }
+        self.cur.insert(k, now_ms);
+    }
+
+    /// whether `to` sent a datagram within KEEP_MS (and is still kept)
+    pub fn may_answer(&mut self, to: &SocketAddr, now_ms: u64) -> bool {
+        self.age(now_ms);
+        let k = peer_key(to);
+        self.cur.get(&k).or_else(|| self.old.get(&k)).is_some_and(|&t| now_ms.saturating_sub(t) < Self::KEEP_MS)
+    }
+
+    /// the addresses kept now (expired ones included until their generation goes)
+    pub fn len(&self) -> usize {
+        self.cur.len() + self.old.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
 #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub struct UdpSocket {
     s: Sock,
+    /// the address it was bound to (a plugin's scope checks its own net.listen against it)
+    bound: SocketAddr,
+    /// the peers it may answer: only a socket net.listen allows, in a process a manifest (or a plugin's scope)
+    /// restricts -- without one every datagram may go anyway
+    answers: Option<crate::sync::Mutex<AnswerSet>>,
+}
+
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+fn now_ms() -> u64 {
+    crate::time_us() / 1000
 }
 
 #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 impl UdpSocket {
-    /// a socket on addr; a fixed port needs net.listen, port 0 (a client's) does not
+    /// a socket on addr; a fixed port needs net.listen, port 0 (a client's) does not.  A socket whose address
+    /// net.listen allows (a fixed port through the check, port 0 when a rule covers it: checked quietly) may answer
+    /// the addresses it receives datagrams from without a net.connect rule (an [`AnswerSet`] per socket)
     pub fn bind(addr: &SocketAddr) -> NetResult<UdpSocket> {
-        if addr.port != 0 && !crate::policy::net_listen_allowed(addr) {
-            return Err(denied());
-        }
+        let listen = if addr.port != 0 {
+            if !crate::policy::net_listen_allowed(addr) {
+                return Err(denied());
+            }
+            true
+        } else {
+            crate::policy::net_listen_granted(addr)
+        };
         let s = Sock(sys::socket(family(addr), 2, 17)?);
         sys::bind_to(s.0, &encode_sockaddr(addr))?;
-        Ok(UdpSocket { s })
+        let answers = (listen && crate::policy::net_restricted()).then(|| crate::sync::Mutex::new(AnswerSet::new(now_ms())));
+        Ok(UdpSocket { s, bound: *addr, answers })
     }
 
+    /// one datagram to `to`: an answer to an address this socket heard from (see bind), else net.connect decides
     pub fn send_to(&self, buf: &[u8], to: &SocketAddr) -> NetResult<usize> {
-        if !crate::policy::net_connect_allowed(to) {
+        if !self.answers_to(to) && !crate::policy::net_connect_allowed(to) {
             return Err(denied());
         }
         sys::send_to(self.s.0, buf, &encode_sockaddr(to))
@@ -1540,11 +1641,26 @@ impl UdpSocket {
         let mut len = 128i32;
         let n = sys::recv_from(self.s.0, buf, &mut from, &mut len)?;
         let a = decode_sockaddr(&from[..len.max(0) as usize]).unwrap_or(SocketAddr::new(IpAddr::UNSPECIFIED_V4, 0));
+        if let Some(set) = &self.answers {
+            set.lock().heard(&a, now_ms());
+        }
         Ok((n, a))
     }
 
     pub fn local_addr(&self) -> NetResult<SocketAddr> {
         self.s.name(false)
+    }
+
+    /// (permissions) whether a datagram to `to` is an answer this socket may send without net.connect: it heard from
+    /// `to` within AnswerSet::KEEP_MS, and inside a plugin's scope the plugin's net.listen covers the socket's address
+    pub fn answers_to(&self, to: &SocketAddr) -> bool {
+        self.answers.as_ref().is_some_and(|set| set.lock().may_answer(to, now_ms())) && crate::policy::net_answer_scoped(&self.bound)
+    }
+
+    /// (permissions, tests) the addresses this socket keeps for answers; None: it keeps none (no manifest, or its
+    /// address is not one net.listen allows)
+    pub fn answer_peers(&self) -> Option<usize> {
+        self.answers.as_ref().map(|set| set.lock().len())
     }
 }
 

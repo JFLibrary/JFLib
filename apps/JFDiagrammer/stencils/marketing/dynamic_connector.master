@@ -1,0 +1,75 @@
+# Dynamischer Verbinder: der Verbinder, den die App verlegt (CN-04).  Er trägt dieselben Zellen
+# wie der Verbinder, den die App selbst anlegt (diagram_core::glue::new_connector): ein 1D-Shape
+# mit aufrechtem Kasten (Width = EndX-BeginX, Height = EndY-BeginY, Angle 0) und ObjType 2
+# (verlegbar), daran erkennt glue::is_connector ihn; sobald ein Ende klebt, verlegt die App ihn
+# rechtwinklig um die Shapes herum und ersetzt die Geometrie (README: 1D-Shapes, „Kein
+# ObjType 2“ gilt für Shapes mit eigener Geometrie, hier ist es gewollt).  Bis dahin zeichnet er
+# einen Z-Verlauf mit dem Knick in der Mitte.  GlueType 2: die Enden kleben auch an das ganze
+# Shape und suchen sich dort die Seite.  Der Text sitzt am Steuerpunkt TextPosition (die App
+# setzt ihn beim Verlegen in die Mitte des Wegs; versteckt, solange es keinen Text gibt), sein
+# Block ist so breit wie der Text.  Formatvorlage "Connector" mit der Pfeilspitze des Designs.
+# Kopie aus blocks, gleich halten.
+master: Dynamic connector
+name.de: Dynamischer Verbinder
+name.en: Dynamic connector
+name.es: Conector dinámico
+name.it: Connettore dinamico
+name.fr: Connecteur dynamique
+style: Connector
+prompt.de: Verbinder, der Shapes umfährt und sich neu verlegt, wenn Sie sie verschieben.
+prompt.en: Connector that routes around shapes and reroutes itself when you move them.
+prompt.es: Conector que rodea las formas y se vuelve a trazar cuando las mueve.
+prompt.it: Connettore che aggira le forme e si ridisegna quando le sposti.
+prompt.fr: Connecteur qui contourne les formes et se retrace quand vous les déplacez.
+keywords.de: Verbinder, dynamisch, Linie, verbinden, rechtwinklig, automatisch, Pfeil
+keywords.en: connector, dynamic, line, connect, right angle, automatic, arrow
+keywords.es: conector, dinámico, línea, conectar, ángulo recto, automático, flecha
+keywords.it: connettore, dinamico, linea, collegare, angolo retto, automatico, freccia
+keywords.fr: connecteur, dynamique, ligne, relier, angle droit, automatique, flèche
+
+[Shape]
+BeginX = 0 mm
+BeginY = 0 mm
+EndX = 40 mm
+EndX.us = 1.5 in
+EndY = 20 mm
+EndY.us = 0.75 in
+Width = GUARD(EndX-BeginX)
+Height = GUARD(EndY-BeginY)
+LocPinX = GUARD(Width*0.5)
+LocPinY = GUARD(Height*0.5)
+Angle = GUARD(0DA)
+FlipX = GUARD(FALSE)
+FlipY = GUARD(FALSE)
+TxtPinX = SETATREF(Controls.TextPosition)
+TxtPinY = SETATREF(Controls.TextPosition.Y)
+TxtWidth = MAX(TEXTWIDTH(TheText), 5*Char.Size)
+TxtHeight = TEXTHEIGHT(TheText, TxtWidth)
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TxtAngle = 0 deg
+LockHeight = TRUE
+LockCalcWH = TRUE
+NoAlignBox = TRUE
+DynFeedback = 2
+GlueType = 2
+ObjType = 2
+NoLiveDynamics = TRUE
+ShapeSplittable = 1
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width*0.5; Y = 0
+LineTo  X = Width*0.5; Y = Height
+LineTo  X = Width; Y = Height
+
+[Controls]
+TextPosition:  X = Width*0.5; Y = Height*0.5
+               XDyn = Controls.TextPosition; YDyn = Controls.TextPosition.Y
+               XCon = IF(OR(STRSAME(SHAPETEXT(TheText),""),HideText),5,0); YCon = 0; CanGlue = FALSE
+               Tip.de = "Text verschieben"
+               Tip.en = "Move the text"
+               Tip.es = "Mover el texto"
+               Tip.it = "Sposta il testo"
+               Tip.fr = "Déplacer le texte"

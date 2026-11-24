@@ -388,7 +388,8 @@ Linux and macOS only the app offers it.
 `--formats dmg` (on a Mac only, alone: `tools/package.py APP --formats dmg`, `cargo jflib package
 --formats dmg`) builds the program per style for `aarch64-apple-darwin` and `x86_64-apple-darwin` and joins
 both into one program for every Mac (a universal program, `lipo`; [INTEL_MAC.md](INTEL_MAC.md)), then puts
-`NAME.app` (Info.plist from PACKAGE, the icon, the entitlements of PERMISSIONS: [APPLE.md](APPLE.md) AP7c) on a
+`NAME.app` (Info.plist from PACKAGE, the icon, the entitlements of PERMISSIONS: [APPLE.md](APPLE.md) AP7c; `gamepad`
+adds none, Apple documents no App Sandbox entitlement for GameController) on a
 compressed disk image beside a link to `/Applications`: `<App>-<ver>-<style>-universal.dmg` (one style:
 `<App>-<ver>-universal.dmg`).  The Intel part needs Rust's target (`rustup target add x86_64-apple-darwin`);
 the program is about twice as large, fonts and images are in it once.  `all` leaves it out (it names the
@@ -552,15 +553,16 @@ own repositories and bundles.
 | `secrets` | `--talk-name=org.freedesktop.secrets` (the Secret Service; plat does not use the Secret portal) |
 | `audio.output` | `--socket=pulseaudio` (`plat::audio` speaks the PulseAudio protocol, also to pipewire-pulse; the socket allows recording too, so only apps that play sound list the right; noted) |
 | `recent` | `--filesystem=xdg-data/recently-used.xbel` (the host's list of recent files for `plat::recent_add` / `ui.recent_add`; it lists every program's recent files; noted) |
+| `gamepad` | `--device=input` (the evdev nodes below `/dev/input` for `plat::pad_watch` / `ui.gamepads`; it shows the nodes of every input device, keyboards too, and the app opens what the host lets the user open; noted). Flatpak 1.15.6 and newer: an older one refuses to build it ("Unknown device type input"), so the bundle is skipped and only the manifest written when the Flatpak in WSL / Linux is older (`flatpak_version` of the probe; WSL's Ubuntu 24.04 has 1.14.6); an installed app with it runs on an older Flatpak without `/dev/input` (no pads) |
 | `fs.user`, `url`, `print`, `autostart` | none: the file dialog, OpenURI, Print and Background portals; files of "Open with" come through the document portal |
 | `location`, `sensors` | none yet, noted: `plat` has no Linux version (later the location portal, no hole; `--system-talk-name=net.hadess.SensorProxy` for iio-sensor-proxy) |
 | `process` | none: programs outside the sandbox are not reachable (`flatpak-spawn --host` would need `--talk-name=org.freedesktop.Flatpak`, a full escape: not granted; noted) |
 | no PERMISSIONS | `--share=network --filesystem=host --talk-name=org.freedesktop.secrets --socket=pulseaudio` (the app may do everything; noted) |
 
 `flatpak_args=` adds more, for example `--talk-name=org.kde.StatusNotifierWatcher` for the tray
-(`plat::tray`), `--talk-name=org.freedesktop.Notifications`, or `--device=input` for a game that reads
-game pads (`plat::pad_watch`, `ui.gamepads`: the evdev nodes below `/dev/input`, which a Flatpak sees
-only with it; Flatpak 1.15.6 and newer, an older one finds no pad).  Without `recent` in
+(`plat::tray`) or `--talk-name=org.freedesktop.Notifications`; game pads come with the line `gamepad`
+of PERMISSIONS, not with `flatpak_args=` (an app without PERMISSIONS that reads pads adds
+`--device=input` here).  Without `recent` in
 `PERMISSIONS` the list of recent files stays in the sandbox's own data folder.  The exported
 `.desktop` file's `Exec` gets flatpak's file forwarding (`@@u %U @@`): opened files come as
 `file:///run/user/<uid>/doc/...` URIs that `plat` turns into paths and grants (`fs.user`).
@@ -601,7 +603,8 @@ allows `autostart` (or there is no PERMISSIONS); capabilities: `internetClient` 
 confined by them; they are shown in the Store, PERMISSIONS stays what plat enforces); `audio.output`
 needs none (playing sound is no MSIX capability, only recording is: `microphone`); `location`
 and `sensors` declare nothing while `plat` has no Windows version (noted; the former will be the
-device capability `location`).  An APK's `android/AndroidManifest.xml` stays the app's own file:
+device capability `location`); `gamepad` needs none (XInput in a full-trust app; the capability list
+has nothing for it, `humaninterfacedevice` is the HID API's; noted).  An APK's `android/AndroidManifest.xml` stays the app's own file:
 with `location` in PERMISSIONS the build refuses a manifest without `ACCESS_FINE_LOCATION` or
 `ACCESS_COARSE_LOCATION` (`tools/android.py`).  The
 package folder holds `<App>.exe` (signed like the setup's, when a certificate is set), modules,

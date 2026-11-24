@@ -601,7 +601,10 @@ WebSocket ([oben](#die-marge-über-websocket-teil-2-nach-der-messung)). Mit Schi
 Clients an (Ereignisse), jeder Client verließ den Raum mit LEAVE (`3 left` beim Server).
 
 Dabei gefunden: `game1-server` beantwortete UDP-Clients aus dem LAN nicht. `plat` prüft `UdpSocket::send_to` gegen
-`net.connect`, und die PERMISSIONS des Servers erlaubten nur `localhost` (PERMDENY im Log); jetzt `net.connect *:*`.
+`net.connect`, und die PERMISSIONS des Servers erlaubten nur `localhost` (PERMDENY im Log); damals `net.connect *:*`. Seit dem
+24.11.2026 antwortet ein UDP-Socket, den `net.listen` erlaubt, denen, die ihm schrieben, ohne Regel (TRANSPORT.md „Antworten
+über UDP ohne `net.connect`“); der Server hat wieder nur `localhost` (für den Client von `--check`), geprüft mit dem Server auf
+der LAN-Adresse des PCs und zwei Clients von derselben Adresse.
 
 ### Der Browser als Client
 
@@ -669,6 +672,6 @@ nehmen dem einen Thread der Schleife die Arbeit ab, wenn es viele werden. `gamet
 - **Deltas gegen eine Vorhersage**.
 - **Die Grenze des Lag-Ausgleichs**: 300 ms (entschieden am 19.11.2026; ob sie auf 400 ms geht, ist eine Frage an den Nutzer
   aus GAME1.md).
-- **Ein UDP-Server und `net.connect`**: Ein Server, der UDP-Clients antwortet, braucht in seinen PERMISSIONS `net.connect *:*`,
-  weil `plat` jedes `send_to` gegen diese Regel prüft. Ob Antworten an eine Adresse, die vorher an einen erlaubten
-  lauschenden Socket schickte, ohne Regel durchgehen sollen, ist eine Frage für `plat` (docs/PERMISSIONS.md).
+- **Ein UDP-Server und `net.connect`**: erledigt am 24.11.2026. Ein UDP-Socket, den `net.listen` erlaubt, antwortet den
+  Adressen, die ihm in den letzten 60 s schrieben, ohne `net.connect` (höchstens 1024 je Socket; PERMISSIONS.md „Network
+  rules“, TRANSPORT.md).

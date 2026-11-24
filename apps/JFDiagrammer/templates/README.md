@@ -122,6 +122,8 @@ werden der Reihe nach angelegt, spätere liegen oben.
 | `Tip` | `TRUE`: das Tipp-Shape. Es bekommt `User.JFD_Tip`; die App wählt es nach dem Anlegen nicht aus und Tests finden es daran |
 | `From`, `To` | statt `Master`: ein dynamischer Verbinder zwischen zwei Shapes dieser Datei (die Zeilennamen von Zeilen davor, keine Verbinder), an beiden Enden dynamisch geklebt (`glue::new_connector`); `Text.<sprache>` beschriftet ihn |
 | `Cff` | statt `Master`: ein funktionsübergreifendes Flussdiagramm, `"horizontal"` oder `"vertical"`, mit `Lanes` Bahnen (Standard 2, mindestens 1) und `Phases` Phasen (Standard 1); `PinX`/`PinY` ist hier die linke obere Ecke, `Text.<sprache>` der Titel. Die Master kommen aus der Schablone `cff`, aufgebaut wie die App es tut (`diagram_core::structure::cff::create`) |
+| `BeginX`, `BeginY`, `EndX`, `EndY` | (JD26) statt `PinX`/`PinY` (und ohne `Width`, `Angle`): ein 1D-Master an diesen Enden (Längen) |
+| `BeginOn`, `BeginPoint`, `EndOn`, `EndPoint` | (JD26) das Ende klebt an Verbindungspunkt `…Point` (ab 1, wie Visios `Connections.X1`) des Shapes der Zeile `…On` davor (kein Verbinder aus `From`/`To`), wie das Kleben in der App (`glue::glue`); braucht `BeginX` … `EndY`. Beispiele: `block/sample.starter` (Pfeile zwischen Blöcken), `cause_effect/fishbone.starter` (Kategorien an der Hauptgräte, Ursachen an den Kategorien) |
 
 ```
 [Shapes]

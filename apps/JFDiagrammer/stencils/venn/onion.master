@@ -1,0 +1,242 @@
+# Zwiebeldiagramm (SH-007, JD26): zwei bis sechs ineinanderliegende Kreise (gestreckt Ellipsen),
+# die sich unten berühren, für Schichten um einen Kern.  Schicht 1 ist der Kern (der kleinste
+# Kreis), Schicht N der äußere; Kreis k hat k/N der Größe der Gruppe und steht auf ihrer
+# Unterkante.  Je Kreis ein Teil der Gruppe mit eigenem Text (im Band zwischen seinem Scheitel und
+# dem des nächstinneren, beim Kern in der Mitte; etwas breiter als die Sehne dort, Wurzel aus 2k+1
+# statt 2k-1 Schritte, damit kurze Texte nicht umbrechen) und eigener Variantenfarbe des Designs
+# (Schnellformatvorlage 100 bis 105), nicht durchscheinend: die inneren Kreise liegen oben.  Die
+# Zahl steht in den Shape-Daten (Prop.Layers); Teile über der Zahl liegen deckungsgleich unter dem
+# äußeren Kreis und zeigen weder Fläche noch Text (die Teile stehen von außen nach innen in der
+# Datei).  Die Teile folgen der Größe der Gruppe.  Kopie in cycle, gleich
+# halten.
+master: Onion diagram
+name.de: Zwiebeldiagramm
+name.en: Onion diagram
+name.es: Diagrama de cebolla
+name.it: Diagramma a cipolla
+name.fr: Diagramme en oignon
+prompt.de: Ineinanderliegende Kreise für Schichten um einen Kern. Die Zahl der Schichten stellen Sie in den Shape-Daten ein.
+prompt.en: Nested circles for layers around a core. Set the number of layers in the shape data.
+prompt.es: Círculos anidados para capas alrededor de un núcleo. Defina el número de capas en los datos de la forma.
+prompt.it: Cerchi annidati per strati attorno a un nucleo. Imposta il numero di strati nei dati della forma.
+prompt.fr: Cercles imbriqués pour des couches autour d'un noyau. Définissez le nombre de couches dans les données de la forme.
+keywords.de: Zwiebel, Zwiebeldiagramm, Schichten, Kern, Ebenen, verschachtelt, Kreise
+keywords.en: onion, onion diagram, layers, core, levels, nested, circles
+keywords.es: cebolla, diagrama de cebolla, capas, núcleo, niveles, anidado, círculos
+keywords.it: cipolla, diagramma a cipolla, strati, nucleo, livelli, annidato, cerchi
+keywords.fr: oignon, diagramme en oignon, couches, noyau, niveaux, imbriqué, cercles
+
+[Shape]
+Width = 60 mm
+Width.us = 2.5 in
+Height = 60 mm
+Height.us = 2.5 in
+
+[User]
+# die Zahl der Schichten (2 bis 6)
+N:  Value = MIN(MAX(ROUND(Prop.Layers,0),2),6)
+
+[Property]
+Layers:  Type = 2; Format = "0"; Value = 3
+         Label.de = Schichten
+         Label.en = Layers
+         Label.es = Capas
+         Label.it = Strati
+         Label.fr = Couches
+         Prompt.de = Anzahl der Schichten (2 bis 6)
+         Prompt.en = Number of layers (2 to 6)
+         Prompt.es = Número de capas (de 2 a 6)
+         Prompt.it = Numero di strati (da 2 a 6)
+         Prompt.fr = Nombre de couches (de 2 à 6)
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+
+# Schicht 6 (1 = Kern): sichtbar ab 6 Schichten; sonst deckungsgleich mit dem äußeren Kreis, verborgen
+[Part L6]
+text.de: Schicht 6
+text.en: Layer 6
+text.es: Capa 6
+text.it: Strato 6
+text.fr: Couche 6
+
+[User]
+# der Kreis, an dessen Stelle das Teil liegt
+K:  Value = MIN(6,Sheet.1!User.N)
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.5)
+PinY = GUARD(Height*0.5)
+Width = GUARD(Sheet.1!Width*User.K/Sheet.1!User.N)
+Height = GUARD(Sheet.1!Height*User.K/Sheet.1!User.N)
+TxtPinX = Width*0.5
+TxtPinY = Height-Sheet.1!Height/Sheet.1!User.N*0.5
+TxtWidth = Sheet.1!Width/Sheet.1!User.N*SQRT(2*User.K+1)*0.9
+TxtHeight = Sheet.1!Height/Sheet.1!User.N*0.8
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+HideText = 6>Sheet.1!User.N
+QuickStyleLineColor = 105
+QuickStyleFillColor = 105
+
+[Geometry]
+NoShow = 6>Sheet.1!User.N
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# Schicht 5 (1 = Kern): sichtbar ab 5 Schichten; sonst deckungsgleich mit dem äußeren Kreis, verborgen
+[Part L5]
+text.de: Schicht 5
+text.en: Layer 5
+text.es: Capa 5
+text.it: Strato 5
+text.fr: Couche 5
+
+[User]
+# der Kreis, an dessen Stelle das Teil liegt
+K:  Value = MIN(5,Sheet.1!User.N)
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.5)
+PinY = GUARD(Height*0.5)
+Width = GUARD(Sheet.1!Width*User.K/Sheet.1!User.N)
+Height = GUARD(Sheet.1!Height*User.K/Sheet.1!User.N)
+TxtPinX = Width*0.5
+TxtPinY = Height-Sheet.1!Height/Sheet.1!User.N*0.5
+TxtWidth = Sheet.1!Width/Sheet.1!User.N*SQRT(2*User.K+1)*0.9
+TxtHeight = Sheet.1!Height/Sheet.1!User.N*0.8
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+HideText = 5>Sheet.1!User.N
+QuickStyleLineColor = 104
+QuickStyleFillColor = 104
+
+[Geometry]
+NoShow = 5>Sheet.1!User.N
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# Schicht 4 (1 = Kern): sichtbar ab 4 Schichten; sonst deckungsgleich mit dem äußeren Kreis, verborgen
+[Part L4]
+text.de: Schicht 4
+text.en: Layer 4
+text.es: Capa 4
+text.it: Strato 4
+text.fr: Couche 4
+
+[User]
+# der Kreis, an dessen Stelle das Teil liegt
+K:  Value = MIN(4,Sheet.1!User.N)
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.5)
+PinY = GUARD(Height*0.5)
+Width = GUARD(Sheet.1!Width*User.K/Sheet.1!User.N)
+Height = GUARD(Sheet.1!Height*User.K/Sheet.1!User.N)
+TxtPinX = Width*0.5
+TxtPinY = Height-Sheet.1!Height/Sheet.1!User.N*0.5
+TxtWidth = Sheet.1!Width/Sheet.1!User.N*SQRT(2*User.K+1)*0.9
+TxtHeight = Sheet.1!Height/Sheet.1!User.N*0.8
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+HideText = 4>Sheet.1!User.N
+QuickStyleLineColor = 103
+QuickStyleFillColor = 103
+
+[Geometry]
+NoShow = 4>Sheet.1!User.N
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# Schicht 3 (1 = Kern): sichtbar ab 3 Schichten; sonst deckungsgleich mit dem äußeren Kreis, verborgen
+[Part L3]
+text.de: Schicht 3
+text.en: Layer 3
+text.es: Capa 3
+text.it: Strato 3
+text.fr: Couche 3
+
+[User]
+# der Kreis, an dessen Stelle das Teil liegt
+K:  Value = MIN(3,Sheet.1!User.N)
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.5)
+PinY = GUARD(Height*0.5)
+Width = GUARD(Sheet.1!Width*User.K/Sheet.1!User.N)
+Height = GUARD(Sheet.1!Height*User.K/Sheet.1!User.N)
+TxtPinX = Width*0.5
+TxtPinY = Height-Sheet.1!Height/Sheet.1!User.N*0.5
+TxtWidth = Sheet.1!Width/Sheet.1!User.N*SQRT(2*User.K+1)*0.9
+TxtHeight = Sheet.1!Height/Sheet.1!User.N*0.8
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+HideText = 3>Sheet.1!User.N
+QuickStyleLineColor = 102
+QuickStyleFillColor = 102
+
+[Geometry]
+NoShow = 3>Sheet.1!User.N
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# Schicht 2 (1 = Kern): sichtbar ab 2 Schichten; sonst deckungsgleich mit dem äußeren Kreis, verborgen
+[Part L2]
+text.de: Schicht 2
+text.en: Layer 2
+text.es: Capa 2
+text.it: Strato 2
+text.fr: Couche 2
+
+[User]
+# der Kreis, an dessen Stelle das Teil liegt
+K:  Value = MIN(2,Sheet.1!User.N)
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.5)
+PinY = GUARD(Height*0.5)
+Width = GUARD(Sheet.1!Width*User.K/Sheet.1!User.N)
+Height = GUARD(Sheet.1!Height*User.K/Sheet.1!User.N)
+TxtPinX = Width*0.5
+TxtPinY = Height-Sheet.1!Height/Sheet.1!User.N*0.5
+TxtWidth = Sheet.1!Width/Sheet.1!User.N*SQRT(2*User.K+1)*0.9
+TxtHeight = Sheet.1!Height/Sheet.1!User.N*0.8
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+HideText = 2>Sheet.1!User.N
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+
+[Geometry]
+NoShow = 2>Sheet.1!User.N
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# Schicht 1 (1 = Kern): sichtbar ab 1 Schichten; sonst deckungsgleich mit dem äußeren Kreis, verborgen
+[Part L1]
+text.de: Schicht 1
+text.en: Layer 1
+text.es: Capa 1
+text.it: Strato 1
+text.fr: Couche 1
+
+[User]
+# der Kreis, an dessen Stelle das Teil liegt
+K:  Value = MIN(1,Sheet.1!User.N)
+
+[Shape]
+PinX = GUARD(Sheet.1!Width*0.5)
+PinY = GUARD(Height*0.5)
+Width = GUARD(Sheet.1!Width*User.K/Sheet.1!User.N)
+Height = GUARD(Sheet.1!Height*User.K/Sheet.1!User.N)
+TxtPinX = Width*0.5
+TxtPinY = Height-Sheet.1!Height/Sheet.1!User.N*0.5
+TxtWidth = Sheet.1!Width/Sheet.1!User.N*SQRT(2*User.K+1)*0.9
+TxtHeight = Sheet.1!Height/Sheet.1!User.N*0.8
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+HideText = 1>Sheet.1!User.N
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+
+[Geometry]
+NoShow = 1>Sheet.1!User.N
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height

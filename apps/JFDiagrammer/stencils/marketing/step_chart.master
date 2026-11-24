@@ -1,0 +1,252 @@
+# Stufendiagramm (SH-030, JD26): zwei bis acht Stufen nebeneinander, jede eine Stufe höher, als
+# Teile einer Gruppe mit eigenem Text.  Die Zahl steht in den Shape-Daten (Prop.Steps); der
+# Steuerpunkt Row_1 an der oberen rechten Ecke ändert sie beim Ziehen nach rechts oder links:
+# jede Stufe ist User.SW breit, die Breite der Gruppe ist Stufen x SW (Ziehen vermehrt die
+# Stufen, die Gruppe wächst mit).  Zieht man die Breite selbst, schickt SETATREF die neue
+# Stufenbreite nach User.SW.  Teile über der Zahl der Stufen liegen auf der letzten Stufe und
+# zeigen weder Linie noch Text.  Die Teile zeichnen nach Width/N (User.W1), damit sie auch dann
+# passen, wenn jemand die Breite ohne SETATREF setzt.
+master: Step chart
+name.de: Stufendiagramm
+name.en: Step chart
+name.es: Diagrama de escalones
+name.it: Diagramma a gradini
+name.fr: Diagramme en escalier
+prompt.de: Stufen nebeneinander für Entwicklungen und Reifegrade. Ziehen Sie den gelben Steuerpunkt nach rechts oder links, um Stufen hinzuzufügen oder zu entfernen.
+prompt.en: Steps side by side for progressions and maturity levels. Drag the yellow control handle to the right or left to add or remove steps.
+prompt.es: Escalones uno al lado de otro para evoluciones y niveles de madurez. Arrastre el controlador amarillo a la derecha o a la izquierda para agregar o quitar escalones.
+prompt.it: Gradini affiancati per sviluppi e livelli di maturità. Trascina la maniglia di controllo gialla a destra o a sinistra per aggiungere o togliere gradini.
+prompt.fr: Marches côte à côte pour les évolutions et les niveaux de maturité. Faites glisser la poignée de contrôle jaune vers la droite ou la gauche pour ajouter ou supprimer des marches.
+keywords.de: Stufen, Treppe, Stufendiagramm, Entwicklung, Reifegrad, Fortschritt, Wachstum
+keywords.en: steps, staircase, step chart, progression, maturity, progress, growth
+keywords.es: escalones, escalera, progresión, madurez, progreso, crecimiento
+keywords.it: gradini, scala, progressione, maturità, progresso, crescita
+keywords.fr: marches, escalier, progression, maturité, progrès, croissance
+
+[Shape]
+Width = SETATREF(User.SW,SETATREFEVAL(SETATREFEXPR()/User.N))*User.N
+Height = 40 mm
+Height.us = 1.5 in
+
+[User]
+# die Zahl der Stufen (2 bis 8) und die Breite einer Stufe
+N:   Value = MIN(MAX(ROUND(Prop.Steps,0),2),8)
+SW:  Value = 18 mm
+     Value.us = 0.75 in
+# die Breite einer Stufe, wie die Teile sie zeichnen
+W1:  Value = Width/User.N
+# die Fuge zwischen den Stufen (sichtbar auch in Designs ohne Shape-Linien)
+Gp:  Value = 1 mm
+     Value.us = 0.04 in
+
+[Property]
+Steps:  Type = 2; Format = "0"; Value = 4
+        Label.de = Stufen
+        Label.en = Steps
+        Label.es = Escalones
+        Label.it = Gradini
+        Label.fr = Marches
+        Prompt.de = Anzahl der Stufen (2 bis 8)
+        Prompt.en = Number of steps (2 to 8)
+        Prompt.es = Número de escalones (de 2 a 8)
+        Prompt.it = Numero di gradini (da 2 a 8)
+        Prompt.fr = Nombre de marches (de 2 à 8)
+
+[Controls]
+Row_1:  X = SETATREF(Prop.Steps,SETATREFEVAL(MIN(MAX(ROUND(SETATREFEXPR()/User.SW,0),2),8)))*User.SW; Y = Height
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 0; YCon = 1; CanGlue = FALSE
+        Tip.de = "Stufen hinzufügen oder entfernen"
+        Tip.en = "Add or remove steps"
+        Tip.es = "Agregar o quitar escalones"
+        Tip.it = "Aggiungi o togli gradini"
+        Tip.fr = "Ajouter ou supprimer des marches"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = 0; Y = Height/User.N*0.5; DirX = 1; DirY = 0
+
+# Stufe 1: sichtbar ab 1 Stufen; sonst deckungsgleich mit der letzten, ohne Linie und Text
+[Part S1]
+text.de: Stufe 1
+text.en: Step 1
+text.es: Paso 1
+text.it: Passo 1
+text.fr: Étape 1
+
+[Shape]
+PinX = GUARD(Sheet.1!User.W1*(MIN(1,Sheet.1!User.N)-0.5))
+PinY = GUARD(Height*0.5)
+Width = GUARD(Sheet.1!User.W1-Sheet.1!User.Gp)
+Height = GUARD(Sheet.1!Height*MIN(1,Sheet.1!User.N)/Sheet.1!User.N)
+HideText = 1>Sheet.1!User.N
+
+[Geometry]
+NoShow = 1>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# Stufe 2: sichtbar ab 2 Stufen; sonst deckungsgleich mit der letzten, ohne Linie und Text
+[Part S2]
+text.de: Stufe 2
+text.en: Step 2
+text.es: Paso 2
+text.it: Passo 2
+text.fr: Étape 2
+
+[Shape]
+PinX = GUARD(Sheet.1!User.W1*(MIN(2,Sheet.1!User.N)-0.5))
+PinY = GUARD(Height*0.5)
+Width = GUARD(Sheet.1!User.W1-Sheet.1!User.Gp)
+Height = GUARD(Sheet.1!Height*MIN(2,Sheet.1!User.N)/Sheet.1!User.N)
+HideText = 2>Sheet.1!User.N
+
+[Geometry]
+NoShow = 2>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# Stufe 3: sichtbar ab 3 Stufen; sonst deckungsgleich mit der letzten, ohne Linie und Text
+[Part S3]
+text.de: Stufe 3
+text.en: Step 3
+text.es: Paso 3
+text.it: Passo 3
+text.fr: Étape 3
+
+[Shape]
+PinX = GUARD(Sheet.1!User.W1*(MIN(3,Sheet.1!User.N)-0.5))
+PinY = GUARD(Height*0.5)
+Width = GUARD(Sheet.1!User.W1-Sheet.1!User.Gp)
+Height = GUARD(Sheet.1!Height*MIN(3,Sheet.1!User.N)/Sheet.1!User.N)
+HideText = 3>Sheet.1!User.N
+
+[Geometry]
+NoShow = 3>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# Stufe 4: sichtbar ab 4 Stufen; sonst deckungsgleich mit der letzten, ohne Linie und Text
+[Part S4]
+text.de: Stufe 4
+text.en: Step 4
+text.es: Paso 4
+text.it: Passo 4
+text.fr: Étape 4
+
+[Shape]
+PinX = GUARD(Sheet.1!User.W1*(MIN(4,Sheet.1!User.N)-0.5))
+PinY = GUARD(Height*0.5)
+Width = GUARD(Sheet.1!User.W1-Sheet.1!User.Gp)
+Height = GUARD(Sheet.1!Height*MIN(4,Sheet.1!User.N)/Sheet.1!User.N)
+HideText = 4>Sheet.1!User.N
+
+[Geometry]
+NoShow = 4>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# Stufe 5: sichtbar ab 5 Stufen; sonst deckungsgleich mit der letzten, ohne Linie und Text
+[Part S5]
+text.de: Stufe 5
+text.en: Step 5
+text.es: Paso 5
+text.it: Passo 5
+text.fr: Étape 5
+
+[Shape]
+PinX = GUARD(Sheet.1!User.W1*(MIN(5,Sheet.1!User.N)-0.5))
+PinY = GUARD(Height*0.5)
+Width = GUARD(Sheet.1!User.W1-Sheet.1!User.Gp)
+Height = GUARD(Sheet.1!Height*MIN(5,Sheet.1!User.N)/Sheet.1!User.N)
+HideText = 5>Sheet.1!User.N
+
+[Geometry]
+NoShow = 5>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# Stufe 6: sichtbar ab 6 Stufen; sonst deckungsgleich mit der letzten, ohne Linie und Text
+[Part S6]
+text.de: Stufe 6
+text.en: Step 6
+text.es: Paso 6
+text.it: Passo 6
+text.fr: Étape 6
+
+[Shape]
+PinX = GUARD(Sheet.1!User.W1*(MIN(6,Sheet.1!User.N)-0.5))
+PinY = GUARD(Height*0.5)
+Width = GUARD(Sheet.1!User.W1-Sheet.1!User.Gp)
+Height = GUARD(Sheet.1!Height*MIN(6,Sheet.1!User.N)/Sheet.1!User.N)
+HideText = 6>Sheet.1!User.N
+
+[Geometry]
+NoShow = 6>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# Stufe 7: sichtbar ab 7 Stufen; sonst deckungsgleich mit der letzten, ohne Linie und Text
+[Part S7]
+text.de: Stufe 7
+text.en: Step 7
+text.es: Paso 7
+text.it: Passo 7
+text.fr: Étape 7
+
+[Shape]
+PinX = GUARD(Sheet.1!User.W1*(MIN(7,Sheet.1!User.N)-0.5))
+PinY = GUARD(Height*0.5)
+Width = GUARD(Sheet.1!User.W1-Sheet.1!User.Gp)
+Height = GUARD(Sheet.1!Height*MIN(7,Sheet.1!User.N)/Sheet.1!User.N)
+HideText = 7>Sheet.1!User.N
+
+[Geometry]
+NoShow = 7>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# Stufe 8: sichtbar ab 8 Stufen; sonst deckungsgleich mit der letzten, ohne Linie und Text
+[Part S8]
+text.de: Stufe 8
+text.en: Step 8
+text.es: Paso 8
+text.it: Passo 8
+text.fr: Étape 8
+
+[Shape]
+PinX = GUARD(Sheet.1!User.W1*(MIN(8,Sheet.1!User.N)-0.5))
+PinY = GUARD(Height*0.5)
+Width = GUARD(Sheet.1!User.W1-Sheet.1!User.Gp)
+Height = GUARD(Sheet.1!Height*MIN(8,Sheet.1!User.N)/Sheet.1!User.N)
+HideText = 8>Sheet.1!User.N
+
+[Geometry]
+NoShow = 8>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0

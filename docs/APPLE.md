@@ -1,5 +1,9 @@
 # Apple-Plan: macOS und iOS nativ
 
+Nachtrag 2026-11-24: Die Restliste von iOS (AP5) ist umgesetzt: Teilen (`plat::share`, auf allen Systemen außer
+Linux), Bildschirm anlassen, Textgröße des Systems, Lesezeichen gewählter Dateien, Drehen mit der GPU-Ausgabe geprüft;
+dazu der Fehler, dass Änderungen der Einstellungen im laufenden Betrieb die App auf iOS nie erreichten (siehe AP5).
+
 Nachtrag 2026-11-19: AP9 (iPadOS) ist umgesetzt und im iPad-Simulator geprüft; was ein echtes iPad braucht, steht
 unter AP9 als ungeprüft.
 
@@ -313,12 +317,30 @@ Android (`web_sensors.rs`) aus Core Motion und Core Location
 Nord (mit Magnetometer, sonst beliebig), der Standort „beim Verwenden“ (`NSLocationWhenInUseUsageDescription` setzt
 `tools/apple.py` für Apps, deren PERMISSIONS `location` nennen oder die keine haben).
 
-- **Noch offen:** Teilen (`UIActivityViewController`; die Bibliothek hat noch keine Schnittstelle dafür),
-  dauerhafte Freigaben gewählter Dateien über einen
-  Neustart (Lesezeichen), Bildschirm anlassen, Textgröße des Systems. Markierter Text der Tastatur (`UITextInput`:
-  Diktat, Vorschläge, Tastaturen mit Zusammensetzung) und Accessibility kamen mit VoiceOver ([VOICEOVER.md](VOICEOVER.md)
-  VO4). Das Bild geht bei jedem Frame
-  ganz als Kopie an den Layer; mit Metal (AP6) entfällt das.
+- **Umgesetzt (2026-11-24), die Restliste:**
+  - **Teilen:** `plat::share(&Share)` mit Titel, Text, Link und Dateien, Antwort über `share_poll`, `CAP_SHARE`.
+    iOS über `UIActivityViewController` ([`apple_ios_share.rs`](../lib/plat/apple_ios_share.rs)), auf dem iPad als
+    Popover am Anker; der Titel kommt als Betreff über eine eigene Item-Quelle mit. Dieselbe Schnittstelle gibt es
+    auf macOS (`NSSharingServicePicker`), Windows (`DataTransferManager`), Android (Chooser für `ACTION_SEND`) und im
+    Browser (`navigator.share`); Linux hat keinen Dialog.
+  - **Bildschirm anlassen:** `plat::inhibit(INHIBIT_IDLE)` schaltet den Idle-Timer von `UIApplication` ab, solange
+    ein Wächter lebt ([`apple_power_ios.rs`](../lib/plat/apple_power_ios.rs)); `INHIBIT_SUSPEND` allein bleibt `None`.
+  - **Textgröße des Systems:** Dynamic Type geht als `text_scale` in die Einstellungen („Large“ 100 %, über
+    `UIFontMetrics`), eine Änderung im Betrieb erreicht die App als `E_SETTINGS`.
+  - **Lesezeichen:** Jede im Dateidialog gewählte Datei und jeder Ordner hinterlässt ein Lesezeichen im Container der
+    App (`$HOME/Library/jfgui/bookmarks`, die letzten 100); der Start löst sie auf und öffnet den Zugriff, so öffnet
+    derselbe Pfad nach einem Neustart wieder. Eine verschobene Datei steht danach unter ihrem neuen Pfad.
+  - **Fehler behoben:** Der Host markierte die App nie als gestartet, deshalb erreichte keine Änderung von Dunkelmodus,
+    Kontrast, Bewegung oder Textgröße im laufenden Betrieb die App.
+  - **Geprüft:** `plattest --test ios` unter UIKit (21 von 21: Bildschirm an, Dunkel und Hell, Textgröße bis zur
+    größten Barrierefreiheitsstufe, Teilen, Drehen; mit `jfgui_GPU=1` folgt die GPU-Ebene dem Drehen), `--test
+    bookmarks` (12 von 12), `--test power`, `--test settings`, `--test share`.
+  - **Noch offen:** Lesezeichen und Teilen auf dem echten iPhone; ob ein Ziel die geteilten Dateien wirklich bekommt,
+    zeigt nur ein Test von Hand.
+
+  Markierter Text der Tastatur (`UITextInput`: Diktat, Vorschläge, Tastaturen mit Zusammensetzung) und Accessibility
+  kamen mit VoiceOver ([VOICEOVER.md](VOICEOVER.md) VO4). Das Bild geht bei jedem Frame ganz als Kopie an den Layer;
+  mit Metal (AP6) entfällt das.
 
 ### AP6: Metal (L)
 
@@ -497,8 +519,8 @@ dargestellte Bild zurückgelesen, keins anders). `render3dtest`: jeder Test einz
 Abweichungen wie auf dem M2 (`pbr` 121 Pixel, `srgb` „tex“ 47–48 Pixel). `--test all` in einem Lauf beendet iOS nach
 `textures` mit Signal 9 (vermutlich der Speicher eines Programms ohne Szene, das 90 große Texturen hinter vielen anderen
 Tests anlegt; `textures` allein ist grün). Die Mobile Gallery geht mit `jfgui_GPU=1` nach 482 ms auf die Swapchain und
-zeigt dasselbe Bild. `tools/apple.py device` gibt die `jfgui_*`-Variablen jetzt an das Programm weiter. **Offen:** das Drehen
-des Geräts.
+zeigt dasselbe Bild. `tools/apple.py device` gibt die `jfgui_*`-Variablen jetzt an das Programm weiter. Das Drehen des Geräts
+ist seit 2026-11-24 geprüft (`plattest --test ios` mit `jfgui_GPU=1`: Ebene, Drawable und Canvas folgen).
 
 **AP6f umgesetzt (2026-11-10):** [GPU.md](GPU.md), CHANGELOG, API.md, ROADMAP. Stufe Voll (AP6g) bleibt eine eigene Entscheidung.
 

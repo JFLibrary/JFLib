@@ -1,0 +1,66 @@
+#!args apps/JFDiagrammer/tests/viewer.vsdx --no-system-fonts --save-dir build
+# JFDiagrammer, JD15: the ways a file opens -- Datei › Öffnen › Schreibgeschützt öffnen (DM-09:
+# the title says so, Strg+S goes to Speichern unter, the file stays), Als Kopie öffnen (UI-06: a
+# new, unnamed drawing), Neu › Neu aus vorhandener Zeichnung (UI-05, the same); Durchsuchen starts
+# in the folder of the open drawing's file; a file that cannot be read shows its notice at once,
+# the File register closes (DF-15); the page shown is saved as the file's TopPage and opens first
+# (DM-04)
+expect text:"viewer – JFDiagrammer" exists
+expect button:"Durchsuchen" missing
+# read-only from Zuletzt verwendet
+key ctrl+o
+expect checkbox:"Schreibgeschützt öffnen" unchecked
+click checkbox:"Schreibgeschützt öffnen"
+click button:"viewer.vsdx"
+expect text:"viewer [Schreibgeschützt] – JFDiagrammer" exists
+key ctrl+s
+expect dialog:"Speichern unter" exists
+key esc
+expect dialog:"Speichern unter" missing
+expect text:"viewer [Schreibgeschützt] – JFDiagrammer" exists
+# as a copy: the dialog in the drawing's folder, the file named there
+key ctrl+o
+click checkbox:"Schreibgeschützt öffnen"
+expect checkbox:"Schreibgeschützt öffnen" unchecked
+click button:"Als Kopie öffnen…"
+expect dialog:"Öffnen" exists
+expect text:"rack_page.vsdx" exists
+click #28684
+type "viewer.vsdx"
+click button:"Öffnen"
+expect dialog:"Öffnen" missing
+expect text:"Zeichnung1 – JFDiagrammer" exists
+expect tab:"Seite-1" exists
+# the copy saved: Strg+S asks for a file, TopPage is the page shown (the second one)
+cmd 5152
+expect tab:"Massstab" selected
+key ctrl+s
+expect dialog:"Speichern unter" exists
+click #28940
+key ctrl+a
+type "jd15-kopie.vsdx"
+click button:"Speichern"
+expect text:"jd15-kopie – JFDiagrammer" exists
+# Neu aus vorhandener Zeichnung: the same as a copy (the dialog starts in build/ now)
+click tab:"Datei"
+click button:"Neu"
+click button:"Neu aus vorhandener Zeichnung…"
+expect dialog:"Öffnen" exists
+click #28684
+type "jd15-kopie.vsdx"
+click button:"Öffnen"
+expect text:"Zeichnung2 – JFDiagrammer" exists
+# (DM-04) it opened on its TopPage
+expect tab:"Massstab" selected
+# a file that is no drawing: the notice at once, back on the drawing
+click tab:"Datei"
+click button:"Öffnen"
+click button:"Durchsuchen"
+expect dialog:"Öffnen" exists
+click #28684
+key ctrl+a
+type "../apps/JFDiagrammer/tests/broken.vsdx"
+click button:"Öffnen"
+expect button:"Zurück" missing
+expect box:"„broken.vsdx“ kann nicht geöffnet werden." exists
+expect text:"Zeichnung2 – JFDiagrammer" exists

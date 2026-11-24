@@ -1,0 +1,79 @@
+#!args --no-system-fonts --save-dir build
+# JFDiagrammer, JD15: changes are never lost without asking (UI-12, KB-01) -- Datei › Schließen,
+# Strg+W, Neu › Erstellen, Öffnen and the window's close ask "Änderungen speichern" while the
+# drawing has changes: Abbrechen keeps everything, Nicht speichern goes on, Speichern saves first
+# (Speichern unter's dialog for a new drawing) and then goes on; without changes nothing asks.
+# After Schließen the window shows no page: no page tabs, no page in the status bar.
+cmd 4404
+drag 500,330 640,420
+cmd 4400
+expect listitem:"Sheet.4" exists
+# Datei › Schließen: Abbrechen keeps the drawing
+cmd 4103
+expect dialog:"Änderungen speichern" exists
+expect text:"Möchten Sie die Änderungen an „Zeichnung1“ speichern?" exists
+click button:"Abbrechen"
+expect dialog:"Änderungen speichern" missing
+expect listitem:"Sheet.4" exists
+# Strg+W: Nicht speichern closes it; nothing of it stays
+key ctrl+w
+expect dialog:"Änderungen speichern" exists
+click button:"Nicht speichern"
+expect dialog:"Änderungen speichern" missing
+expect listitem:"Sheet.4" missing
+expect text:"Keine Zeichnung geöffnet" exists
+expect tab:"Seite-1" missing
+expect text:"Seite 1 von 1" missing
+expect text:"Zeichnung1 – JFDiagrammer" missing
+shot build/JFDiagrammer-closed.png
+# a new drawing without changes: Neu › Erstellen asks nothing
+cmd 4097
+click button:"Leere Zeichnung"
+click button:"Erstellen"
+expect dialog:"Änderungen speichern" missing
+expect text:"Zeichnung2 – JFDiagrammer" exists
+expect tab:"Seite-1" exists
+# with a change Neu › Erstellen asks; Speichern: Speichern unter, then the new drawing
+cmd 4404
+drag 500,330 640,420
+cmd 4400
+cmd 4097
+click button:"Leere Zeichnung"
+click button:"Erstellen"
+expect dialog:"Änderungen speichern" exists
+expect text:"Möchten Sie die Änderungen an „Zeichnung2“ speichern?" exists
+click button:"Speichern"
+expect dialog:"Speichern unter" exists
+click #28940
+key ctrl+a
+type "jd15-ask.vsdx"
+click button:"Speichern"
+expect dialog:"Speichern unter" missing
+expect text:"Zeichnung3 – JFDiagrammer" exists
+expect listitem:"Sheet.4" missing
+# Öffnen asks too: Nicht speichern opens the saved file, its shape is there
+cmd 4404
+drag 500,330 640,420
+cmd 4400
+key ctrl+o
+click button:"jd15-ask.vsdx"
+expect dialog:"Änderungen speichern" exists
+click button:"Nicht speichern"
+expect text:"jd15-ask – JFDiagrammer" exists
+expect listitem:"Sheet.4" exists
+# saved, unchanged: Schließen asks nothing
+cmd 4103
+expect dialog:"Änderungen speichern" missing
+expect text:"Keine Zeichnung geöffnet" exists
+# the window's close with changes: the question; Abbrechen keeps the window and the drawing
+cmd 4097
+click button:"Leere Zeichnung"
+click button:"Erstellen"
+cmd 4404
+drag 500,330 640,420
+cmd 4400
+close window main
+expect dialog:"Änderungen speichern" exists
+click button:"Abbrechen"
+expect dialog:"Änderungen speichern" missing
+expect listitem:"Sheet.4" exists

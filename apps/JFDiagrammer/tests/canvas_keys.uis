@@ -1,0 +1,70 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD15 (KB-06, KB-09, KB-04, SB-02, ZF-06): Tab without a selection takes the
+# first shape (Shift+Tab the last) though the focus was on the one drawn last; Ctrl+Shift drag
+# of the selection makes a copy and keeps to one axis (one undo step), a Ctrl+Shift click on it
+# still zooms in; Ctrl+Shift right drag pans (the zoom stays, no menu), a Ctrl+Shift right click
+# zooms out without a menu; the status bar shows a line's length and angle; with Optionen ›
+# Erweitert › Teilweise umschlossene Shapes auswählen the selection rectangle takes the shapes it
+# touches
+cmd 4404
+drag 500,330 640,420
+drag 820,500 960,560
+cmd 4400
+# KB-06
+key esc
+key tab
+expect listitem:"Sheet.4" selected
+expect listitem:"Sheet.5" unselected
+key esc
+key shift+tab
+expect listitem:"Sheet.5" selected
+expect listitem:"Sheet.4" unselected
+key esc
+# KB-09: the copy goes right, the original stays; one undo step
+click 570,375
+drag 570,375 700,385 ctrl shift
+expect listitem:"Sheet.4" rect 500 324 151 100
+expect listitem:"Sheet.6" rect 626 324 151 100
+expect listitem:"Sheet.6" selected
+expect listitem:"Sheet.4" unselected
+key ctrl+z
+expect listitem:"Sheet.6" missing
+expect listitem:"Sheet.4" rect 500 324 151 100
+# KB-04: the view pans by the drag, the zoom stays, no menu comes
+drag 900,650 800,600 right ctrl shift
+expect listitem:"Sheet.4" rect 400 274 151 100
+expect button:"67 %" exists
+expect menuitem:"Seite einrichten" missing
+expect menuitem:"Ausschneiden" missing
+# SB-02: a line: length and angle
+cmd 4406
+drag 700,300 900,400
+expect button:"Länge: 89 mm  Winkel: -27°" exists
+cmd 4400
+key ctrl+z
+# the magnifier on a selected shape: two clicks in (66.7 %, 75 %), a right click out, no menu
+click 470,325
+expect listitem:"Sheet.4" selected
+click 470,325 ctrl shift
+click 470,325 ctrl shift
+expect button:"75 %" exists
+click 470,325 r ctrl shift
+expect button:"67 %" exists
+expect menuitem:"Ausschneiden" missing
+cmd 5126
+# ZF-06: at first the rectangle takes only what lies wholly inside it
+key esc
+drag 480,300 850,520
+expect listitem:"Sheet.4" selected
+expect listitem:"Sheet.5" unselected
+key esc
+click tab:"Datei"
+click button:"Optionen"
+click button:"Erweitert"
+expect switch:"Teilweise umschlossene Shapes auswählen" unchecked
+click switch:"Teilweise umschlossene Shapes auswählen"
+expect switch:"Teilweise umschlossene Shapes auswählen" checked
+key esc
+drag 480,300 850,520
+expect listitem:"Sheet.4" selected
+expect listitem:"Sheet.5" selected

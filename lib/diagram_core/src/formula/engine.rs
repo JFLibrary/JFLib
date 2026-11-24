@@ -11,6 +11,9 @@
 //   eng.user_set(&mut tx, sheet, addr, input)    a user's change: GUARD, SETATREF redirection
 //   eng.run_action(&mut tx, sheet, addr)         an action or event cell: SETF and effects
 //   eng.evaluate(&doc, sheet, addr)              one cell with stored inputs
+//   Engine::with_seed(seed) / eng.seed(seed)     (JD15, FX-06) RAND's generator from that seed
+//                                                (SplitMix64; every engine starts with the same
+//                                                one, an app may seed it, e.g. from a clock)
 //
 // Nothing is recalculated on its own: opening a file computes nothing (PLAN.md, "Fallen").  A
 // formula that cannot be computed here -- an unknown function, a glue helper, a cycle -- keeps
@@ -180,9 +183,21 @@ pub(crate) struct Run {
     pub(crate) set_value: Option<Val>,
     pub(crate) themes: Themes,
     metrics: Rc<dyn TextMetrics>,
+    // (JD15, FX-06) RAND's generator state (the engine's, handed back by finish)
+    rng: u64,
 }
 
 impl Run {
+    /// (JD15, FX-06) the next random number of RAND: 0 <= x < 1 (SplitMix64)
+    pub(crate) fn random(&mut self) -> f64 {
+        self.rng = self.rng.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut z = self.rng;
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        z ^= z >> 31;
+        (z >> 11) as f64 / (1u64 << 53) as f64
+    }
+
     pub(crate) fn push_effect(&mut self, e: Effect) {
         if let Some(v) = self.effects.as_mut() {
             v.push(e);
@@ -544,7 +559,12 @@ pub struct Engine {
     built: bool,
     themes: Themes,
     metrics: Rc<dyn TextMetrics>,
+    // (JD15, FX-06) RAND's generator state
+    rng: u64,
 }
+
+// (JD15, FX-06) the seed every engine starts with
+const SEED: u64 = 0x5EED_0F_4A4D_1515;
 
 impl Default for Engine {
     fn default() -> Self {
@@ -560,12 +580,27 @@ impl Engine {
 
     /// an engine that measures text with the app's fonts
     pub fn with_metrics(metrics: Rc<dyn TextMetrics>) -> Engine {
-        Engine { cache: BTreeMap::new(), fwd: BTreeMap::new(), rev: BTreeMap::new(), pending: Vec::new(), built: false, themes: Themes::default(), metrics }
+        Engine { cache: BTreeMap::new(), fwd: BTreeMap::new(), rev: BTreeMap::new(), pending: Vec::new(), built: false, themes: Themes::default(), metrics, rng: SEED }
     }
 
-    /// forget everything (the document was replaced, or its themes changed)
+    /// (JD15, FX-06) an engine whose RAND starts from `seed` (the same numbers every time)
+    pub fn with_seed(seed: u64) -> Engine {
+        let mut e = Engine::new();
+        e.seed(seed);
+        e
+    }
+
+    /// (JD15, FX-06) RAND's generator anew from `seed`
+    pub fn seed(&mut self, seed: u64) {
+        self.rng = seed;
+    }
+
+    /// forget everything (the document was replaced, or its themes changed); RAND's generator
+    /// goes on
     pub fn reset(&mut self) {
+        let rng = self.rng;
         *self = Engine::with_metrics(self.metrics.clone());
+        self.rng = rng;
     }
 
     /// forget the parsed theme parts (JD11: a design was applied or a part replaced); the
@@ -593,11 +628,13 @@ impl Engine {
                 t
             },
             metrics: self.metrics.clone(),
+            rng: self.rng,
         }
     }
 
     // take back what a run kept, and its dependencies
     fn finish(&mut self, run: &mut Run) {
+        self.rng = run.rng;
         self.cache = core::mem::take(&mut run.cache);
         self.themes = core::mem::take(&mut run.themes);
         self.graph();

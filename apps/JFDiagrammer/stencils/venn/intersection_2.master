@@ -1,0 +1,71 @@
+# Schnittmenge von 2 Mengen (SH-007, JD26): zwei Kreise (gestreckt Ellipsen) nur als Umriss,
+# gefüllt ist allein ihre Überlappung (die Linse aus zwei Ellipsenbögen durch die Schnittpunkte).
+# Die Kreise haben die Mitten bei einem und zwei Dritteln der Breite und reichen je über zwei
+# Drittel; die Schnittpunkte liegen dann bei halber Breite, ±0,433 der Höhe um die Mitte.
+# Eine Gruppe aus zwei Teilen: die Umrisse der Mengen in der Linie der Formatvorlage Connector
+# (Verbinder-Liste des Designs, QuickStyleType 3, ohne Pfeilspitzen: sichtbar auch in Designs ohne
+# Shape-Linien) und die Linse mit der Füllung von Normal.  Der Text der Gruppe steht in der Linse,
+# 0,3 der Breite breit (so breit wie die Linse in halber Höhe: kurze Texte brechen nicht um).
+master: Intersection of 2 sets
+name.de: Schnittmenge von 2 Mengen
+name.en: Intersection of two sets
+name.es: Intersección de 2 conjuntos
+name.it: Intersezione di 2 insiemi
+name.fr: Intersection de 2 ensembles
+prompt.de: Zwei Mengen, deren Schnittmenge hervorgehoben ist.
+prompt.en: Two sets with their intersection highlighted.
+prompt.es: Dos conjuntos con su intersección resaltada.
+prompt.it: Due insiemi con la loro intersezione evidenziata.
+prompt.fr: Deux ensembles dont l'intersection est mise en évidence.
+keywords.de: Venn, Schnittmenge, Durchschnitt, Menge, und, Überlappung, Mengenlehre
+keywords.en: Venn, intersection, set, and, overlap, set theory
+keywords.es: Venn, intersección, conjunto, y, superposición, teoría de conjuntos
+keywords.it: Venn, intersezione, insieme, e, sovrapposizione, teoria degli insiemi
+keywords.fr: Venn, intersection, ensemble, et, chevauchement, théorie des ensembles
+
+[Shape]
+Width = 60 mm
+Width.us = 2.25 in
+Height = 40 mm
+Height.us = 1.5 in
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtWidth = Width*0.3
+TxtHeight = Height*0.4
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+# nur die Gruppe (SelectMode 0, ausdrücklich): die Teile sind Fläche und Umriss, keine eigenen
+# Objekte; der Text gehört der Gruppe
+SelectMode = 0
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+
+# die Schnittmenge: rechter Bogen von A, linker Bogen von B
+[Part Lens]
+
+[Geometry]
+NoLine = TRUE
+MoveTo           X = Width*0.5; Y = Height*0.933
+EllipticalArcTo  X = Width*0.5; Y = Height*0.067; A = Width*0.6667; B = Height*0.5; C = 0 deg; D = Width*0.6667/Height
+EllipticalArcTo  X = Width*0.5; Y = Height*0.933; A = Width*0.3333; B = Height*0.5; C = 0 deg; D = Width*0.6667/Height
+
+# die Mengen als Umriss
+[Part Sets]
+style: Connector
+
+[Shape]
+BeginArrow = 0
+EndArrow = 0
+QuickStyleType = 3
+
+[Geometry]
+NoFill = TRUE
+Ellipse  X = Width*0.3333; Y = Height*0.5; A = Width*0.6667; B = Height*0.5; C = Width*0.3333; D = Height
+
+[Geometry]
+NoFill = TRUE
+Ellipse  X = Width*0.6667; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.6667; D = Height

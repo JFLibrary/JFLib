@@ -47,7 +47,9 @@
 // of its geometry on the line through its middle), on the side that gives the cheapest way
 // among the obstacles (length + bends; one search over the sides of both ends, route::best);
 // where the other end lies within a side's reach, the point straight opposite it is offered
-// too (Visio's files show such straight connections).  The straight style docks where the line
+// too (Visio's files show such straight connections).  (JD15, SS-18) WalkPreference bit 1 / 2
+// (visWalkPrefBegNS / EndNS): that end prefers top and bottom -- a way from there wins when it is
+// as short and has as few bends as the cheapest one.  The straight style docks where the line
 // between the two ends leaves the outline.  Obstacles are the boxes of the page's top-level
 // shapes that are not 1-D (route.rs keeps the page's LineToNodeX/Y as clearance, else 1/8 in).
 // ConFixedCode 1 and 2 (reroute manually / never) keep the corners and only move the first and
@@ -929,6 +931,30 @@ fn candidates(doc: &Document, t: Target, at: [f64; 2], toward: [f64; 2], other: 
     }
 }
 
+// (JD15, SS-18) WalkPreference with bit 1 (Begin) or 2 (End) set: the end prefers the top and
+// bottom of its shape -- among ways as short and with as few bends as the cheapest one, a way
+// from those sides wins (Visio's sides, the default, need nothing: SIDES puts them first)
+fn prefer_walk(ca: &[Port], cb: &[Port], boxes: &[[f64; 4]], opts: &Opts, walk: i64, found: (usize, usize, Vec<[f64; 2]>)) -> (usize, usize, Vec<[f64; 2]>) {
+    if walk & 3 == 0 || found.2.len() < 2 {
+        return found;
+    }
+    let vertical = |p: &Port| p.dir.is_some_and(|d| d[0] == 0.0);
+    let pick = |ports: &[Port], on: bool| -> Vec<usize> { (0..ports.len()).filter(|&k| !on || vertical(&ports[k])).collect() };
+    let (ia, ib) = (pick(ca, walk & 1 != 0), pick(cb, walk & 2 != 0));
+    if ia.is_empty() || ib.is_empty() || (ia.len() == ca.len() && ib.len() == cb.len()) {
+        return found;
+    }
+    let (sa, sb): (Vec<Port>, Vec<Port>) = (ia.iter().map(|&k| ca[k]).collect(), ib.iter().map(|&k| cb[k]).collect());
+    let (i, j, way) = route::best(&sa, &sb, boxes, opts);
+    let len = |w: &[[f64; 2]]| w.windows(2).map(|s| (s[1][0] - s[0][0]).abs() + (s[1][1] - s[0][1]).abs()).sum::<f64>();
+    let (l0, l1) = (len(&found.2), len(&way));
+    if way.len() >= 2 && l1 <= l0 + 1e-9 * (1.0 + l0) && route::bends(&way) <= route::bends(&found.2) {
+        (ia[i], ib[j], way)
+    } else {
+        found
+    }
+}
+
 // a kept way (ConFixedCode): its corners stay, the first and last piece move with the ends
 fn keep(cur: &[[f64; 2]], b: [f64; 2], e: [f64; 2]) -> Option<Vec<[f64; 2]>> {
     let n = cur.len();
@@ -959,13 +985,17 @@ fn route_one(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef, force: bool, b
     let opts = opts_for(doc, c.owner);
     let fixed = !force && matches!(num(doc, sheet, "ConFixedCode").map(|v| v as i64), Some(1 | 2));
     let refs = [reference(doc, targets[0], bp), reference(doc, targets[1], ep)];
+    // (JD15, SS-18) WalkPreference: bit 1 Begin, bit 2 End prefer top and bottom
+    // (visWalkPrefBegNS, visWalkPrefEndNS), else the sides
+    let walk = num(doc, sheet, "WalkPreference").filter(|v| v.is_finite()).unwrap_or(0.0) as i64;
     let ca = candidates(doc, targets[0], bp, refs[1], facing(doc, targets[1], ep), style);
     let cb = candidates(doc, targets[1], ep, refs[0], facing(doc, targets[0], bp), style);
     let pts = if style == Style::Straight {
         route::straight(&ca[0], &cb[0])
     } else {
         // one search over the ports of both ends: the cheapest pair of sides among the obstacles
-        let (i, j, way) = route::best(&ca, &cb, boxes, &opts);
+        let found = route::best(&ca, &cb, boxes, &opts);
+        let (i, j, way) = prefer_walk(&ca, &cb, boxes, &opts, walk, found);
         match fixed.then(|| keep(&path(doc, c), ca[i].at, cb[j].at)).flatten() {
             Some(p) => p,
             None => way,

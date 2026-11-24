@@ -1,0 +1,6 @@
+#!args apps/JFDiagrammer/tests/broken.vsdx --no-system-fonts
+# JFDiagrammer, JD15: a file on the command line (a double click in the file manager) that cannot
+# be opened says so (DF-15): its notice stays over the new, empty drawing that starts instead
+expect box:"„broken.vsdx“ kann nicht geöffnet werden." exists
+expect text:"Zeichnung1 – JFDiagrammer" exists
+expect tab:"Seite-1" exists

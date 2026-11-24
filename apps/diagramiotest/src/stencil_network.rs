@@ -3,11 +3,15 @@
 //
 //   stencils/network/<set>/<measure>   every set builds in both measures, write -> read ->
 //                       write is the same, a second build gives the same bytes
+//   stencils/network/rack_equipment/<measure>/dimension/...   (JD15) the dimensions show their
+//                       length in a text field: 600 mm / 1000 mm, US 24 in / 40 in
 //   stencils/network/data      a dropped device has the shape data of its includes (asset,
 //                       network, computer) with the labels in the language it was dropped in
 //   stencils/network/rack      the rack: height = base + top + units x 44.45 mm, its connection
 //                       points on every unit boundary; a user's height goes to Prop.RackUnits
-//                       (SETATREF) and snaps; devices alike; the master pages are 1:20
+//                       (SETATREF) and snaps; devices alike; the master pages are 1:20; (JD15,
+//                       MS-10) on a 1:1 page the rack keeps its size on the paper, on 1:10 its
+//                       real size (Visio's range of eight)
 //
 //   stencils/network/dock      a server dropped over a rack docks with its outward point on the
 //                       nearest unit boundary of the rail (diagram_core::dock) and joins the
@@ -42,7 +46,7 @@ pub(crate) const SETS: &[(&str, &str, usize)] = &[
     ("locations", "net_locations", 8),
     ("symbols", "net_symbols", 24),
     ("servers", "net_servers", 17),
-    ("rack_equipment", "rack_equipment", 17),
+    ("rack_equipment", "rack_equipment", 19),
     ("rack_freestanding", "rack_freestanding", 9),
     ("rack_servers", "rack_servers", 17),
 ];
@@ -76,6 +80,9 @@ pub fn run(h: &mut H) {
                     let again = build_set(set, m).map(|(_, x)| x).unwrap_or_default();
                     h.check(&format!("{tag}/deterministic"), again == bytes, format!("same bytes: {}", again == bytes));
                     let back = read_back(h, &format!("{tag}/roundtrip"), &bytes);
+                    if name == "rack_equipment" {
+                        dimension_checks(h, &b.doc, m, &tag);
+                    }
                     if m == Measure::Metric {
                         match name {
                             "rack_equipment" => rack = back,
@@ -93,6 +100,20 @@ pub fn run(h: &mut H) {
     if let Some(doc) = &rack {
         rack_checks(h, doc);
         dock_checks(h, doc);
+    }
+}
+
+// (JD15) the dimensions of the rack stencil show their length in a text field: 600 mm and 1000 mm
+// on the metric master pages, 24 in and 40 in on the US ones
+fn dimension_checks(h: &mut H, doc: &Document, m: Measure, tag: &str) {
+    let want = if m == Measure::Us { [("Dimension - horizontal", "24 in"), ("Dimension - vertical", "40 in")] } else { [("Dimension - horizontal", "600 mm"), ("Dimension - vertical", "1000 mm")] };
+    for (nu, text) in want {
+        let shown = doc
+            .masters()
+            .find(|&mr| MasterTexts::of(doc, mr).name_u == nu)
+            .and_then(|mr| doc.master(mr).and_then(|x| x.master_shape()).map(|slot| ShapeRef { owner: Owner::Master(mr), slot }))
+            .map(|s| diagram_core::field::plain(doc, s));
+        h.check(&format!("{tag}/dimension/{nu}"), shown.as_deref() == Some(text), format!("{shown:?} (want {text})"));
     }
 }
 
@@ -250,6 +271,28 @@ fn rack_checks(h: &mut H, src: &Document) {
         c.map(|c| doc.resolve(SheetRef::Shape(s), &CellAddr::single(c)).formula()).map(|f| matches!(f, diagram_core::Formula::Expr(_) | diagram_core::Formula::Inherited))
     };
     h.check("stencils/network/rack/formula-kept", formula(&doc, rack) == Some(true) && formula(&doc, switch) == Some(true), format!("rack {:?}, switch {:?}", formula(&doc, rack), formula(&doc, switch)));
+    // (JD15, MS-10) Visio's range of eight: on a 1:1 page the 1:20 rack keeps its size on the
+    // paper (a twentieth in drawing units), its units still count and snap (1000 mm / 20 -> 20 U);
+    // on a 1:10 page (within eight times) its real size
+    for (scale, f) in [(1.0, 0.05), (10.0, 1.0)] {
+        let Some((mut doc, page)) = new_drawing(scale) else { return };
+        let r = {
+            let mut tx = doc.transaction("drop");
+            let r = put(&mut tx, src, page, "Rack", (100.0, 100.0), 0);
+            let _ = tx.commit();
+            r
+        };
+        let Some(r) = r else {
+            h.check(&format!("stencils/network/rack/range-of-eight/1-{scale}"), false, String::from("rack not placed"));
+            continue;
+        };
+        recalc_all(&mut doc, page);
+        let before = hmm(&doc, r);
+        let ok = user_height(&mut doc, r, 1000.0 * f);
+        h.check(&format!("stencils/network/rack/range-of-eight/1-{scale}"),
+            (before - (100.0 + 42.0 * u) * f).abs() < 1e-6 && ok && units(&doc, r) == 20.0 && (hmm(&doc, r) - (100.0 + 20.0 * u) * f).abs() < 1e-6,
+            format!("{before:.3} mm (want {:.3}), after {:.0} mm: {} U {:.3} mm", (100.0 + 42.0 * u) * f, 1000.0 * f, units(&doc, r), hmm(&doc, r)));
+    }
 }
 
 /// diagramiotest --write-network-previews DIR

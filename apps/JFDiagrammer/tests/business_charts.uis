@@ -1,0 +1,60 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD26: Diagramme und Grafiken (VL-38) and the mechanics of the business graphics
+# -- the strategy starter (SWOT, layered pyramid, circular motion); the pyramid's levels in the
+# Shape-Daten pane (4 -> 6, the pyramid grows), its control point at the top one level down
+# (SETATREF: 5 levels), undo; a step chart from Marketingdiagramme, its control point two steps to
+# the right (6 steps, the chart grows); a pie chart slice whose share comes from its shape data
+click tab:"Datei"
+click button:"Geschäft"
+click button:"Diagramme und Grafiken"
+click button:"Beispiel: Strategie"
+expect button:"Beispiel: Strategie" checked
+click button:"Erstellen"
+expect tab:"Marketingdiagramme" selected
+expect tab:"Pyramiden-Shapes" exists
+expect tab:"Diagramm- und Mathematik-Shapes" exists
+expect listitem:"SWOT" rect 462 349 202 151
+expect listitem:"Pyramide mit Ebenen" rect 689 361 201 126
+expect listitem:"Kreisbewegung" rect 940 361 126 126
+shot build/JFDiagrammer-business-charts.png
+# the levels in the shape data
+click 790,470
+cmd 5139
+expect tab:"Shape-Daten" selected
+expect text:"Ebenen" exists
+expect #20784 text "4"
+click #20784
+key ctrl+a
+type "6"
+key enter
+expect #20784 text "6"
+expect listitem:"Pyramide mit Ebenen" rect 546 330 201 189
+# the control point at the top one level down
+expect button:"Steuerpunkt 1" rect 641 325 10 10
+drag button:"Steuerpunkt 1" 646,361
+expect #20784 text "5"
+expect listitem:"Pyramide mit Ebenen" rect 546 346 201 157
+shot build/JFDiagrammer-business-pyramid.png
+key ctrl+z
+expect #20784 text "6"
+# a step chart: its control point two steps to the right
+click tab:"Marketingdiagramme"
+drag button:"Stufendiagramm" 355,670
+expect #20784 text "4"
+expect listitem:"Stufendiagramm" rect 266 620 178 100
+drag button:"Steuerpunkt 1" 535,620
+expect #20784 text "6"
+shot build/JFDiagrammer-business-steps.png
+# a pie chart slice: 60 % from the shape data
+click tab:"Diagramm- und Mathematik-Shapes"
+drag button:"Kreisdiagrammsegment" 900,660
+expect text:"Anteil (%)" exists
+expect #20788 text "25"
+expect listitem:"Kreisdiagrammsegment" rect 900 622 38 38
+click #20788
+key ctrl+a
+type "60"
+key enter
+expect #20788 text "60"
+expect listitem:"Kreisdiagrammsegment" exists
+shot build/JFDiagrammer-business-pie.png

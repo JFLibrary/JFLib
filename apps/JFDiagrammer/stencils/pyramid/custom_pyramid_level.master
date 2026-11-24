@@ -1,0 +1,55 @@
+# Benutzerdefinierte Pyramidenebene (SH-032, JD26; in Visio „Benutzerdefinierte Pyramide“): eine
+# einzelne Pyramidenebene zum Stapeln, ein Trapez, unten so breit wie das Shape, oben um User.D je
+# Seite eingerückt.  Row_1 an der oberen linken Ecke ändert den Einzug (Abstand vom linken Rand,
+# nur waagrecht): er bleibt beim Strecken, so passen gleich hohe Ebenen mit gleichem Einzug
+# aufeinander, wenn die obere um 2 x Einzug schmaler ist.
+master: Custom pyramid level
+name.de: Benutzerdefinierte Pyramidenebene
+name.en: Custom pyramid level
+name.es: Nivel de pirámide personalizado
+name.it: Livello di piramide personalizzato
+name.fr: Niveau de pyramide personnalisé
+prompt.de: Einzelne Pyramidenebene zum Stapeln. Die Neigung der Seiten ändern Sie mit dem gelben Steuerpunkt.
+prompt.en: Single pyramid level for stacking. Drag the yellow control handle to change the slope of the sides.
+prompt.es: Nivel individual de pirámide para apilar. Arrastre el controlador amarillo para cambiar la inclinación de los lados.
+prompt.it: Singolo livello di piramide da impilare. Trascina la maniglia di controllo gialla per cambiare l'inclinazione dei lati.
+prompt.fr: Niveau de pyramide individuel à empiler. Faites glisser la poignée de contrôle jaune pour modifier l'inclinaison des côtés.
+keywords.de: Ebene, Trapez, Pyramide, Pyramidenebene, stapeln, benutzerdefiniert, Benutzerdefinierte Pyramide
+keywords.en: level, trapezoid, pyramid, pyramid level, stack, custom, layer
+keywords.es: nivel, trapecio, pirámide, nivel de pirámide, apilar, personalizado
+keywords.it: livello, trapezio, piramide, livello di piramide, impilare, personalizzato
+keywords.fr: niveau, trapèze, pyramide, niveau de pyramide, empiler, personnalisé
+
+[Shape]
+Width = 60 mm
+Width.us = 2.5 in
+Height = 12.5 mm
+Height.us = 0.5 in
+
+[User]
+# der Einzug je Seite
+D:  Value = MIN(MAX(Controls.Row_1,0),Width*0.49)
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width-User.D; Y = Height
+LineTo  X = User.D; Y = Height
+LineTo  X = 0; Y = 0
+
+[Controls]
+Row_1:  X = 6 mm; Y = Height
+        X.us = 0.25 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 2; YCon = 1; CanGlue = FALSE
+        Tip.de = "Neigung der Seiten ändern"
+        Tip.en = "Change the slope of the sides"
+        Tip.es = "Cambiar la inclinación de los lados"
+        Tip.it = "Cambia l'inclinazione dei lati"
+        Tip.fr = "Modifier l'inclinaison des côtés"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width-User.D*0.5; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = User.D*0.5; Y = Height*0.5; DirX = 1; DirY = 0

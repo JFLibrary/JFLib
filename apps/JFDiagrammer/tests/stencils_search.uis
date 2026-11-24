@@ -1,5 +1,7 @@
-# JFDiagrammer, JD9: searching shapes (SL-04) -- over NameU, the names in all five languages
-# and the keywords of every stencil read (the built-in ones too, open or not); accents and case
+# JFDiagrammer, JD9: searching shapes (SL-04) -- over NameU, the names in all five languages,
+# the keywords and (JD15) the QuickInfos of every stencil read (the built-in ones too, open or
+# not); (JD15) every word or one of them (an option), the search box hidden by an option;
+# accents and case
 # do not count; the hits show in the current language.  #24577 is the panel's search box
 # (stencils_panel.rs ID_PANEL + 1)
 focus #24577
@@ -8,15 +10,16 @@ type "carreau"
 expect button:"Raute" exists
 expect button:"Rechteck" missing
 key esc
-# a German keyword of the ellipse, a stencil that is not open
+# a German keyword of the ellipse, a stencil that is not open (JD26: "kreis" finds a dozen
+# business shapes too, "oval" the ellipse only)
 focus #24577
-type "kreis"
+type "oval"
 expect button:"Ellipse" exists
 key esc
-# an English keyword without its accent, Spanish "rectángulo" without the accent
+# an English keyword without its accent, Spanish "rectángulo" without the accent (JD26: the
+# marketing diagrams have a Rechteck of their own, so the rounded one names the hit)
 focus #24577
 type "rectangulo"
-expect button:"Rechteck" exists
 expect button:"Abgerundetes Rechteck" exists
 key esc
 # nothing found
@@ -25,3 +28,39 @@ type "zzzz"
 expect text:"Keine Shapes gefunden" exists
 key esc
 expect text:"Keine Shapes gefunden" missing
+# (JD15) the QuickInfo counts: "geschlossenen" stands only in the bar's QuickInfo (Blöcke)
+focus #24577
+type "geschlossenen"
+expect button:"Balken offen/geschlossen" exists
+key esc
+# every word must match by default; with Optionen › Erweitert › "Shape-Suche: ein Wort genügt"
+# one is enough
+focus #24577
+type "zzzz oval"
+expect text:"Keine Shapes gefunden" exists
+key esc
+click tab:"Datei"
+click button:"Optionen"
+click button:"Erweitert"
+expect switch:"Shape-Suche: ein Wort genügt" unchecked
+click switch:"Shape-Suche: ein Wort genügt"
+click button:"Zurück"
+focus #24577
+type "zzzz oval"
+expect button:"Ellipse" exists
+key esc
+# "Shape-Suche anzeigen" off: no search box
+click tab:"Datei"
+click button:"Optionen"
+click button:"Erweitert"
+expect switch:"Shape-Suche anzeigen" checked
+click switch:"Shape-Suche anzeigen"
+click button:"Zurück"
+expect #24577 missing
+expect button:"Weitere Shapes" exists
+click tab:"Datei"
+click button:"Optionen"
+click button:"Erweitert"
+click switch:"Shape-Suche anzeigen"
+click button:"Zurück"
+expect #24577 exists

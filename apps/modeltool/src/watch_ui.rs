@@ -2,7 +2,8 @@
 // gpu_view and builds it again when the script or one of its modules is saved (watch.rs looks every 300 ms).  The
 // same cameras, grid and light as the pictures (render.rs): the three plan views and the three-quarter view, and a
 // free view about the model's middle (drag with the left button: turn; the wheel: nearer, farther).  An error in
-// the script shows in a bar above the view with its place; the model of the last build that ran stays.
+// the script shows in a bar above the view with its place; the model of the last build that ran stays.  The
+// host's warnings (the script went on) show in a bar of their own below it, each with its place.
 //
 //   F5 builds again by hand, Ctrl+Q ends.  Headless with --script (tests/watch.uis, tests/watch_fehler.uis).
 
@@ -27,6 +28,7 @@ const ID_REBUILD: u32 = 111;
 // (an info bar's close button takes the next id)
 const ID_ERR: u32 = 120;
 const ID_FINDINGS: u32 = 130;
+const ID_WARN: u32 = 140;
 const CMD_QUIT: u32 = 1;
 const CMD_REBUILD: u32 = 2;
 const TIMER_POLL: u32 = 1;
@@ -268,6 +270,19 @@ impl App for WatchApp {
             }
         } else if !st.findings.is_empty() {
             ui.infobar(ID_FINDINGS, IB_WARNING, "Prüfung fehlgeschlagen", &st.findings.join("; "));
+        }
+        // the host's warnings: the script went on; each with its place and line, as the console shows them
+        if st.warning_count > 0 {
+            let n = st.warning_count;
+            let title = if n == 1 { String::from("1 Warnung im Skript") } else { format!("{} Warnungen im Skript", n) };
+            ui.infobar(ID_WARN, IB_WARNING, &title, "das Skript lief weiter");
+            for w in &st.warnings {
+                for (k, line) in w.iter().enumerate() {
+                    if !line.trim_start().starts_with('|') {
+                        ui.text(if k == 0 { TS_BODY_STRONG } else { TS_BODY | TX_SECONDARY }, line.trim_end());
+                    }
+                }
+            }
         }
         // the model
         ui.next_size(0, -1);

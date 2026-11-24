@@ -1,0 +1,61 @@
+# Startdiagramm „Beispiel: System“ des Blockdiagramms: Eingang, Verarbeitung und Ausgang mit
+# 1D-Pfeilen, deren Enden an den Verbindungspunkten der Blöcke kleben (BeginOn/EndOn), ein
+# Speicher darunter mit Doppelpfeil, Überschrift und Tipp.  Positionen für A4 bzw. Letter quer.
+starter: sample
+name.de: Beispiel: System
+name.en: Sample: System
+name.es: Ejemplo: sistema
+name.it: Esempio: sistema
+name.fr: Exemple : système
+description.de: Drei Blöcke mit geklebten Pfeilen und ein Speicher, zum Abwandeln.
+description.en: Three blocks with glued arrows and a store, to adapt.
+description.es: Tres bloques con flechas pegadas y un almacén, para adaptar.
+description.it: Tre blocchi con frecce incollate e un archivio, da adattare.
+description.fr: Trois blocs avec des flèches collées et un stockage, à adapter.
+
+[Shapes]
+title:  Stencil = "standard"; Master = "Text box"
+        PinX = 148 mm; PinY = 170 mm; Width = 160 mm; Height = 12 mm
+        PinX.us = 5.5 in; PinY.us = 6.9 in; Width.us = 6 in; Height.us = 0.5 in
+        Text.de = "Systemübersicht"; Text.en = "System overview"; Text.es = "Vista general del sistema"
+        Text.it = "Panoramica del sistema"; Text.fr = "Vue d'ensemble du système"
+in:     Stencil = "blocks"; Master = "Box"
+        PinX = 70 mm; PinY = 125 mm
+        PinX.us = 2.6 in; PinY.us = 4.9 in
+        Text.de = "Eingang"; Text.en = "Input"; Text.es = "Entrada"
+        Text.it = "Ingresso"; Text.fr = "Entrée"
+proc:   Stencil = "blocks"; Master = "Box"
+        PinX = 148 mm; PinY = 125 mm
+        PinX.us = 5.5 in; PinY.us = 4.9 in
+        Text.de = "Verarbeitung"; Text.en = "Processing"; Text.es = "Procesamiento"
+        Text.it = "Elaborazione"; Text.fr = "Traitement"
+out:    Stencil = "blocks"; Master = "Box"
+        PinX = 226 mm; PinY = 125 mm
+        PinX.us = 8.4 in; PinY.us = 4.9 in
+        Text.de = "Ausgang"; Text.en = "Output"; Text.es = "Salida"
+        Text.it = "Uscita"; Text.fr = "Sortie"
+store:  Stencil = "blocks"; Master = "Circle"
+        PinX = 148 mm; PinY = 62 mm
+        PinX.us = 5.5 in; PinY.us = 2.5 in
+        Text.de = "Speicher"; Text.en = "Store"; Text.es = "Almacén"
+        Text.it = "Archivio"; Text.fr = "Stockage"
+a1:     Stencil = "blocks"; Master = "1-D arrow"
+        BeginX = 90 mm; BeginY = 125 mm; EndX = 128 mm; EndY = 125 mm
+        BeginX.us = 3.35 in; BeginY.us = 4.9 in; EndX.us = 4.75 in; EndY.us = 4.9 in
+        BeginOn = "in"; BeginPoint = 2; EndOn = "proc"; EndPoint = 4
+a2:     Stencil = "blocks"; Master = "1-D arrow"
+        BeginX = 168 mm; BeginY = 125 mm; EndX = 206 mm; EndY = 125 mm
+        BeginX.us = 6.25 in; BeginY.us = 4.9 in; EndX.us = 7.65 in; EndY.us = 4.9 in
+        BeginOn = "proc"; BeginPoint = 2; EndOn = "out"; EndPoint = 4
+a3:     Stencil = "blocks"; Master = "1-D double arrow"
+        BeginX = 148 mm; BeginY = 115 mm; EndX = 148 mm; EndY = 77 mm
+        BeginX.us = 5.5 in; BeginY.us = 4.525 in; EndX.us = 5.5 in; EndY.us = 3.125 in
+        BeginOn = "proc"; BeginPoint = 1; EndOn = "store"; EndPoint = 3
+tip:    Stencil = "callouts"; Master = "Tip"; Tip = TRUE
+        PinX = 230 mm; PinY = 55 mm; Width = 100 mm; Height = 30 mm
+        PinX.us = 8.6 in; PinY.us = 2.2 in; Width.us = 3.6 in; Height.us = 1.2 in
+        Text.de = "Tipp: Ziehen Sie Blöcke und Pfeile aus den Schablonen links auf die Seite. Die Enden der 1D-Pfeile kleben an den Verbindungspunkten. Diesen Hinweis können Sie löschen."
+        Text.en = "Tip: Drag blocks and arrows from the stencils on the left onto the page. The ends of the 1-D arrows glue to the connection points. You can delete this note."
+        Text.es = "Consejo: arrastre bloques y flechas desde las colecciones de formas de la izquierda a la página. Los extremos de las flechas 1D se pegan a los puntos de conexión. Puede eliminar esta nota."
+        Text.it = "Suggerimento: trascinare blocchi e frecce dalle raccolte di forme a sinistra sulla pagina. Le estremità delle frecce 1D si incollano ai punti di connessione. È possibile eliminare questa nota."
+        Text.fr = "Astuce : faites glisser des blocs et des flèches des bibliothèques de formes à gauche sur la page. Les extrémités des flèches 1D se collent aux points de connexion. Vous pouvez supprimer cette note."

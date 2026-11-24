@@ -1,0 +1,67 @@
+# Neutrales Gesicht (SH-003, JD26): derselbe Aufbau wie das lachende Gesicht (smiley.master), nur
+# liegt der Steuerpunkt Row_1 auf der Höhe der Mundwinkel: der Mund ist gerade.  Kreis, Augen und
+# Mund als Löcher (Gerade-Ungerade-Regel; so zeigt sie auch ein Design ohne Shape-Linien).  Row_1
+# (nur senkrecht, anteilig) biegt den Mund nach unten zum Lachen oder nach oben zum traurigen
+# Gesicht.  Geometrie und Steuerpunkt gleich halten wie in smiley.master.
+master: Neutral face
+name.de: Neutrales Gesicht
+name.en: Neutral face
+name.es: Cara neutral
+name.it: Faccina neutra
+name.fr: Visage neutre
+prompt.de: Gesicht mit geradem Mund. Mit dem gelben Steuerpunkt ändern Sie den Mund von lachend bis traurig.
+prompt.en: Face with a straight mouth. Drag the yellow control handle to change the mouth from smiling to sad.
+prompt.es: Cara con la boca recta. Arrastre el controlador amarillo para cambiar la boca de sonriente a triste.
+prompt.it: Faccina con la bocca dritta. Trascina la maniglia di controllo gialla per cambiare la bocca da sorridente a triste.
+prompt.fr: Visage à la bouche droite. Faites glisser la poignée de contrôle jaune pour faire passer la bouche du sourire à la tristesse.
+keywords.de: Gesicht, neutral, Smiley, gleichgültig, Emoji, Stimmung, Bewertung
+keywords.en: face, neutral, smiley, indifferent, emoji, mood, rating
+keywords.es: cara, neutral, indiferente, emoticono, estado de ánimo, valoración
+keywords.it: faccina, neutra, indifferente, emoji, umore, valutazione
+keywords.fr: visage, neutre, indifférent, émoticône, humeur, évaluation
+
+[Shape]
+Width = 30 mm
+Width.us = 1.25 in
+Height = 30 mm
+Height.us = 1.25 in
+
+[User]
+# die Höhe der Mundmitte, begrenzt auf die untere Hälfte des Gesichts; die halbe Dicke des Munds
+My:  Value = MIN(MAX(Controls.Row_1.Y, Height*0.14), Height*0.5)
+T:   Value = Height*0.025
+
+# 1 der Kopf
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# 2, 3 die Augen (Löcher im Kopf)
+[Geometry]
+Ellipse  X = Width*0.35; Y = Height*0.64; A = Width*0.4; B = Height*0.64; C = Width*0.35; D = Height*0.72
+
+[Geometry]
+Ellipse  X = Width*0.65; Y = Height*0.64; A = Width*0.7; B = Height*0.64; C = Width*0.65; D = Height*0.72
+
+# 4 der Mund (Loch): unterer Bogen, rechter Winkel, oberer Bogen zurück
+[Geometry]
+MoveTo           X = Width*0.27; Y = Height*0.36-User.T
+EllipticalArcTo  X = Width*0.73; Y = Height*0.36-User.T; A = Width*0.5; B = User.My-User.T; C = 0 deg; D = Width/Height
+LineTo           X = Width*0.73; Y = Height*0.36+User.T
+EllipticalArcTo  X = Width*0.27; Y = Height*0.36+User.T; A = Width*0.5; B = User.My+User.T; C = 0 deg; D = Width/Height
+LineTo           X = Width*0.27; Y = Height*0.36-User.T
+
+[Controls]
+Row_1:  X = Width*0.5; Y = Height*0.36
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 1; YCon = 0; CanGlue = FALSE
+        Tip.de = "Mund ändern"
+        Tip.en = "Change the mouth"
+        Tip.es = "Cambiar la boca"
+        Tip.it = "Cambia la bocca"
+        Tip.fr = "Modifier la bouche"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

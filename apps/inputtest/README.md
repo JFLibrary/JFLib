@@ -85,6 +85,6 @@ The pads per platform: Windows reads XInput (Xbox-compatible pads only; a PlaySt
 up only through Steam Input or a driver that makes it an Xbox pad), Linux the evdev nodes of game
 controllers (an Xbox pad over USB through xpad, a PlayStation pad through hid-playstation, a
 Switch Pro pad through hid-nintendo; the KDE desktop gives the logged-in user access to them, in
-a Flatpak they need `--device=input`), macOS GameController (Xbox, PlayStation, Switch Pro and MFi
+a Flatpak they need `--device=input`, which the line `gamepad` of the app's PERMISSIONS gives the package), macOS GameController (Xbox, PlayStation, Switch Pro and MFi
 pads over USB or Bluetooth), the browser the Gamepad API (Chrome maps known pads to the standard
 layout; Firefox on Linux may show a pad with *eigene Belegung*, then the names do not fit).

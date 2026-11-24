@@ -1,0 +1,58 @@
+# Kreissegment (SH-004, JD26): ein Tortenstück aus dem Kreis (gestreckt der Ellipse) des Kastens.
+# Es beginnt oben und läuft im Uhrzeigersinn bis zum Steuerpunkt Row_1: der Winkel ist die
+# Richtung des Punkts von der Mitte aus (frei ziehbar, 5° bis 355°).  Der Bogen ist ein
+# Ellipsenbogen durch die Mitte des Stücks.  Der Text steht in der Mitte des Stücks;
+# Verbindungspunkte an der Spitze und auf der Mitte des Bogens.
+master: Pie slice
+name.de: Kreissegment
+name.en: Pie slice
+name.es: Sector circular
+name.it: Settore circolare
+name.fr: Secteur circulaire
+prompt.de: Tortenstück für Kreisdiagramme. Mit dem gelben Steuerpunkt ändern Sie den Winkel.
+prompt.en: Pie slice for pie charts. Drag the yellow control handle to change the angle.
+prompt.es: Porción para gráficos circulares. Arrastre el controlador amarillo para cambiar el ángulo.
+prompt.it: Fetta per grafici a torta. Trascina la maniglia di controllo gialla per cambiare l'angolo.
+prompt.fr: Part de secteur pour les graphiques en secteurs. Faites glisser la poignée de contrôle jaune pour modifier l'angle.
+keywords.de: Kreissegment, Tortenstück, Kreisdiagramm, Sektor, Anteil, Winkel, Torte
+keywords.en: pie slice, wedge, pie chart, sector, share, angle
+keywords.es: sector, porción, gráfico circular, cuña, proporción, ángulo
+keywords.it: settore, fetta, grafico a torta, spicchio, quota, angolo
+keywords.fr: secteur, part, graphique en secteurs, camembert, proportion, angle
+
+[Shape]
+Width = 30 mm
+Width.us = 1.25 in
+Height = 30 mm
+Height.us = 1.25 in
+TxtWidth = Width*0.4
+TxtHeight = Height*0.2
+TxtPinX = Width*0.5*(1+0.55*SIN(User.S*0.5))
+TxtPinY = Height*0.5*(1+0.55*COS(User.S*0.5))
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# der Winkel im Bogenmaß, im Uhrzeigersinn von oben bis zur Richtung des Steuerpunkts
+S:  Value = MIN(MAX(MODULUS(PI()*0.5-ATAN2((Controls.Row_1.Y-Height*0.5)/Height,(Controls.Row_1-Width*0.5)/Width),2*PI()),0.0873),6.1959)
+
+[Geometry]
+MoveTo           X = Width*0.5; Y = Height*0.5
+LineTo           X = Width*0.5; Y = Height
+EllipticalArcTo  X = Width*0.5*(1+SIN(User.S)); Y = Height*0.5*(1+COS(User.S))
+                 A = Width*0.5*(1+SIN(User.S*0.5)); B = Height*0.5*(1+COS(User.S*0.5)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5; Y = Height*0.5
+
+[Controls]
+Row_1:  X = Width; Y = Height*0.5
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 0; YCon = 0; CanGlue = FALSE
+        Tip.de = "Winkel ändern"
+        Tip.en = "Change the angle"
+        Tip.es = "Cambiar el ángulo"
+        Tip.it = "Cambia l'angolo"
+        Tip.fr = "Modifier l'angle"
+
+[Connection]
+Row  X = Width*0.5; Y = Height*0.5; DirX = 0; DirY = 0
+Row  X = Width*0.5*(1+SIN(User.S*0.5)); Y = Height*0.5*(1+COS(User.S*0.5)); DirX = -SIN(User.S*0.5); DirY = -COS(User.S*0.5)

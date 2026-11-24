@@ -157,6 +157,37 @@ Grenzen des Browsers: Eine Seite darf nur mit 1000 oder 3000 bis 4999 schließen
 hat (`bufferedAmount`), sieht Rust nicht; `netchan` begrenzt deshalb, was das Spiel schickt, und nicht der Socket. Die
 Sockets gehören dem Thread der App: Die Rechen-Worker des Builds mit Threads erreichen sie nicht.
 
+### Antworten über UDP ohne `net.connect`
+
+Ein Server über UDP antwortet Clients, deren Adressen er vorher nicht kennt. Bis zum 24.11.2026 prüfte `plat` jedes
+`UdpSocket::send_to` gegen `net.connect`; ein Server mit PERMISSIONS brauchte `net.connect *:*`, nur um zu antworten, und
+durfte damit auch überall hin verbinden (gefunden mit G7e Teil 2, unten). Jetzt gilt ([PERMISSIONS.md](PERMISSIONS.md),
+„Network rules“): Ein UDP-Socket, dessen Adresse `net.listen` erlaubt, darf an jede Adresse senden, von der er in den
+letzten 60 s ein Datagramm empfangen hat, ohne Regel in `net.connect`. Jede andere Adresse prüft weiter `net.connect`.
+Ohne PERMISSIONS ändert sich nichts (alles ist erlaubt, der Socket führt keine Liste).
+
+- **Welche Sockets.** Ein fester Port geht ohnehin durch die Prüfung von `net.listen`; ein Socket auf Port 0 braucht
+  keine Regel (der eines Clients), antwortet aber nur, wenn eine Regel von `net.listen` seine Adresse mit Port 0 oder `*`
+  deckt (still geprüft: keine Frage, kein PERMDENY). Der Client von `netchan` bindet `0.0.0.0:0` oder `[::]:0` und
+  braucht keine Antworten: Er schreibt nur an seinen Server (`net.connect`).
+- **Die Liste je Socket** (`plat::net::AnswerSet`): die Absender mit der Zeit ihres letzten Datagramms, in zwei
+  Generationen zu je 512 Adressen. Ist die neue voll oder 60 s alt, wird sie die alte, die alte fällt weg. Eine Adresse
+  gilt 60 s nach ihrem letzten Datagramm; Senden verlängert nichts. Höchstens 1024 Adressen, rund 50 KB.
+- **Gefälschte Absender.** UDP beweist den Absender nicht: Wer Datagramme mit fremder Absenderadresse schicken kann, öffnet
+  diesem Socket den Weg an diese Adresse, so wie jeder UDP-Server dem antwortet, der schreibt. Größer als 1024 Adressen
+  wird die Liste dadurch nicht; eine Flut schiebt ältere Einträge hinaus, ihre Clients bekommen nach ihrem nächsten
+  Datagramm wieder Antwort (ein Client von Spiel 1 schickt 60 je Sekunde, eine Flut müsste also über 1000 gefälschte
+  Absender in 16 ms schicken, um ihn für einen Moment zu verdrängen). Dass die Antworten auf einen fremden Absender nicht
+  größer sind als die Anfrage, sorgt der Handschlag von `netchan` (zustandsloses Cookie, [Handschlag über
+  UDP](#handschlag-über-udp)).
+- **Plugins.** Im Bereich eines Plugins (`policy::on_behalf`) braucht eine Antwort zusätzlich das `net.listen` des
+  Plugins für die Adresse des Sockets.
+- **Ziele.** Der Code liegt im gemeinsamen Teil von `net.rs` und gilt auf Windows, Linux, macOS und iOS; Android hat noch
+  keine Sockets (AN2 nimmt den Linux-Teil, die Regel kommt dann mit), der Browser hat kein UDP.
+
+`apps/game1-server/PERMISSIONS` hat seitdem nur `net.listen *:*` und `net.connect localhost:*` (der eigene Client von
+`--check`).
+
 ### Paketformat
 
 Byte 0 ist `VERSION << 4 | Art` (Version 2 seit U3; Version 1 ohne Schlüssel liest niemand mehr), danach Little-Endian:
@@ -307,6 +338,7 @@ bis `max_message` (1 MiB); beim Empfänger kommt jede Nachricht genau einmal, ga
 | Ungesendetes des Desktop-WebSockets | 4 MiB (`send`: `Backlog`, nichts gesendet) | `WsOptions` |
 | Warteschlange der lesenden Threads des Servers | 8192 Einträge (UDP verwirft, WebSocket wartet) | `server.rs` |
 | Browser: Nachricht, Warteschlange, Sockets | 1 MiB, 8 MiB, 64 | `WsLimits`, `WS_MAX_SOCKETS` |
+| Antworten eines UDP-Sockets ohne `net.connect` (nur mit PERMISSIONS) | 1024 Absender, 60 s nach dem letzten Datagramm | `plat::net::AnswerSet` |
 
 Die Vorgaben sind geschätzt; Teil 2 stellt sie nach Messungen ein. Ein Spiel mit 60 Hz Eingaben und Bestätigungen
 braucht rund 70 Pakete je Sekunde je Client, 300 lassen Luft für Stöße.
@@ -466,10 +498,10 @@ Schwankung der Ankunft 3 ms. Über WebSocket: Umlauf 16 bis 28 ms, p99 39 bis 89
 wartet auf dessen Wiederholung, und dann kommen Eingaben in Schüben (der Netcode hält deshalb über WebSocket einen Tick mehr
 Vorlauf). Fedora als Server und weitere Rechner waren nicht erreichbar.
 
-Dabei gefunden: Ein Server mit UDP braucht in seinen PERMISSIONS `net.connect` für die Adressen seiner Clients, weil `plat`
-jedes `UdpSocket::send_to` gegen diese Regel prüft; `game1-server` hatte nur `localhost` und schickte Clients im LAN keine
-CHALLENGE (PERMDENY). Ob Antworten an eine Adresse, die vorher an einen erlaubten lauschenden Socket schickte, ohne eigene
-Regel durchgehen sollen, ist offen.
+Dabei gefunden: Ein Server mit UDP brauchte in seinen PERMISSIONS `net.connect` für die Adressen seiner Clients, weil `plat`
+jedes `UdpSocket::send_to` gegen diese Regel prüfte; `game1-server` hatte nur `localhost` und schickte Clients im LAN keine
+CHALLENGE (PERMDENY). Seit dem 24.11.2026 darf ein Socket, den `net.listen` erlaubt, denen antworten, die ihm schrieben
+([Antworten über UDP ohne `net.connect`](#antworten-über-udp-ohne-netconnect)).
 
 ## Was nicht getestet ist
 

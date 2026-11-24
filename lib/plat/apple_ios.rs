@@ -52,6 +52,12 @@ type CfRef = *const c_void;
 mod services;
 pub(crate) use services::notes;
 pub use services::{clip_get, clip_has, clip_set, clip_set_many, file_dialog, file_dialog_poll};
+// (tests) the bookmarks of chosen files
+pub use services::{ios_bookmark_add, ios_bookmark_paths, ios_bookmarks_clear, ios_bookmarks_restore};
+// the share sheet (share.rs): UIActivityViewController
+#[path = "apple_ios_share.rs"]
+pub(crate) mod share_sheet;
+pub use share_sheet::{ios_share_dismiss, ios_share_shown};
 // the motion sensors and the location (sensors.rs through web_sensors.rs)
 #[path = "apple_ios_motion.rs"]
 pub(crate) mod motion;
@@ -63,7 +69,7 @@ pub use a11y_ios::{IosAxAct, IosAxElem, IosAxText, ios_ax_act, ios_ax_escape, io
 // the iPad (AP9): the menus in iPadOS's menu bar, the pointer without a button, test aids
 #[path = "apple_ios_pad.rs"]
 pub(crate) mod pad;
-pub use pad::{IosMenuRow, IosPadMenus, IosPadPointer, IosPadView, ios_pad_keyboard, ios_pad_menu_build, ios_pad_menu_choose, ios_pad_menus, ios_pad_pointer,
+pub use pad::{IosGpuLayer, IosMenuRow, IosPadMenus, IosPadPointer, IosPadView, ios_dark, ios_pad_keyboard, ios_text_size, ios_pad_menu_build, ios_pad_menu_choose, ios_pad_menus, ios_pad_pointer,
               ios_pad_rotate, ios_pad_view, ios_pad_window};
 
 #[repr(C)]
@@ -271,6 +277,9 @@ pub(crate) fn before_main() {
 /// (apple.rs main, an app installed its runtime) UIKit takes the main thread
 pub(crate) fn run() -> ! {
     HOSTED.store(true, Ordering::Release);
+    // the traits and screens the host sends from now on reach the app as E_SETTINGS (before, nothing
+    // did: a change of dark mode, contrast, motion or text size at run time went unseen)
+    crate::web::host_started();
     register();
     let name = nsstring("JFAppDelegate");
     // SAFETY: the process's own argc / argv (dyld's); UIApplicationMain never returns.
@@ -360,6 +369,8 @@ extern "C" fn trait_zero(_this: Id, _sel: Sel) -> isize {
 }
 
 extern "C" fn app_launched(_this: Id, _sel: Sel, _app: Id, _options: Id) -> bool {
+    // the files and folders chosen in earlier runs open again (apple_ios_services.rs)
+    services::bookmarks_restore();
     true
 }
 
@@ -449,7 +460,8 @@ fn life(typ: u8, data: u32) {
     jfgui_input(time_ms());
 }
 
-/// dark / light, reduced motion, darker colours -> jfgui_system (a change: E_SETTINGS)
+/// dark / light, reduced motion, darker colours, the text size of the system (Dynamic Type) ->
+/// jfgui_system (a change: E_SETTINGS)
 fn send_traits(traits: Id) {
     if traits.is_null() {
         return;
@@ -458,7 +470,8 @@ fn send_traits(traits: Id) {
     let (style, motion, contrast) = unsafe {
         (msg!(traits, c"userInterfaceStyle"; isize), UIAccessibilityIsReduceMotionEnabled(), UIAccessibilityDarkerSystemColorsEnabled())
     };
-    let key = (style as u32 & 3) | (motion as u32) << 2 | (contrast as u32) << 3;
+    let scale = text_scale(traits);
+    let key = (style as u32 & 3) | (motion as u32) << 2 | (contrast as u32) << 3 | scale << 4;
     if host().traits.replace(key) == key {
         return;
     }
@@ -467,12 +480,23 @@ fn send_traits(traits: Id) {
         1 => "0",
         _ => "-",
     };
-    let text = format!("dark={dark}\nmotion={}\ncontrast={}\n", motion as u8, contrast as u8);
+    let text = format!("dark={dark}\nmotion={}\ncontrast={}\nscale={scale}\n", motion as u8, contrast as u8);
     if inbox(text.as_bytes()) {
         jfgui_system(text.len() as u32);
         jfgui_input(time_ms());
         request_frame();
     }
+}
+
+/// the traits' text size as a percentage of the default ("Large" = 100; the accessibility sizes go
+/// beyond 300, which settings.rs clamps): what UIFontMetrics makes of 100 points for these traits
+fn text_scale(traits: Id) -> u32 {
+    // SAFETY: the default metrics (a shared object) scale a value for a live UITraitCollection.
+    let v = unsafe {
+        let m: Id = msg!(class(c"UIFontMetrics"), c"defaultMetrics"; Id);
+        if m.is_null() { 100.0 } else { msg!(m, c"scaledValueForValue:compatibleWithTraitCollection:", 100.0f64 => f64, traits => Id; f64) }
+    };
+    if v.is_finite() && v > 0.0 { ((v + 0.5) as u32).clamp(25, 500) } else { 100 }
 }
 
 // ---------------------------------------------------------------- the view controller and its view

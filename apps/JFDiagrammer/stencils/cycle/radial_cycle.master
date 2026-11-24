@@ -1,0 +1,259 @@
+# Radialzyklus (SH-033, JD26): drei bis acht Kreise (gestreckt Ellipsen) gleichmäßig im Ring um
+# eine Mitte, Kreis 1 oben, im Uhrzeigersinn; jeder ein Teil der Gruppe mit eigenem Text und
+# eigener Variantenfarbe (100 bis 106, der achte 103).  Die Kreise füllen 0,8 ihres Abstands und
+# reichen bis an den Rand; ihr Durchmesser folgt der Zahl.  Die Zahl steht in den Shape-Daten
+# (Prop.Count); Kreise über der Zahl liegen verborgen auf dem letzten (die Teile stehen von 8 bis 1
+# in der Datei).  Die Kreise tragen anfangs ihre Nummer (sie passt auch in kleine Kreise).
+master: Radial cycle
+name.de: Radialzyklus
+name.en: Radial cycle
+name.es: Ciclo radial
+name.it: Ciclo radiale
+name.fr: Cycle radial
+prompt.de: Kreise im Ring um eine Mitte für wiederkehrende Abläufe. Die Zahl der Kreise stellen Sie in den Shape-Daten ein.
+prompt.en: Circles in a ring around a centre for recurring processes. Set the number of circles in the shape data.
+prompt.es: Círculos en anillo alrededor de un centro para procesos recurrentes. Defina el número de círculos en los datos de la forma.
+prompt.it: Cerchi ad anello intorno a un centro per processi ricorrenti. Imposta il numero di cerchi nei dati della forma.
+prompt.fr: Cercles en anneau autour d'un centre pour les processus récurrents. Définissez le nombre de cercles dans les données de la forme.
+keywords.de: Zyklus, radial, Kreise, Ring, Kreislauf, Phasen, wiederkehrend
+keywords.en: cycle, radial, circles, ring, loop, phases, recurring
+keywords.es: ciclo, radial, círculos, anillo, fases, recurrente
+keywords.it: ciclo, radiale, cerchi, anello, fasi, ricorrente
+keywords.fr: cycle, radial, cercles, anneau, phases, récurrent
+
+[Shape]
+Width = 70 mm
+Width.us = 2.75 in
+Height = 70 mm
+Height.us = 2.75 in
+
+[User]
+# die Zahl der Elemente (3 bis 8), der Winkel je Element, der Sinus des halben Winkels; der
+# Durchmesser eines Kreises und der Radius des Rings ihrer Mitten als Anteil der Breite (die
+# Elemente füllen 0.8 ihres Abstands, der Ring reicht bis an den Rand)
+N:   Value = MIN(MAX(ROUND(Prop.Count,0),3),8)
+S:   Value = 2*PI()/User.N
+Sn:  Value = SIN(PI()/User.N)
+Dc:  Value = User.Sn*0.8/(1+0.8*User.Sn)
+Rc:  Value = 0.5-User.Dc*0.5
+
+[Property]
+Count:  Type = 2; Format = "0"; Value = 6
+        Label.de = Kreise
+        Label.en = Circles
+        Label.es = Círculos
+        Label.it = Cerchi
+        Label.fr = Cercles
+        Prompt.de = Anzahl der Kreise (3 bis 8)
+        Prompt.en = Number of circles (3 to 8)
+        Prompt.es = Número de círculos (de 3 a 8)
+        Prompt.it = Numero di cerchi (da 3 a 8)
+        Prompt.fr = Nombre de cercles (de 3 à 8)
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+
+# Element 8 (von oben im Uhrzeigersinn): sichtbar ab 8; sonst deckungsgleich mit dem letzten, verborgen
+[Part C8]
+text.de: 8
+text.en: 8
+text.es: 8
+text.it: 8
+text.fr: 8
+
+[User]
+# das Element, an dessen Stelle das Teil liegt, sein Winkel (mathematisch, im Bogenmaß)
+K:   Value = MIN(8,Sheet.1!User.N)
+T:   Value = PI()*0.5-(User.K-1)*Sheet.1!User.S
+
+[Shape]
+Width = GUARD(Sheet.1!Width*Sheet.1!User.Dc)
+Height = GUARD(Sheet.1!Height*Sheet.1!User.Dc)
+PinX = GUARD(Sheet.1!Width*(0.5+Sheet.1!User.Rc*COS(User.T)))
+PinY = GUARD(Sheet.1!Height*(0.5+Sheet.1!User.Rc*SIN(User.T)))
+HideText = 8>Sheet.1!User.N
+QuickStyleLineColor = 103
+QuickStyleFillColor = 103
+
+[Geometry]
+NoShow = 8>Sheet.1!User.N
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# Element 7 (von oben im Uhrzeigersinn): sichtbar ab 7; sonst deckungsgleich mit dem letzten, verborgen
+[Part C7]
+text.de: 7
+text.en: 7
+text.es: 7
+text.it: 7
+text.fr: 7
+
+[User]
+# das Element, an dessen Stelle das Teil liegt, sein Winkel (mathematisch, im Bogenmaß)
+K:   Value = MIN(7,Sheet.1!User.N)
+T:   Value = PI()*0.5-(User.K-1)*Sheet.1!User.S
+
+[Shape]
+Width = GUARD(Sheet.1!Width*Sheet.1!User.Dc)
+Height = GUARD(Sheet.1!Height*Sheet.1!User.Dc)
+PinX = GUARD(Sheet.1!Width*(0.5+Sheet.1!User.Rc*COS(User.T)))
+PinY = GUARD(Sheet.1!Height*(0.5+Sheet.1!User.Rc*SIN(User.T)))
+HideText = 7>Sheet.1!User.N
+QuickStyleLineColor = 106
+QuickStyleFillColor = 106
+
+[Geometry]
+NoShow = 7>Sheet.1!User.N
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# Element 6 (von oben im Uhrzeigersinn): sichtbar ab 6; sonst deckungsgleich mit dem letzten, verborgen
+[Part C6]
+text.de: 6
+text.en: 6
+text.es: 6
+text.it: 6
+text.fr: 6
+
+[User]
+# das Element, an dessen Stelle das Teil liegt, sein Winkel (mathematisch, im Bogenmaß)
+K:   Value = MIN(6,Sheet.1!User.N)
+T:   Value = PI()*0.5-(User.K-1)*Sheet.1!User.S
+
+[Shape]
+Width = GUARD(Sheet.1!Width*Sheet.1!User.Dc)
+Height = GUARD(Sheet.1!Height*Sheet.1!User.Dc)
+PinX = GUARD(Sheet.1!Width*(0.5+Sheet.1!User.Rc*COS(User.T)))
+PinY = GUARD(Sheet.1!Height*(0.5+Sheet.1!User.Rc*SIN(User.T)))
+HideText = 6>Sheet.1!User.N
+QuickStyleLineColor = 105
+QuickStyleFillColor = 105
+
+[Geometry]
+NoShow = 6>Sheet.1!User.N
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# Element 5 (von oben im Uhrzeigersinn): sichtbar ab 5; sonst deckungsgleich mit dem letzten, verborgen
+[Part C5]
+text.de: 5
+text.en: 5
+text.es: 5
+text.it: 5
+text.fr: 5
+
+[User]
+# das Element, an dessen Stelle das Teil liegt, sein Winkel (mathematisch, im Bogenmaß)
+K:   Value = MIN(5,Sheet.1!User.N)
+T:   Value = PI()*0.5-(User.K-1)*Sheet.1!User.S
+
+[Shape]
+Width = GUARD(Sheet.1!Width*Sheet.1!User.Dc)
+Height = GUARD(Sheet.1!Height*Sheet.1!User.Dc)
+PinX = GUARD(Sheet.1!Width*(0.5+Sheet.1!User.Rc*COS(User.T)))
+PinY = GUARD(Sheet.1!Height*(0.5+Sheet.1!User.Rc*SIN(User.T)))
+HideText = 5>Sheet.1!User.N
+QuickStyleLineColor = 104
+QuickStyleFillColor = 104
+
+[Geometry]
+NoShow = 5>Sheet.1!User.N
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# Element 4 (von oben im Uhrzeigersinn): sichtbar ab 4; sonst deckungsgleich mit dem letzten, verborgen
+[Part C4]
+text.de: 4
+text.en: 4
+text.es: 4
+text.it: 4
+text.fr: 4
+
+[User]
+# das Element, an dessen Stelle das Teil liegt, sein Winkel (mathematisch, im Bogenmaß)
+K:   Value = MIN(4,Sheet.1!User.N)
+T:   Value = PI()*0.5-(User.K-1)*Sheet.1!User.S
+
+[Shape]
+Width = GUARD(Sheet.1!Width*Sheet.1!User.Dc)
+Height = GUARD(Sheet.1!Height*Sheet.1!User.Dc)
+PinX = GUARD(Sheet.1!Width*(0.5+Sheet.1!User.Rc*COS(User.T)))
+PinY = GUARD(Sheet.1!Height*(0.5+Sheet.1!User.Rc*SIN(User.T)))
+HideText = 4>Sheet.1!User.N
+QuickStyleLineColor = 103
+QuickStyleFillColor = 103
+
+[Geometry]
+NoShow = 4>Sheet.1!User.N
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# Element 3 (von oben im Uhrzeigersinn): immer sichtbar
+[Part C3]
+text.de: 3
+text.en: 3
+text.es: 3
+text.it: 3
+text.fr: 3
+
+[User]
+# das Element, an dessen Stelle das Teil liegt, sein Winkel (mathematisch, im Bogenmaß)
+K:   Value = MIN(3,Sheet.1!User.N)
+T:   Value = PI()*0.5-(User.K-1)*Sheet.1!User.S
+
+[Shape]
+Width = GUARD(Sheet.1!Width*Sheet.1!User.Dc)
+Height = GUARD(Sheet.1!Height*Sheet.1!User.Dc)
+PinX = GUARD(Sheet.1!Width*(0.5+Sheet.1!User.Rc*COS(User.T)))
+PinY = GUARD(Sheet.1!Height*(0.5+Sheet.1!User.Rc*SIN(User.T)))
+QuickStyleLineColor = 102
+QuickStyleFillColor = 102
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# Element 2 (von oben im Uhrzeigersinn): immer sichtbar
+[Part C2]
+text.de: 2
+text.en: 2
+text.es: 2
+text.it: 2
+text.fr: 2
+
+[User]
+# das Element, an dessen Stelle das Teil liegt, sein Winkel (mathematisch, im Bogenmaß)
+K:   Value = MIN(2,Sheet.1!User.N)
+T:   Value = PI()*0.5-(User.K-1)*Sheet.1!User.S
+
+[Shape]
+Width = GUARD(Sheet.1!Width*Sheet.1!User.Dc)
+Height = GUARD(Sheet.1!Height*Sheet.1!User.Dc)
+PinX = GUARD(Sheet.1!Width*(0.5+Sheet.1!User.Rc*COS(User.T)))
+PinY = GUARD(Sheet.1!Height*(0.5+Sheet.1!User.Rc*SIN(User.T)))
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+# Element 1 (von oben im Uhrzeigersinn): immer sichtbar
+[Part C1]
+text.de: 1
+text.en: 1
+text.es: 1
+text.it: 1
+text.fr: 1
+
+[User]
+# das Element, an dessen Stelle das Teil liegt, sein Winkel (mathematisch, im Bogenmaß)
+K:   Value = MIN(1,Sheet.1!User.N)
+T:   Value = PI()*0.5-(User.K-1)*Sheet.1!User.S
+
+[Shape]
+Width = GUARD(Sheet.1!Width*Sheet.1!User.Dc)
+Height = GUARD(Sheet.1!Height*Sheet.1!User.Dc)
+PinX = GUARD(Sheet.1!Width*(0.5+Sheet.1!User.Rc*COS(User.T)))
+PinY = GUARD(Sheet.1!Height*(0.5+Sheet.1!User.Rc*SIN(User.T)))
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height

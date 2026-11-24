@@ -1,7 +1,8 @@
 // "06 System": what the system tells the app and does for it -- its settings live (scheme,
 // contrast, animations, text size, accent; UIC_SETTINGS), a notification (ui.notify; a click
 // UIC_NOTE, one that went away UIC_NOTE_GONE), the screen kept on (plat::inhibit with
-// INHIBIT_IDLE) and the lifecycle (UIC_ACTIVE, UIC_SUSPEND: 2 in the background, a hidden tab
+// INHIBIT_IDLE), the share sheet (plat::share: a text, a link and a small file; the answer of
+// share_poll shown) and the lifecycle (UIC_ACTIVE, UIC_SUSPEND: 2 in the background, a hidden tab
 // or Android's onStop, 0 back).  "Design des Systems" lets the theme follow the system (the
 // gallery itself stays light, AF_LIGHT).
 // With jfgui_SELFTEST=system (the start intent's extras on Android, debug builds;
@@ -9,7 +10,7 @@
 // written to data://system-state.txt as "key=value" lines.
 
 use alloc::{format, string::String};
-use plat::{INHIBIT_IDLE, Inhibit, SysSettings};
+use plat::{INHIBIT_IDLE, Inhibit, SHARE_CANCELLED, SHARE_DONE, SHARE_FAILED, SHARE_NONE, SHARE_PENDING, Share, SysSettings};
 use ui::*;
 use ui::i18n::{t, tf};
 
@@ -17,6 +18,9 @@ const STATE: &str = "data://system-state.txt";
 const ID_SYSTHEME: u32 = 600;
 const ID_NOTIFY: u32 = 601;
 const ID_KEEPON: u32 = 602;
+const ID_SHARE: u32 = 603;
+/// the small file the share button hands over
+const SHARE_FILE: &str = "data://Galerie-Teilen.txt";
 
 #[derive(Default)]
 pub struct System {
@@ -43,6 +47,9 @@ pub struct System {
     keep: i32,
     held: Option<Inhibit>,
     keep_failed: bool,
+    /// the share sheet: how often opened, the last answer (SHARE_*; SHARE_PENDING while open)
+    shares: u32,
+    share: i32,
     written: String,
 }
 
@@ -86,6 +93,22 @@ impl System {
             let id = ui.notify(t("JFLib Galerie"), &tf("Benachrichtigung Nummer {}", &[&format!("{}", self.notes)]), None);
             self.shown = id;
         }
+        ui.next_size(0, 44);
+        if ui.button(ID_SHARE, t("Teilen")) & EV_ACT != 0 {
+            self.shares += 1;
+            plat::write_file(SHARE_FILE, "JFLib Galerie: eine Datei zum Teilen".as_bytes());
+            let s = Share {
+                title: String::from(t("JFLib Galerie")),
+                text: String::from(t("Geteilt aus der JFLib Galerie")),
+                url: String::from("https://jflib.org/"),
+                files: alloc::vec![String::from(SHARE_FILE)],
+                anchor: ui.last_rect(),
+            };
+            self.share = plat::share(&s);
+        }
+        if let Some(r) = plat::share_poll() {
+            self.share = r;
+        }
         ui.box_end();
         ui.next_size(0, 40);
         let was = self.keep;
@@ -123,6 +146,16 @@ impl System {
             (_, id) => format!("#{id} {}", t("gezeigt")),
         };
         ui.text(TS_BODY | TX_WRAP, &tf("Benachrichtigung: {}", &[&note]));
+        let shared = match self.share {
+            _ if self.shares == 0 => t("noch nicht"),
+            SHARE_PENDING => t("offen"),
+            SHARE_DONE => t("geteilt"),
+            SHARE_CANCELLED => t("abgebrochen"),
+            SHARE_FAILED => t("fehlgeschlagen"),
+            SHARE_NONE => t("nicht möglich"),
+            _ => "?",
+        };
+        ui.text(TS_BODY | TX_WRAP, &tf("Teilen: {}", &[shared]));
         let on = plat::inhibited() & INHIBIT_IDLE != 0;
         let tail = if self.keep_failed { format!(" ({})", t("nicht möglich")) } else { String::new() };
         ui.text(TS_BODY | TX_WRAP, &tf("Bildschirm an: {}{}", &[yn(on), &tail]));
@@ -170,7 +203,7 @@ impl System {
         let text = format!(
             "selftest=system\ndark_system={}\ndark={}\ncontrast={}\ncolors={}\nmotion={}\nscale={}\naccent={}\nsettings={}\nbits={:#x}\n\
              themes={}\nactive={}\nsuspend={}\nbackground={}\nforeground={}\nnotes={}\nshown={}\nclicked={}\ngone={}\nkeep={}\n\
-             inhibited={}\n",
+             inhibited={}\nshares={}\nshare={}\n",
             s.dark.map_or("-", |d| if d { "1" } else { "0" }),
             f(ui.theme_dark()),
             f(ui.high_contrast()),
@@ -191,6 +224,8 @@ impl System {
             self.gone,
             self.keep,
             plat::inhibited(),
+            self.shares,
+            self.share,
         );
         if text != self.written {
             plat::write_file(STATE, text.as_bytes());

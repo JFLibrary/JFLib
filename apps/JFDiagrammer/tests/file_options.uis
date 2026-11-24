@@ -1,0 +1,81 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD15: options that act now -- QuickInfos › Keine QuickInfos hides every QuickInfo
+# (UI-13); Standardspeicherort für Zeichnungen is where a new drawing's Speichern unter starts
+# (UI-15); Anzahl der Rückgängig-Schritte limits undo for the drawings made after it (UI-18);
+# Eingabetaste beendet die Textbearbeitung: Enter ends the text, Shift+Enter makes a new line
+# (TX-01, KB-10).  The settings live in memory (no --config).
+theme light
+# a QuickInfo by default
+move 588,75
+wait 1500
+expect text:"Zeigertool (Strg+1)" exists
+move 700,600
+wait 600
+click tab:"Datei"
+click button:"Optionen"
+click #248649743
+click "Keine QuickInfos"
+expect #248649743 text "Keine QuickInfos"
+key esc
+move 588,75
+wait 1500
+expect text:"Zeigertool (Strg+1)" missing
+# the folder for new drawings: Speichern unter starts there
+click tab:"Datei"
+click button:"Optionen"
+click #24849
+click #152374785
+type "build"
+key tab
+key esc
+key ctrl+s
+expect dialog:"Speichern unter" exists
+expect text:"cargo" exists
+key esc
+# one step of undo for the next drawing
+click tab:"Datei"
+click button:"Optionen"
+click button:"Erweitert"
+click #161873580
+key ctrl+a
+type "1"
+key tab
+expect #161873580 text "1"
+# Enter ends the text
+click #138549632
+expect #138549632 checked
+click button:"Neu"
+click button:"Leere Zeichnung"
+click button:"Erstellen"
+expect text:"Zeichnung2 – JFDiagrammer" exists
+cmd 4404
+drag 500,330 640,420
+drag 820,430 960,520
+cmd 4400
+expect listitem:"Sheet.4" exists
+expect listitem:"Sheet.5" exists
+key ctrl+z
+key ctrl+z
+expect listitem:"Sheet.5" missing
+expect listitem:"Sheet.4" exists
+# Enter ends the editing, the shape keeps the text
+click 570,375
+key f2
+expect tab:"Text" exists
+type "Eins"
+key enter
+expect tab:"Text" missing
+expect listitem:"Eins" exists
+# Shift+Enter: a new line, the editing goes on
+key f2
+key ctrl+end
+key shift+enter
+type "Zwei"
+expect tab:"Text" exists
+key enter
+expect tab:"Text" missing
+# the text has both lines
+key f2
+expect #23552 text "Eins\nZwei"
+key esc
+expect tab:"Text" missing
