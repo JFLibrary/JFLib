@@ -1,6 +1,6 @@
 # JFDiagrammer – Stand der Features
 
-Stand 2026-11-24, Etappe JD15 (PLAN.md › „JD15: Bestandsaufnahme und P1-Abnahme“), mit JD16, JD17, JD18 und JD26. Diese Datei hält für
+Stand 2026-11-24, Etappe JD15 (PLAN.md › „JD15: Bestandsaufnahme und P1-Abnahme“), mit JD16, JD17, JD18, JD19 und JD26. Diese Datei hält für
 jede P1- und P2-Zeile aus [FEATURES.md](FEATURES.md) fest, wie weit sie in JFDiagrammer ist. Geprüft wurde
 in der laufenden App (Skripte unter `tests/`, Screenshots), nicht nur im Code; die Schablonen aus
 FEATURES 4.2 stehen mit einer Zeile je Schablone da.
@@ -26,7 +26,7 @@ Leseschlüssel:
   ohne eigenen Check (nur bei teilweise); „(Probe)“ ist eine Beobachtung aus JD15 zusätzlich zum Check.
 - Die P2-Zeilen gehören laut PLAN in Phase 2b (JD16–JD25) und Phase 3 (JD26–JD34). JD16 (ältere XML-Formate,
   Makro-Teile, Dokumenteigenschaften, Fensterzustand), JD17 (binäre Schablonen), JD18 (Datenquellen und
-  Verknüpfung) und JD26 (Geschäftsgrafiken) sind eingetragen.
+  Verknüpfung), JD19 (Datengrafiken und Berichte) und JD26 (Geschäftsgrafiken) sind eingetragen.
 
 ## Zusammenfassung
 
@@ -36,7 +36,7 @@ Leseschlüssel:
 | 1.1 Visio-Formate ab 2013 (OPC/XML, „VSDX-Familie“) | 5 | 1 | 0 | 4 | 3 | 0 |
 | 1.2 Ältere XML-Formate 2003–2010 | 0 | 0 | 0 | 2 | 0 | 0 |
 | 1.3 Binärformate (nur Import) | 0 | 0 | 0 | 0 | 2 | 0 |
-| 1.4 Export („Speichern unter“ und „Exportieren“) | 3 | 3 | 0 | 0 | 1 | 4 |
+| 1.4 Export („Speichern unter“ und „Exportieren“) | 3 | 3 | 0 | 1 | 2 | 2 |
 | 1.5 Import | 0 | 2 | 0 | 3 | 0 | 1 |
 | 2.1 Dokument | 5 | 1 | 0 | 0 | 0 | 4 |
 | 2.2 Seiten | 6 | 2 | 0 | 0 | 2 | 4 |
@@ -46,8 +46,8 @@ Leseschlüssel:
 | 2.6 Format: Linie, Füllung, Schatten, Effekte | 3 | 2 | 0 | 0 | 1 | 1 |
 | 2.7 Text und Felder | 6 | 2 | 0 | 0 | 0 | 2 |
 | 2.8 Verbinder, Kleben, Routing und Layout | 4 | 6 | 0 | 0 | 1 | 6 |
-| 2.9 Container, Listen, Swimlanes, Beschriftungen, Legenden | 4 | 1 | 0 | 1 | 0 | 2 |
-| 2.10 Daten | 2 | 0 | 0 | 1 | 1 | 6 |
+| 2.9 Container, Listen, Swimlanes, Beschriftungen, Legenden | 4 | 1 | 0 | 2 | 0 | 1 |
+| 2.10 Daten | 2 | 0 | 0 | 3 | 3 | 2 |
 | 2.11 Hyperlinks, QuickInfos und Kommentare | 1 | 0 | 0 | 0 | 0 | 4 |
 | 2.12 Designs (Themes), Varianten und Schnellformatvorlagen | 4 | 0 | 0 | 1 | 0 | 1 |
 | 2.13 ShapeSheet: Abschnitte | 11 | 12 | 0 | 6 | 9 | 1 |
@@ -57,13 +57,13 @@ Leseschlüssel:
 | 3.3 Register „Start“ | 19 | 4 | 0 | 0 | 3 | 4 |
 | 3.4 Register „Einfügen“ | 6 | 2 | 0 | 0 | 0 | 2 |
 | 3.6 Register „Entwurf“ | 6 | 2 | 0 | 0 | 0 | 3 |
-| 3.7 Register „Daten“ | 0 | 1 | 0 | 3 | 0 | 4 |
+| 3.7 Register „Daten“ | 1 | 0 | 0 | 7 | 0 | 0 |
 | 3.8 Register „Prozess“ | 0 | 0 | 0 | 0 | 0 | 5 |
-| 3.9 Register „Überprüfen“, „Ansicht“, „Entwicklertools“, „Hilfe“ | 3 | 3 | 0 | 0 | 1 | 15 |
+| 3.9 Register „Überprüfen“, „Ansicht“, „Entwicklertools“, „Hilfe“ | 3 | 3 | 0 | 1 | 1 | 14 |
 | 3.10 Kontext- und Vorlagenregister | 1 | 2 | 0 | 0 | 0 | 4 |
 | 3.11 Shapes-Seitenleiste | 3 | 5 | 0 | 0 | 2 | 0 |
 | 3.12 Zeichenfenster | 5 | 11 | 0 | 0 | 1 | 5 |
-| 3.13 Aufgabenbereiche | 1 | 5 | 0 | 0 | 2 | 5 |
+| 3.13 Aufgabenbereiche | 1 | 5 | 0 | 1 | 2 | 4 |
 | 3.14 Statusleiste | 2 | 1 | 0 | 0 | 0 | 1 |
 | 3.15 Drucken und Seite einrichten | 3 | 5 | 0 | 0 | 0 | 1 |
 | 3.16 Tastenkürzel | 9 | 6 | 0 | 0 | 1 | 2 |
@@ -73,10 +73,10 @@ Leseschlüssel:
 | 4.14 Vorschläge für eigene Kategorien | 0 | 0 | 0 | 0 | 0 | 6 |
 | 5.1 Vorlagen-Infrastruktur | 4 | 0 | 0 | 0 | 0 | 0 |
 | 5.2 Vorlagen nach Kategorie | 6 | 1 | 0 | 2 | 1 | 10 |
-| 5.3 Assistenten und Generatoren | 0 | 0 | 0 | 3 | 0 | 4 |
-| **zusammen** | **174** | **106** | **1** | **39** | **37** | **181** |
+| 5.3 Assistenten und Generatoren | 0 | 0 | 0 | 4 | 0 | 3 |
+| **zusammen** | **175** | **105** | **1** | **50** | **40** | **167** |
 
-P2-Zeilen, die schon fertig sind (39): DF-04, DF-05, DF-07, DF-12, DF-20, DF-21, IM-05, IM-08, IM-10, LY-05, MS-07, SP-13, ST-09, DA-05, TH-06, SS-11, SS-21, SS-22, SS-31, SS-33, SS-36, FX-11, FX-12, RD-02, RD-03, RD-09, LG-05, SH-003, SH-004, SH-007, SH-031, SH-032, SH-033, SH-041, VL-32, VL-38, AS-03, AS-04, AS-20.
+P2-Zeilen, die schon fertig sind (50): DF-04, DF-05, DF-07, DF-12, DF-20, DF-21, EX-16, IM-05, IM-08, IM-10, LY-05, MS-07, SP-13, ST-08, ST-09, DA-05, DA-08, DA-13, TH-06, SS-11, SS-21, SS-22, SS-31, SS-33, SS-36, FX-11, FX-12, RD-02, RD-03, RD-04, RD-05, RD-07, RD-09, RD-10, RU-06, AB-12, LG-05, SH-003, SH-004, SH-007, SH-031, SH-032, SH-033, SH-041, VL-32, VL-38, AS-03, AS-04, AS-05, AS-20.
 <!-- summary:end -->
 
 ## Offene Entscheidungen des Nutzers
@@ -215,10 +215,10 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | EX-07 | EMF | P2 | fehlt | – | alles (JD25) |
 | EX-09 | Webseite | P2 | fehlt | Format in der Liste grau | alles (JD25) |
 | EX-11 | Als Vorlage/Schablone speichern | P1 | fertig | templates_own.uis (`.vstx`), status_formats.uis (`.vssx`), dit roundtrip „new stencil masters“, templates | – |
-| EX-12 | Shape-Bericht exportieren | P2 | fehlt | – | alles (JD19) |
+| EX-12 | Shape-Bericht exportieren | P2 | teilweise | reports_output.uis (Excel-Arbeitsmappe, CSV, Webseite), reports.uis (Tabellen-Shape), codectest --sheet (XLSX- und CSV-Schreiber) | XML-Ausgabe (Visios XML-Berichtsformat ist nicht dokumentiert) |
 | EX-14 | Kopieren in die Zwischenablage | P1 | teilweise | export.uis (Seite/Auswahl als PNG+DIB oder SVG-Text), edit_group.uis (app-interne Zwischenablage) | eigenes Format über die System-Zwischenablage (zwischen Fenstern), EMF, Text für andere Programme, Bild + SVG in einem Vorgang |
 | EX-15 | Drucken | P1 | fertig | print.uis (Seite einrichten, Kacheln, Vorschau) | – (Windows druckt als Raster 300 dpi; Vektor JD25) |
-| EX-16 | Daten exportieren | P2 | fehlt | – | alles (JD19) |
+| EX-16 | Daten exportieren | P2 | fertig | reports_output.uis (Datei › Exportieren › Daten exportieren: alle Seiten als CSV und XLSX) | – |
 
 ### 1.5 Import
 
@@ -373,7 +373,7 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | ST-04 | Listen | P1 | fertig | structures_list.uis; core structure::tests::lists_keep_order, structure_functions (LISTORDER) | – |
 | ST-05 | Swimlanes | P1 | fertig | structures_cff.uis, context_jd15.uis (Bahn davor/danach einfügen); dit structures | – |
 | ST-06 | Beschriftungen | P1 | fertig | structures_callout.uis; core structure::tests::callouts_follow_their_target; Lösen/Anheften über den Steuerpunkt (structures.rs `callout_point`) | – |
-| ST-08 | Legende für Datengrafiken | P2 | fehlt | – | alles (JD19) |
+| ST-08 | Legende für Datengrafiken | P2 | fertig | data_graphics_edit.uis (senkrecht und waagerecht, je ein Rückgängig-Schritt), dit datagraphics, core datagraphic::tests | – |
 | ST-09 | Zählende Legende | P2 | fertig | network_devices.uis (zählt, wächst und schrumpft) | – |
 
 ### 2.10 Daten
@@ -384,12 +384,12 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | DA-02 | Shape-Daten definieren | P1 | fertig | panes_edit.uis (Shape-Daten definieren, mehrere Shapes) | – |
 | DA-04 | Datenverknüpfung | P2 | teilweise | data_import_xlsx.uis (Quelle anbinden, Schlüssel, Spalten umbenennen/umtypisieren/ordnen, Quelle umbenennen und entfernen), data_drag_row.uis (Zeile auf ein Shape, auf die leere Fläche mit und ohne gewählten Master, mehrere Zeilen, Verknüpfung aufheben), data_link.uis (automatisch über Spaltenabgleich), core data::tests | Spalten ausblenden (Visios Format kennt dafür kein Feld, das wir kennen); mehrere Zeilen auf ein Shape gezogen: nur die erste |
 | DA-05 | Daten aktualisieren | P2 | fertig | data_refresh_conflict.uis (alle und einzeln, Intervall, Quelle neu wählen, fehlende Zeile, eigener Wert, gelöst mit Rückgängig), core data::tests (Schlüssel, Reihenfolge, doppelte Schlüssel, überschreiben), dit data (Aktualisieren gespeichert); Visio-Gegenprobe ausstehend | – |
-| DA-07 | Datengrafiken | P2 | fehlt | – | alles (JD19) |
-| DA-08 | Datengrafik-Felder | P2 | fehlt | – | alles (JD19) |
-| DA-09 | Shape-Berichte | P2 | fehlt | – | alles (JD19) |
+| DA-07 | Datengrafiken | P2 | teilweise | data_graphics.uis, data_graphics_edit.uis, dit datagraphics, core datagraphic::tests | Mehrfachbalken und Torte als Datenleiste; Überschrift-Elemente nur gelesen und behalten, nicht angeboten; der Rahmen (visDGShowBorder) wird gespeichert, nicht gezeichnet; Farben nur aus einer Palette; Symbolregeln und Farbe nach Wert in eigenen JFD_-Zellen, Abgleich mit einer von Visio gespeicherten Datei steht aus (Anleitung im Gegenprobe-Ordner) |
+| DA-08 | Datengrafik-Felder | P2 | fertig | data_graphics.uis (Bereich Datengrafikfelder, Galerie, Position, Konfigurieren) | – |
+| DA-09 | Shape-Berichte | P2 | teilweise | reports.uis, reports_output.uis, core report::tests, io report::tests, dit reports | XML-Ausgabe; Flussdiagramm-, Organigramm-, Raum- und Fenster/Türen-Berichte (die Vorlagen haben dafür keine Shape-Daten); Untershapes von Master-Instanzen und Hintergrundseiten zählen nicht; Tabellen-Shape bis 2000 Zeilen; Abgleich mit einer von Visio gespeicherten Datei steht aus (Anleitung im Gegenprobe-Ordner) |
 | DA-10 | Diagramm überprüfen | P2 (Prüfen) | fehlt | Vorlagen bringen Regelsätze mit (dit templates), Prüfen gibt es nicht | alles (JD24) |
 | DA-11 | Organigramm-Daten | P2 | fehlt | – | alles (JD28) |
-| DA-13 | Bericht aktualisieren | P2 | fehlt | – | alles (JD19) |
+| DA-13 | Bericht aktualisieren | P2 | fertig | reports.uis (Kontextmenü „Bericht aktualisieren“, ein Rückgängig-Schritt), reports_output.uis (über die Verknüpfung zum mitgelieferten Bericht); Ebene „Bericht“ | – |
 
 ### 2.11 Hyperlinks, QuickInfos und Kommentare
 
@@ -585,12 +585,12 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 |---|---|---|---|---|---|
 | RD-02 | Benutzerdefinierter Import | P2 | fertig | data_import_xlsx.uis, data_import_csv.uis (Datenauswahl-Assistent; ODBC/SQL grau, P3) | – |
 | RD-03 | Alle aktualisieren | P2 | fertig | data_refresh_conflict.uis (Alle aktualisieren, Daten aktualisieren..., Intervall, nach Aktualisierung automatisch verknüpfen) | – |
-| RD-04 | Datengrafik-Katalog | P2 | fehlt | – | (JD19) |
-| RD-05 | Position, Konfigurieren | P2 | fehlt | – | (JD19) |
-| RD-07 | Legende einfügen | P2 | fehlt | – | (JD19) |
-| RD-08 | Fenster Shape-Daten, Externe Daten, Datengrafikfelder | P1 | teilweise | tests/panes.uis, tests/panes_edit.uis, data_import_xlsx.uis (Register Daten: Fenster „Shape-Daten“ und „Externe Daten“) | Datengrafikfelder (JD19) |
+| RD-04 | Datengrafik-Katalog | P2 | fertig | data_graphics.uis (Keine, Text, Datenleisten, Symbolsätze, Farbe nach Wert; Kacheln gerendert) | – |
+| RD-05 | Position, Konfigurieren | P2 | fertig | data_graphics.uis | – |
+| RD-07 | Legende einfügen | P2 | fertig | data_graphics_edit.uis | – |
+| RD-08 | Fenster Shape-Daten, Externe Daten, Datengrafikfelder | P1 | fertig | tests/panes.uis, tests/panes_edit.uis, data_import_xlsx.uis (Fenster „Shape-Daten“ und „Externe Daten“), data_graphics.uis (Datengrafikfelder) | – |
 | RD-09 | Daten verknüpfen | P2 | fertig | data_link.uis | – |
-| RD-10 | Erweiterte Datengrafiken | P2 | fehlt | – | (JD19) |
+| RD-10 | Erweiterte Datengrafiken | P2 | fertig | data_graphics_edit.uis (Neu, Bearbeiten, Umbenennen, Duplizieren, Löschen, Shapes mit dieser Grafik auswählen) | – |
 
 ### 3.8 Register „Prozess“
 
@@ -610,7 +610,7 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | RU-03 | Barrierefreiheit überprüfen | P2 | fehlt | – | (JD20) |
 | RU-04 | Sprache | P2 | fehlt | – | (JD20) |
 | RU-05 | Kommentare | P2 | fehlt | „Neuer Kommentar“ im Shape-Menü grau | (JD20) |
-| RU-06 | Shape-Berichte | P2 | fehlt | – | (JD19) |
+| RU-06 | Shape-Berichte | P2 | fertig | reports.uis (Register Überprüfen › Berichte, Dialog Berichte) | – |
 | RA-01 | Präsentationsmodus | P2 | fehlt | – | (JD22) |
 | RA-02 | Lineal, Seitenumbruch, Gitternetz, Führungslinien | P1 | fertig | tests/panes.uis (Gitternetz, Lineal), tests/edit_view.uis, tests/status_ribbon_2.uis, tests/canvas_guides.uis (Führungslinien aus: nicht gezeichnet, kein Einrasten, keine neue aus dem Lineal) | – |
 | RA-03 | Aufgabenbereiche | P1 | teilweise | tests/panes.uis, tests/shell_commands.uis | Zeichnungsexplorer, Ebenen, Kommentare, Probleme (alle P2: JD22/JD20/JD24) |
@@ -671,7 +671,7 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | ZF-09 | Livedynamik | P1 | teilweise | edit_shapes.uis (Vorschau beim Ziehen) | Option „Livedynamik aktivieren“ ohne Wirkung (nur in options.rs gelesen), kein Umriss-Modus |
 | ZF-10 | AutoVerbinden-Pfeile und Schnell-Shape-Leiste | P1 | teilweise | structures_arrows.uis, structures_arrows_overlap.uis | Schnell-Shape-Leiste mit Vorschau (CN-07-Rest) |
 | ZF-11 | Minisymbolleiste | P2 | fehlt | Probe | → JD22 |
-| ZF-12 | Kontextmenü am Shape | P1 | teilweise | status_ui_panel.uis, hyperlink.uis, my_shapes.uis, actions_menu.uis (Aktionen des Shapes), context_jd15.uis (Shape-Name, Bahn davor/danach), data_drag_row.uis (Daten › Verknüpfung mit Zeile aufheben) | Daten ▸ verknüpfte Zeile anzeigen, Datengrafik (JD19), Kommentar grau (JD20) |
+| ZF-12 | Kontextmenü am Shape | P1 | teilweise | status_ui_panel.uis, hyperlink.uis, my_shapes.uis, actions_menu.uis (Aktionen des Shapes), context_jd15.uis (Shape-Name, Bahn davor/danach), data_drag_row.uis (Daten › Verknüpfung mit Zeile aufheben), data_graphics_edit.uis (Daten › Datengrafik bearbeiten), reports.uis (Bericht aktualisieren an Berichtstabellen) | Daten ▸ verknüpfte Zeile anzeigen, Kommentar grau (JD20) |
 | ZF-13 | Kontextmenüs Seite, Register, Schablone | P1 | fertig | status_ui_panel.uis, pages.uis, panes.uis | – |
 | ZF-14 | Seitenregister | P1 | teilweise | pages.uis, viewer.uis | Ziehen = Umordnen (Probe; nur Dialog „Seiten neu anordnen“) |
 | ZF-15 | Hyperlink-Zeiger | P1 | fertig | hyperlink.uis | – (Link-Cursor nicht skriptbar) |
@@ -697,8 +697,8 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | AB-08 | Zeichnungsexplorer | P2 | fehlt | – | → JD22 |
 | AB-09 | Ebenen | P2 | teilweise | layers.uis (Dialog) | als Bereich → JD22 |
 | AB-10 | Kommentare | P2 | fehlt | commands_check.uis (COMMENT_NEW zurückgestellt) | → JD20 |
-| AB-11 | Externe Daten | P2 | teilweise | data_import_xlsx.uis, data_import_csv.uis, data_drag_row.uis (Register je Quelle, Kettensymbol, Sortieren, Kontextmenü, Ziehen) | Datengrafikfelder im Menü (JD19); seitliches Scrollen bei vielen Spalten |
-| AB-12 | Datengrafikfelder | P2 | fehlt | – | → JD19 |
+| AB-11 | Externe Daten | P2 | teilweise | data_import_xlsx.uis, data_import_csv.uis, data_drag_row.uis (Register je Quelle, Kettensymbol, Sortieren, Kontextmenü, Ziehen) | seitliches Scrollen bei vielen Spalten |
+| AB-12 | Datengrafikfelder | P2 | fertig | data_graphics.uis | – |
 | AB-13 | Probleme | P2 | fehlt | – | → JD24 |
 
 ### 3.14 Statusleiste
@@ -903,7 +903,7 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | VL-38 | Diagramme und Grafiken, Marketingdiagramme | P2 | fertig | business_charts.uis, dio templates | – |
 | VL-40 | Grundlagen Elektrotechnik, Schaltkreise und Logik, Industriesteuerungen, Elektrische Systeme | P2 | fehlt | – | → JD30 |
 | VL-50 | Standardnetzwerk (2D/3D) | P1 | fertig | network_templates.uis, network_devices.uis, dio templates | – (3D-Form braucht P3-Schablonen) |
-| VL-51 | Detailliertes Netzwerk (2D/3D) | P1 | teilweise | network_templates.uis, dio templates | Netzwerkberichte (DA-09 → JD19); Raumelemente (SH-155) und 3D sind P3 |
+| VL-51 | Detailliertes Netzwerk (2D/3D) | P1 | teilweise | network_templates.uis, dio templates, reports.uis (Netzwerkgeräte, Netzwerkausstattung mitgeliefert) | Raumelemente (SH-155) und 3D sind P3 |
 | VL-52 | Rack-Diagramm | P1 | fertig | network_templates.uis, network_rack.uis | – (Startdiagramm nur mit leerem Gestell) |
 | VL-54 | AWS-Architektur | P2 | fehlt | – | → JD32 |
 | VL-60 | Grundriss, Hausplan, Büroplan | P2 | fehlt | – | → JD31 |
@@ -918,7 +918,7 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | AS-01 | Organigramm-Assistent | P2 | fehlt | – | → JD28 |
 | AS-03 | Datenauswahl-Assistent | P2 | fertig | data_import_xlsx.uis, data_import_csv.uis (Quelle, Bereich, Spalten und Zeilen, Schlüssel) | – |
 | AS-04 | Daten verknüpfen | P2 | fertig | data_link.uis (Seite oder Auswahl, mehrere Paare, ersetzen, Rückgängig) | – |
-| AS-05 | Berichtsdefinition | P2 | fehlt | – | → JD19 |
+| AS-05 | Berichtsdefinition | P2 | fertig | reports.uis (vier Schritte, Kriterium, Spalten, Teilergebnisse, Sortieren, In dieser Zeichnung), reports_output.uis (.vrd öffnen) | – |
 | AS-11 | Shapes nummerieren, Array, Maßlinien | P2 | fehlt | – | → JD21 |
 | AS-17 | Verhalten-Assistent (ohne Formeln) | P2 | fehlt | – | → JD23 |
 | AS-20 | Verbundene Zeichnung aus Text | P2 | fertig | data_text_drawing.uis (Vorschau der Datensätze und Probleme als Tabelle, Trennzeichen und Einheit, Master-Zuordnung aus geöffneten Schablonen und Zeichnung, angezeigte oder neue Seite) | – |
