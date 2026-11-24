@@ -439,6 +439,13 @@ anfassen:
   Beobachtungsmodus von Hand, Tempo bei runden Körpern (ein Turm 311 ms), ebene Teilflächen zusammenführen, Abschrägen
   nichtkonvexer Körper; welche Wünsche an JFScript gebaut werden (Rangfolge des Laufs: Vektoren mit Operatoren,
   Mathematik in Grad, benannte Argumente, bedingter Ausdruck, Position des Aufrufs).
+- **Stand 2026-11-24:** `modeltool` nimmt Stufe S1 von JFScript (dort `docs/RICHTUNG.md`, die Richtung der Sprache
+  für alle JF-Apps): die Namen der Skript-API sind englisch, auch die Parameter (`m.bevel(width, segments, axis)`);
+  Warnungen des Hosts kommen mit ihrer Zeile in Konsole, `report.json` und Beobachtungsmodus; eine fehlgeschlagene
+  Regel (`model.expect_size`, `model.budget`) nennt ihre Zeile; Mathematik in Grad, `list.range` und
+  `list.linspace` kommen aus JFScript ([GEOM.md](GEOM.md)). Die Prüfsumme blieb `0fae175a31a0f15e`. Die übrigen
+  Wünsche folgen dem Richtungspapier (Vektoren und Host-Objekte mit S2, benannte Argumente und der bedingte
+  Ausdruck mit S3).
 
 **G7h Spiel 1**
 
@@ -470,7 +477,8 @@ anfassen:
   Browser gegen den Server, die Runde des Nutzers mit Mitspielern.
 - Vom Nutzer entschieden am 24.11.2026 (Fragen nach Teil 1): der Arbeitsname `game1` und `org.jfreund.game1`
   bleiben bis zur ersten Veröffentlichung (danach kostet ein Wechsel den Umzug gespeicherter Einstellungen); die
-  Waffe vor der Kamera wird kleiner und rückt nach rechts unten, die Mitte bleibt frei; die Werft wird in Teil 2
+  Waffe vor der Kamera wird kleiner und rückt nach rechts unten, die Mitte bleibt frei (umgesetzt am 24.11.2026:
+  Variante B, 0,7 der alten Größe, in jedem Fensterformat rechts unten; [GAME1.md](GAME1.md)); die Werft wird in Teil 2
   mit den Booleschen Operationen aus G7g gebaut (echte Öffnungen statt Kisten, die Prüfsumme der Karte ändert
   sich dabei gewollt).
 
