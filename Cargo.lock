@@ -1476,7 +1476,7 @@ dependencies = [
 [[package]]
 name = "jfscript"
 version = "0.1.0"
-source = "git+https://github.com/JFLibrary/JFScript#3565e7f63db4bb3cd562ac5f6831b8a285585e75"
+source = "git+https://github.com/JFLibrary/JFScript#c9708522b2cb532b5a52b2c35c8279a630633631"
 dependencies = [
  "jflib-agent-core",
 ]

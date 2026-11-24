@@ -1,9 +1,10 @@
 {
   "tool": "modeltool 0.1.0",
   "script": "treppe.jfs",
-  "key": "57146fb25e58c7b4bc1c7733d51a6fea",
+  "key": "5489483686ed4c619ee05da8a3d6df6c",
   "ok": true,
   "errors": [],
+  "warnings": [],
   "findings": [],
   "params": {},
   "model": {
@@ -52,7 +53,8 @@
     {"name": "kugel oben", "material": "handlauf", "ok": true, "closed": true, "outward": true, "triangles": 224, "vertices": 166, "min": [0.42, 3.26547002, -1.463205029], "size": [0.06, 0.06, 0.06], "area": 0.01095002, "volume": 0.000106018, "degenerate": 0}
   ],
   "expect": [
-    {"rule": "size", "expected": [1.04, null, 4.05], "actual": [1.04, 3.32547002, 4.05], "tolerance": 0.001, "ok": true}
+    {"rule": "size", "file": "treppe.jfs", "line": 43, "expected": [1.04, null, 4.05], "actual": [1.04, 3.32547002, 4.05], "tolerance": 0.001, "ok": true},
+    {"rule": "budget", "file": "treppe.jfs", "line": 42, "expected": 3000, "actual": 964, "ok": true}
   ],
   "materials": [
     {"name": "beton", "color": "#a8a8a3", "roughness": 0.9, "metallic": 0},
@@ -63,5 +65,5 @@
   "imports": [],
   "files": {"report": "report.json", "glb": "model.glb", "sheet": "sheet.png", "front": "front.png", "side": "side.png", "top": "top.png", "iso": "iso.png"},
   "views": {"images": true, "size": 512, "grid_on": true, "grid": 0.5, "sheet": "front | side over top | iso", "cameras": "front: from +Z; side: from +X; top: from +Y, front at the bottom; the three at one scale; iso: from front right above", "adapter": "NVIDIA GeForce RTX 2070 SUPER"},
-  "timing": {"script_ms": 0.565, "geometry_ms": 2.327, "checks_ms": 1.307, "render_ms": 930.406, "export_ms": 0.231, "total_ms": 1133.197, "fuel": 275}
+  "timing": {"script_ms": 0.543, "geometry_ms": 0.615, "checks_ms": 0.877, "render_ms": 8018.781, "export_ms": 0.289, "total_ms": 8052.025, "fuel": 275}
 }

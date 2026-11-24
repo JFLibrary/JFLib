@@ -1,9 +1,10 @@
 {
   "tool": "modeltool 0.1.0",
   "script": "tuer.jfs",
-  "key": "e0d68a61a331207d45f2b16a050714b2",
+  "key": "a8c40f15c846bb88282196f7b0e04cfe",
   "ok": true,
   "errors": [],
+  "warnings": [],
   "findings": [],
   "params": {},
   "model": {
@@ -53,7 +54,8 @@
     {"name": "bänder", "material": "drücker", "ok": true, "closed": true, "outward": true, "triangles": 96, "vertices": 116, "min": [-0.4495, 0.25, -0.0155], "size": [0.016, 1.51, 0.016], "area": 0.011700516, "volume": 0.00004224, "degenerate": 0}
   ],
   "expect": [
-    {"rule": "size", "expected": [1.025, 2.08, null], "actual": [1.025, 2.08, 0.145], "tolerance": 0.001, "ok": true}
+    {"rule": "size", "file": "tuer.jfs", "line": 59, "expected": [1.025, 2.08, null], "actual": [1.025, 2.08, 0.145], "tolerance": 0.001, "ok": true},
+    {"rule": "budget", "file": "tuer.jfs", "line": 58, "expected": 4000, "actual": 688, "ok": true}
   ],
   "materials": [
     {"name": "zarge", "color": "#d8d2c4", "roughness": 0.5, "metallic": 0},
@@ -66,5 +68,5 @@
   "imports": [],
   "files": {"report": "report.json", "glb": "model.glb", "sheet": "sheet.png", "front": "front.png", "side": "side.png", "top": "top.png", "iso": "iso.png"},
   "views": {"images": true, "size": 512, "grid_on": true, "grid": 0.5, "sheet": "front | side over top | iso", "cameras": "front: from +Z; side: from +X; top: from +Y, front at the bottom; the three at one scale; iso: from front right above", "adapter": "NVIDIA GeForce RTX 2070 SUPER"},
-  "timing": {"script_ms": 0.671, "geometry_ms": 0.82, "checks_ms": 0.755, "render_ms": 8223.382, "export_ms": 0.272, "total_ms": 8256.129, "fuel": 499}
+  "timing": {"script_ms": 0.606, "geometry_ms": 0.585, "checks_ms": 0.746, "render_ms": 4898.308, "export_ms": 0.286, "total_ms": 5013.039, "fuel": 499}
 }

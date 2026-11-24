@@ -1,7 +1,8 @@
 // watch -- the core of the observation mode (`modeltool --watch FILE`): the script and every module it asked for,
 // watched by their content (an editor may keep the time stamp or replace the file), built again when one changes;
 // what a build gives for the window (watch_ui.rs): the model, its summary and findings, or the errors with their
-// places.  No window here, so the console test (selftest group "watch") runs it with real files.
+// places, and the host's warnings with theirs.  No window here, so the console test (selftest group "watch") runs
+// it with real files.
 
 use alloc::format;
 use alloc::rc::Rc;
@@ -25,6 +26,11 @@ pub struct State {
     pub findings: Vec<String>,
     /// the errors of a failed run: per problem its lines (file:line:col: message, the source line, the calls)
     pub errors: Vec<Vec<String>>,
+    /// the host's warnings of the last build (it ran or failed): per warning its lines (file:line:col: Warnung:
+    /// message, the source line), at most run::WARNINGS_SHOWN, then a line with how many more
+    pub warnings: Vec<Vec<String>>,
+    /// how many warnings the last build gave (also those not shown and not kept)
+    pub warning_count: u64,
     /// what the script printed
     pub output: String,
     /// the number of builds so far
@@ -57,7 +63,7 @@ impl Watched {
             file,
             params: params.to_vec(),
             seen: Vec::new(),
-            state: State { model: None, title: String::new(), ok: None, summary: String::new(), findings: Vec::new(), errors: Vec::new(), output: String::new(), builds: 0, ms: 0.0 },
+            state: State { model: None, title: String::new(), ok: None, summary: String::new(), findings: Vec::new(), errors: Vec::new(), warnings: Vec::new(), warning_count: 0, output: String::new(), builds: 0, ms: 0.0 },
         }
     }
 
@@ -80,6 +86,8 @@ impl Watched {
             self.seen = alloc::vec![(self.file.clone(), None)];
             self.state.ok = None;
             self.state.errors = alloc::vec![alloc::vec![format!("{}: Fehler: die Datei lässt sich nicht lesen", self.file)]];
+            self.state.warnings.clear();
+            self.state.warning_count = 0;
             self.state.ms = 0.0;
             return;
         };
@@ -95,9 +103,11 @@ impl Watched {
         self.seen = alloc::vec![(self.file.clone(), Some(bytes))];
         self.seen.extend(asked);
         self.state.output = r.output.clone();
+        let mut sources = alloc::vec![(r.file.clone(), src.clone())];
+        sources.extend(r.imports.iter().cloned());
+        self.state.warnings = run::format_warnings(&r, &sources).iter().map(|w| w.lines().map(String::from).collect()).collect();
+        self.state.warning_count = r.warnings.len() as u64 + r.warnings_dropped;
         if !r.ok() {
-            let mut sources = alloc::vec![(r.file.clone(), src.clone())];
-            sources.extend(r.imports.iter().cloned());
             self.state.ok = None;
             self.state.errors = r.problems.iter().map(|p| run::format_problem(p, &sources).lines().map(String::from).collect()).collect();
             self.state.ms = (plat::time_us().saturating_sub(t0)) as f64 / 1000.0;
