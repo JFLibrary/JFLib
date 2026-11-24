@@ -2,4 +2,4 @@
 # JFDiagrammer, JD8 rest: every command of the ribbon, the menus and the shortcuts has its function,
 # except the ones cmds_later.rs puts off with a reason (P2/P3 in FEATURES.md); the notice of
 # --check-commands names any other command that is still without one (dump shows it)
-expect "Befehlsprüfung: Alle Befehle angeschlossen, 20 zurückgestellt" exists
+expect "Befehlsprüfung: Alle Befehle angeschlossen, 19 zurückgestellt" exists

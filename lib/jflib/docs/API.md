@@ -105,7 +105,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [doc_io](#doc_io) -- conservative DOCX interchange and bounded file I/O
   <br>[lib.rs](#doc_io-crate-root) · [bibliography.rs](#doc_iobibliographyrs) · [bibtex.rs](#doc_iobibtexrs) · [clipboard.rs](#doc_ioclipboardrs) · [html_import.rs](#doc_iohtml_importrs) · [fragment.rs](#doc_iofragmentrs) · [exchange.rs](#doc_ioexchangers) · [library.rs](#doc_iolibraryrs) · [preservation.rs](#doc_iopreservationrs) · [preserved_text.rs](#doc_iopreserved_textrs) · [ris.rs](#doc_iorisrs) · [preserved_stories.rs](#doc_iopreserved_storiesrs)
 - [diagram_core](#diagram_core) -- the diagram model: ShapeSheet cells, formulas, geometry, routing and layout
-  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/data.rs](#diagram_coresrcdatars) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/dock.rs](#diagram_coresrcdockrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/field.rs](#diagram_coresrcfieldrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/layout.rs](#diagram_coresrclayoutrs) · [src/layout/adjust.rs](#diagram_coresrclayoutadjustrs) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/draw.rs](#diagram_coresrcopsdrawrs) · [src/ops/picture.rs](#diagram_coresrcopspicturers) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/pagesetup.rs](#diagram_coresrcpagesetuprs) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/route.rs](#diagram_coresrcrouters) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
+  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/data.rs](#diagram_coresrcdatars) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/dock.rs](#diagram_coresrcdockrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/field.rs](#diagram_coresrcfieldrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/layout.rs](#diagram_coresrclayoutrs) · [src/layout/adjust.rs](#diagram_coresrclayoutadjustrs) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/draw.rs](#diagram_coresrcopsdrawrs) · [src/ops/picture.rs](#diagram_coresrcopspicturers) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/pagesetup.rs](#diagram_coresrcpagesetuprs) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/jumps.rs](#diagram_coresrcrenderjumpsrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/route.rs](#diagram_coresrcrouters) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
 - [diagram_io](#diagram_io) -- Visio file formats (the VSDX family) and diagram exports
   <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/data.rs](#diagram_iosrcdatars) · [src/props.rs](#diagram_iosrcpropsrs) · [src/stencil.rs](#diagram_iosrcstencilrs) · [src/template.rs](#diagram_iosrctemplaters) · [src/textdraw.rs](#diagram_iosrctextdrawrs) · [src/vdx/mod.rs](#diagram_iosrcvdxmodrs) · [src/vss/mod.rs](#diagram_iosrcvssmodrs) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/windows.rs](#diagram_iosrcwindowsrs) · [src/xml.rs](#diagram_iosrcxmlrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
@@ -58961,6 +58961,10 @@ gfx, later the exports of diagram_io)
                                   (JD7, rebuild.rs) the items of some top-level shapes made
                                   anew in their place; false: shapes came, went or changed
                                   their order (build anew)
+  render::affected(&doc, &drawing, &Options, &shapes) -> tops   (JD21) the top-level shapes
+                                  rebuild makes anew for these shapes: theirs and those of the
+                                  connectors whose line jumps they change
+  drawing.jumps()                 (JD21, jumps.rs) the line jumps drawn, per connector
   Drawing { width, height, scale, items, fonts, notes }   in paper inches, y up, the origin at
                                   the page's bottom left corner; items in painter's order
   drawing.query(rect, &mut out)   the items whose boxes touch a rectangle (a grid over the
@@ -58984,6 +58988,9 @@ closed sub-paths of the Geometry sections without NoFill (even-odd), a Foreign s
 picture, the lines of the sections without NoLine with their line ends, the text.  Not
 drawn: deleted subshapes (Del, ID 4294967295, no Type), guides, sections with NoShow,
 shapes whose layers are all hidden.  A layer's colour (Color not 255) colours its members.
+(JD21) Where two dynamic connectors of a page cross, one of them hops over the other (line
+jumps, CN-06, jumps.rs): worked out before the page's shapes are drawn and put into the
+connector's line (its shadow and line ends follow); no cell changes, nothing is routed.
 
 Values Visio caches as "Themed" (the Theme style and a few shapes) are resolved against the
 page's theme: the theme part whose schemeEnum the page's ThemeIndex names (colours by
@@ -59024,6 +59031,9 @@ inches (geometry times PageScale / DrawingScale).
 - **`fn tops(&self) -> impl Iterator<Item = (ShapeRef, Range<usize>)> + '_`**
   the top-level shapes in painter's order (those of the background pages first) with
   their items
+- **`fn jumps(&self) -> impl Iterator<Item = (ShapeRef, &[Jump])> + '_`**
+  (JD21) the line jumps drawn: every connector that got some, with them (the pages in
+  painter's order, background pages first; the connectors in painter's order)
 
 - **`enum Note`**
   what the viewer does not draw (yet), or draws only roughly
@@ -59150,6 +59160,105 @@ the grid was built for lies in the cells at the edge, where a query outside look
   in the old numbering; `items` the list as it is now
 - **`fn query(&self, rect: [f64; 4], out: &mut Vec<u32>)`**
 
+### `diagram_core/src/render/jumps.rs`
+
+Source: [`lib/diagram_core/src/render/jumps.rs`](../lib/diagram_core/src/render/jumps.rs)
+
+```text
+jumps -- (JD21, CN-06) line jumps: where two dynamic connectors of a page cross, one of them
+hops over the other (an arc, a gap, a square, a bump of 2 to 7 sides); worked out while the
+display list is built, never written into a cell, never routed
+
+  PageJumps                    a page's settings and connectors: their straight pieces in paper
+                               inches in painter's order, a grid over the pieces, the jumps
+                               each connector got
+  builder.page_jumps(page, k)  (build) every connector of a page and its jumps, before the
+                               page's shapes are drawn (k: the index of its first top-level
+                               shape in the drawing)
+  builder.jumped(shape, line)  a connector's line (paper inches) with its jumps put in: own()
+                               draws that line, its shadow and its line ends
+  plan / refresh               (rebuild, affected) the connectors that cross a changed
+                               top-level shape's connectors before or after the change: their
+                               jumps change with it, so their top-level shapes are made anew
+  Jump, JumpStyle              one jump as drawn (drawing.jumps(): tests, diagramiotest)
+
+Visio's rules.  Documented (learn.microsoft.com, Page Layout and Shape Layout sections; the
+Visio 2007 XML reference, LineJumpCode element; Visio 2000 user's guide, "Displaying line
+jumps on crossing connectors"; support.microsoft.com, "Add or remove connector line jumps"):
+* Page: LineJumpCode which line jumps: 0 none, 1 horizontal lines, 2 vertical lines, 3 the last
+  routed line, 4 the last displayed line (the top one in the z-order), 5 the first displayed
+  line (the bottom one); "display order is the order of the Shape elements in the page".
+  LineJumpStyle 0 and 1 arc, 2 gap, 3 square, 4 .. 9 two to seven sides.  LineJumpFactorX / Y:
+  the size of the jumps on horizontal / vertical connectors relative to LineToLineX / Y (0 ..
+  10; LineToLineX 0.1 in with the factor 0.5 gives jumps of 0.05 in; Visio's own files: 0.125
+  in or 2.5 mm, the factor 2/3).  PageLineJumpDirX: horizontal connectors jump 1 up, 2 down;
+  PageLineJumpDirY: vertical ones 1 left, 2 right; 0 the default.
+* Connector: ConLineJumpCode 0 as the page says, 1 never, 2 always, 3 the other connector
+  jumps, 4 neither connector jumps; ConLineJumpStyle 0 the page's, 1 .. 9 as LineJumpStyle;
+  ConLineJumpDirX / Y 0 the page's, else as the page's cells (Developer › Behavior ›
+  Connector, "Line jumps").
+* Line jumps belong to dynamic connectors ("routable connectors display line jumps when they
+  cross other connectors"): only 1-D shapes with the routable flag in ObjType take part
+  (glue::is_connector), plain lines neither jump nor are jumped over.  Only the page shown
+  counts; the jumps are not part of the connector's geometry (the corpus' 104 connectors have
+  MoveTo / LineTo rows only).
+Assumed (no source found; the Visio check of JD21 shows them to the user):
+* The default directions are up (horizontal pieces) and left (vertical pieces); the docs'
+  text for value 0 names them swapped ("left" for X, "up" for Y).
+* The size is the jump's width along the line, its height half of it (the arc a half
+  circle); square: the box of that half circle; n sides: the corners on the half circle.
+* A piece is horizontal when it runs more along x than along y (slanted pieces of straight
+  connectors too); "horizontal lines": at a crossing the more horizontal piece jumps, at a tie
+  the upper one in the z-order; "vertical lines" alike.
+* "Last routed": Visio keeps no record of it in the file; the connector with the higher ID
+  (the one added later) jumps.
+* The connector codes: "neither" on either side: no jump; "always" on a side, or "other" on
+  the other side, makes that side jump; when both sides are asked, the page's rule decides
+  between them (else the upper one); a side with "never" never jumps; without such codes the
+  page's rule decides.  "Always" works on a page with LineJumpCode 0 too.
+* Only straight pieces jump and are jumped over (curved connectors and the rounded corners of
+  a connector with Rounding take no part); a jump that would reach over the end of its piece
+  (a bend, the line's end) is left out; a connector's end on another line (a T) is no
+  crossing, nor are lines that run along each other; a connector does not jump over itself.
+* Jumps on one piece closer than their width merge into one wider jump of the same height.
+* Connectors in groups take part like top-level ones (where they are drawn); shapes not drawn
+  (hidden layers, not printed, LinePattern 0) take no part.
+* Missing cells: LineJumpCode 1, LineJumpStyle 0, LineToLineX / Y 0.125 in, the factors 2/3,
+  the directions 0 (Visio's "No Style" holds these values).
+Lengths: the page layout cells are lengths on paper (as LineToNodeX for the router, glue.rs),
+the display list is in paper inches.
+
+Large pages: the pieces lie in a uniform grid (at most 64 x 64 cells), a crossing test looks
+only at the pieces in the cells of a piece's box; nothing compares all pairs.  A rebuild works
+out the changed shapes' connectors and the connectors they cross (before and after), nothing
+else.
+```
+
+- **`enum JumpStyle`**
+  how a jump looks (LineJumpStyle)
+  - `Arc` -- a half circle (0, 1)
+  - `Gap` -- the line stops and goes on (2)
+  - `Square` -- three sides of a box (3)
+  - `Sides(u8)` -- 2 .. 7 sides with their corners on a half circle (4 .. 9)
+
+**`impl JumpStyle`**
+
+- **`fn from_code(v: u32) -> JumpStyle`**
+  LineJumpStyle / ConLineJumpStyle 1 .. 9 (0 and other values: the arc)
+
+- **`struct Jump`**
+  a jump as drawn
+  - `sub: u32` -- the straight piece it lies on: Path::subs[sub].segs[seg] of the connector's line as
+    drawn without jumps (paper inches)
+  - `seg: u32`
+  - `from: f64` -- where it starts and ends on the piece (distances from the piece's start, inches)
+  - `to: f64`
+  - `start: [f64; 2]` -- those two points
+  - `end: [f64; 2]`
+  - `normal: [f64; 2]` -- the side it rises to (a unit vector across the piece) and how high (inches)
+  - `height: f64`
+  - `style: JumpStyle`
+
 ### `diagram_core/src/render/rebuild.rs`
 
 Source: [`lib/diagram_core/src/render/rebuild.rs`](../lib/diagram_core/src/render/rebuild.rs)
@@ -59169,8 +59278,17 @@ The result is the list build would make of the document now, as long as only tho
 changed.  false (nothing changed in the drawing): a shape came or went, the top-level order
 changed, the page's size or scale changed, a named shape of the page is not in the drawing
 -- the caller builds anew.  Changes the shapes do not show (the page's layers, styles,
-masters, themes) are the caller's to know: they need build.
+masters, themes; JD21: its line jump cells) are the caller's to know: they need build.
+
+(JD21) Line jumps: a connector that moved changes the jumps of the connectors it crossed and
+crosses now, so their top-level shapes are made anew too (jumps::plan; render::affected names
+them all beforehand, for a caller that keeps something per top-level shape, PageView::update).
 ```
+
+- **`fn affected(doc: &Document, d: &Drawing, opts: &Options, shapes: &[ShapeRef]) -> Vec<ShapeRef>`**
+  (JD21) the top-level shapes rebuild makes anew for `shapes`: theirs, and those of the
+  connectors whose line jumps they change (in painter's order; shapes the drawing does not
+  show are passed over)
 
 - **`fn rebuild(doc: &Document, d: &mut Drawing, measure: &mut dyn Measure, opts: &Options, shapes: &[ShapeRef]) -> bool`**
   the items of the top-level shapes of `shapes` made anew in `d` -> false: build anew
@@ -63198,7 +63316,9 @@ view -- a page of a diagram as a render2d scene plus what the scene cannot hold
                                    texts measured with the fonts drawn), the scene made of
                                    it, pictures decoded
   view.update(&doc, &mut fonts, &shapes) -> Option<[f64; 4]>   (JD7) the named shapes (their
-                                   top-level shapes) made anew in the list and the scene; the
+                                   top-level shapes; JD21: and the connectors whose line jumps
+                                   they change, render::affected) made anew in the list and
+                                   the scene; the
                                    box of what changed, old and new place (paper inches;
                                    a zero box: nothing drawn either way); None: shapes came,
                                    went or changed their order -- the page was built anew

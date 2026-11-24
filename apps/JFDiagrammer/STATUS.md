@@ -45,7 +45,7 @@ Leseschlüssel:
 | 2.5 Shapes, Geometrie und Gruppen | 5 | 6 | 0 | 1 | 0 | 5 |
 | 2.6 Format: Linie, Füllung, Schatten, Effekte | 3 | 2 | 0 | 0 | 1 | 1 |
 | 2.7 Text und Felder | 6 | 2 | 0 | 0 | 0 | 2 |
-| 2.8 Verbinder, Kleben, Routing und Layout | 4 | 6 | 0 | 1 | 1 | 5 |
+| 2.8 Verbinder, Kleben, Routing und Layout | 4 | 6 | 0 | 2 | 1 | 4 |
 | 2.9 Container, Listen, Swimlanes, Beschriftungen, Legenden | 4 | 1 | 0 | 1 | 0 | 2 |
 | 2.10 Daten | 2 | 0 | 0 | 1 | 1 | 6 |
 | 2.11 Hyperlinks, QuickInfos und Kommentare | 1 | 0 | 0 | 0 | 0 | 4 |
@@ -56,7 +56,7 @@ Leseschlüssel:
 | 3.2 Titelleiste, Registerzeile und Menüband allgemein | 2 | 3 | 0 | 0 | 1 | 2 |
 | 3.3 Register „Start“ | 20 | 3 | 0 | 0 | 3 | 4 |
 | 3.4 Register „Einfügen“ | 6 | 2 | 0 | 0 | 0 | 2 |
-| 3.6 Register „Entwurf“ | 6 | 2 | 0 | 1 | 0 | 2 |
+| 3.6 Register „Entwurf“ | 7 | 1 | 0 | 1 | 0 | 2 |
 | 3.7 Register „Daten“ | 0 | 1 | 0 | 3 | 0 | 4 |
 | 3.8 Register „Prozess“ | 0 | 0 | 0 | 0 | 0 | 5 |
 | 3.9 Register „Überprüfen“, „Ansicht“, „Entwicklertools“, „Hilfe“ | 3 | 3 | 0 | 0 | 1 | 15 |
@@ -74,9 +74,9 @@ Leseschlüssel:
 | 5.1 Vorlagen-Infrastruktur | 4 | 0 | 0 | 0 | 0 | 0 |
 | 5.2 Vorlagen nach Kategorie | 6 | 1 | 0 | 2 | 1 | 10 |
 | 5.3 Assistenten und Generatoren | 0 | 0 | 0 | 3 | 0 | 4 |
-| **zusammen** | **176** | **104** | **1** | **41** | **37** | **179** |
+| **zusammen** | **177** | **103** | **1** | **42** | **37** | **178** |
 
-P2-Zeilen, die schon fertig sind (41): DF-04, DF-05, DF-07, DF-12, DF-20, DF-21, IM-05, IM-08, IM-10, LY-05, MS-07, SP-13, CN-14, ST-09, DA-05, TH-06, SS-11, SS-21, SS-22, SS-31, SS-33, SS-36, FX-11, FX-12, RW-09, RD-02, RD-03, RD-09, LG-05, SH-003, SH-004, SH-007, SH-031, SH-032, SH-033, SH-041, VL-32, VL-38, AS-03, AS-04, AS-20.
+P2-Zeilen, die schon fertig sind (42): DF-04, DF-05, DF-07, DF-12, DF-20, DF-21, IM-05, IM-08, IM-10, LY-05, MS-07, SP-13, CN-06, CN-14, ST-09, DA-05, TH-06, SS-11, SS-21, SS-22, SS-31, SS-33, SS-36, FX-11, FX-12, RW-09, RD-02, RD-03, RD-09, LG-05, SH-003, SH-004, SH-007, SH-031, SH-032, SH-033, SH-041, VL-32, VL-38, AS-03, AS-04, AS-20.
 <!-- summary:end -->
 
 ## Offene Entscheidungen des Nutzers
@@ -128,7 +128,7 @@ L = mehr. P2-Teile von P1-Zeilen stehen bei ihrer P2-Etappe.
 | JD21 | CN-16 | Einfügen › Verbinder mit dem Verbinder-Master der markierten Kachel (Shapes verbinden kann es) | S |
 | JD21 | ST-02 | Container-Stilkatalog (14) als Galerie, Kategorien bearbeiten | S |
 | JD21 | RS-27 | Zu Gruppe hinzufügen / Aus Gruppe entfernen | S |
-| JD21 | SL-03, PR-09 | Strg-Ziehen mehrerer Master, Teilen beim Ablegen auf Verbinder, Leuchten von Container/Liste; Linienübergänge-Optionen | M |
+| JD21 | SL-03, PR-09 | Strg-Ziehen mehrerer Master, Teilen beim Ablegen auf Verbinder, Leuchten von Container/Liste | M |
 | JD22 | DM-03, RA-07 | Einrast- und Klebeziele, Stärke, Einrastwinkel, im Dokument speichern | S |
 | JD22 | PG-03, ZF-14 | Seitenregister per Ziehen umordnen (`ui.tabs`) | S |
 | JD22 | SP-10, ZF-04, AB-04 | Führungslinien per Klick wählen, verschieben, drehen, Mitnehmen geklebter Shapes, Führungspunkte | M |
@@ -349,7 +349,7 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | CN-03 | Dynamisches Kleben | P1 | fertig | edit_connect.uis (ganzes Shape, grüne Enden, folgt), canvas_glue.uis (Strg schaltet statisch/dynamisch, mit dem Verbinder-Werkzeug und beim Ziehen eines Endes); core glue_tests::dynamic_glue_* | – |
 | CN-04 | Dynamischer Verbinder | P1 | teilweise | edit_connect.uis, edit_golden.uis; Verbinder rechtwinklig/gerade/gebogen/zurücksetzen (core glue_tests::styles_straight_and_curved, a_fixed_route_keeps_its_corners) | Knick- und Segment-Ziehpunkte (verschieben, hinzufügen, entfernen) |
 | CN-05 | Routing um Hindernisse | P1 | teilweise | edit_golden.uis, structures_layout.uis; core glue_tests::routes_never_cross_obstacles, a_hundred_obstacles, the_page_scale_and_spacing_count | Seitenrouting-Stile außer rechtwinklig/gerade (Flussdiagramm, Baum, Organigramm, Netzwerk …) samt Richtung; Durchlässigkeit je Richtung |
-| CN-06 | Linienübergänge | P2 | fehlt | Befehl grau (cmds_later.rs) | alles (JD21) |
+| CN-06 | Linienübergänge | P2 | fertig | jumps.uis (anzeigen, Stil, Größe, Richtung, je Verbinder, Export), dit jumps (alle Codes und Stile, Rundlauf, SVG, PNG), core render::jumps::tests (Kreuzungen, Teil-Neubau, große Seite); Visio-Gegenprobe JD21 offen | – |
 | CN-07 | AutoVerbinden | P1 | teilweise | structures_arrows.uis, structures_arrows_overlap.uis (Pfeile, Klick, Ziehen, Schalter) | Schnell-Shapes-Leiste mit Live-Vorschau |
 | CN-08 | Automatisch einfügen | P2 | fehlt | Option „Verbinder teilen“ ohne Wirkung | alles (JD21) |
 | CN-09 | Automatisch löschen | P2 | fehlt | Option „Verbinder löschen“ ohne Wirkung | alles (JD21) |
@@ -433,7 +433,7 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | SS-16 | Verschiedenes | P2 | teilweise | stencils_search.uis (ShapeKeywords); dit stencils/structure (HideText); NonPrinting/ObjType in der Darstellung | Comment als QuickInfo, NoObjHandles/NoCtlHandles, DropOnPageScale, Kalender |
 | SS-17 | Gruppeneigenschaften | P1 | teilweise | network_devices.uis (SVG-Gruppen mit SelectMode 0); DisplayMode in der Darstellung (dit render) | SelectMode 1/2, IsDropTarget, IsSnapTarget, IsTextEditTarget, DontMoveChildren |
 | SS-18 | Klebeinfo | P1 | fertig | core glue_tests::static_glue_writes_visio_cells_and_follows, glue::tests::walk_preference_picks_the_sides; dit edit | – (WalkPreference als Vorrang zwischen gleich teuren Wegen) |
-| SS-19 | Shape-Layout | P1 | teilweise | ObjType, ShapeRouteStyle, ConFixedCode, Relationships wirken (structures_layout.uis, dit structures); ObjType und ShapeFixedCode im Seitenlayout (core layout::tests::fixed_and_unplaceable_shapes_stay) | Durchlässigkeit je Richtung, ShapePlowCode, ShapePlaceFlip/ShapePlaceStyle, Linienübergänge je Verbinder (CN-06), DisplayLevel |
+| SS-19 | Shape-Layout | P1 | teilweise | ObjType, ShapeRouteStyle, ConFixedCode, Relationships wirken (structures_layout.uis, dit structures); ObjType und ShapeFixedCode im Seitenlayout (core layout::tests::fixed_and_unplaceable_shapes_stay); ConLineJumpCode/-Style/-DirX/-DirY (jumps.uis, dit jumps) | Durchlässigkeit je Richtung, ShapePlowCode, ShapePlaceFlip/ShapePlaceStyle, DisplayLevel |
 | SS-20 | Ebenenzugehörigkeit | P1 | fertig | layers.uis; dit render/fills/hidden-layer, two-layers | – |
 | SS-21 | Theme-Eigenschaften | P2 | fertig | dit designs (foreign/mixed-numbers), render/pages/themed; core formula::tests::themed_values | – |
 | SS-22 | Schnellformatvorlage | P2 | fertig | format.uis (Schnellformatvorlagen); core formula::tests::themed_values | – |
@@ -448,7 +448,7 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | SS-36 | Scratch | P2 | fertig | core formula::tests::parses_reference_forms; dit formulas (Korpus) | – |
 | SS-38 | Ebenen (Seite) | P1 | fertig | layers.uis | – |
 | SS-39 | Seiteneigenschaften | P1 | teilweise | page_setup_ribbon.uis, canvas_glue.uis (InhibitSnap der Seite schaltet Raster, Führungslinien und dynamisches Gitter ab); core pagesetup::tests | UIVisibility ohne Wirkung |
-| SS-40 | Seitenlayout | P1 | teilweise | RouteStyle, AvenueSize, LineToNode wirken (structures_layout.uis); PlaceStyle, PlaceDepth, AvenueSize, BlockSize, ResizePage, LineRouteExt wirken im Seitenlayout (layout_options.uis, core layout::tests::store_writes_the_page_cells) | PlaceFlip, LineJump*, PlowCode, DynamicsOff, CtrlAsInput ohne Wirkung (meist an CN-06, P2) |
+| SS-40 | Seitenlayout | P1 | teilweise | RouteStyle, AvenueSize, LineToNode wirken (structures_layout.uis); PlaceStyle, PlaceDepth, AvenueSize, BlockSize, ResizePage, LineRouteExt wirken im Seitenlayout (layout_options.uis, core layout::tests::store_writes_the_page_cells); LineJumpCode/-Style, LineJumpFactorX/Y, LineToLineX/Y, PageLineJumpDirX/Y (jumps.uis, dit jumps) | PlaceFlip, PlowCode, DynamicsOff, CtrlAsInput ohne Wirkung |
 | SS-41 | Druckeigenschaften | P1 | teilweise | print.uis (Ränder, Zentrieren, Kacheln, Papier, Ausrichtung, Skalierung) | Raster drucken; Druckeinrichtung gilt je Dokument statt je Seite |
 | SS-42 | Lineal und Raster | P2 | teilweise | dit roundtrip (Abschnitt bleibt erhalten) | Rasterabstand/-dichte und Ursprung der Seite wirken nicht |
 | SS-43 | Dokumenteigenschaften (Dokument-ShapeSheet) | P2 | teilweise | erhalten (dit samples/doc-sheet) | ohne Wirkung |
@@ -575,7 +575,7 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | RW-07 | Hintergründe | P2 | fehlt | – | (JD22) |
 | RW-08 | Rahmen und Titel | P2 | fehlt | – | (JD22) |
 | RW-09 | Seite neu layouten | P2 | fertig | layout_relayout.uis (Menü mit Livevorschau), layout_options.uis (Weitere Layoutoptionen) | – |
-| RW-10 | Verbinder (Layout) | P1 | teilweise | tests/status_ribbon_2.uis (Rechtwinklig, Gerade, Gebogen), tests/edit_connect.uis | Linienübergänge anzeigen und Stil (grau, P2 CN-06) |
+| RW-10 | Verbinder (Layout) | P1 | fertig | tests/status_ribbon_2.uis (Rechtwinklig, Gerade, Gebogen), tests/edit_connect.uis, tests/jumps.uis (Linienübergänge anzeigen; Stil über Seite einrichten wie Visio) | – |
 | RW-11 | DS Layout und Routing | P1 | fertig | tests/structures_layout.uis | – |
 
 ### 3.7 Register „Daten“
@@ -721,7 +721,7 @@ Trennlinie (BeginGroup) im Menü, KB-06 Enter/Umschalt+Enter-Auswahl, SS-39 UIVi
 | PR-06 | Seitengröße | P1 | fertig | print.uis, status_ui_print.uis, page_setup_ribbon.uis (Automatisch anpassen über Entwurf) | – |
 | PR-07 | Zeichnungsmaßstab | P1 | fertig | page_setup_ribbon.uis, status_ui_print.uis, page_formats.uis (vier Gruppen) | – |
 | PR-08 | Seiteneigenschaften | P1 | fertig | print.uis, status_ui_print.uis, page_formats.uis (Maßeinheit der Seite) | – |
-| PR-09 | Layout und Routing | P1 | teilweise | structures_layout.uis, status_ui_print.uis | Richtung, Verbinder-Darstellung, Größe der Linienübergänge; „Shapes auf Verbinder teilen“/„beim Ablegen verschieben“ ohne Wirkung |
+| PR-09 | Layout und Routing | P1 | teilweise | structures_layout.uis, status_ui_print.uis, jumps.uis (Linienübergänge: wo, Stil, Größe, Richtung) | Richtung, Verbinder-Darstellung; „Shapes auf Verbinder teilen“/„beim Ablegen verschieben“ ohne Wirkung |
 
 ### 3.16 Tastenkürzel
 

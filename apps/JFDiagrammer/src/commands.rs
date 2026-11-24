@@ -390,6 +390,8 @@ commands! {
     DIAGRAM_ROTATE_RIGHT = 0x1C57, "Diagramm um 90° nach rechts drehen", JD_ROTATE_RIGHT, 0;
     DIAGRAM_FLIP_V = 0x1C58, "Diagramm vertikal spiegeln", JD_FLIP_V, 0;
     DIAGRAM_FLIP_H = 0x1C59, "Diagramm horizontal spiegeln", JD_FLIP_H, 0;
+    // (JD21 jumps) the dialog Verbinder-Verhalten (line jumps per connector, jumps_ui.rs)
+    CONN_BEHAVIOR = 0x1C20, "Verbinder-Verhalten", 0, 0;
 }
 
 /// a command's handler: what it does (the function behind it exists)
@@ -652,6 +654,9 @@ static HANDLERS: &[(u32, Handler)] = &[
     (DIAGRAM_ROTATE_RIGHT, |a, ui| crate::layout_cmds::turn(a, ui, diagram_core::layout::Turn::Right)),
     (DIAGRAM_FLIP_V, |a, ui| crate::layout_cmds::turn(a, ui, diagram_core::layout::Turn::FlipV)),
     (DIAGRAM_FLIP_H, |a, ui| crate::layout_cmds::turn(a, ui, diagram_core::layout::Turn::FlipH)),
+    // (JD21 jumps) Linienübergänge anzeigen, Verbinder-Verhalten (jumps_ui.rs)
+    (LINE_JUMPS, crate::jumps_ui::toggle),
+    (CONN_BEHAVIOR, crate::jumps_ui::open),
 ];
 
 // toggles: whether the command is on
@@ -726,6 +731,8 @@ static CHECKED: &[(u32, fn(&Diagrammer) -> bool)] = &[
     (DATA_AUTO_LINK_REFRESH, crate::data_refresh::auto_link_on),
     // (JD21 layout) Positionieren › Seitenumbrüche vermeiden
     (AVOID_BREAKS, crate::layout_cmds::avoid_on),
+    // (JD21 jumps) the page shown has line jumps
+    (LINE_JUMPS, crate::jumps_ui::shown),
 ];
 
 /// the handler of a command (None: not available yet)
@@ -755,6 +762,8 @@ pub(crate) fn usable(app: &Diagrammer, id: u32) -> bool {
         && crate::data_pane::available(app, id)
         // (JD21 layout) the layout commands
         && crate::layout_cmds::available(app, id)
+        // (JD21 jumps) Linienübergänge anzeigen, Verbinder-Verhalten
+        && crate::jumps_ui::available(app, id)
 }
 
 /// the toggle is on

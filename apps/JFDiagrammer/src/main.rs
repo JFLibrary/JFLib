@@ -46,6 +46,7 @@
 //                     Format, Shapes verbinden, the Verbindungspfeile
 //   src/structures_cff.rs   (JD10) the register Funktionsübergreifendes Flussdiagramm
 //   src/layout_ui.rs  (JD10) Layout-Verhalten per shape, Seite einrichten › Layout und Routing
+//   src/jumps_ui.rs   (JD21) line jumps: Linienübergänge anzeigen, the dialog Verbinder-Verhalten
 //   src/templates.rs  (JD13) the templates: built-in (build.rs builds them from templates/ into
 //                     .vstx), the own ones, a new drawing from one, Speichern als Vorlage
 //   src/templates_ui.rs  (JD13) Datei › Neu: the catalogue with rendered previews
@@ -178,6 +179,8 @@ mod layers;
 mod dlg_layout;
 mod layout_cmds;
 mod layout_ui;
+// (JD21 jumps) Linienübergänge anzeigen, Verbinder-Verhalten
+mod jumps_ui;
 // (JD13) the legend of a network plan counts its devices
 mod legend;
 mod options;
@@ -343,6 +346,8 @@ pub(crate) struct Diagrammer {
     pub textdraw: data_textdraw::TextDrawState,
     /// (JD21 layout) the layout commands: live preview, Seitenumbrüche vermeiden, the dialogs
     pub lay: layout_cmds::LayoutCmds,
+    /// (JD21 jumps) Verbinder-Verhalten, Linienübergänge anzeigen (jumps_ui.rs)
+    pub jumps: jumps_ui::JumpsState,
 }
 
 impl Diagrammer {
@@ -417,6 +422,7 @@ impl Diagrammer {
             dask: data_ask::AskState::default(),
             textdraw: data_textdraw::TextDrawState::default(),
             lay: layout_cmds::LayoutCmds::default(),
+            jumps: jumps_ui::JumpsState::default(),
             page_views: alloc::vec::Vec::new(),
             view_page: None,
         }
@@ -565,6 +571,8 @@ impl App for Diagrammer {
         commands::states(self, ui);
         // (JD15) the lane commands show in a lane's menu only (ST-05); QuickInfos off (UI-13)
         structures_cff::menu_states(self, ui);
+        // (JD21 jumps) Verbinder-Verhalten in a connector's menu only
+        jumps_ui::menu_states(self, ui);
         ui.tooltips_set(self.opts.get(&options::TIPS) != 2);
         stencils_panel::states(self, ui);
         shell::frame(self, ui);
@@ -605,6 +613,8 @@ impl App for Diagrammer {
         data_link::dialog(self, ui);
         data_ask::dialog(self, ui);
         data_textdraw::dialog(self, ui);
+        // (JD21 jumps) Verbinder-Verhalten
+        jumps_ui::dialog(self, ui);
     }
 
     fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {

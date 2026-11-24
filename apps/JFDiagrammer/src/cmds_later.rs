@@ -29,7 +29,6 @@ pub(crate) static LATER: &[(u32, &str)] = &[
     (VAR_CONNECTORS, "RW-06, TH-05: Verbindersätze sind P2"),
     (VAR_FONTS, "RW-06, TH-05: Schriftsätze sind P2"),
     (VAR_EMBELLISHMENT, "RW-06, TH-05: Verzierungsgrad ist P2"),
-    (LINE_JUMPS, "CN-06: Linienübergänge sind P2 (PLAN JD7); der Renderer zeichnet noch keine"),
     // (JD18) Register Daten: was erst die Datengrafiken (JD19) brauchen, und P3
     (DATA_QUICK_IMPORT, "RD-01, DA-06: Schnellimport ist P3 (Benutzerdefinierter Import geht)"),
     (DATA_GRAPHICS, "RD-04, DA-07: Datengrafiken kommen mit JD19"),
