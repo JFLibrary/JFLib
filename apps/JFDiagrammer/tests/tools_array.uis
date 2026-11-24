@@ -1,0 +1,67 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD21 (AS-11, RA-09): Ansicht › Add-Ons › Shapes vervielfältigen (Visio's Array
+# add-on) -- a box with its text copied into 2 rows and 3 columns, 10 mm between the shapes, to the
+# right and down: five copies in their cells, the box and its copies selected, one undo step;
+# again from middle to middle (60 mm, 40 mm) to the left and up.  The dialog's ids: 0x7EB8_0000
+# (2125987840) + 2 rows, + 3 columns, + 4 between rows, + 5 between columns, + 8 direction
+theme light
+cmd 4404
+drag 450,320 540,360
+cmd 4400
+click 495,340
+type "Box"
+click 1100,700
+click 495,340
+click tab:"Ansicht"
+click button:"Shapes vervielfältigen"
+expect dialog:"Shapes vervielfältigen" exists
+click #2125987842
+key ctrl+a
+type "2"
+click #2125987843
+key ctrl+a
+type "3"
+click #2125987844
+key ctrl+a
+type "10"
+click #2125987845
+key ctrl+a
+type "10"
+expect radio:"Zwischen den Shapes" checked
+expect combo:"Nach rechts unten" exists
+expect text:"Kopien: 5" exists
+shot build/JFDiagrammer-tools-array.png
+click button:"OK"
+expect dialog:"Shapes vervielfältigen" missing
+# 50 mm from column to column (40 + 10), 20 mm from row to row (10 + 10); all six selected
+expect #1417855388 rect 450 324 100 25
+expect #1365334356 rect 576 324 100 25
+expect #1400851020 rect 701 324 101 25
+expect #1505263375 rect 450 374 100 25
+expect #1605127205 rect 576 374 100 25
+expect #1372675387 rect 701 374 101 25
+expect #1372675387 selected
+expect #1417855388 selected
+# one undo step
+key ctrl+z
+expect #1365334356 missing
+expect #1417855388 rect 450 324 100 25
+# from middle to middle, to the left and up
+click 495,335
+click button:"Shapes vervielfältigen"
+click radio:"Von Mitte zu Mitte"
+click #2125987844
+key ctrl+a
+type "40"
+click #2125987845
+key ctrl+a
+type "60"
+click #2125987848
+click "Nach links oben"
+click button:"OK"
+# 60 mm to the left, 40 mm up (the third column lies under the Shapes panel)
+expect #1417855388 rect 450 324 100 25
+expect #1405578773 rect 299 324 101 25
+expect #1476012109 rect 450 223 100 25
+expect #1359341195 rect 299 223 101 25
+expect #1359341195 selected

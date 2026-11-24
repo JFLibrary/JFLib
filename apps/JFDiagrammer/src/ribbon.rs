@@ -1,7 +1,8 @@
 // ribbon -- the registers of the ribbon: Start, Einfügen, Entwurf, (JD18) Daten, Ansicht with
 // every P1 command of FEATURES.md 3.3-3.9, the context registers Container-Tools › Format (RK-01)
 // and Textwerkzeuge › Text (RK-11), and (JD10) Funktionsübergreifendes Flussdiagramm (RK-03)
-// while the page holds one
+// while the page holds one; (JD21) Ansicht › Add-Ons, Container-Tools' styles and Einfügen ›
+// Container as galleries of pictures (container_styles.rs)
 //
 //   tabs(app) -> Vec<Reg>         the registers shown now: File, the four, the context ones
 //                                 the selection asks for (app.selection_kind)
@@ -24,7 +25,7 @@ use ui::i18n::t;
 use ui::*;
 
 use crate::commands::{self, *};
-use crate::{lang, tc, Diagrammer};
+use crate::{container_styles, lang, tc, Diagrammer};
 
 /// the kinds of selection that bring context registers (until JD7 the shell preview,
 /// --shell-preview, stands in for a real selection)
@@ -165,9 +166,13 @@ static LAYER_MENU: [It; 2] = [C(LAYER_ASSIGN), C(LAYER_PROPERTIES)];
 static SELECT_MENU_ITEMS: [It; 4] = [C(SELECT_ALL), C(SELECT_BY_TYPE), C(SELECT_AREA), C(LASSO)];
 static PAGE_MENU: [It; 3] = [C(PAGE_BLANK), C(PAGE_BACKGROUND), C(PAGE_DUPLICATE)];
 static PICTURE_MENU: [It; 1] = [C(PICTURE_FILE)];
-static CONTAINER_MENU: [It; 6] = [C(CONTAINER_1), C(CONTAINER_2), C(CONTAINER_3), C(CONTAINER_4), C(CONTAINER_5), C(CONTAINER_6)];
+// (JD21 tools) the 14 styles, drawn as a gallery of pictures (container_styles::flyout)
+static CONTAINER_MENU: [It; 14] = [
+    C(CONTAINER_1), C(CONTAINER_2), C(CONTAINER_3), C(CONTAINER_4), C(CONTAINER_5), C(CONTAINER_6), C(CONTAINER_7), C(CONTAINER_8), C(CONTAINER_9),
+    C(CONTAINER_10), C(CONTAINER_11), C(CONTAINER_12), C(CONTAINER_13), C(CONTAINER_14),
+];
 static CALLOUT_MENU: [It; 6] = [C(CALLOUT_1), C(CALLOUT_2), C(CALLOUT_3), C(CALLOUT_4), C(CALLOUT_5), C(CALLOUT_6)];
-static CT_STYLE_MENU: [It; 6] = [C(CT_STYLE_1), C(CT_STYLE_2), C(CT_STYLE_3), C(CT_STYLE_4), C(CT_STYLE_5), C(CT_STYLE_6)];
+// (JD21 tools) drawn as pictures of the selected container's style (container_styles::flyout)
 static CT_HEADING_MENU: [It; 4] = [C(CT_HEADING_1), C(CT_HEADING_2), C(CT_HEADING_3), C(CT_HEADING_4)];
 static CT_AUTOSIZE_MENU: [It; 3] = [C(CT_RESIZE_0), C(CT_RESIZE_1), C(CT_RESIZE_2)];
 static CFF_ORIENT_MENU: [It; 2] = [C(CFF_HORIZONTAL), C(CFF_VERTICAL)];
@@ -267,7 +272,7 @@ static DATA: [Group; 5] = [
 ];
 
 // i18n
-static VIEW: [Group; 3] = [
+static VIEW: [Group; 4] = [
     Group("Anzeigen", 0, &[
         Col::Small(&[Sm::Check(RULER), Sm::Check(PAGE_BREAKS)]),
         Col::Small(&[Sm::Check(GRID), Sm::Check(GUIDES)]),
@@ -275,13 +280,23 @@ static VIEW: [Group; 3] = [
     ]),
     Group("Zoom", 0, &[Col::Big(ZOOM), Col::Small(&[Sm::Btn(FIT_WINDOW), Sm::Btn(PAGE_WIDTH)])]),
     Group("Visuelle Unterstützung", SNAP_GLUE, &[Col::Small(&[Sm::Check(DYN_GRID), Sm::Check(CONNECT_ARROWS), Sm::Check(CONN_POINTS)])]),
+    // (JD21 tools) Visio's Makros › Add-Ons as own tools (addons.rs)
+    Group("Add-Ons", 0, &[
+        Col::Big(NUMBER_SHAPES),
+        Col::Big(ARRAY_SHAPES),
+        Col::BigMenu(DIMENSIONS, &DIM_MENU),
+        Col::Small(&[Sm::Check(NUMBER_ON_DROP), Sm::Btn(CATEGORIES)]),
+    ]),
 ];
+// (JD21 tools) Maßlinien: the three kinds
+static DIM_MENU: [It; 3] = [C(DIM_HORIZONTAL), C(DIM_VERTICAL), C(DIM_ALIGNED)];
 
 // i18n
 static CONTAINER_FORMAT: [Group; 3] = [
     Group("Größe", 0, &[Col::BigMenu(CT_MARGINS, &MARGIN_MENU), Col::Big(CT_FIT), Col::BigMenu(CT_AUTOSIZE, &CT_AUTOSIZE_MENU)]),
-    Group("Containerformatvorlagen", 0, &[Col::BigMenu(CT_STYLES, &CT_STYLE_MENU), Col::BigMenu(CT_HEADING, &CT_HEADING_MENU)]),
-    Group("Mitgliedschaft", 0, &[Col::Big(CT_LOCK), Col::Big(CT_SELECT), Col::Big(CT_DISBAND)]),
+    // (JD21 tools) the styles as a gallery with pictures (container_styles.rs)
+    Group("Containerformatvorlagen", 0, &[Col::Gallery(CT_STYLES, container_styles::SHOWN as u32, 0), Col::BigMenu(CT_HEADING, &CT_HEADING_MENU)]),
+    Group("Mitgliedschaft", 0, &[Col::Big(CT_LOCK), Col::Big(CT_SELECT), Col::Big(CT_DISBAND), Col::Small(&[Sm::Btn(CATEGORIES)])]),
 ];
 
 // i18n
@@ -362,6 +377,10 @@ fn menu_of(id: u32) -> Option<(Reg, u32, &'static [It])> {
 pub(crate) fn menu_place(id: u32) -> Option<(Reg, u32)> {
     if id == THEMES {
         return Some((Reg::Design, crate::design_gallery::ID_ALL));
+    }
+    // (JD21 tools) Containerformatvorlagen: the gallery's list of all styles
+    if id == CT_STYLES {
+        return Some((Reg::Container, container_styles::ID_ALL));
     }
     menu_of(id).map(|(reg, pid, _)| (reg, pid))
 }
@@ -537,6 +556,11 @@ fn column(app: &mut Diagrammer, ui: &mut Ui, col: &Col, width: i32, tiles: u32, 
             ui.next_size(width, CONTENT_H);
             crate::design_gallery::variants(app, ui, CONTENT_H);
         }
+        // (JD21 tools) the container styles
+        Col::Gallery(CT_STYLES, ..) => {
+            ui.next_size(width, CONTENT_H);
+            container_styles::gallery(app, ui, CONTENT_H);
+        }
         Col::Gallery(id, n, color) => {
             ui.next_size(width, CONTENT_H);
             ui.box_begin(0, BOX_H | BOX_FIXED, 2);
@@ -636,6 +660,10 @@ fn small(app: &mut Diagrammer, ui: &mut Ui, s: &Sm, compact: bool) {
 fn menu(app: &mut Diagrammer, ui: &mut Ui, pid: u32, items: &[It]) {
     // (JD11) Füllung, Linie and Schriftfarbe bring their colour menus
     if crate::format_menus::flyout(app, ui, pid) {
+        return;
+    }
+    // (JD21 tools) Einfügen › Container and Kopfzeilenstil as pictures
+    if container_styles::flyout(app, ui, pid) {
         return;
     }
     if ui.flyout_begin(pid, 0) {

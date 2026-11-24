@@ -10,7 +10,8 @@
 //   insert_callout(app, ui, k)    callout master k for every selected shape (tied to it, up to
 //                                 the right), else alone in the middle of the view
 //   container ops                 fit, automatic size, margins, style, heading style, lock,
-//                                 select the contents, disband, add, remove
+//                                 select the contents, disband, add, remove; (JD21) 14 styles,
+//                                 a style applied through container_styles::apply
 //   connect_shapes(app, ui)       the selected shapes chained by dynamic connectors in the
 //                                 order they were selected; (JD15) by instances of the
 //                                 connector master marked in the Shapes panel (the armed tile,
@@ -39,10 +40,14 @@ use crate::edit_doc;
 use crate::structures::{self, place_master};
 use crate::Diagrammer;
 
-/// the container masters' style names (msvSDContainerStyle 1..6), the commands that apply them
-pub(crate) const CONTAINER_STYLES: [u32; 6] = [CT_STYLE_1, CT_STYLE_2, CT_STYLE_3, CT_STYLE_4, CT_STYLE_5, CT_STYLE_6];
-/// Einfügen › Container: a new container in style 1..6
-pub(crate) const CONTAINER_INSERTS: [u32; 6] = [CONTAINER_1, CONTAINER_2, CONTAINER_3, CONTAINER_4, CONTAINER_5, CONTAINER_6];
+/// the container masters' style names (msvSDContainerStyle 1..14; JD21: 7..14), the commands
+/// that apply them
+pub(crate) const CONTAINER_STYLES: [u32; 14] = crate::container_styles::STYLES;
+/// Einfügen › Container: a new container in style 1..14
+pub(crate) const CONTAINER_INSERTS: [u32; 14] = [
+    CONTAINER_1, CONTAINER_2, CONTAINER_3, CONTAINER_4, CONTAINER_5, CONTAINER_6, CONTAINER_7, CONTAINER_8, CONTAINER_9, CONTAINER_10, CONTAINER_11,
+    CONTAINER_12, CONTAINER_13, CONTAINER_14,
+];
 /// the heading styles (msvSDHeadingStyle 1..4)
 pub(crate) const HEADING_STYLES: [u32; 4] = [CT_HEADING_1, CT_HEADING_2, CT_HEADING_3, CT_HEADING_4];
 /// Einfügen › Beschriftung: the callout masters
@@ -130,7 +135,8 @@ pub(crate) fn run(app: &mut Diagrammer, ui: &mut Ui, id: u32) -> bool {
     } else if let Some(k) = CALLOUTS.iter().position(|c| c.0 == id) {
         insert_callout(app, ui, k);
     } else if let Some(k) = CONTAINER_STYLES.iter().position(|&x| x == id) {
-        set_cell(app, ui, t("Containerformatvorlage"), "msvSDContainerStyle", k as f64 + 1.0, None);
+        // (JD21) the heading style follows when the new style lacks it (container_styles.rs)
+        crate::container_styles::apply(app, ui, k as u32 + 1, true);
     } else if let Some(k) = HEADING_STYLES.iter().position(|&x| x == id) {
         set_cell(app, ui, t("Kopfzeilenstil"), "msvSDHeadingStyle", k as f64 + 1.0, None);
     } else if let Some(m) = MARGINS.iter().find(|m| m.0 == id) {

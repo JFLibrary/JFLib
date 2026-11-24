@@ -1,18 +1,35 @@
 # Container: EIN Shape (keine Gruppe).  Der Text ist die Überschrift, er steht in der Kopfzeile.
 #
-# Sechs Containerstile (User.msvSDContainerStyle, 1-basiert), alle eigene Entwürfe im NetLab-Stil:
-#   1 Klar         dünner Schieferrahmen, helles Kopfband, Trennlinie
-#   2 Akzent       kräftiger Signalblau-Rahmen, Signalblau-Kopfband, weiße Schrift
-#   3 Gestrichelt  gestrichelter Rahmen und Trennlinie, keine Füllung
-#   4 Fläche       nur eine helle Fläche, keine Linien
-#   5 Eckwinkel    nur vier Eckwinkel und das helle Kopfband
-#   6 Abgerundet   abgerundeter Rahmen, sehr helle Fläche, Trennlinie
-# Vier Kopfzeilenstile (User.msvSDHeadingStyle): 1 Kopfband oben, 2 nur Titel oben (ohne Band),
-# 3 Kopfband links (Text um 90° gedreht), 4 ohne Kopf.  Sie setzen JFD_HeadingEdge und
-# JFD_HeadingSize per Formel; Kopfband, Trennlinie und Textblock folgen NUR diesen beiden Zellen
-# (HeadTop … HeadRight), so dass die App den Kopf mit JFD_HeadingSize = 0 abschalten kann.
+# Vierzehn Containerstile (User.msvSDContainerStyle, 1-basiert), alle eigene Entwürfe im NetLab-Stil
+# (eckig, Schiefer und Signalblau).  1-6 sind die Stile von JD10 und bleiben, wie sie waren
+# (vorhandene Zeichnungen sehen gleich aus); 7-14 kommen mit JD21 (ST-02) dazu:
+#   1 Klar          dünner Schieferrahmen, helles Kopfband, Trennlinie
+#   2 Akzent        kräftiger Signalblau-Rahmen, Signalblau-Kopfband, weiße Schrift
+#   3 Gestrichelt   gestrichelter Rahmen und Trennlinie, keine Füllung
+#   4 Fläche        nur eine helle Fläche, keine Linien
+#   5 Eckwinkel     nur vier Eckwinkel und das helle Kopfband
+#   6 Abgerundet    abgerundeter Rahmen, sehr helle Fläche, Trennlinie
+#   7 Leiste        dünner Schieferrahmen, schmale Signalblau-Leiste an der Kopfkante
+#   8 Doppelrahmen  zwei dünne Schieferrahmen, Trennlinie im inneren
+#   9 Schiefer      Schiefer-Kopfband mit weißer Schrift, flacher Schatten unten rechts
+#  10 Reiter        Karteireiter oben links, der Rahmen beginnt unter ihm
+#  11 Kopflinie     kein Rahmen, nur eine kräftige Signalblau-Linie unter dem Titel
+#  12 Klammer       eckige Klammern links und rechts, Trennlinie zwischen ihnen
+#  13 Signal        kräftiger Signalblau-Rahmen, helles Kopfband, blaue Schrift
+#  14 Kopf unten    wie Klar, die Kopfzeile liegt unten (bzw. rechts)
+# Die Farben sind die feste NetLab-Palette der Stile 1-6 (begründete Ausnahme von „keine Farben
+# im Master“: ein Containerstil ist ein gewählter Look, die Galerie zeigt ihn so).
+#
+# Kopfzeilenstile (User.msvSDHeadingStyle, 1 bis msvSDHeadingStyleCount): 1 Kopf betont (Band,
+# Leiste, Reiter oder Linie des Stils), 2 nur Titel (ohne Band), 3 Kopf seitlich (Text um 90°
+# gedreht), 4 ohne Kopf.  Die Stile 1-8, 13, 14 haben alle vier, 9 und 11 drei, 10 und 12 zwei.
+# Stil 14 legt den Kopf unten bzw. rechts statt oben bzw. links.  Ein Kopfzeilenstil außerhalb der
+# Anzahl zeigt keinen Kopf.  Sie setzen JFD_HeadingEdge und JFD_HeadingSize per Formel; Kopfband,
+# Trennlinie und Textblock folgen NUR diesen beiden Zellen (HeadTop … HeadRight), so dass die App
+# den Kopf mit JFD_HeadingSize = 0 abschalten kann.
 # Ein Geometrieabschnitt je Teil, ein- und ausgeschaltet über NoShow/NoFill/NoLine:
-#   1 Rahmen   2 Kopfband   3 Trennlinie   4-7 Eckwinkel
+#   1 Rahmen   2 Kopfband   3 Trennlinie   4-7 Eckwinkel (Stil 12: die Klammern)
+#   8 innerer Rahmen (Stil 8)   9 Schatten (Stil 9)   10 Reiter (Stil 10)
 master: Container
 name.de: Container
 name.en: Container
@@ -40,18 +57,18 @@ Width = 120 mm
 Width.us = 4.5 in
 Height = 80 mm
 Height.us = 3 in
-LineWeight = IF(OR(User.msvSDContainerStyle=2,User.msvSDContainerStyle=5),1.5 pt,IF(OR(User.msvSDContainerStyle=3,User.msvSDContainerStyle=6),1 pt,0.75 pt))
-LineColor = IF(OR(User.msvSDContainerStyle=1,User.msvSDContainerStyle=3),RGB(77,85,96),RGB(31,95,168))
-LinePattern = IF(User.msvSDContainerStyle=3,2,1)
-Rounding = IF(User.msvSDContainerStyle=6,User.Radius,0)
-FillForegnd = IF(User.msvSDContainerStyle=2,RGB(31,95,168),IF(User.msvSDContainerStyle=4,RGB(238,243,249),IF(User.msvSDContainerStyle=6,RGB(245,248,252),RGB(230,239,248))))
+LineWeight = IF(OR(User.St=11,User.St=13),2.25 pt,IF(OR(User.St=2,User.St=5,User.St=12),1.5 pt,IF(OR(User.St=3,User.St=6,User.St=9,User.St=10),1 pt,0.75 pt)))
+LineColor = IF(OR(User.St=1,User.St=3,User.St=7,User.St=8,User.St=9,User.St=12,User.St=14),RGB(77,85,96),RGB(31,95,168))
+LinePattern = IF(User.St=3,2,1)
+Rounding = IF(User.St=6,User.Radius,0)
+FillForegnd = IF(OR(User.St=2,User.St=7),RGB(31,95,168),IF(User.St=4,RGB(238,243,249),IF(User.St=6,RGB(245,248,252),IF(User.St=9,RGB(77,85,96),RGB(230,239,248)))))
 FillBkgnd = FillForegnd
 FillPattern = 1
-# der Textblock in der Kopfzeile (links/rechts um 90° gedreht)
-TxtWidth = IF(User.HeadLeft+User.HeadRight>0,Height,Width)
-TxtHeight = IF(User.HeadLeft+User.HeadRight>0,User.HeadLeft+User.HeadRight,User.HeadTop+User.HeadBottom)
-TxtPinX = IF(User.HeadLeft>0,User.HeadLeft*0.5,IF(User.HeadRight>0,Width-User.HeadRight*0.5,Width*0.5))
-TxtPinY = IF(User.HeadTop>0,Height-User.HeadTop*0.5,IF(User.HeadBottom>0,User.HeadBottom*0.5,Height*0.5))
+# der Textblock in der Kopfzeile (links/rechts um 90° gedreht); Stil 7: unter der Leiste, Stil 10: im Reiter
+TxtWidth = IF(User.HeadLeft+User.HeadRight>0,Height,IF(User.Tab,User.TabW-User.TabSlant,Width))
+TxtHeight = IF(User.HeadLeft+User.HeadRight>0,User.HeadLeft+User.HeadRight,User.HeadTop+User.HeadBottom)-User.Inset
+TxtPinX = IF(User.HeadLeft>0,User.Inset+(User.HeadLeft-User.Inset)*0.5,IF(User.HeadRight>0,Width-User.Inset-(User.HeadRight-User.Inset)*0.5,IF(User.Tab,(User.TabW-User.TabSlant)*0.5,Width*0.5)))
+TxtPinY = IF(User.HeadTop>0,Height-User.Inset-(User.HeadTop-User.Inset)*0.5,IF(User.HeadBottom>0,User.Inset+(User.HeadBottom-User.Inset)*0.5,Height*0.5))
 TxtLocPinX = TxtWidth*0.5
 TxtLocPinY = TxtHeight*0.5
 TxtAngle = IF(User.HeadLeft+User.HeadRight>0,90 deg,0 deg)
@@ -76,14 +93,18 @@ msvSDContainerLocked:             Value = FALSE
 msvSDContainerNoHighlight:        Value = FALSE
 msvSDContainerNoRibbon:           Value = FALSE
 msvSDContainerStyle:              Value = 1
-msvSDContainerStyleCount:         Value = 6
+msvSDContainerStyleCount:         Value = 14
 msvSDHeadingStyle:                Value = 1
-msvSDHeadingStyleCount:           Value = 4
+# die Anzahl der Kopfzeilenstile hängt vom Stil ab
+msvSDHeadingStyleCount:           Value = IF(OR(User.St=10,User.St=12),2,IF(OR(User.St=9,User.St=11),3,4))
 msvSDContainerRequiredCategories: Value = ""
 msvSDContainerExcludedCategories: Value = "DoNotContain"
+# Stil und Kopfzeilenstil, auf die vorhandenen begrenzt (außerhalb: kein Kopf)
+St:               Value = MAX(1,MIN(User.msvSDContainerStyle,14))
+Hd:               Value = IF(OR(User.msvSDHeadingStyle<1,User.msvSDHeadingStyle>User.msvSDHeadingStyleCount),4,User.msvSDHeadingStyle)
 # die Kopfzeile aus dem Kopfzeilenstil (die App darf beide Zellen auch selbst setzen)
-JFD_HeadingEdge:  Value = INDEX(User.msvSDHeadingStyle-1,"Top;Top;Left;None")
-JFD_HeadingSize:  Value = IF(OR(User.msvSDHeadingStyle<1,User.msvSDHeadingStyle>3),0,User.HeadDepth)
+JFD_HeadingEdge:  Value = IF(User.St=14,INDEX(User.Hd-1,"Bottom;Bottom;Right;None"),INDEX(User.Hd-1,"Top;Top;Left;None"))
+JFD_HeadingSize:  Value = IF(User.Hd>3,0,User.HeadDepth)
 HeadDepth:        Value = 8 mm
                   Value.us = 0.3 in
 # die Tiefe der Kopfzeile je Kante (0: nicht an dieser Kante)
@@ -92,32 +113,58 @@ HeadBottom:       Value = IF(STRSAME(User.JFD_HeadingEdge,"Bottom",TRUE),MIN(MAX
 HeadLeft:         Value = IF(STRSAME(User.JFD_HeadingEdge,"Left",TRUE),MIN(MAX(User.JFD_HeadingSize,0),Width),0)
 HeadRight:        Value = IF(STRSAME(User.JFD_HeadingEdge,"Right",TRUE),MIN(MAX(User.JFD_HeadingSize,0),Width),0)
 HeadShown:        Value = User.HeadTop+User.HeadBottom+User.HeadLeft+User.HeadRight>0
-# das Kopfband und die Trennlinie zum Inneren
-BandX0:           Value = IF(User.HeadRight>0,Width-User.HeadRight,0)
-BandX1:           Value = IF(User.HeadLeft>0,User.HeadLeft,Width)
-BandY0:           Value = IF(User.HeadTop>0,Height-User.HeadTop,0)
-BandY1:           Value = IF(User.HeadBottom>0,User.HeadBottom,Height)
-SepX0:            Value = IF(User.HeadLeft>0,User.HeadLeft,IF(User.HeadRight>0,Width-User.HeadRight,0))
-SepX1:            Value = IF(User.HeadLeft+User.HeadRight>0,User.SepX0,Width)
-SepY0:            Value = IF(User.HeadTop>0,Height-User.HeadTop,IF(User.HeadBottom>0,User.HeadBottom,0))
-SepY1:            Value = IF(User.HeadLeft+User.HeadRight>0,Height,User.SepY0)
 # welche Teile der Stil zeigt (Kopfzeilenstil 2: nur der Titel, kein Band, keine Linie)
-Band:             Value = AND(User.HeadShown,User.msvSDHeadingStyle<>2,OR(User.msvSDContainerStyle=1,User.msvSDContainerStyle=2,User.msvSDContainerStyle=5))
-Sep:              Value = AND(User.HeadShown,User.msvSDHeadingStyle<>2,OR(User.msvSDContainerStyle=1,User.msvSDContainerStyle=3,User.msvSDContainerStyle=6))
+Band:             Value = AND(User.HeadShown,User.Hd<>2,OR(User.St=1,User.St=2,User.St=5,User.St=7,User.St=9,User.St=13,User.St=14))
+Sep:              Value = AND(User.HeadShown,User.Hd<>2,OR(User.St=1,User.St=3,User.St=6,User.St=8,User.St=11,User.St=12,User.St=14))
+Tab:              Value = AND(User.HeadTop>0,User.Hd<>2,User.St=10)
+# Stil 7: die Leiste (so tief wie Bar) außen an der Kopfkante, der Text darunter
+Bar:              Value = 2 mm
+                  Value.us = 0.08 in
+Inset:            Value = IF(AND(User.Band,User.St=7),MIN(User.Bar,User.HeadTop+User.HeadBottom+User.HeadLeft+User.HeadRight),0)
+BT:               Value = IF(User.St=7,MIN(User.HeadTop,User.Bar),User.HeadTop)
+BB:               Value = IF(User.St=7,MIN(User.HeadBottom,User.Bar),User.HeadBottom)
+BL:               Value = IF(User.St=7,MIN(User.HeadLeft,User.Bar),User.HeadLeft)
+BR:               Value = IF(User.St=7,MIN(User.HeadRight,User.Bar),User.HeadRight)
+# das Kopfband und die Trennlinie zum Inneren (Stil 8 und 12: die Linie endet innen)
+BandX0:           Value = IF(User.BR>0,Width-User.BR,0)
+BandX1:           Value = IF(User.BL>0,User.BL,Width)
+BandY0:           Value = IF(User.BT>0,Height-User.BT,0)
+BandY1:           Value = IF(User.BB>0,User.BB,Height)
+SI:               Value = IF(User.St=8,User.DF,IF(User.St=12,User.CX,0))
+SepX0:            Value = IF(User.HeadLeft>0,User.HeadLeft,IF(User.HeadRight>0,Width-User.HeadRight,User.SI))
+SepX1:            Value = IF(User.HeadLeft+User.HeadRight>0,User.SepX0,Width-User.SI)
+SepY0:            Value = IF(User.HeadTop>0,Height-User.HeadTop,IF(User.HeadBottom>0,User.HeadBottom,User.SI))
+SepY1:            Value = IF(User.HeadLeft+User.HeadRight>0,Height-User.SI,User.SepY0)
 Radius:           Value = 3 mm
                   Value.us = 0.125 in
 CornerLen:        Value = 10 mm
                   Value.us = 0.4 in
 Corner:           Value = MIN(User.CornerLen,Width*0.3,Height*0.3)
+# die Arme der Eckwinkel (Stil 5) bzw. der Klammern (Stil 12: halbe Höhe, die Winkel treffen sich)
+Arm:              Value = 4 mm
+                  Value.us = 0.16 in
+CX:               Value = IF(User.St=12,MIN(User.Arm,Width*0.2),User.Corner)
+CY:               Value = IF(User.St=12,Height*0.5,User.Corner)
+# Stil 8: Abstand des inneren Rahmens
+DF:               Value = MIN(1.2 mm,Width*0.1,Height*0.1)
+                  Value.us = MIN(0.05 in,Width*0.1,Height*0.1)
+# Stil 9: Versatz des Schattens
+Off:              Value = 1.5 mm
+                  Value.us = 0.06 in
+# Stil 10: der Reiter (Breite, Schräge rechts) und die Oberkante des Rahmens unter ihm
+TabW:             Value = MIN(Width,MAX(35 mm,Width*0.5))
+                  Value.us = MIN(Width,MAX(1.4 in,Width*0.5))
+TabSlant:         Value = MIN(User.HeadTop*0.5,User.TabW*0.25)
+FT:               Value = IF(User.Tab,Height-User.HeadTop,Height)
 
-# 1 der Rahmen (Stil 4 und 6 gefüllt)
+# 1 der Rahmen (Stil 4 und 6 gefüllt; Stil 10 mit Reiter: unter dem Reiter)
 [Geometry]
-NoFill = AND(User.msvSDContainerStyle<>4,User.msvSDContainerStyle<>6)
-NoLine = OR(User.msvSDContainerStyle=4,User.msvSDContainerStyle=5)
+NoFill = AND(User.St<>4,User.St<>6)
+NoLine = OR(User.St=4,User.St=5,User.St=11,User.St=12)
 MoveTo  X = 0; Y = 0
 LineTo  X = Width; Y = 0
-LineTo  X = Width; Y = Height
-LineTo  X = 0; Y = Height
+LineTo  X = Width; Y = User.FT
+LineTo  X = 0; Y = User.FT
 LineTo  X = Geometry1.X1; Y = Geometry1.Y1
 
 # 2 das Kopfband
@@ -137,37 +184,68 @@ NoShow = NOT(User.Sep)
 MoveTo  X = User.SepX0; Y = User.SepY0
 LineTo  X = User.SepX1; Y = User.SepY1
 
-# 4-7 die Eckwinkel (Stil 5)
+# 4-7 die Eckwinkel (Stil 5) bzw. die Klammern (Stil 12)
 [Geometry]
 NoFill = TRUE
-NoShow = User.msvSDContainerStyle<>5
-MoveTo  X = 0; Y = User.Corner
+NoShow = AND(User.St<>5,User.St<>12)
+MoveTo  X = 0; Y = User.CY
 LineTo  X = 0; Y = 0
-LineTo  X = User.Corner; Y = 0
+LineTo  X = User.CX; Y = 0
 
 [Geometry]
 NoFill = TRUE
-NoShow = User.msvSDContainerStyle<>5
-MoveTo  X = Width-User.Corner; Y = 0
+NoShow = AND(User.St<>5,User.St<>12)
+MoveTo  X = Width-User.CX; Y = 0
 LineTo  X = Width; Y = 0
-LineTo  X = Width; Y = User.Corner
+LineTo  X = Width; Y = User.CY
 
 [Geometry]
 NoFill = TRUE
-NoShow = User.msvSDContainerStyle<>5
-MoveTo  X = Width; Y = Height-User.Corner
+NoShow = AND(User.St<>5,User.St<>12)
+MoveTo  X = Width; Y = Height-User.CY
 LineTo  X = Width; Y = Height
-LineTo  X = Width-User.Corner; Y = Height
+LineTo  X = Width-User.CX; Y = Height
 
 [Geometry]
 NoFill = TRUE
-NoShow = User.msvSDContainerStyle<>5
-MoveTo  X = User.Corner; Y = Height
+NoShow = AND(User.St<>5,User.St<>12)
+MoveTo  X = User.CX; Y = Height
 LineTo  X = 0; Y = Height
-LineTo  X = 0; Y = Height-User.Corner
+LineTo  X = 0; Y = Height-User.CY
+
+# 8 der innere Rahmen (Stil 8)
+[Geometry]
+NoFill = TRUE
+NoShow = User.St<>8
+MoveTo  X = User.DF; Y = User.DF
+LineTo  X = Width-User.DF; Y = User.DF
+LineTo  X = Width-User.DF; Y = Height-User.DF
+LineTo  X = User.DF; Y = Height-User.DF
+LineTo  X = Geometry8.X1; Y = Geometry8.Y1
+
+# 9 der flache Schatten unten rechts (Stil 9), außerhalb des Rahmens
+[Geometry]
+NoLine = TRUE
+NoShow = User.St<>9
+MoveTo  X = User.Off; Y = -User.Off
+LineTo  X = Width+User.Off; Y = -User.Off
+LineTo  X = Width+User.Off; Y = Height-User.Off
+LineTo  X = Width; Y = Height-User.Off
+LineTo  X = Width; Y = 0
+LineTo  X = User.Off; Y = 0
+LineTo  X = Geometry9.X1; Y = Geometry9.Y1
+
+# 10 der Reiter (Stil 10, Kopf oben): links bündig, rechts abgeschrägt
+[Geometry]
+NoShow = NOT(User.Tab)
+MoveTo  X = 0; Y = User.FT
+LineTo  X = 0; Y = Height
+LineTo  X = User.TabW-User.TabSlant; Y = Height
+LineTo  X = User.TabW; Y = User.FT
+LineTo  X = Geometry10.X1; Y = Geometry10.Y1
 
 [Character]
-Row  Color = IF(AND(User.Band,User.msvSDContainerStyle=2),RGB(255,255,255),IF(OR(User.msvSDContainerStyle=2,User.msvSDContainerStyle=5,User.msvSDContainerStyle=6),RGB(31,95,168),IF(User.msvSDContainerStyle=3,RGB(77,85,96),RGB(29,34,40))))
+Row  Color = IF(AND(User.Band,OR(User.St=2,User.St=9)),RGB(255,255,255),IF(OR(User.St=2,User.St=5,User.St=6,User.St=10,User.St=13),RGB(31,95,168),IF(OR(User.St=3,User.St=9),RGB(77,85,96),RGB(29,34,40))))
      Style = 1
 
 [Paragraph]

@@ -47,6 +47,9 @@
 //   src/structures_cff.rs   (JD10) the register Funktionsübergreifendes Flussdiagramm
 //   src/layout_ui.rs  (JD10) Layout-Verhalten per shape, Seite einrichten › Layout und Routing
 //   src/jumps_ui.rs   (JD21) line jumps: Linienübergänge anzeigen, the dialog Verbinder-Verhalten
+//   src/addons.rs     (JD21) Ansicht › Add-Ons: Shapes nummerieren (dlg_number.rs), vervielfältigen
+//                     (dlg_array.rs), Maßlinien (tools_dim.rs); the container styles as galleries
+//                     (container_styles.rs) and Kategorien (dlg_categories.rs)
 //   src/templates.rs  (JD13) the templates: built-in (build.rs builds them from templates/ into
 //                     .vstx), the own ones, a new drawing from one, Speichern als Vorlage
 //   src/templates_ui.rs  (JD13) Datei › Neu: the catalogue with rendered previews
@@ -147,6 +150,13 @@ mod cmds_paste;
 mod cmds_picture;
 mod cmds_text;
 mod commands;
+// (JD21 tools) Ansicht › Add-Ons, container styles, categories
+mod addons;
+mod container_styles;
+mod dlg_array;
+mod dlg_categories;
+mod dlg_number;
+mod tools_dim;
 // (JD18) data: the register Daten, the pane Externe Daten, import, link, refresh, drawing from text
 mod data_ask;
 mod data_cmds;
@@ -358,6 +368,8 @@ pub(crate) struct Diagrammer {
     /// (JD21 autoconn) the connector automatics: a move's split, the tool "once", marked tiles,
     /// the quick shapes bar
     pub autoconn: autoconn::AutoConn,
+    /// (JD21 tools) Add-Ons' dialogs, the container styles' galleries (addons.rs)
+    pub addons: addons::Addons,
 }
 
 impl Diagrammer {
@@ -434,6 +446,7 @@ impl Diagrammer {
             lay: layout_cmds::LayoutCmds::default(),
             jumps: jumps_ui::JumpsState::default(),
             autoconn: autoconn::AutoConn::default(),
+            addons: addons::Addons::default(),
             page_views: alloc::vec::Vec::new(),
             view_page: None,
         }
@@ -626,6 +639,9 @@ impl App for Diagrammer {
         data_textdraw::dialog(self, ui);
         // (JD21 jumps) Verbinder-Verhalten
         jumps_ui::dialog(self, ui);
+        // (JD21 tools) a container style's preview goes when its tile is left; the dialogs
+        addons::after(self, ui);
+        addons::dialogs(self, ui);
     }
 
     fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {

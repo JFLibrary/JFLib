@@ -65,6 +65,9 @@
 //                                 after it make room (CN-08), a deleted shape's connectors go
 //                                 and the flow through it heals (CN-09), drops push shapes
 //                                 away (PlowCode)
+//   tools::*                      (JD21) Visio's add-ons as tools (AS-11, RA-09): numbering
+//                                 shapes, arrays of copies, dimension lines glued or tied to
+//                                 the shapes they measure
 //
 // Rules that hold from the start: no std (only alloc), no unsafe code, nothing recalculated on
 // opening a file (connectors, layout and containers move only when something moves), and a
@@ -100,6 +103,7 @@ mod shape;
 pub mod structure;
 mod sheet;
 mod strings;
+pub mod tools;
 mod units;
 mod views;
 
