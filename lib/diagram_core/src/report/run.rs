@@ -19,6 +19,7 @@
 //   "<field> (<function>)" -- and with GrandSummary a last row over all (Visio's inventory:
 //   Master-Name and the count of each)
 //
+// Summaries take the numbers of a column, also numbers kept as text ("450" in a text field).
 // Values: a number in the definition's precision with the drawing's decimal sign
 // (Document::fields), with the unit's abbreviation when ShowUnits is on and the unit has one
 // (lengths in the unit of their cell, per cent, angles, durations); dates in the general date
@@ -498,6 +499,8 @@ fn summary(rows: &[&Vec<Raw>], k: usize, f: Func) -> Option<(f64, Option<Unit>)>
                 }
                 Some(*x)
             }
+            // a number kept as text (a text field typed into) counts as that number
+            Raw::Text(t) => number(t),
             _ => None,
         })
         .collect();

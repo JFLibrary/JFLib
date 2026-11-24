@@ -472,3 +472,18 @@ fn table_shape_and_refresh() {
     assert!(f.doc.shape(g).is_some() && f.doc.shape(g2).is_none());
     assert_eq!(texts_of(&f.doc, g)[4], "1200.00");
 }
+
+#[test]
+fn numbers_kept_as_text_count_in_summaries() {
+    let mut f = fx();
+    let mut tx = f.doc.transaction("text");
+    let v = Value::Text(tx.intern("450"));
+    tx.set_shape_data(SheetRef::Shape(f.shapes[2]), "Kosten", "Kosten", v).unwrap();
+    tx.commit();
+    let mut d = def(&[(1, Property::Data(s("Name")), "Name", 0), (2, Property::Data(s("Kosten")), "Kosten", Func::Total.bit())]);
+    d.filters.push(Filter::new(1, Property::Data(s("Kosten")), Condition::Exists, ""));
+    let t = run(&f.doc, &d, &ctx(f.page));
+    let r = texts(&t);
+    assert_eq!(r[2], vec![s("Router"), s("450")]);
+    assert_eq!(r.last().unwrap(), &vec![s("Summe"), s("2699.50")]);
+}

@@ -11,6 +11,10 @@
 //                        unchanged while the file opens
 //   write_check(dir)     --write-report DIR: jd19-bericht.vsdx for the Visio counter-check
 //                        (shapes with shape data, two definitions, a report table)
+//   write_fixture(dir)   --write-report-fixture DIR: jd19-geraete.vsdx, the fixture of
+//                        JFDiagrammer's report scripts: the five devices with their shape data
+//                        (Firewall on page 2), no definition, no table; jd19-geraeteliste.vrd:
+//                        the device list as a report definition file
 
 use alloc::format;
 use alloc::string::String;
@@ -77,6 +81,13 @@ pub(crate) fn definitions() -> (ReportDef, ReportDef) {
     (list, inv)
 }
 
+// the Type cell of a shape data row (7 currency, 2 number), as Visio's numeric fields have it
+fn typed(tx: &mut diagram_core::Transaction, sheet: SheetRef, row: &str, ty: f64) {
+    let (sec, rk, cell) = (tx.intern("Property"), tx.intern(row), tx.intern("Type"));
+    let a = diagram_core::CellAddr::row(diagram_core::SecKey::one(sec), diagram_core::RowKey::Named(rk), cell);
+    let _ = tx.set_constant(sheet, &a, Value::Num(ty), None);
+}
+
 // five boxes with shape data on page 1, the definitions in the document, the device list as a
 // table on page 1 (on the layer "Bericht")
 fn drawing() -> (Document, PageRef) {
@@ -96,6 +107,8 @@ fn drawing() -> (Document, PageRef) {
         let _ = tx.set_shape_data(sheet, "Standort", "Standort", p);
         let _ = tx.set_shape_data(sheet, "Kosten", "Kosten", Value::Num(*cost));
         let _ = tx.set_shape_data(sheet, "Auslastung", "Auslastung", Value::Num(*load));
+        typed(&mut tx, sheet, "Kosten", 7.0);
+        typed(&mut tx, sheet, "Auslastung", 2.0);
     }
     let _ = report::add(&mut tx, &list);
     let _ = report::add(&mut tx, &inv);
@@ -202,6 +215,44 @@ fn visio_like(h: &mut H) {
         a.len() == 2 && a[0].def == st[0].def && a[1].xml == bad
     });
     h.check("reports/visio/rewrite", same, s("written back: the definition the same, the broken row unchanged"));
+}
+
+/// --write-report-fixture DIR: jd19-geraete.vsdx (JFDiagrammer's tests/reports*.uis)
+pub(crate) fn write_fixture(dir: &str) -> i32 {
+    let mut doc = vsdx::new_document(DocKind::Drawing, Measure::Metric);
+    let mut eng = diagram_core::formula::Engine::new();
+    let page = doc.pages().next().expect("page");
+    let mut tx = doc.transaction("fixture");
+    let page2 = tx.add_page_like(page, "Seite-2", "Page-2", false, None).unwrap_or(page);
+    for (i, (name, place, cost, load)) in DEVICES.iter().enumerate() {
+        let (pg, x) = if i == 4 { (page2, 3.0) } else { (page, 1.5 + 2.0 * i as f64) };
+        let Ok(sh) = diagram_core::ops::new_shape(&mut tx, &mut eng, Owner::Page(pg), diagram_core::ops::Basic::Rectangle, [x, 6.0], [x + 1.4, 6.8]) else { continue };
+        let _ = tx.set_text(sh, Some(Text::plain(name)));
+        let sheet = SheetRef::Shape(sh);
+        let n = Value::Text(tx.intern(name));
+        let _ = tx.set_shape_data(sheet, "Name", "Name", n);
+        let p = Value::Text(tx.intern(place));
+        let _ = tx.set_shape_data(sheet, "Standort", "Standort", p);
+        let _ = tx.set_shape_data(sheet, "Kosten", "Kosten", Value::Num(*cost));
+        let _ = tx.set_shape_data(sheet, "Auslastung", "Auslastung", Value::Num(*load));
+        typed(&mut tx, sheet, "Kosten", 7.0);
+        typed(&mut tx, sheet, "Auslastung", 2.0);
+    }
+    tx.commit();
+    let bytes = write(&doc);
+    let out = format!("{dir}/jd19-geraete.vsdx");
+    // and the device list as a .vrd file (Durchsuchen...)
+    let vrd = format!("{dir}/jd19-geraeteliste.vrd");
+    if !plat::write_file(&vrd, report::to_xml(&definitions().0).as_bytes()) {
+        crate::out(&format!("cannot write {vrd}\n"));
+        return 1;
+    }
+    if bytes.is_empty() || !plat::write_file(&out, &bytes) {
+        crate::out(&format!("cannot write {out}\n"));
+        return 1;
+    }
+    crate::out(&format!("{out}: {} bytes\n", bytes.len()));
+    0
 }
 
 /// --write-report DIR: jd19-bericht.vsdx (the Visio counter-check)

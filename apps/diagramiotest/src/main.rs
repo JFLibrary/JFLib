@@ -40,7 +40,9 @@
 //                                         data_refresh_conflict.uis (data_fixture.rs)
 //   diagramiotest --write-report DIR     (JD19) jd19-bericht.vsdx: shapes with shape data, two
 //                                         report definitions and a report table for the Visio
-//                                         counter-check (reports.rs)
+//                                         counter-check (reports.rs); --write-report-fixture DIR
+//                                         jd19-geraete.vsdx, the fixture of JFDiagrammer's
+//                                         report scripts
 //   diagramiotest --write-vdx DIR        (JD16) the self-written .vdx / .vsx files and the .vsdx /
 //                                         .vssx JFDiagrammer writes from them (vdx.rs)
 //   diagramiotest --write-vss DIR        (JD17) the sample stencil jd17-schablone.vss (three masters
@@ -270,6 +272,10 @@ fn run() -> i32 {
     if let Some(dir) = arg(&args, "--write-data") {
         // (JD18) the drawing with linked data for the Visio counter-check
         return data::write_check(&dir, arg(&args, "--xlsx").as_deref());
+    }
+    if let Some(dir) = arg(&args, "--write-report-fixture") {
+        // (JD19) the drawing of JFDiagrammer's report scripts
+        return reports::write_fixture(&dir);
     }
     if let Some(dir) = arg(&args, "--write-report") {
         // (JD19) the drawing with report definitions and a report table for the Visio counter-check
