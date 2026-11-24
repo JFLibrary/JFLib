@@ -57,6 +57,10 @@
 //                                 hierarchy, compact tree, radial, circular; CN-13), connected
 //                                 shapes aligned and spaced (CN-14), shapes off the page
 //                                 breaks (PR-03), the diagram turned or flipped (RS-25)
+//   autoconn::*                   (JD21) a shape dropped on a connector splits it and the shapes
+//                                 after it make room (CN-08), a deleted shape's connectors go
+//                                 and the flow through it heals (CN-09), drops push shapes
+//                                 away (PlowCode)
 //
 // Rules that hold from the start: no std (only alloc), no unsafe code, nothing recalculated on
 // opening a file (connectors, layout and containers move only when something moves), and a
@@ -66,6 +70,7 @@
 
 extern crate alloc;
 
+pub mod autoconn;
 mod cell;
 pub mod data;
 pub mod design;

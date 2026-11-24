@@ -915,6 +915,8 @@ static LIB_TEXTS: &[[&str; 9]] = &[
     ["Verbindungspfeil links", "Connection arrow left", "Flèche de connexion vers la gauche", "Flecha de conexión a la izquierda", "Freccia di connessione a sinistra", "Verbindingspijl links", "Strzałka połączenia w lewo", "سهم الاتصال لليسار", "חץ חיבור שמאלה"],
     ["Verbindungspfeil oben", "Connection arrow up", "Flèche de connexion vers le haut", "Flecha de conexión hacia arriba", "Freccia di connessione in alto", "Verbindingspijl boven", "Strzałka połączenia w górę", "سهم الاتصال للأعلى", "חץ חיבור למעלה"],
     ["Element einfügen", "Insert item", "Insérer un élément", "Insertar elemento", "Inserisci elemento", "Element invoegen", "Wstaw element", "إدراج عنصر", "הוספת פריט"],
+    // (JD21) a tile of the quick shapes bar at a connection arrow (Visio's Quick Shapes)
+    ["Schnell-Shape", "Top shape", "Forme principale", "Forma principal", "Forma principale", "Hoofdvorm", "Główny kształt", "شكل رئيسي", "צורה ראשית"],
     // (JD7) the rulers (ui.ruler)
     ["Lineal", "Ruler", "Règle", "Regla", "Righello", "Liniaal", "Linijka", "مسطرة", "סרגל"],
 ];

@@ -24,6 +24,8 @@
 //                                   reader's click on an arrow or a mark reports it as a click)
 //   tools SE_POINTER, SE_CONNECT, SE_LINE, SE_RECT, SE_ELLIPSE, SE_TEXT, SE_PLACE, SE_FREEFORM,
 //         SE_ARC
+//   SeState::quick: Vec<SeQuick>    (JD21) the quick shapes the bar at a hot connection arrow
+//                                   offers (see below)
 //
 // Model (SeModel, borrowed per call; world units are the canvas's, y down):
 //   SeShape { key, parent, bx, ends, pin, bbox, flags, points }
@@ -110,6 +112,18 @@
 // Insertion marks (SeModel::marks): with the pointer tool and no gesture each mark shows while
 // the pointer is on its owner (the shape under the pointer, or inside the owner's box) or
 // within MARK_NEAR (16) DIP of it; a click reports SeEv::Mark { tag }, a drag does nothing.
+//
+// (JD21) Quick shapes bar (SeState::quick, Visio's mini toolbar of an AutoConnect arrow, CN-07):
+// while an arrow is under the pointer and the app lists quick shapes, a bar with the first
+// QUICK_MAX (4) of them shows beside the arrow where the new shape does not go (above the box
+// for the arrows left and right, right of it for those up and down): a row of QUICK_TILE (28)
+// DIP tiles with their previews (the app's Draw, like the Shapes panel's tiles), on the flyout
+// colour with a thin frame, square.  The arrow stays hot while the pointer is on the bar or
+// between it and the arrow; the tile under the pointer is drawn hot and each change of it is
+// SeEv::QuickHover { key, dir, tile } once (tile 255: on no tile any more; the app's live
+// preview), a click on a tile SeEv::Quick { key, dir, tile }; the bar goes with the arrows.
+// Screen readers and scripts get a K_BUTTON per tile named "Schnell-Shape: <name>" (value: the
+// tile's index).
 
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;
@@ -118,7 +132,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::ops::Range;
 
-use crate::cmd::{Draw, Gfx};
+use crate::cmd::{Draw, DrawRef, Gfx};
 use crate::consts::*;
 use crate::diagram::{dist, fl, fx, inside, ipx, node_sem_id, overlaps, snapv, DiagramState, ExtIn};
 use crate::keys::*;
@@ -291,6 +305,23 @@ pub struct SeModel<'a> {
     pub hit: &'a dyn Fn([f32; 2], f32, u64) -> u64,
 }
 
+/// (JD21) a tile of the quick shapes bar at a hot connection arrow (SeState::quick)
+#[derive(Clone)]
+pub struct SeQuick {
+    /// its name (the button's name for screen readers and scripts)
+    pub name: String,
+    /// its preview, drawn into the tile (None: a generic shapes icon)
+    pub draw: Option<DrawRef>,
+    /// the preview's version (cmd_custom: change it when the drawing changes)
+    pub ver: u32,
+}
+
+impl core::fmt::Debug for SeQuick {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("SeQuick").field("name", &self.name).field("ver", &self.ver).finish()
+    }
+}
+
 /// what an end or a control point is glued to
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub enum SeGlue {
@@ -353,6 +384,12 @@ pub enum SeEv {
     ArrowHover { key: u64, dir: u8 },
     /// a click on the insertion mark with this tag (SeModel::marks)
     Mark { tag: u32 },
+    /// (JD21) a click on tile `tile` of the quick shapes bar at the connection arrow `dir` of
+    /// shape `key`; the selection stays as it was
+    Quick { key: u64, dir: u8, tile: u8 },
+    /// (JD21) the pointer went onto tile `tile` of the quick shapes bar of arrow `dir` of shape
+    /// `key`, or off the tiles (tile 255, dir 255); once per change (a live preview)
+    QuickHover { key: u64, dir: u8, tile: u8 },
 }
 
 // what a point of the canvas shows
@@ -375,6 +412,8 @@ enum SHit {
     Arrow(u64, u8),
     /// an insertion mark: index into SeModel::marks, its tag
     Mark(u32, u32),
+    /// (JD21) a tile of the quick shapes bar: the shape, the arrow's direction, the tile
+    Quick(u64, u8, u8),
 }
 
 // handle positions: top left, top, top right, right, bottom right, bottom, bottom left, left
@@ -398,6 +437,11 @@ const ARROW_MIN: i32 = 16; // no arrows around a shape smaller than this on the 
 const MARK_LEN: i32 = 9; // an insertion mark from its base to its tip
 const MARK_HALF: i32 = 5; // half its base
 const MARK_NEAR: i32 = 16; // a mark shows while the pointer is this near to it
+const QUICK_MAX: usize = 4; // (JD21) the tiles of the quick shapes bar
+const QUICK_TILE: i32 = 28; // a tile of it (DIP)
+const QUICK_PAD: i32 = 3; // the bar's padding around the tiles
+const QUICK_GAP: i32 = 2; // from the arrow's tip to the bar
+const QUICK_NAME: &str = "Schnell-Shape"; // i18n (library texts): a tile's name before its own
 // the directions 0 right, 1 down, 2 left, 3 up (y down)
 const DIRS: [[f32; 2]; 4] = [[1.0, 0.0], [0.0, 1.0], [-1.0, 0.0], [0.0, -1.0]];
 
@@ -446,6 +490,43 @@ impl ArrowSet {
             t >= self.base[d] - tol && t <= self.base[d] + self.len + tol && l.abs() <= self.half + tol
         })
         .map(|d| d as u8)
+    }
+
+    // (JD21) the quick shapes bar of arrow d with n tiles (tile, pad, gap in px): x0, y0, x1, y1,
+    // a row beside the arrow where the new shape does not go: above the box's top edge for the
+    // arrows left and right (from the arrow's base outwards), right of the box for those up and
+    // down (beside the arrow); never more than two tiles away from the arrow
+    fn quick_rect(&self, d: usize, n: usize, tile: f32, pad: f32, gap: f32) -> [f32; 4] {
+        let e = self.edge(d);
+        let b = self.b;
+        let base = self.base[d & 3];
+        let (w, h) = (n as f32 * tile + pad * 2.0, tile + pad * 2.0);
+        match d & 3 {
+            0 | 2 => {
+                let y1 = (b[1] - gap).max(e[1] - self.half - gap - tile * 2.0).min(e[1] - self.half - gap);
+                let x0 = if d & 3 == 0 { e[0] + base } else { e[0] - base - w };
+                [x0, y1 - h, x0 + w, y1]
+            }
+            _ => {
+                let mid = if d & 3 == 1 { e[1] + base + self.len * 0.5 } else { e[1] - base - self.len * 0.5 };
+                let x0 = (b[2] + gap).min(e[0] + self.half + gap + tile * 2.0).max(e[0] + self.half + gap);
+                [x0, mid - h * 0.5, x0 + w, mid + h * 0.5]
+            }
+        }
+    }
+
+    // (JD21) where the pointer keeps the bar of arrow d: the bar and the arrow and what lies
+    // between them
+    fn quick_zone(&self, d: usize, bar: [f32; 4]) -> [f32; 4] {
+        let t = self.tri(d);
+        let (mut x0, mut y0, mut x1, mut y1) = (bar[0], bar[1], bar[2], bar[3]);
+        for p in t {
+            x0 = x0.min(p[0]);
+            y0 = y0.min(p[1]);
+            x1 = x1.max(p[0]);
+            y1 = y1.max(p[1]);
+        }
+        [x0, y0, x1, y1]
     }
 
     // p on the box, on an arrow or in the strip between them
@@ -587,6 +668,13 @@ pub struct SeState {
     arrow_key: u64,
     arrow_hot: u8,
     arrow_said: (u64, u8),
+    /// (JD21) the quick shapes the bar at a hot connection arrow offers (the first QUICK_MAX;
+    /// empty: no bar); the app sets them (Visio: the active stencil's quick shapes)
+    pub quick: Vec<SeQuick>,
+    // the arrow whose bar shows, the tile under the pointer (255: none), what QuickHover said
+    quick_at: Option<(u64, u8)>,
+    quick_hot: u8,
+    quick_said: (u64, u8, u8),
     // the pointer (world) while insertion marks may show, the mark under it (index, tag)
     mark_p: Option<[f32; 2]>,
     mark_hot: Option<(u32, u32)>,
@@ -642,6 +730,10 @@ impl SeState {
             arrow_key: 0,
             arrow_hot: 255,
             arrow_said: (0, 255),
+            quick: Vec::new(),
+            quick_at: None,
+            quick_hot: 255,
+            quick_said: (0, 255, 255),
             mark_p: None,
             mark_hot: None,
             quiet: None,
@@ -691,7 +783,29 @@ impl SeState {
         self.arrow_hot = 255;
         self.mark_p = None;
         self.mark_hot = None;
+        self.quick_at = None;
+        self.quick_hot = 255;
         self.say_arrow(out);
+        self.say_quick(out);
+    }
+
+    // (JD21) SeEv::QuickHover when the tile under the pointer changed
+    fn say_quick(&mut self, out: &mut Vec<SeEv>) {
+        let now = match self.quick_at {
+            Some((k, d)) if self.quick_hot != 255 => (k, d, self.quick_hot),
+            _ => (0, 255, 255),
+        };
+        if now != self.quick_said {
+            let key = if now.2 == 255 { self.quick_said.0 } else { now.0 };
+            out.push(SeEv::QuickHover { key, dir: now.1, tile: now.2 });
+            self.quick_said = now;
+        }
+    }
+
+    /// (JD21) the tile of the quick shapes bar under the pointer: the shape's key, the arrow's
+    /// direction, the tile's index
+    pub fn quick_hover(&self) -> Option<(u64, u8, u8)> {
+        self.quick_at.filter(|_| self.quick_hot != 255).map(|(k, d)| (k, d, self.quick_hot))
     }
 
     // SeEv::ArrowHover when the arrow under the pointer changed
@@ -1055,7 +1169,7 @@ impl Ui {
                 dg.vp.step(-1, i.px[0] as f32 + 0.5, i.px[1] as f32 + 0.5);
             } else {
                 let k = match st.hover {
-                    SHit::Shape(k) | SHit::Handle(k, _) | SHit::Rotate(k) | SHit::Pin(k) | SHit::End(k, _) | SHit::Point(k, _) | SHit::Arrow(k, _) => k,
+                    SHit::Shape(k) | SHit::Handle(k, _) | SHit::Rotate(k) | SHit::Pin(k) | SHit::End(k, _) | SHit::Point(k, _) | SHit::Arrow(k, _) | SHit::Quick(k, ..) => k,
                     // a mark lies on a shape: that one
                     SHit::Mark(..) => st.shape(m, st.hover_shape).filter(|s| s.flags & SEF_NOSELECT == 0).map_or(0, |s| s.key),
                     _ => 0,
@@ -1076,7 +1190,7 @@ impl Ui {
         if !was_idle && matches!(st.g, G::Idle) {
             st.quiet = Some(i.px);
         }
-        if st.quiet.is_some() || !matches!(st.g, G::Idle | G::Press { hit: SHit::Arrow(..) | SHit::Mark(..), .. }) {
+        if st.quiet.is_some() || !matches!(st.g, G::Idle | G::Press { hit: SHit::Arrow(..) | SHit::Mark(..) | SHit::Quick(..), .. }) {
             st.extras_off(&mut out);
         }
         // the cursor for the next call of ui.diagram
@@ -1196,6 +1310,18 @@ impl Ui {
         Some(set)
     }
 
+    // (JD21) the quick shapes bar that shows: its rectangle (canvas px) and its tiles
+    fn se_quick_bar(&self, st: &SeState, dg: &DiagramState, m: &SeModel) -> Option<([f32; 4], usize)> {
+        let (k, d) = st.quick_at?;
+        if st.quick.is_empty() || !st.arrows {
+            return None;
+        }
+        let a = self.se_arrow_set(st, dg, m, k)?;
+        let n = st.quick.len().min(QUICK_MAX);
+        let r = a.quick_rect(d as usize, n, self.dp(QUICK_TILE) as f32, self.dp(QUICK_PAD) as f32, self.dp(QUICK_GAP) as f32);
+        r.iter().all(|v| v.is_finite()).then_some((r, n))
+    }
+
     // the triangle of an insertion mark (canvas px)
     fn se_mark_tri(&self, dg: &DiagramState, mk: &SeMark) -> [[f32; 2]; 3] {
         tri_at(dg.vp.to_screen(mk.at), mk.dir as usize, self.dp(MARK_LEN) as f32, self.dp(MARK_HALF) as f32)
@@ -1223,7 +1349,7 @@ impl Ui {
         if st.quiet.is_some_and(|q| q != i.px) {
             st.quiet = None;
         }
-        if let G::Press { hit: hit @ (SHit::Arrow(..) | SHit::Mark(..)), .. } = st.g {
+        if let G::Press { hit: hit @ (SHit::Arrow(..) | SHit::Mark(..) | SHit::Quick(..)), .. } = st.g {
             // held on one: it stays as it was
             st.hover = hit;
             return;
@@ -1236,6 +1362,35 @@ impl Ui {
         }
         let p = dg.vp.to_screen(i.p);
         let tol = self.dp(2) as f32;
+        // (JD21) on the quick shapes bar of the hot arrow: the arrow stays hot, the tile under
+        // the pointer is the hover
+        if let Some((qk, qd)) = st.quick_at.filter(|_| st.arrows && !st.quick.is_empty()) {
+            if let Some(a) = self.se_arrow_set(st, dg, m, qk) {
+                let n = st.quick.len().min(QUICK_MAX);
+                let (tile, pad) = (self.dp(QUICK_TILE) as f32, self.dp(QUICK_PAD) as f32);
+                let r = a.quick_rect(qd as usize, n, tile, pad, self.dp(QUICK_GAP) as f32);
+                let z = a.quick_zone(qd as usize, r);
+                let on_arrow = a.hit(p, tol) == Some(qd);
+                if !on_arrow && p[0] >= z[0] - tol && p[0] <= z[2] + tol && p[1] >= z[1] - tol && p[1] <= z[3] + tol {
+                    st.arrow_key = qk;
+                    st.arrow_hot = qd;
+                    st.mark_p = None;
+                    st.mark_hot = None;
+                    let x = p[0] - r[0] - pad;
+                    let k = if x >= 0.0 && p[0] <= r[2] { (x / tile) as usize } else { n };
+                    let inside = p[1] >= r[1] + pad && p[1] <= r[3] - pad && k < n;
+                    st.quick_hot = if inside { k as u8 } else { 255 };
+                    if inside {
+                        st.hover = SHit::Quick(qk, qd, k as u8);
+                    } else {
+                        st.hover = SHit::None;
+                    }
+                    st.say_arrow(out);
+                    st.say_quick(out);
+                    return;
+                }
+            }
+        }
         // the arrows: the current shape's while the pointer is on one of them, on one of its
         // handles or in their zone; else those of the top-level shape under the pointer
         let (mut key, mut hot) = (0u64, 255u8);
@@ -1295,7 +1450,11 @@ impl Ui {
         } else if hot != 255 {
             st.hover = SHit::Arrow(key, hot);
         }
+        // (JD21) a hot arrow opens its quick shapes bar; it stays while the pointer is on it
+        st.quick_at = (st.arrow_hot != 255 && st.arrow_key != 0 && !st.quick.is_empty()).then_some((st.arrow_key, st.arrow_hot));
+        st.quick_hot = 255;
         st.say_arrow(out);
+        st.say_quick(out);
     }
 
     // what an end or a control point at p would glue to; the point it would go to.  `swap`
@@ -1506,6 +1665,7 @@ impl Ui {
             // the selection stays: the app selects what it makes
             SHit::Arrow(key, dir) => out.push(SeEv::Arrow { key, dir }),
             SHit::Mark(_, tag) => out.push(SeEv::Mark { tag }),
+            SHit::Quick(key, dir, tile) => out.push(SeEv::Quick { key, dir, tile }),
             _ => {}
         }
         G::Idle
@@ -1528,8 +1688,8 @@ impl Ui {
                 };
                 return G::Connect { tool: SE_CONNECT, a, ga: SeGlue::Shape(k), b: a };
             }
-            // a mark is for clicks only
-            SHit::Mark(..) => return G::Hold,
+            // a mark and a quick shape are for clicks only
+            SHit::Mark(..) | SHit::Quick(..) => return G::Hold,
             _ => {}
         }
         if tool == SE_PLACE {
@@ -2101,6 +2261,30 @@ impl Ui {
                     self.se_tri(&t, if hot { full } else { soft });
                 }
             }
+            // (JD21) the quick shapes bar of the hot arrow
+            if let Some((r, n)) = self.se_quick_bar(st, dg, m) {
+                let (tile, pad) = (self.dp(QUICK_TILE), self.dp(QUICK_PAD));
+                let (x0, y0) = (fl(r[0]), fl(r[1]));
+                let (w, h) = (fl(r[2]) - x0, fl(r[3]) - y0);
+                let (bg, line) = (self.color(T_FLYOUT) | 0xFF00_0000, self.color(T_FLYOUT_STROKE) | 0xFF00_0000);
+                self.cmd_rrect(x0, y0, w, h, 0, self.hair().max(1), bg, line, line);
+                for k in 0..n {
+                    let (tx, ty) = (x0 + pad + k as i32 * tile, y0 + pad);
+                    if st.quick_hot == k as u8 {
+                        self.cmd_rrect(tx, ty, tile, tile, 0, self.hair().max(1), self.color(T_SUBTLE_HOVER) | 0xFF00_0000, full, full);
+                    }
+                    let q = &st.quick[k];
+                    let inset = self.dp(3);
+                    match &q.draw {
+                        Some(d) => self.cmd_custom(tx + inset, ty + inset, tile - inset * 2, tile - inset * 2, Some(d.clone()), 0, q.ver),
+                        None => {
+                            let c = self.color(T_TEXT2) | 0xFF00_0000;
+                            self.draw_color(c);
+                            self.draw_frame(tx + inset * 2, ty + inset * 2, tile - inset * 4, tile - inset * 4, 0, self.hair().max(1));
+                        }
+                    }
+                }
+            }
         }
         // handles of a single selection
         if let Some(sh) = st.single(m) {
@@ -2369,6 +2553,25 @@ impl Ui {
             if self.se_mark_shown(st, dg, m, mk) {
                 let sid = node_sem_id(id ^ 0x4D4B, mk.owner.rotate_left(32) ^ mk.tag as u64);
                 extra.push((self.se_mark_tri(dg, mk), sid, MARK_NAME, mk.tag as i32, SeEv::Mark { tag: mk.tag }));
+            }
+        }
+        // (JD21) the tiles of the quick shapes bar
+        if let (Some((qr, n)), Some((qk, qd))) = (self.se_quick_bar(st, dg, m), st.quick_at) {
+            let (tile, pad) = (self.dp(QUICK_TILE), self.dp(QUICK_PAD));
+            for k in 0..n {
+                let (x, y) = (fl(qr[0]) + pad + k as i32 * tile, fl(qr[1]) + pad);
+                let Some(mut rect) = clip([x, y, tile, tile]) else { continue };
+                if self.rtl {
+                    rect[0] = self.rtl_map(rect[0] + rect[2] - 1, r[0], r[2]);
+                }
+                let sid = node_sem_id(id ^ 0x5143, qk.wrapping_mul(16).wrapping_add(qd as u64 * 4 + k as u64));
+                if self.m.a11y.pending() && self.a11y_click(sid) {
+                    st.pend.push(SeEv::Quick { key: qk, dir: qd, tile: k as u8 });
+                    self.repass();
+                }
+                self.last_set(rect, 0);
+                let name = format!("{}: {}", crate::i18n::tr(QUICK_NAME), st.quick[k].name);
+                self.sem(K_BUTTON, sid, Some(&name), k as i32);
             }
         }
         for (t, sid, name, value, ev) in extra {
