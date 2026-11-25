@@ -1,6 +1,6 @@
 [package]
 name = "jflib-physics"
-description = "Collision shapes, broad phase and deterministic queries for games"
+description = "Collision, deterministic queries and rigid bodies with joints for games"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

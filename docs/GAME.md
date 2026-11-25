@@ -78,7 +78,7 @@ Was es gibt (Code auf `main` ab7e77e1):
 | --- | --- | --- | --- |
 | `render3d` (wächst) | nur Zeichnen, auch Durchsichtiges, Partikel, Skinning auf der GPU, Nachbearbeitung | `gpu`, `gltf`, `rt` (seit G7f) | JFLib (E2) |
 | `plat` (wächst) | Gamepad, relative Maus, Pointer-Lock, Tasten nach Lage; WebSocket im Browser | – | JFLib |
-| `lib/physics` (neu) | Formen, Kollision, Abfragen, Character-Controller, später Starrkörper | nur Mathematik | Vorschlag: JFLib |
+| `lib/physics` (neu) | Formen, Kollision, Abfragen, Character-Controller, Starrkörper und Gelenke (seit U18) | nur Mathematik | Vorschlag: JFLib |
 | `lib/anim` (neu, G7i) | Skelette, Clips, Überblenden, IK (die CPU-Seite) | `gltf` | Vorschlag: JFLib |
 | `lib/geom` (neu, G7g) | der Modellierkern: Netze, Grundkörper, Extrudieren, CSG, UV, Vereinfachen | `rt` (nur Mathematik) | Vorschlag: JFLib |
 | `lib/game` (neu, G7b) | Weltmodell, Takt, Eingabe-Aktionen, Kameras, Assets, Raumklang, Netcode | `physics`, `plat`, `base` (`netchan` mit G7e); `render3d` nicht | eigenes Repository |
@@ -491,7 +491,9 @@ anfassen:
 
 **G7i Bewegung.** Skins, Animationen und Morph-Ziele in `lib/gltf` lesen; Skinning in `render3d` (auf der GPU, mit
 Verdeckung und Schatten); `lib/anim`: Clips abtasten, überblenden, ein Zustandsautomat, Bewegung aus der Wurzel,
-einfache IK für Füße und Blick. Physik 2: Starrkörper (Kisten, Fässer), Gelenke, Ragdolls.
+einfache IK für Füße und Blick. Physik 2: Starrkörper (Kisten, Fässer), Gelenke, Ragdolls; die Starrkörper und Gelenke sind
+seit U18 da ([PHYSICS.md](PHYSICS.md), „Starrkörper“), ein Ragdoll ist ein Satz von Gelenken, sein Bau aus einem Skelett kommt
+mit `lib/anim`.
 
 **G7j Große Welten.** Die Welt in Zellen, im Hintergrund geladen und entladen; der Ursprung folgt der Kamera von
 selbst. Komprimierte Texturen (BC7 auf dem Desktop, ASTC auf Apple und Telefonen, im Browser nach

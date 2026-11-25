@@ -14,7 +14,10 @@ use alloc::vec::Vec;
 use physics::math::{self, sqrt};
 use physics::{Aabb, BodyId, CAST_SKIN, ConvexHull, Filter, HullError, Iso, MeshError, MeshOptions, Quat, Shape, TriMesh, Vec3, World, query};
 
-pub const ALL: &[&str] = &["math", "hull", "ray", "distance", "cast", "tunnel", "seams", "bvh", "world", "fuzz", "edge", "character", "charfuzz"];
+pub const ALL: &[&str] = &[
+    "math", "hull", "ray", "distance", "cast", "tunnel", "seams", "bvh", "world", "fuzz", "edge", "character", "charfuzz", "mass", "motion", "contact",
+    "stack", "joint", "ccd", "events", "dynfuzz",
+];
 
 pub fn run(names: &[&str], quick: bool) -> i32 {
     let (mut checks, mut failed) = (0u64, 0u64);
@@ -38,6 +41,14 @@ pub fn run(names: &[&str], quick: bool) -> i32 {
             "fuzz" => fuzz_tests(&mut c),
             "character" => crate::character::scenario_tests(&mut c),
             "charfuzz" => crate::character::fuzz_tests(&mut c),
+            "mass" => crate::dynamics::mass_tests(&mut c),
+            "motion" => crate::dynamics::motion_tests(&mut c),
+            "contact" => crate::dynamics::contact_tests(&mut c),
+            "stack" => crate::dynamics::stack_tests(&mut c),
+            "joint" => crate::dynamics::joint_tests(&mut c),
+            "ccd" => crate::dynamics::ccd_tests(&mut c),
+            "events" => crate::dynamics::event_tests(&mut c),
+            "dynfuzz" => crate::dynamics::fuzz_tests(&mut c),
             _ => edge_tests(&mut c),
         }
         let ms = (plat::time_us() - t0) / 1000;

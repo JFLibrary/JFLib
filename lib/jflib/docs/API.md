@@ -120,8 +120,8 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
   <br>[src/export/mod.rs](#diagram_viewsrcexportmodrs) · [src/export/pdf.rs](#diagram_viewsrcexportpdfrs) · [src/export/raster.rs](#diagram_viewsrcexportrasterrs) · [src/export/svg.rs](#diagram_viewsrcexportsvgrs) · [src/fonts.rs](#diagram_viewsrcfontsrs) · [src/image.rs](#diagram_viewsrcimagers) · [src/measure.rs](#diagram_viewsrcmeasurers) · [src/view.rs](#diagram_viewsrcviewrs)
 - [dxf](#dxf) -- DXF import (ASCII): tables, blocks and entities of model space, without a GPU
   <br>[lib.rs](#dxf-crate-root) · [src/fonts.rs](#dxfsrcfontsrs) · [src/mtext.rs](#dxfsrcmtextrs) · [src/strings.rs](#dxfsrcstringsrs)
-- [physics](#physics) -- Collision shapes, broad phase and deterministic queries for games
-  <br>[src/bvh.rs](#physicssrcbvhrs) · [src/character.rs](#physicssrccharacterrs) · [src/gjk.rs](#physicssrcgjkrs) · [src/hull.rs](#physicssrchullrs) · [src/math.rs](#physicssrcmathrs) · [src/mesh.rs](#physicssrcmeshrs) · [src/query.rs](#physicssrcqueryrs) · [src/shape.rs](#physicssrcshapers) · [src/tree.rs](#physicssrctreers) · [src/world.rs](#physicssrcworldrs)
+- [physics](#physics) -- Collision, deterministic queries and rigid bodies with joints for games
+  <br>[src/bvh.rs](#physicssrcbvhrs) · [src/character.rs](#physicssrccharacterrs) · [src/gjk.rs](#physicssrcgjkrs) · [src/hull.rs](#physicssrchullrs) · [src/joint.rs](#physicssrcjointrs) · [src/mass.rs](#physicssrcmassrs) · [src/math.rs](#physicssrcmathrs) · [src/mesh.rs](#physicssrcmeshrs) · [src/query.rs](#physicssrcqueryrs) · [src/shape.rs](#physicssrcshapers) · [src/sim.rs](#physicssrcsimrs) · [src/tree.rs](#physicssrctreers) · [src/world.rs](#physicssrcworldrs)
 - [game](#game) -- The game core: a world of entities and components, a fixed tick, input actions, cameras
   <br>[lib.rs](#game-crate-root) · [src/assets.rs](#gamesrcassetsrs) · [src/audio.rs](#gamesrcaudiors) · [src/camera.rs](#gamesrccamerars) · [src/input.rs](#gamesrcinputrs) · [src/net/arena.rs](#gamesrcnetarenars) · [src/net/bits.rs](#gamesrcnetbitsrs) · [src/net/bot.rs](#gamesrcnetbotrs) · [src/net/client.rs](#gamesrcnetclientrs) · [src/net/clock.rs](#gamesrcnetclockrs) · [src/net/event.rs](#gamesrcneteventrs) · [src/net/input.rs](#gamesrcnetinputrs) · [src/net/lagcomp.rs](#gamesrcnetlagcomprs) · [src/net/link.rs](#gamesrcnetlinkrs) · [src/net/predict.rs](#gamesrcnetpredictrs) · [src/net/proto.rs](#gamesrcnetprotors) · [src/net/quant.rs](#gamesrcnetquantrs) · [src/net/room.rs](#gamesrcnetroomrs) · [src/net/server.rs](#gamesrcnetserverrs) · [src/net/sim.rs](#gamesrcnetsimrs) · [src/net/snapshot.rs](#gamesrcnetsnapshotrs) · [src/net/walker.rs](#gamesrcnetwalkerrs) · [src/pose.rs](#gamesrcposers) · [src/sparse.rs](#gamesrcsparsers) · [src/tick.rs](#gamesrctickrs) · [src/world.rs](#gamesrcworldrs)
 - [game_render3d](#game_render3d) -- The bridge from the game core to render3d: entities with a mesh as scene instances
@@ -67252,10 +67252,11 @@ version; TEXT's %% codes (specials).
 
 ## physics
 
-*Collision shapes, broad phase and deterministic queries for games* -- crate root [`lib/physics/src/lib.rs`](../lib/physics/src/lib.rs)
+*Collision, deterministic queries and rigid bodies with joints for games* -- crate root [`lib/physics/src/lib.rs`](../lib/physics/src/lib.rs)
 
 ```text
-physics -- collision for games: shapes, broad phase, queries; deterministic, the same bits on every target
+physics -- collision and rigid bodies for games: shapes, broad phase, queries, a character controller,
+bodies with contacts and joints; deterministic, the same bits on every target
 
   Shape          sphere, capsule, box, convex hull (ConvexHull::new: quickhull), static triangle mesh
                  (TriMesh: f32 vertices, a binned-SAH tree, active edges against ghost collisions)
@@ -67266,7 +67267,14 @@ physics -- collision for games: shapes, broad phase, queries; deterministic, the
   CharacterController  the kinematic figure: an upright capsule that walks, runs, jumps, crouches, takes
                  steps and ramps up to a slope limit, slides along walls, snaps down; one step a pure
                  function of (state, input, world, dt)
-  math           Vec3, Quat, Iso, Aabb in f64; sqrt correctly rounded, sin / cos / atan2 from rt's
+  Simulation     rigid bodies (RigidBody: static, kinematic, dynamic; MassProps from the shape and a
+                 density) in a World: gravity, forces, contacts with friction, restitution and rolling
+                 resistance (manifold.rs: faces clipped along the GJK / EPA normal, up to four points),
+                 joints (joint.rs: ball with cone and twist, hinge, fixed, slider, distance; limits,
+                 motors, springs), the soft step of Box2D v3 with substeps (solver.rs), speculative
+                 contacts, sweeps of fast bodies, sleeping islands, contact and sensor events; Clone is
+                 a snapshot that steps on to the same bits
+  math           Vec3, Quat, Mat3, Iso, Aabb in f64; sqrt correctly rounded, sin / cos / atan2 from rt's
                  portable math
 
 Narrow phase: GJK for distances, EPA for penetration, GJK ray casting with conservative advancement for
@@ -67535,6 +67543,133 @@ MAX_HULL_POINTS: usize = 1 << 16
 - **`fn volume(&self) -> f64`**
   the volume (for tests and mass properties later)
 
+### `physics/src/joint.rs`
+
+Source: [`lib/physics/src/joint.rs`](../lib/physics/src/joint.rs)
+
+```text
+joint -- constraints between two bodies: ball (with a swing cone and a twist range, for ragdolls),
+hinge (limits, motor, spring), fixed, slider (limits, motor, spring), distance (rope, rod, spring)
+
+Every joint has a frame on each body: its origin is the anchor, its X axis the axis (of a hinge, a
+slider, the twist of a ball joint).  The parts are solved one after the other in every pass of the solver
+(solver.rs): motor and spring first, then the limits, the locked rotations, the anchors last (what must
+hold best).  Soft as the contacts: with the bias the error goes away like a damped spring of the
+simulation's joint frequency, the relax pass removes the velocity that leaves.  Limits are one-sided and
+speculative like contacts: a hinge that is still short of its limit may turn exactly up to it in a
+substep.  The impulses are kept from step to step (warm start).
+```
+
+- **`struct JointId`**
+  a joint of a [`crate::Simulation`]: an index and a generation, like [`BodyId`]
+
+**`impl JointId`**
+
+- **`fn index(self) -> u32`**
+  the slot (used again after a remove)
+- **`fn generation(self) -> u32`**
+  how often the slot was used before
+
+- **`struct Motor`**
+  drives a hinge (rad/s) or a slider (m/s) towards a speed with at most `max_force` (N m or N)
+  - `speed: f64` -- the speed it drives towards
+  - `max_force: f64` -- the largest torque or force it uses
+
+- **`struct Spring`**
+  pulls a hinge's angle (rad), a slider's position (m) or a distance joint's length (m) towards `target`
+  like a damped spring
+  - `target: f64` -- the angle, position or length it pulls towards
+  - `hertz: f64` -- how fast it oscillates (Hz); 0 is no spring
+  - `damping_ratio: f64` -- 1 is critically damped, below oscillates, above creeps
+
+- **`enum JointKind`**
+  what a joint allows
+  - `Ball { cone: Option<f64>, twist: Option<(f64, f64)> }` -- the anchors stay together, the bodies turn freely; optionally the X axes of the two frames stay within
+    a cone of this half angle (radians, the swing) and body b turns about its X axis only within
+    (low, high) radians relative to a (the twist): a shoulder, a hip, a neck
+  - `Hinge { limits: Option<(f64, f64)>, motor: Option<Motor>, spring: Option<Spring> }` -- the anchors stay together, the bodies turn about the X axis only, by an angle that starts at 0 when the
+    frames are aligned; within (low, high) radians, driven by a motor, pulled by a spring
+  - `Fixed` -- no relative motion at all
+  - `Slider { limits: Option<(f64, f64)>, motor: Option<Motor>, spring: Option<Spring> }` -- no rotation; b's anchor moves along a's X axis only, at a position that starts at 0 on a's anchor;
+    within (low, high) metres, driven by a motor, pulled by a spring
+  - `Distance { min: f64, max: f64, spring: Option<Spring> }` -- the anchors stay between `min` and `max` apart (a rope: min 0; a rod: min = max; `max` may be
+    infinite), free otherwise, with a spring towards its target length between them
+
+**`impl JointKind`**
+
+- **`const BALL: JointKind = JointKind::Ball { cone: None, twist: None }`**
+  a ball joint without limits
+- **`const HINGE: JointKind = JointKind::Hinge { limits: None, motor: None, spring: None }`**
+  a hinge without limits, motor or spring
+- **`const SLIDER: JointKind = JointKind::Slider { limits: None, motor: None, spring: No ...`**
+  a slider without limits, motor or spring
+- **`const fn rod(length: f64) -> JointKind`**
+  a rod of length `length`
+- **`const fn rope(length: f64) -> JointKind`**
+  a rope of at most `length`
+
+- **`struct Joint`**
+  A joint between bodies `a` and `b`: its frame on each (in the body's own frame, the frame its shape is
+  in), what it allows, whether the two bodies still collide with each other.
+  - `a: BodyId` -- the first body
+  - `b: BodyId` -- the second body (limits, motors and positions are b relative to a)
+  - `frame_a: Iso` -- the joint's frame in a's frame: the origin is the anchor, X the axis
+  - `frame_b: Iso` -- the joint's frame in b's frame
+  - `kind: JointKind` -- what it allows
+  - `collide_connected: bool` -- do a and b still collide with each other (default false)
+  - `user: u64` -- free for the caller
+
+- **`enum JointError`**
+  why a joint was refused
+  - `DeadBody` -- a body id is dead
+  - `SameBody` -- both ends are the same body
+  - `NothingMoves` -- neither end is a dynamic body (nothing could move)
+  - `NotFinite` -- a frame, a limit, a motor or a spring is not finite
+  - `Range` -- a limit's low end above its high end, a negative cone, length, force, frequency or damping
+
+### `physics/src/mass.rs`
+
+Source: [`lib/physics/src/mass.rs`](../lib/physics/src/mass.rs)
+
+```text
+mass -- the mass, the centre of mass and the inertia tensor of a shape of uniform density
+
+Spheres, capsules and boxes in closed form; a convex hull from the tetrahedra between a point inside it
+and its triangles (the second moment of a tetrahedron with one corner at the origin is
+det / 120 (a a^T + b b^T + c c^T + s s^T), s = a + b + c), moved to the centre of mass with the
+parallel axis theorem.  A mesh has none: it is static.
+```
+
+- **`struct MassProps`**
+  The mass of a body: how much (kg), where its centre is (in the shape's frame) and how it resists turning
+  about that centre (the inertia tensor, kg m², in the shape's frame).
+  - `mass: f64` -- kg
+  - `center: Vec3` -- the centre of mass in the shape's frame
+  - `inertia: Mat3` -- the inertia tensor about the centre of mass, in the shape's frame
+
+**`impl MassProps`**
+
+- **`const fn new(mass: f64, center: Vec3, inertia: Mat3) -> MassProps`**
+  a mass `mass` at `center` with this inertia tensor
+- **`const fn point(mass: f64) -> MassProps`**
+  a point mass at the origin that does not turn (an infinite inertia is no number: the tensor is 0 and a
+  body reads 0 as "does not turn")
+- **`fn transformed(&self, iso: &Iso) -> MassProps`**
+  the same body seen in the frame `iso` places it in (the centre moved, the tensor turned)
+- **`fn inertia_about(&self, p: Vec3) -> Mat3`**
+  the inertia tensor about another point (the parallel axis theorem), in the same frame
+- **`fn scaled(&self, factor: f64) -> MassProps`**
+  the mass and tensor scaled by `factor` (another density)
+- **`fn is_valid(&self) -> bool`**
+  mass, centre and tensor finite, the mass positive, the tensor symmetric with non-negative principal
+  moments that keep the triangle inequality (what a solid body can have; within a relative 1e-9)
+
+**`impl Shape`**
+
+- **`fn mass_properties(&self, density: f64) -> Option<MassProps>`**
+  the mass properties of the shape filled with `density` (kg/m³), None for a mesh (static only) and for
+  a density that is not positive and finite
+
 ### `physics/src/math.rs`
 
 Source: [`lib/physics/src/math.rs`](../lib/physics/src/math.rs)
@@ -67668,6 +67803,16 @@ the same code on every target.
   the rotation as a matrix
 - **`fn is_identity(self) -> bool`**
   is this the identity, bit for bit (no rotation work needed)
+- **`fn from_scaled_axis(v: Vec3) -> Quat`**
+  the rotation by |v| radians about the direction of `v` (a rotation vector; zero gives the identity):
+  exact, so a body spinning at a constant rate turns by its rate times the time
+- **`fn to_scaled_axis(self) -> Vec3`**
+  the rotation vector of a unit quaternion: its axis times its angle in [0, pi] (the inverse of
+  [`Quat::from_scaled_axis`])
+- **`fn dot(self, o: Quat) -> f64`**
+  the 4D dot product (the cosine of half the angle between two unit quaternions, up to the sign)
+- **`fn is_finite(self) -> bool`**
+  every component finite
 
 - **`struct Mat3`**
   A 3 x 3 matrix by columns (a rotation from [`Quat::to_mat3`])
@@ -67681,6 +67826,38 @@ the same code on every target.
   M v
 - **`fn mul_vec_t(&self, v: Vec3) -> Vec3`**
   M^T v (the inverse of a rotation)
+- **`const ZERO: Mat3 = Mat3 { cols: [Vec3::ZERO, Vec3::ZERO, Vec3::ZERO] }`**
+  the zero matrix
+- **`const fn diagonal(d: Vec3) -> Mat3`**
+  the matrix with `d` on the diagonal
+- **`const fn from_cols(x: Vec3, y: Vec3, z: Vec3) -> Mat3`**
+  the matrix with these columns
+- **`fn at(&self, r: usize, c: usize) -> f64`**
+  the element in row `r` and column `c`
+- **`fn transpose(&self) -> Mat3`**
+  M^T
+- **`fn mul(&self, n: &Mat3) -> Mat3`**
+  the product M N
+- **`fn add(&self, n: &Mat3) -> Mat3`**
+  M + N
+- **`fn sub(&self, n: &Mat3) -> Mat3`**
+  M - N
+- **`fn scale(&self, s: f64) -> Mat3`**
+  s M
+- **`fn determinant(&self) -> f64`**
+  the determinant
+- **`fn inverse(&self) -> Option<Mat3>`**
+  the inverse, None when the matrix is singular (or not finite)
+- **`fn rotated(&self, q: Quat) -> Mat3`**
+  R M R^T: a tensor of a body's frame (its inertia) in the frame rotated by `q`
+- **`fn outer(a: Vec3, b: Vec3) -> Mat3`**
+  the outer product a b^T
+- **`fn skew(v: Vec3) -> Mat3`**
+  the matrix of the cross product with `v` (skew(v) w = v x w)
+- **`fn trace(&self) -> f64`**
+  the sum of the diagonal
+- **`fn is_finite(&self) -> bool`**
+  every element finite
 
 - **`struct Iso`**
   A placement: rotate, then move (no scale).  The pose of a body and of a query shape.
@@ -67962,6 +68139,275 @@ mesh (two-sided triangles)
 - **`fn aabb(&self, iso: &Iso) -> Aabb`**
   the box around the shape placed by `iso`
 
+### `physics/src/sim.rs`
+
+Source: [`lib/physics/src/sim.rs`](../lib/physics/src/sim.rs)
+
+```text
+sim -- rigid bodies: a world of static, kinematic and dynamic bodies that move under gravity, forces,
+contacts and joints, step by step, with the same bits on every target
+
+A step: kinematic targets become velocities; every awake body looks for others near it in the trees of
+the collision World (its box grown by how far it can move in this step), each pair gets its manifolds
+(manifold.rs) and the impulses of the last step's points that lie within 2 cm of the new ones; a sleeping
+body that an awake one would touch wakes with its island.  Then the substeps of the soft solver
+(solver.rs, joint.rs), restitution, the new poses (into the World, so queries and the character controller
+see them), a sweep of fast bodies against what does not move (they stop where they first touch it, so they
+do not pass through a wall between two steps), sleep: an island (bodies linked by contacts and joints) whose
+bodies all moved slower than `sleep_speed` for `time_to_sleep` sleeps until something touches it.
+
+Determinism: everything in slot order, pairs sorted, no hash containers, no threads; the same bits on every
+target as the queries (checked by physicstest's checksums).
+```
+
+- **`enum BodyKind`**
+  how a body moves
+  - `Static` -- never (a map, a wall); moved only by [`Simulation::set_iso`]
+  - `Kinematic` -- by its velocity, which only the caller sets (a door, a platform, a lift); pushes dynamic bodies, nothing
+    pushes it
+  - `Dynamic` -- by gravity, forces, contacts and joints
+
+- **`struct RigidBody`**
+  What [`Simulation::add`] makes a body from.  `RigidBody::dynamic(shape, iso)` and the `with_` methods
+  for the rest.
+  - `kind: BodyKind` -- how it moves
+  - `shape: Shape` -- its shape (a mesh only for a static or kinematic body)
+  - `iso: Iso` -- where the shape's frame is
+  - `linear_velocity: Vec3` -- m/s, of the centre of mass
+  - `angular_velocity: Vec3` -- rad/s, world frame
+  - `density: f64` -- kg/m³ (1000: water), for the mass from the shape
+  - `mass: Option<MassProps>` -- the mass as given instead of from the shape and density (in the shape's frame)
+  - `friction: f64` -- Coulomb friction; two bodies use the square root of the product of theirs (default 0.6)
+  - `restitution: f64` -- how much of the approach speed comes back, 0 to 1; two bodies use the larger (default 0)
+  - `rolling_resistance: f64` -- rolling resistance: the torque that brakes a rolling body is this times the normal force times its
+    smallest radius; two bodies use the larger (default 0: a ball rolls on until damping stops it)
+  - `linear_damping: f64` -- 1/s: the velocity loses this fraction per second (default 0)
+  - `angular_damping: f64` -- 1/s (default 0.05)
+  - `gravity_scale: f64` -- how much of the simulation's gravity acts on it (default 1)
+  - `layers: u32` -- the layers the body is in (also what queries filter by)
+  - `mask: u32` -- the layers it collides with: two bodies collide when each one's mask has a layer of the other
+  - `sensor: bool` -- it reports overlaps ([`ContactEvent::SensorBegin`]) and pushes nothing
+  - `bullet: bool` -- it is swept against every body that is not a bullet, not only against what does not move (for small
+    fast projectiles)
+  - `can_sleep: bool` -- it may fall asleep (default true)
+  - `gyroscopic: bool` -- gyroscopic forces: a body tumbling about an unstable axis flips as it does in space (Bullet's implicit
+    step; costs a little, default off)
+  - `fixed_rotation: bool` -- it never turns (a figure's capsule pushed around as a dynamic body)
+  - `awake: bool` -- it starts awake (default true)
+  - `user: u64` -- free for the caller (the World's body has it too)
+
+**`impl RigidBody`**
+
+- **`fn new(kind: BodyKind, shape: Shape, iso: Iso) -> RigidBody`**
+  a body of `kind` with the defaults
+- **`fn fixed(shape: Shape, iso: Iso) -> RigidBody`**
+  a body that never moves
+- **`fn dynamic(shape: Shape, iso: Iso) -> RigidBody`**
+  a body moved by gravity, forces, contacts and joints
+- **`fn kinematic(shape: Shape, iso: Iso) -> RigidBody`**
+  a body moved by its velocity only
+- **`fn with_velocity(mut self, v: Vec3) -> RigidBody`**
+  the velocity of the centre of mass at the start (m/s)
+- **`fn with_angular_velocity(mut self, w: Vec3) -> RigidBody`**
+  the angular velocity at the start (rad/s, world frame)
+- **`fn with_density(mut self, density: f64) -> RigidBody`**
+  the density the mass comes from (kg/m³)
+- **`fn with_mass(mut self, mass: MassProps) -> RigidBody`**
+  the mass as given (in the shape's frame) instead of from the density
+- **`fn with_friction(mut self, friction: f64) -> RigidBody`**
+  the friction coefficient
+- **`fn with_restitution(mut self, restitution: f64) -> RigidBody`**
+  how much of an approach speed comes back (0 to 1)
+- **`fn with_rolling_resistance(mut self, c: f64) -> RigidBody`**
+  the rolling resistance coefficient (0: none)
+- **`fn with_damping(mut self, linear: f64, angular: f64) -> RigidBody`**
+  the linear and angular damping (1/s)
+- **`fn with_gravity_scale(mut self, scale: f64) -> RigidBody`**
+  how much of the gravity acts on it
+- **`fn with_layers(mut self, layers: u32, mask: u32) -> RigidBody`**
+  the layers it is in and those it collides with
+- **`fn with_user(mut self, user: u64) -> RigidBody`**
+  a value for the caller (also the World body's `user`)
+- **`fn sensor(mut self) -> RigidBody`**
+  reports overlaps, pushes nothing
+- **`fn bullet(mut self) -> RigidBody`**
+  swept against every body, not only the static ones
+- **`fn sleepless(mut self) -> RigidBody`**
+  never falls asleep
+- **`fn gyroscopic(mut self) -> RigidBody`**
+  with gyroscopic forces
+- **`fn fixed_rotation(mut self) -> RigidBody`**
+  never turns
+- **`fn asleep(mut self) -> RigidBody`**
+  starts asleep (until something touches it)
+
+- **`enum BodyError`**
+  why [`Simulation::add`] refused a body
+  - `DynamicMesh` -- a mesh can be static or kinematic, not dynamic
+  - `Mass` -- no valid mass: the density is not positive, or the given mass properties are not those of a body
+  - `NotFinite` -- the pose, a velocity or a parameter is not finite
+
+- **`struct SimParams`**
+  How the simulation steps.  The defaults suit bodies from centimetres to tens of metres at 60 steps a
+  second.
+  - `gravity: Vec3` -- m/s²
+  - `substeps: u32` -- solver substeps per step (1 to 64; default 4)
+  - `contact_hertz: f64` -- how stiff contacts push apart (Hz; at most a quarter of the substep rate; default 30)
+  - `contact_damping_ratio: f64` -- their damping ratio (default 10)
+  - `joint_hertz: f64` -- how stiff joints hold (Hz; at most half the substep rate; default 60)
+  - `joint_damping_ratio: f64` -- their damping ratio (default 2)
+  - `max_push_speed: f64` -- the fastest an overlap is pushed apart (m/s; default 3)
+  - `restitution_threshold: f64` -- slower approaches do not bounce (m/s; default 1)
+  - `linear_slop: f64` -- this much overlap is left alone, so resting contacts stay (m; default 0.005)
+  - `speculative_distance: f64` -- contact points are made this far before touching, plus how far the bodies can move in the step
+    (m; default 0.02)
+  - `max_speed: f64` -- no body moves faster (m/s; default 1000)
+  - `sleep: bool` -- may islands fall asleep (default true)
+  - `time_to_sleep: f64` -- how long an island must be slow to fall asleep (s; default 0.5)
+  - `sleep_speed: f64` -- slow: every point of every body of the island slower than this (m/s; default 0.05)
+  - `continuous: bool` -- sweep fast bodies against what does not move (default true)
+
+- **`struct BodyState`**
+  what a body is now
+  - `kind: BodyKind` -- how it moves
+  - `iso: Iso` -- the shape's frame
+  - `center: Vec3` -- the centre of mass (world)
+  - `linear_velocity: Vec3` -- of the centre of mass (m/s)
+  - `angular_velocity: Vec3` -- rad/s, world frame
+  - `mass: f64` -- kg (0 for static and kinematic bodies)
+  - `awake: bool` -- awake (it moves in the next step)
+
+- **`struct ContactPoint`**
+  a point of a [`ContactManifold`]
+  - `point: Vec3` -- world, between the two surfaces, at the start of the last step
+  - `separation: f64` -- the gap then (negative: overlap)
+  - `normal_impulse: f64` -- the impulse along the normal in the last substep (N s; divided by the substep: the force)
+
+- **`struct ContactManifold`**
+  the contact of two bodies along one normal
+  - `a: BodyId` -- the first body (the convex one when the other is a mesh)
+  - `b: BodyId` -- the second body
+  - `normal: Vec3` -- unit, from a towards b
+  - `triangle: u32` -- with a mesh: its lowest triangle of the manifold; else [`crate::NO_TRIANGLE`]
+  - `count: usize` -- how many of `points` are used
+  - `points: [ContactPoint; MAX_POINTS]` -- the points (the first `count`)
+
+- **`enum ContactEvent`**
+  what happened between bodies in a step
+  - `Begin { a: BodyId, b: BodyId, point: Vec3, normal: Vec3, speed: f64 }` -- a and b started to touch: where, the normal from a towards b, how fast they approached (m/s, along
+    the normal: for the loudness of a sound)
+  - `End { a: BodyId, b: BodyId }` -- a and b no longer touch (also when one of them was removed: then its id is dead)
+  - `SensorBegin { sensor: BodyId, other: BodyId }` -- a body entered a sensor
+  - `SensorEnd { sensor: BodyId, other: BodyId }` -- a body left a sensor (or one of them was removed)
+
+- **`struct SimStats`**
+  counters of the last step
+  - `bodies: usize` -- all bodies
+  - `awake: usize` -- awake dynamic and moving kinematic bodies
+  - `manifolds: usize` -- manifolds (also of islands asleep)
+  - `points: usize` -- their points
+  - `joints: usize` -- joints
+  - `pairs: usize` -- pairs whose manifolds were computed
+  - `sleeping_islands: usize` -- islands asleep
+  - `swept: usize` -- bodies a sweep stopped
+
+- **`struct Simulation`**
+  The rigid bodies of a game, and the collision [`World`] they live in (for rays, casts and the character
+  controller; [`Simulation::world`]).  Bodies are added and removed here, not in the World.  A clone is a
+  snapshot: it steps on to the same bits as the original (the impulses kept for the next step and the
+  islands asleep included), for a client that rolls back and steps again.
+
+**`impl Simulation`**
+
+- **`fn new() -> Simulation`**
+  an empty simulation with the default parameters (gravity 9.81 m/s² down -Y)
+- **`fn with_params(params: SimParams) -> Simulation`**
+  an empty simulation with these parameters
+- **`fn params(&self) -> &SimParams`**
+  the parameters
+- **`fn set_params(&mut self, params: SimParams)`**
+  change the parameters (they apply from the next step)
+- **`fn world(&self) -> &World`**
+  the collision world of the bodies: rays, casts, overlaps and the character controller run on it
+- **`fn len(&self) -> usize`**
+  the number of bodies
+- **`fn is_empty(&self) -> bool`**
+  no bodies
+- **`fn add(&mut self, body: RigidBody) -> Result<BodyId, BodyError>`**
+  add a body -> its id (also its id in [`Simulation::world`])
+- **`fn remove(&mut self, id: BodyId) -> bool`**
+  remove a body, its joints and its contacts -> false when the id is dead.  Bodies it touched wake up.
+- **`fn contains(&self, id: BodyId) -> bool`**
+  is the id alive
+- **`fn state(&self, id: BodyId) -> Option<BodyState>`**
+  what the body is now
+- **`fn iso(&self, id: BodyId) -> Option<Iso>`**
+  where its shape's frame is
+- **`fn velocity(&self, id: BodyId) -> Option<(Vec3, Vec3)>`**
+  the velocity of the centre of mass (m/s) and the angular velocity (rad/s)
+- **`fn velocity_at(&self, id: BodyId, point: Vec3) -> Option<Vec3>`**
+  the velocity of the body's point that is at `point` now
+- **`fn mass(&self, id: BodyId) -> Option<MassProps>`**
+  the mass properties (in the shape's frame; mass 0 for static and kinematic bodies)
+- **`fn is_awake(&self, id: BodyId) -> bool`**
+  is it awake (a static body never is)
+- **`fn set_iso(&mut self, id: BodyId, iso: Iso) -> bool`**
+  put the body somewhere else (teleport) -> false when the id is dead.  It wakes, and so does what touched
+  it.
+- **`fn set_velocity(&mut self, id: BodyId, linear: Vec3, angular: Vec3) -> bool`**
+  set the velocities (m/s, rad/s) -> false when the id is dead; a static body has none
+- **`fn apply_impulse(&mut self, id: BodyId, impulse: Vec3, point: Vec3) -> bool`**
+  an impulse (N s) at a point (world) of a dynamic body -> false when the id is dead
+- **`fn apply_angular_impulse(&mut self, id: BodyId, impulse: Vec3) -> bool`**
+  an angular impulse (N m s) on a dynamic body
+- **`fn apply_force(&mut self, id: BodyId, force: Vec3, point: Vec3) -> bool`**
+  a force (N) at a point (world) of a dynamic body during the next step (forces add up; a step clears
+  them)
+- **`fn apply_torque(&mut self, id: BodyId, torque: Vec3) -> bool`**
+  a torque (N m) on a dynamic body during the next step
+- **`fn move_kinematic(&mut self, id: BodyId, target: Iso, dt: f64) -> bool`**
+  move a kinematic body to `target` over the next step of `dt` seconds: its velocities are set so it
+  gets there (what it touches on the way is pushed), and it ends exactly there.  After that step it keeps
+  those velocities until they are set again.
+- **`fn wake(&mut self, id: BodyId) -> bool`**
+  wake a body and its island
+- **`fn set_material(&mut self, id: BodyId, friction: f64, restitution: f64, rolling_resistance: f64) -> bool`**
+  set friction, restitution and rolling resistance
+- **`fn set_layers(&mut self, id: BodyId, layers: u32, mask: u32) -> bool`**
+  set the layers the body is in and those it collides with
+- **`fn set_gravity_scale(&mut self, id: BodyId, scale: f64) -> bool`**
+  set the gravity scale
+- **`fn add_joint(&mut self, a: BodyId, b: BodyId, frame: Iso, kind: JointKind) -> Result<JointId, JointError>`**
+  a joint between a and b whose frame is `frame` (world) at their poses now -> its id
+- **`fn add_distance_joint(&mut self, a: BodyId, b: BodyId, pa: Vec3, pb: Vec3, kind: JointKind) -> Result<JointId, JointError>`**
+  a distance joint between a's point `pa` and b's point `pb` (world, now) -> its id
+- **`fn add_joint_local(&mut self, joint: Joint) -> Result<JointId, JointError>`**
+  a joint with its frames given in the bodies' own frames -> its id
+- **`fn remove_joint(&mut self, id: JointId) -> bool`**
+  remove a joint -> false when the id is dead.  Its bodies wake.
+- **`fn joint(&self, id: JointId) -> Option<&Joint>`**
+  the joint
+- **`fn set_joint(&mut self, id: JointId, kind: JointKind, collide_connected: bool) -> bool`**
+  change a joint's kind (limits, motor, spring) or whether its bodies collide -> false when the id is
+  dead or the new joint is not valid; its bodies wake
+- **`fn joints(&self) -> impl Iterator<Item = (JointId, &Joint)> + '_`**
+  every joint with its id, by index
+- **`fn joint_position(&self, id: JointId) -> Option<f64>`**
+  a hinge's angle (rad), a slider's position (m), a distance joint's length (m), a ball joint's twist
+  (rad), now
+- **`fn joint_force(&self, id: JointId) -> Option<(Vec3, Vec3)>`**
+  the force (N) and torque (N m) the joint applied to b in the last step (world; a got the opposite):
+  for breakable joints and for measuring
+- **`fn step(&mut self, dt: f64)`**
+  advance the simulation by `dt` seconds (a fixed step, 1/60 s for example); the events of the step are
+  in [`Simulation::events`] afterwards
+- **`fn events(&self) -> &[ContactEvent]`**
+  the events of the last step (contacts that began and ended, sensors entered and left)
+- **`fn stats(&self) -> SimStats`**
+  the counters of the last step
+- **`fn manifolds(&self) -> impl Iterator<Item = ContactManifold> + '_`**
+  the manifolds of the last step (also of islands asleep), by body
+
 ### `physics/src/tree.rs`
 
 Source: [`lib/physics/src/tree.rs`](../lib/physics/src/tree.rs)
@@ -68060,7 +68506,7 @@ bodies gets the same answer from them, as long as the bodies have the same ids.
 
 - **`struct World`**
   A set of bodies and the queries over them.  Bodies move with [`World::set_iso`]; nothing moves by itself
-  (no dynamics in this stage).
+  here (a [`crate::Simulation`] moves the bodies of its World).  A clone answers every query as the original.
 
 **`impl World`**
 

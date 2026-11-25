@@ -1,5 +1,6 @@
 #!args --check
 # physicstest is a console program: every test group of lib/physics against its references (math, hull,
-# ray, distance, cast, tunnel, seams, bvh, world, fuzz, edge) and of the character controller (character,
-# charfuzz); exit code 1 when a check fails.  The determinism checksums (--checksum) are compared across the
-# targets by hand (docs/PHYSICS.md, "Prüfsummen").
+# ray, distance, cast, tunnel, seams, bvh, world, fuzz, edge), of the character controller (character,
+# charfuzz) and of the rigid bodies (mass, motion, contact, stack, joint, ccd, events, dynfuzz); exit code 1
+# when a check fails.  The determinism checksums (--checksum) are compared across the targets by hand
+# (docs/PHYSICS.md, "Prüfsummen" and "Prüfsumme der Starrkörper").

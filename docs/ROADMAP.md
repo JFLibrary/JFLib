@@ -2702,8 +2702,27 @@ Crates, die einer JF-App folgen:
   isolierte Gruppen (wie isolierte gezeichnet), Überdrucken, ICC-Profile (wie ihre Gerätefarben),
   Formulare ausfüllen und schreiben, Verschlüsselung, PDF/A und Signaturen beim Schreiben,
   Signaturen prüfen, die vordefinierten CMaps Ostasiens außer Identity und den Unicode-CMaps.
-- **P2** · *fehlt* · `physics` hat Kollisionen und einen Charakter-Controller nach Quake 3, was
-  Spiel 1 braucht; es fehlen Starrkörper-Dynamik, Gelenke und ein Solver.
+- **P2** · *erledigt* (2026-11-24, U18) · `physics`: Starrkörper mit Kontakten, Gelenken und einem Löser
+  ([`physics/src/sim.rs`](../lib/physics/src/sim.rs), [PHYSICS.md](PHYSICS.md) „Starrkörper“). `Simulation` bewegt statische,
+  kinematische und dynamische Körper in ihrer `World`, Strahlen, Casts und der Character-Controller sehen sie; Masse aus Form
+  und Dichte (Hüllen über ihre Tetraeder), Reibung, Restitution, Rollwiderstand, Ebenen, Sensoren, Bullets, Kreiselkräfte.
+  Der Soft Step von Box2D v3 in 3D (vier Teilschritte, Kontakte und Gelenke als gedämpfte Federn, Relax), Kontaktpunkte wie
+  in Jolt (die Flächen beider Formen entlang der Normale aus GJK und EPA geschnitten, bis zu vier, gegen Netze je Dreieck mit
+  den aktiven Kanten), spekulative Kontakte so weit ein Körper im Schritt kommt, Sweeps schneller Körper und ein Strahl des
+  Schwerpunkts gegen alles, was sich nicht bewegt, schlafende Inseln, Kontakt- und Sensorereignisse. Gelenke: Kugel mit
+  Kegel und Verdrehung, Scharnier, fest, Schieber, Abstand (Seil, Stange), mit Grenzen, Motoren und Federn, genug für
+  Ragdolls. `Simulation` ist `Clone`: eine Kopie rechnet zu denselben Bits weiter (Zurückspulen im Netzspiel). Geprüft in
+  `physicstest` mit acht neuen Gruppen (1271 Prüfungen: Massen gegen geschlossene Formen, Scheiben und Tonons Tetraeder,
+  freie Bewegung gegen die genauen Summen des Integrators, Reibung, Restitution, Rollen, Stapel, Pendelperioden, Ketten,
+  Grenzen, Ragdolls, ein Kügelchen mit 500 m/s gegen eine 1 mm dünne Wand, Würfe mit 150 m/s auf den Boden, zufällige
+  Szenen mit allen Gelenken ohne Energiegewinn); eine dritte Prüfsumme, gleich unter Linux, Windows (Wine) und im Browser.
+  Die Tests fanden auf dem Weg: Kontaktspalte, die an der Oberfläche einer rollenden Kugel verfolgt wurden (ein Kügelchen
+  ging durch die Wand), eine Kapsel, die schräg nur ein Ende anbot (sie kippte durchs Netz), leichte Körper, die schwere
+  durch den Boden drückten, Gelenke, die einander widersprechen und Energie gewannen (bis zum 60-fachen).
+  Kosten auf einem Kern eines i7-1165G7: 207 Körper 0,9 ms je Schritt, 1339 Körper (762 wach) 13 ms, eine Pyramide aus 210
+  Kisten 2,3 ms.
+  Offen: Massenverhältnisse über 1:10 sacken (1:100: 4 cm), weiche Gelenke geben im Aufprall nach (ein Ragdoll bis
+  3,5 cm und 11°), Sweeps drehen nicht, eine Form je Körper, keine Threads; macOS und Android nicht gelaufen.
 - **P2** · *erledigt* (2026-11-21, U7) · `installer`: Die Seiten sprechen die Sprache des
   Benutzers (Deutsch, Englisch, Französisch, Spanisch, Italienisch, Niederländisch, Polnisch,
   Arabisch, Hebräisch; die Namen und Beschreibungen der Stile aus `styles/S/INFO` mit). Die

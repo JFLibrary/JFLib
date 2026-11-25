@@ -446,6 +446,43 @@ impl Quat {
     pub fn is_identity(self) -> bool {
         self.x == 0.0 && self.y == 0.0 && self.z == 0.0 && self.w == 1.0
     }
+
+    /// the rotation by |v| radians about the direction of `v` (a rotation vector; zero gives the identity):
+    /// exact, so a body spinning at a constant rate turns by its rate times the time
+    pub fn from_scaled_axis(v: Vec3) -> Quat {
+        let a2 = v.length_sq();
+        if !(a2 > 0.0) {
+            return Quat::IDENTITY;
+        }
+        let a = sqrt(a2);
+        let (s, c) = sincos(a * 0.5);
+        let k = s / a;
+        Quat::new(v.x * k, v.y * k, v.z * k, c)
+    }
+
+    /// the rotation vector of a unit quaternion: its axis times its angle in [0, pi] (the inverse of
+    /// [`Quat::from_scaled_axis`])
+    pub fn to_scaled_axis(self) -> Vec3 {
+        let q = if self.w < 0.0 { Quat::new(-self.x, -self.y, -self.z, -self.w) } else { self };
+        let v = Vec3::new(q.x, q.y, q.z);
+        let s = v.length();
+        if !(s > 0.0) {
+            return Vec3::ZERO;
+        }
+        v * (2.0 * atan2(s, q.w) / s)
+    }
+
+    /// the 4D dot product (the cosine of half the angle between two unit quaternions, up to the sign)
+    #[inline]
+    pub fn dot(self, o: Quat) -> f64 {
+        self.x * o.x + self.y * o.y + self.z * o.z + self.w * o.w
+    }
+
+    /// every component finite
+    #[inline]
+    pub fn is_finite(self) -> bool {
+        self.x.is_finite() && self.y.is_finite() && self.z.is_finite() && self.w.is_finite()
+    }
 }
 
 // ---------------------------------------------------------------- Mat3
@@ -471,6 +508,100 @@ impl Mat3 {
     #[inline]
     pub fn mul_vec_t(&self, v: Vec3) -> Vec3 {
         Vec3::new(self.cols[0].dot(v), self.cols[1].dot(v), self.cols[2].dot(v))
+    }
+
+    /// the zero matrix
+    pub const ZERO: Mat3 = Mat3 { cols: [Vec3::ZERO, Vec3::ZERO, Vec3::ZERO] };
+
+    /// the matrix with `d` on the diagonal
+    #[inline]
+    pub const fn diagonal(d: Vec3) -> Mat3 {
+        Mat3 { cols: [Vec3::new(d.x, 0.0, 0.0), Vec3::new(0.0, d.y, 0.0), Vec3::new(0.0, 0.0, d.z)] }
+    }
+
+    /// the matrix with these columns
+    #[inline]
+    pub const fn from_cols(x: Vec3, y: Vec3, z: Vec3) -> Mat3 {
+        Mat3 { cols: [x, y, z] }
+    }
+
+    /// the element in row `r` and column `c`
+    #[inline]
+    pub fn at(&self, r: usize, c: usize) -> f64 {
+        self.cols[c][r]
+    }
+
+    /// M^T
+    pub fn transpose(&self) -> Mat3 {
+        let [a, b, c] = self.cols;
+        Mat3 { cols: [Vec3::new(a.x, b.x, c.x), Vec3::new(a.y, b.y, c.y), Vec3::new(a.z, b.z, c.z)] }
+    }
+
+    /// the product M N
+    #[allow(clippy::should_implement_trait)] // with mul_vec beside it, Mul would hide which product is meant
+    pub fn mul(&self, n: &Mat3) -> Mat3 {
+        Mat3 { cols: [self.mul_vec(n.cols[0]), self.mul_vec(n.cols[1]), self.mul_vec(n.cols[2])] }
+    }
+
+    /// M + N
+    #[allow(clippy::should_implement_trait)]
+    pub fn add(&self, n: &Mat3) -> Mat3 {
+        Mat3 { cols: [self.cols[0] + n.cols[0], self.cols[1] + n.cols[1], self.cols[2] + n.cols[2]] }
+    }
+
+    /// M - N
+    #[allow(clippy::should_implement_trait)]
+    pub fn sub(&self, n: &Mat3) -> Mat3 {
+        Mat3 { cols: [self.cols[0] - n.cols[0], self.cols[1] - n.cols[1], self.cols[2] - n.cols[2]] }
+    }
+
+    /// s M
+    pub fn scale(&self, s: f64) -> Mat3 {
+        Mat3 { cols: [self.cols[0] * s, self.cols[1] * s, self.cols[2] * s] }
+    }
+
+    /// the determinant
+    pub fn determinant(&self) -> f64 {
+        self.cols[0].dot(self.cols[1].cross(self.cols[2]))
+    }
+
+    /// the inverse, None when the matrix is singular (or not finite)
+    pub fn inverse(&self) -> Option<Mat3> {
+        let [a, b, c] = self.cols;
+        let (bc, ca, ab) = (b.cross(c), c.cross(a), a.cross(b));
+        let det = a.dot(bc);
+        if !(det != 0.0 && det.is_finite()) {
+            return None;
+        }
+        let inv = 1.0 / det;
+        // the rows of the inverse are the cross products of the columns
+        Some(Mat3 { cols: [bc * inv, ca * inv, ab * inv] }.transpose())
+    }
+
+    /// R M R^T: a tensor of a body's frame (its inertia) in the frame rotated by `q`
+    pub fn rotated(&self, q: Quat) -> Mat3 {
+        let r = q.to_mat3();
+        r.mul(self).mul(&r.transpose())
+    }
+
+    /// the outer product a b^T
+    pub fn outer(a: Vec3, b: Vec3) -> Mat3 {
+        Mat3 { cols: [a * b.x, a * b.y, a * b.z] }
+    }
+
+    /// the matrix of the cross product with `v` (skew(v) w = v x w)
+    pub fn skew(v: Vec3) -> Mat3 {
+        Mat3 { cols: [Vec3::new(0.0, v.z, -v.y), Vec3::new(-v.z, 0.0, v.x), Vec3::new(v.y, -v.x, 0.0)] }
+    }
+
+    /// the sum of the diagonal
+    pub fn trace(&self) -> f64 {
+        self.cols[0].x + self.cols[1].y + self.cols[2].z
+    }
+
+    /// every element finite
+    pub fn is_finite(&self) -> bool {
+        self.cols[0].is_finite() && self.cols[1].is_finite() && self.cols[2].is_finite()
     }
 }
 
