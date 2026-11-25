@@ -54,16 +54,35 @@ change: `m.move(..)` gives a new one. Convex solids (and the results of earlier 
 into `geom.union`, `geom.difference` and `geom.intersection`, which give one closed solid (a window cut
 out of a wall: `geom.difference(wand, fenster)`); `m.bevel(width, segments)` chamfers or rounds the edges
 of a convex solid. `import()` reads modules only from the script's folder and below. `modeltool --api`
-lists every function; [GEOM.md](../../docs/GEOM.md) describes them and what the checks mean.
+lists every function, the members of a mesh and of a vector and the operators;
+[GEOM.md](../../docs/GEOM.md) describes them and what the checks mean.
+
+A mesh and a vector are objects of the host (JFScript S2): `type(m)` is `"mesh"`, `print(m)` shows
+`mesh(12 Dreiecke)`, `m.tris` is a property, and the script cannot open or change one; a mesh the script
+no longer holds is freed during the run. Points and vectors are `vec`s with operators, or lists as
+before:
+
+```js
+let a = vec(0.45, 0.18, 1.9)              // also vec([x, y, z])
+let b = a + vec(0, 1.5, -2.4)             // + - between vectors, * / with a number, -v
+let richtung = (b - a).normalized()       // length, dot, cross, normalized, distance, lerp
+let rohr = geom.sweep(profile.circle(0.025, 16), [a - richtung * 0.1, b + richtung * 0.1])
+let kugel = geom.sphere(0.03, 16).move(a)  // every point argument takes a vec or [x, y, z]
+print(rohr.bounds().size.y, b.x)          // bounds() gives vecs; v.x instead of v[0]
+```
 
 The names of functions and parameters are English (decision G9.3 of JFScript's direction paper: with
 named arguments they become part of the interface), the descriptions and messages German; the names in a
-script (variables, `--param` keys) are its author's. What the host accepts but is very likely a mistake
-is a warning at the call, and the script goes on: more arguments than a function reads, a value for
-`geom.sweep`'s `closed` that is no bool, a second `model.name`, `model.budget` or `model.uv_scale` with
-another value, a material defined again differently. The console shows each like an error
-(`kiste.jfs:3:7: Warnung: model.name: …` with the source line), `report.json` lists them under `warnings`
-(file, line, column, message), the watch window in a bar of their own.
+script (variables, `--param` keys) are its author's. One description in `src/host.rs` (`host::api()`, a
+`script::Api` with TypeScript-like signatures) gives `--api`, the names the compiler knows and JFScript's
+language services their view of the host. What is very likely a mistake is a warning, and the script goes
+on: first those of the language services on the script and its modules (a member a mesh or a vector does
+not have, `vec.ad` for `vec.add`, a division of two ints), then the host's at the call (more arguments
+than a function reads, a value for `geom.sweep`'s `closed` that is no bool, a second `model.name`,
+`model.budget` or `model.uv_scale` with another value, a material defined again differently). The
+console shows each like an error (`kiste.jfs:3:7: Warnung: model.name: …` with the source line),
+`report.json` lists them under `warnings` (file, line, column, message), the watch window in a bar of
+their own.
 
 ## Watch
 
@@ -78,8 +97,8 @@ builds by hand, Ctrl+Q ends.
 | File | What it is |
 |---|---|
 | `src/main.rs` | the command line, a build (report, glTF, pictures), the cache |
-| `src/host.rs` | the script's functions (`geom.*`, `profile.*`, `vec.*`, `model.*`, methods of a mesh), their reference (`--api`), the materials |
-| `src/run.rs` | compile, run, the errors and warnings with the source line, the measurements and the report |
+| `src/host.rs` | the script's functions (`geom.*`, `profile.*`, `vec.*`, `model.*`) and its objects (a mesh, a vector) as JFScript host objects, their description (`host::api()`: `--api`, the language services), the materials |
+| `src/run.rs` | compile, the language services' check, run, the errors and warnings with the source line, the measurements and the report |
 | `src/render.rs` | the pictures offscreen through render3d; the cameras, grid and light the window shares |
 | `src/watch.rs`, `src/watch_ui.rs` | the observation mode: the watched files and the builds; the window |
 | `src/export.rs` | the model as glTF (lib/gltf's `write_document`) |
