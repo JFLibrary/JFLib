@@ -69,14 +69,20 @@ pub(crate) struct Soft {
 impl Soft {
     pub(crate) const RIGID: Soft = Soft { bias_rate: 0.0, mass_scale: 1.0, impulse_scale: 0.0 };
 
-    /// a spring of `hertz` with damping ratio `zeta`, solved implicitly over a substep of `h` seconds
+    /// a spring of `hertz` with damping ratio `zeta`, solved implicitly over a substep of `h` seconds.  A
+    /// frequency above half the substep rate is that (a stiffer spring cannot be followed); a damping ratio so
+    /// large that the coefficients overflow is a rigid constraint without bias
     pub(crate) fn new(hertz: f64, zeta: f64, h: f64) -> Soft {
         if !(hertz > 0.0) {
             return Soft { bias_rate: 0.0, mass_scale: 1.0, impulse_scale: 0.0 };
         }
+        let hertz = if hertz * h > 0.5 { 0.5 / h } else { hertz };
         let omega = 2.0 * core::f64::consts::PI * hertz;
         let a1 = 2.0 * zeta + h * omega;
         let a2 = h * omega * a1;
+        if !(a1.is_finite() && a2.is_finite()) {
+            return Soft { bias_rate: 0.0, mass_scale: 1.0, impulse_scale: 0.0 };
+        }
         let a3 = 1.0 / (1.0 + a2);
         Soft { bias_rate: omega / a1, mass_scale: a2 * a3, impulse_scale: a3 }
     }
@@ -133,6 +139,8 @@ pub(crate) struct CPoint {
     pub normal_impulse: f64,
     pub tangent_impulse: [f64; 2],
     pub max_normal_impulse: f64,
+    /// the smallest gap the passes saw (restitution only where the contact closed)
+    pub min_separation: f64,
     pub normal_mass: f64,
     pub tangent_mass: [f64; 2],
     /// the normal velocity at the step's start (negative: approaching), for restitution and events
@@ -180,6 +188,7 @@ pub(crate) fn prepare(c: &mut Constraint, bodies: &[SBody]) {
         p.tangent_mass = [axis_mass(a, b, p.ra, p.rb, c.tangent[0]), axis_mass(a, b, p.ra, p.rb, c.tangent[1])];
         p.approach = relative_velocity(a, b, p.ra, p.rb).dot(c.normal);
         p.max_normal_impulse = 0.0;
+        p.min_separation = p.separation;
     }
     c.rolling_mass = if c.rolling > 0.0 { a.inv_i.add(&b.inv_i).inverse().unwrap_or(Mat3::ZERO) } else { Mat3::ZERO };
 }
@@ -197,7 +206,7 @@ pub(crate) fn warm_start(c: &Constraint, bodies: &mut [SBody]) {
 
 /// one pass over a constraint: the normal impulses (with the soft bias when `use_bias`), then friction
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn solve(c: &mut Constraint, bodies: &mut [SBody], soft: &Soft, inv_h: f64, max_push: f64, slop: f64, use_bias: bool) {
+pub(crate) fn solve(c: &mut Constraint, bodies: &mut [SBody], soft: &Soft, inv_h: f64, max_push: f64, use_bias: bool) {
     let (a, b) = pair(bodies, c.sa, c.sb);
     let n = c.normal;
     let dp = b.dp - a.dp;
@@ -206,13 +215,14 @@ pub(crate) fn solve(c: &mut Constraint, bodies: &mut [SBody], soft: &Soft, inv_h
         let pa = a.dq.rotate(p.ta);
         let pb = b.dq.rotate(p.tb);
         let s = (dp + (pb - pa)).dot(n) + p.base;
+        p.min_separation = min(p.min_separation, s);
         let (bias, mass_scale, impulse_scale) = if s > 0.0 {
             (s * inv_h, 1.0, 0.0) // speculative: come exactly this close in this substep
         } else if c.deep > 0.0 && s < -c.deep {
             // too deep for a soft contact: rigid, and a fifth of the excess out per substep
             (if use_bias { max(0.2 * (s + c.deep) * inv_h, -max_push) } else { 0.0 }, 1.0, 0.0)
         } else if use_bias {
-            (max(soft.bias_rate * min(0.0, s + slop), -max_push), soft.mass_scale, soft.impulse_scale)
+            (max(soft.bias_rate * s, -max_push), soft.mass_scale, soft.impulse_scale)
         } else {
             (0.0, 1.0, 0.0)
         };
@@ -256,14 +266,16 @@ pub(crate) fn solve(c: &mut Constraint, bodies: &mut [SBody], soft: &Soft, inv_h
     }
 }
 
-/// restitution once after the substeps: points that approached faster than `threshold` and were pushed
-pub(crate) fn restitution(c: &mut Constraint, bodies: &mut [SBody], threshold: f64) {
+/// restitution once after the substeps: points that approached faster than `threshold`, were pushed and came
+/// within `slop` of touching (a speculative point that something else stopped short of the surface does not
+/// bounce)
+pub(crate) fn restitution(c: &mut Constraint, bodies: &mut [SBody], threshold: f64, slop: f64) {
     if !(c.restitution > 0.0) {
         return;
     }
     let (a, b) = pair(bodies, c.sa, c.sb);
     for p in &mut c.points[..c.count] {
-        if p.approach > -threshold || !(p.max_normal_impulse > 0.0) {
+        if p.approach > -threshold || !(p.max_normal_impulse > 0.0) || p.min_separation > slop {
             continue;
         }
         let vn = relative_velocity(a, b, p.ra, p.rb).dot(c.normal);

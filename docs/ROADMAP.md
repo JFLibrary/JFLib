@@ -2712,15 +2712,16 @@ Crates, die einer JF-App folgen:
   Schwerpunkts gegen alles, was sich nicht bewegt, schlafende Inseln, Kontakt- und Sensorereignisse. Gelenke: Kugel mit
   Kegel und Verdrehung, Scharnier, fest, Schieber, Abstand (Seil, Stange), mit Grenzen, Motoren und Federn, genug für
   Ragdolls. `Simulation` ist `Clone`: eine Kopie rechnet zu denselben Bits weiter (Zurückspulen im Netzspiel). Geprüft in
-  `physicstest` mit acht neuen Gruppen (1271 Prüfungen: Massen gegen geschlossene Formen, Scheiben und Tonons Tetraeder,
+  `physicstest` mit acht neuen Gruppen (1784 Prüfungen: Massen gegen geschlossene Formen, Scheiben und Tonons Tetraeder,
   freie Bewegung gegen die genauen Summen des Integrators, Reibung, Restitution, Rollen, Stapel, Pendelperioden, Ketten,
   Grenzen, Ragdolls, ein Kügelchen mit 500 m/s gegen eine 1 mm dünne Wand, Würfe mit 150 m/s auf den Boden, zufällige
-  Szenen mit allen Gelenken ohne Energiegewinn); eine dritte Prüfsumme, gleich unter Linux, Windows (Wine) und im Browser.
+  Szenen mit allen Gelenken ohne Energiegewinn); eine dritte Prüfsumme, gleich unter Linux, Windows (Wine) und in
+  WebAssembly unter Node.
   Die Tests fanden auf dem Weg: Kontaktspalte, die an der Oberfläche einer rollenden Kugel verfolgt wurden (ein Kügelchen
   ging durch die Wand), eine Kapsel, die schräg nur ein Ende anbot (sie kippte durchs Netz), leichte Körper, die schwere
   durch den Boden drückten, Gelenke, die einander widersprechen und Energie gewannen (bis zum 60-fachen).
-  Kosten auf einem Kern eines i7-1165G7: 207 Körper 0,9 ms je Schritt, 1339 Körper (762 wach) 13 ms, eine Pyramide aus 210
-  Kisten 2,3 ms.
+  Kosten auf einem Kern eines i7-1165G7: 207 Körper 0,9 ms je Schritt, 1339 Körper (731 wach) 15 ms, eine Pyramide aus 210
+  Kisten 2,1 ms.
   Offen: Massenverhältnisse über 1:10 sacken (1:100: 4 cm), weiche Gelenke geben im Aufprall nach (ein Ragdoll bis
   3,5 cm und 11°), Sweeps drehen nicht, eine Form je Körper, keine Threads; macOS und Android nicht gelaufen.
 - **P2** · *erledigt* (2026-11-21, U7) · `installer`: Die Seiten sprechen die Sprache des

@@ -26,6 +26,9 @@ fn rel(a: f64, b: f64) -> f64 {
 }
 
 fn mat_rel(a: &Mat3, b: &Mat3) -> f64 {
+    if !a.is_finite() || !b.is_finite() {
+        return f64::INFINITY;
+    }
     let mut m = 0.0f64;
     let s = b.trace().abs().max(1e-300);
     for r in 0..3 {
@@ -156,10 +159,12 @@ pub fn mass_tests(c: &mut Ctx) {
         }
         let off = rng.vec(-100.0, 100.0);
         let pts: Vec<Vec3> = p.iter().map(|v| *v + off).collect();
+        // four points with a volume: the hull must take all of them
         let Ok(hull) = ConvexHull::new(&pts) else {
+            c.check(false, || format!("the hull refused the tetrahedron {:?}", pts));
             continue;
         };
-        if hull.points().len() != 4 {
+        if !c.check(hull.points().len() == 4, || format!("the hull of the tetrahedron {:?} has {} corners", pts, hull.points().len())) {
             continue;
         }
         let m = Shape::hull(hull).mass_properties(rho).expect("tetra");
@@ -190,6 +195,18 @@ pub fn mass_tests(c: &mut Ctx) {
     c.check(Shape::mesh(mesh).mass_properties(rho).is_none(), || "a mesh gave a mass".into());
     c.check(!MassProps::new(1.0, Vec3::ZERO, Mat3::diagonal(Vec3::new(1.0, 1.0, 3.0))).is_valid(), || "a tensor against the triangle inequality is valid".into());
     c.check(MassProps::point(2.0).is_valid(), || "a point mass is not valid".into());
+    // a tensor whose diagonal looks fine but whose principal moments do not (-1, 3, 1)
+    let bad = Mat3::from_cols(Vec3::new(1.0, 2.0, 0.0), Vec3::new(2.0, 1.0, 0.0), Vec3::new(0.0, 0.0, 1.0));
+    c.check(!MassProps::new(1.0, Vec3::ZERO, bad).is_valid(), || "a tensor with a negative principal moment is valid".into());
+    let mut sim = Simulation::new();
+    c.check(sim.add(RigidBody::dynamic(Shape::sphere(1.0), Iso::IDENTITY).with_mass(MassProps::new(1.0, Vec3::ZERO, bad))).err() == Some(physics::BodyError::Mass), || "a body with a negative principal moment was accepted".into());
+    // a turned box's tensor is valid in any frame
+    let turned = Shape::cuboid(Vec3::new(0.1, 0.5, 2.0)).mass_properties(rho).expect("box").transformed(&Iso::new(Vec3::ZERO, Quat::from_axis_angle(Vec3::new(1.0, 2.0, 3.0).normalize_or_zero(), 0.9)));
+    c.check(turned.is_valid(), || format!("a turned box is not valid: {:?}", turned));
+    c.check(Shape::cuboid(Vec3::new(-1.0, -1.0, 1.0)).mass_properties(rho).is_none() && Shape::sphere(-0.5).mass_properties(rho).is_none() && Shape::capsule(0.5, -0.1).mass_properties(rho).is_none(), || "negative sizes gave a mass".into());
+    c.check(Shape::capsule(0.0, 0.3).mass_properties(rho).is_some(), || "a capsule of half height 0 (a ball) gave no mass".into());
+    let tiny = Mat3::diagonal(Vec3::splat(1e-105)).inverse();
+    c.check(tiny.is_some_and(|m| rel(m.at(0, 0), 1e105) < 1e-12 && m.is_finite()), || format!("the inverse of a tiny diagonal: {:?}", tiny));
 }
 
 // ---------------------------------------------------------------- motion
@@ -256,6 +273,16 @@ pub fn motion_tests(c: &mut Ctx) {
     c.check(at.pos == target.pos && at.rot.dot(target.rot).abs() > 1.0 - 1e-15, || format!("kinematic at {:?} want {:?}", at, target));
     let (v, w) = sim.velocity(k).expect("v");
     c.check((v - Vec3::new(0.3, 0.1, -0.2) / DT).length() < 1e-9 && (w.y - 0.2 / DT).abs() < 1e-9, || format!("kinematic velocity {:?} {:?}", v, w));
+    // a kinematic body that never turns stays so; a move over an infinite time is refused
+    let mut sim = Simulation::new();
+    let k = sim.add(RigidBody::kinematic(Shape::cuboid(Vec3::splat(0.5)), Iso::IDENTITY).fixed_rotation()).expect("kinematic");
+    sim.set_velocity(k, Vec3::new(1.0, 0.0, 0.0), Vec3::new(0.0, 3.0, 0.0));
+    sim.step(DT);
+    sim.move_kinematic(k, Iso::new(Vec3::new(1.0, 0.0, 0.0), Quat::from_axis_angle(Vec3::Y, 1.0)), DT);
+    sim.step(DT);
+    let at = sim.iso(k).expect("iso");
+    c.check(at.rot.is_identity() && at.pos == Vec3::new(1.0, 0.0, 0.0), || format!("a kinematic body with fixed rotation turned or missed: {:?}", at));
+    c.check(!sim.move_kinematic(k, Iso::IDENTITY, f64::INFINITY), || "a move over an infinite time was taken".into());
     // gravity scale 0 floats
     let mut sim = Simulation::new();
     let b = sim.add(RigidBody::dynamic(Shape::sphere(0.5), Iso::at(Vec3::new(0.0, 5.0, 0.0))).with_gravity_scale(0.0)).expect("float");
@@ -434,6 +461,26 @@ pub fn contact_tests(c: &mut Ctx) {
         let bottom = Shape::cuboid(Vec3::new(0.7, 0.3, 0.45)).aabb(&s.iso).min.y;
         c.check(ms.len() == 1 && ms[0].count == 4, || format!("box on a mesh: {} manifolds {:?}", ms.len(), ms.iter().map(|m| m.count).collect::<Vec<_>>()));
         c.check(bottom > -0.006 && bottom < 0.002 && !s.awake, || format!("box on a mesh rests at {} awake {}", bottom, s.awake));
+    }
+    // a ball in a valley of two faces 2 degrees apart: one manifold (within the merge), every point on the line
+    // through its centre along the normal, so it is pushed through its centre also by the face of the other
+    // normal
+    {
+        let mut sim = Simulation::new();
+        let (sn, cs) = math::sincos(1.0f64.to_radians());
+        let t = sn / cs;
+        let h = (5.0 * t) as f32;
+        let pos = [[-5.0, h, 5.0], [0.0, 0.0, 5.0], [0.0, 0.0, -5.0], [-5.0, h, -5.0], [5.0, h, 5.0], [5.0, h, -5.0]];
+        let valley = physics::TriMesh::new(&pos, &[0, 1, 2, 0, 2, 3, 1, 4, 5, 1, 5, 2]).expect("valley");
+        sim.add(RigidBody::fixed(Shape::mesh(valley), Iso::IDENTITY)).expect("valley");
+        let ball = sim.add(RigidBody::dynamic(Shape::sphere(1.0), Iso::at(Vec3::new(0.0, sqrt(1.0 + t * t), 0.0)))).expect("ball");
+        run(&mut sim, 30);
+        let center = sim.state(ball).expect("state").center;
+        sim.step(DT);
+        let ms: Vec<_> = sim.manifolds().filter(|m| m.a == ball).collect();
+        let off = ms.iter().flat_map(|m| m.points[..m.count].iter().map(move |p| (p.point - center).cross(m.normal).length())).fold(0.0, f64::max);
+        let counts: Vec<usize> = ms.iter().map(|m| m.count).collect();
+        c.check(counts == [2] && off < 1e-9, || format!("a ball in a valley: points {:?}, up to {} m off the line through its centre", counts, off));
     }
     // a kinematic platform carries a box (friction) and lifts it
     {
@@ -645,7 +692,7 @@ pub fn joint_tests(c: &mut Ctx) {
         let ip = l * l + 0.4 * r * r;
         let t0 = 2.0 * PI * sqrt(ip / (g * l));
         let series = 1.0 + a0 * a0 / 16.0 + 11.0 * a0 * a0 * a0 * a0 / 3072.0 + 173.0 * (a0 * a0) * (a0 * a0) * (a0 * a0) / 737_280.0;
-        c.check(rel(t, t0 * series) < 0.005 || c.quick, || format!("pendulum L {} amplitude {}: period {} want {}", l, a0, t, t0 * series));
+        c.check(rel(t, t0 * series) < 0.005, || format!("pendulum L {} amplitude {}: period {} want {}", l, a0, t, t0 * series));
         let (gap, _, _) = joint_error(&sim, j);
         c.check(gap < 0.002, || format!("pendulum L {}: the anchors {} m apart", l, gap));
     }
@@ -935,6 +982,59 @@ pub fn joint_tests(c: &mut Ctx) {
         c.check(a > 1.5 - 0.03 && a < 2.5 + 0.03 && x > 2.0 - 0.01 && x < 3.0 + 0.01, || format!("joints made outside their limits: angle {} position {}", a, x));
         c.check(fastest < 30.0, || format!("joints made outside their limits jolted their bodies to {} m/s", fastest));
     }
+    // a rod made with both anchors in one point pushes them apart to its length
+    {
+        let mut sim = Simulation::with_params(no_gravity());
+        let hub = anchor(&mut sim, Vec3::ZERO);
+        let ball = sim.add(RigidBody::dynamic(Shape::sphere(0.1), Iso::at(Vec3::new(0.0, 0.0, 0.0))).sleepless()).expect("ball");
+        let j = sim.add_joint(hub, ball, Iso::IDENTITY, JointKind::rod(1.0)).expect("rod");
+        run(&mut sim, 120);
+        let len = sim.joint_position(j).expect("length");
+        c.check((len - 1.0).abs() < 0.01, || format!("a rod from one point: length {} want 1", len));
+    }
+    // a slider whose motor is taken away coasts instead of being driven on by the motor's old impulse
+    {
+        let mut sim = Simulation::with_params(no_gravity());
+        let rail = anchor(&mut sim, Vec3::ZERO);
+        let car = sim.add(RigidBody::dynamic(Shape::cuboid(Vec3::splat(0.2)), Iso::IDENTITY).with_damping(0.0, 0.0).sleepless()).expect("car");
+        let kind = |m: Option<Motor>| JointKind::Slider { limits: None, motor: m, spring: None };
+        let j = sim.add_joint(rail, car, Iso::IDENTITY, kind(Some(Motor { speed: 2.0, max_force: 1000.0 }))).expect("slider");
+        run(&mut sim, 60);
+        let v0 = sim.velocity(car).expect("v").0.x;
+        sim.set_joint(j, kind(None), false);
+        run(&mut sim, 60);
+        let v1 = sim.velocity(car).expect("v").0.x;
+        c.check((v0 - 2.0).abs() < 0.02 && (v1 - v0).abs() < 1e-6, || format!("a slider without its motor: {} m/s then {} m/s", v0, v1));
+    }
+    // a body welded to a slow kinematic carrier stays awake and goes along
+    {
+        let mut sim = Simulation::new();
+        let carrier = sim.add(RigidBody::kinematic(Shape::cuboid(Vec3::new(1.0, 0.1, 1.0)), Iso::at(Vec3::new(0.0, 3.0, 0.0))).with_velocity(Vec3::new(0.01, 0.0, 0.0))).expect("carrier");
+        let load = sim.add(RigidBody::dynamic(Shape::cuboid(Vec3::splat(0.2)), Iso::at(Vec3::new(0.0, 2.5, 0.0)))).expect("load");
+        sim.add_joint(carrier, load, Iso::at(Vec3::new(0.0, 2.8, 0.0)), JointKind::Fixed).expect("weld");
+        run(&mut sim, 300);
+        let (pc, pl) = (sim.state(carrier).expect("c").center, sim.state(load).expect("l").center);
+        c.check(sim.is_awake(load) && ((pl.x - pc.x).abs() < 0.002), || format!("the welded load: awake {} at {:?}, the carrier at {:?}", sim.is_awake(load), pl, pc));
+    }
+    // a cone whose axes start against each other turns b back into it
+    {
+        let mut sim = Simulation::with_params(no_gravity());
+        let top = anchor(&mut sim, Vec3::ZERO);
+        let limb = sim.add(RigidBody::dynamic(Shape::capsule(0.3, 0.05), Iso::IDENTITY).sleepless()).expect("limb");
+        let joint = physics::Joint {
+            a: top,
+            b: limb,
+            frame_a: Iso::IDENTITY,
+            frame_b: Iso::new(Vec3::ZERO, Quat::from_axis_angle(Vec3::Z, PI)),
+            kind: JointKind::Ball { cone: Some(0.5), twist: None },
+            collide_connected: false,
+            user: 0,
+        };
+        let j = sim.add_joint_local(joint).expect("ball");
+        run(&mut sim, 240);
+        let (_, swing, _) = joint_error(&sim, j);
+        c.check(swing < 0.5 + 3.0f64.to_radians(), || format!("antiparallel axes: swing {} after 4 s, cone 0.5", swing));
+    }
     // what is refused
     {
         let mut sim = Simulation::new();
@@ -945,6 +1045,9 @@ pub fn joint_tests(c: &mut Ctx) {
         c.check(sim.add_joint(d, d, Iso::IDENTITY, JointKind::BALL) == Err(JointError::SameBody), || "a joint of a body with itself".into());
         c.check(sim.add_joint(a, d, Iso::IDENTITY, JointKind::Hinge { limits: Some((1.0, 0.0)), motor: None, spring: None }) == Err(JointError::Range), || "limits the wrong way round".into());
         c.check(sim.add_joint(a, d, Iso::IDENTITY, JointKind::Distance { min: f64::NAN, max: 1.0, spring: None }) == Err(JointError::NotFinite), || "a NaN length".into());
+        c.check(sim.add_joint(a, d, Iso::IDENTITY, JointKind::Slider { limits: Some((f64::INFINITY, f64::INFINITY)), motor: None, spring: None }) == Err(JointError::Range), || "limits no position meets".into());
+        c.check(sim.add_joint(a, d, Iso::new(Vec3::ZERO, Quat::new(f64::INFINITY, 0.0, 0.0, 1.0)), JointKind::BALL) == Err(JointError::NotFinite), || "a frame with an infinite rotation".into());
+        c.check(sim.add_joint(a, d, Iso::IDENTITY, JointKind::Hinge { limits: None, motor: None, spring: Some(Spring { target: 0.0, hertz: 1e200, damping_ratio: 1.0 }) }).is_ok(), || "a very stiff spring was refused".into());
         let j = sim.add_joint(a, d, Iso::IDENTITY, JointKind::BALL).expect("joint");
         c.check(sim.remove(d) && sim.joint(j).is_none(), || "removing a body left its joint".into());
     }
@@ -953,6 +1056,27 @@ pub fn joint_tests(c: &mut Ctx) {
 // ---------------------------------------------------------------- ccd
 
 pub fn ccd_tests(c: &mut Ctx) {
+    // two balls 1.5 m apart that each move 1 m towards the other in a step find each other
+    {
+        let mut sim = Simulation::with_params(no_gravity());
+        let a = sim.add(RigidBody::dynamic(Shape::sphere(1.0), Iso::at(Vec3::new(-1.75, 0.0, 0.0))).with_velocity(Vec3::new(60.0, 0.0, 0.0))).expect("a");
+        let b = sim.add(RigidBody::dynamic(Shape::sphere(1.0), Iso::at(Vec3::new(1.75, 0.0, 0.0))).with_velocity(Vec3::new(-60.0, 0.0, 0.0))).expect("b");
+        let mut closest = f64::INFINITY;
+        for _ in 0..4 {
+            sim.step(DT);
+            closest = closest.min((sim.state(b).expect("b").center - sim.state(a).expect("a").center).length());
+        }
+        c.check(closest > 2.0 - 0.01, || format!("two balls racing at each other came {} m close (radii 1 + 1)", closest));
+    }
+    // a bullet across the path of a moving body: swept with the motion relative to it, it stops where they meet
+    {
+        let mut sim = Simulation::with_params(no_gravity());
+        let shot = sim.add(RigidBody::dynamic(Shape::sphere(0.1), Iso::at(Vec3::new(-5.0, 0.0, 0.0))).with_velocity(Vec3::new(600.0, 0.0, 0.0)).bullet()).expect("shot");
+        sim.add(RigidBody::dynamic(Shape::sphere(0.5), Iso::at(Vec3::new(0.0, -5.0, 0.0))).with_velocity(Vec3::new(0.0, 600.0, 0.0))).expect("target");
+        sim.step(DT);
+        let x = sim.state(shot).expect("shot").center.x;
+        c.check(x < 0.0 && x > -1.0, || format!("the bullet across a moving body ended at x {} (they meet at about -0.42)", x));
+    }
     // a pellet at 500 m/s does not pass a 1 mm wall, a box or a mesh; without the sweep it does
     for (mesh, continuous) in [(false, true), (true, true), (false, false)] {
         let mut sim = Simulation::with_params(SimParams { continuous, ..no_gravity() });
@@ -1030,6 +1154,35 @@ pub fn ccd_tests(c: &mut Ctx) {
 // ---------------------------------------------------------------- events
 
 pub fn event_tests(c: &mut Ctx) {
+    // a static sensor teleported off a sleeping body ends the overlap, back onto it begins it again
+    {
+        let mut sim = Simulation::new();
+        floor(&mut sim, 20.0);
+        let crate_box = sim.add(RigidBody::dynamic(Shape::cuboid(Vec3::splat(0.3)), Iso::at(Vec3::new(0.0, 0.3, 0.0)))).expect("box");
+        let zone = sim.add(RigidBody::fixed(Shape::cuboid(Vec3::splat(1.0)), Iso::at(Vec3::new(0.0, 0.5, 0.0))).sensor()).expect("sensor");
+        run(&mut sim, 120);
+        let pair = |e: &ContactEvent| matches!(e, ContactEvent::SensorEnd { sensor, other } | ContactEvent::SensorBegin { sensor, other } if *sensor == zone && *other == crate_box);
+        c.check(!sim.is_awake(crate_box), || "the box in the sensor did not fall asleep".into());
+        sim.set_iso(zone, Iso::at(Vec3::new(10.0, 0.5, 0.0)));
+        sim.step(DT);
+        let ended = sim.events().iter().filter(|e| pair(e) && matches!(e, ContactEvent::SensorEnd { .. })).count();
+        sim.set_iso(zone, Iso::at(Vec3::new(0.0, 0.5, 0.0)));
+        sim.step(DT);
+        let began = sim.events().iter().filter(|e| pair(e) && matches!(e, ContactEvent::SensorBegin { .. })).count();
+        c.check(ended == 1 && began == 1, || format!("a teleported sensor: {} ends, {} begins", ended, began));
+    }
+    // a floor that no longer collides with a sleeping body: its contact ends
+    {
+        let mut sim = Simulation::new();
+        let fl = floor(&mut sim, 20.0);
+        let ball = sim.add(RigidBody::dynamic(Shape::sphere(0.3), Iso::at(Vec3::new(0.0, 0.3, 0.0)))).expect("ball");
+        run(&mut sim, 120);
+        sim.set_layers(fl, 1, 0);
+        sim.step(DT);
+        let ended = sim.events().iter().any(|e| matches!(e, ContactEvent::End { .. }));
+        let left = sim.manifolds().filter(|m| m.a == ball || m.b == ball).count();
+        c.check(ended && left == 0, || format!("a floor relayered: end {} manifolds {}", ended, left));
+    }
     // one Begin at the impact with its speed, nothing while resting, End when lifted off
     {
         let mut sim = Simulation::new();
@@ -1087,12 +1240,18 @@ pub fn event_tests(c: &mut Ctx) {
         let want = -9.81 * hh * k;
         c.check((sim.velocity(ball).expect("v").0.y - want).abs() < 1e-9, || "the sensor slowed the ball".into());
         let door = sim.add(RigidBody::kinematic(Shape::cuboid(Vec3::splat(0.2)), Iso::at(Vec3::new(-3.0, 5.0, 0.0))).with_velocity(Vec3::new(6.0, 0.0, 0.0))).expect("kinematic");
-        let mut seen = 0;
+        let mut seen = Vec::new();
         for _ in 0..90 {
             sim.step(DT);
-            seen += sim.events().iter().filter(|e| matches!(e, ContactEvent::SensorBegin { other, .. } | ContactEvent::SensorEnd { other, .. } if *other == door)).count();
+            for e in sim.events() {
+                match e {
+                    ContactEvent::SensorBegin { sensor: s, other } if *s == sensor && *other == door => seen.push(true),
+                    ContactEvent::SensorEnd { sensor: s, other } if *s == sensor && *other == door => seen.push(false),
+                    _ => {}
+                }
+            }
         }
-        c.check(seen == 2, || format!("a kinematic body through the sensor: {} events", seen));
+        c.check(seen == [true, false], || format!("a kinematic body through the sensor: {:?} (begin true, end false)", seen));
     }
 }
 
@@ -1191,12 +1350,15 @@ pub fn fuzz_tests(c: &mut Ctx) {
             for (k, (b, _)) in ids.iter().enumerate() {
                 let st = sim.state(*b).expect("state");
                 let c0 = st.center;
+                // back above the floor inside its square, it counts again
                 if c0.x.abs() > 7.5 || c0.z.abs() > 7.5 {
                     left[k] = true;
+                } else if c0.y >= 0.0 {
+                    left[k] = false;
                 }
                 if !(c0.is_finite() && st.linear_velocity.is_finite() && st.angular_velocity.is_finite() && st.iso.rot.is_finite()) {
                     bad = Some((step, *b, "not finite"));
-                } else if !left[k] && c0.y < 0.0 && (mesh || c0.y > -2.0) {
+                } else if !left[k] && c0.y < 0.0 {
                     bad = Some((step, *b, "its centre in or under the floor"));
                 }
             }
@@ -1343,7 +1505,7 @@ pub fn checksum(mut put: impl FnMut(u64)) {
         let ids: Vec<BodyId> = sim.world().bodies().map(|(id, _)| id).collect();
         for id in ids {
             let st = sim.state(id).expect("state");
-            for v in [st.center.x, st.center.y, st.center.z, st.iso.rot.x, st.iso.rot.y, st.iso.rot.z, st.iso.rot.w] {
+            for v in [st.center.x, st.center.y, st.center.z, st.iso.pos.x, st.iso.pos.y, st.iso.pos.z, st.iso.rot.x, st.iso.rot.y, st.iso.rot.z, st.iso.rot.w] {
                 f(&mut put, v);
             }
             for v in [st.linear_velocity, st.angular_velocity] {

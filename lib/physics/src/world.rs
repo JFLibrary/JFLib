@@ -224,6 +224,27 @@ impl World {
         true
     }
 
+    /// make the body's box in the trees hold `bx` (with the margin), as a moving body: the simulation grows it
+    /// by how far the body can move in a step, so two bodies that come towards each other find each other
+    pub(crate) fn cover(&mut self, id: BodyId, bx: &Aabb) {
+        let margin = self.margin;
+        let index = id.index;
+        let Some(b) = self.slot_mut(id) else {
+            return;
+        };
+        let (leaf, tree) = (b.leaf, b.tree);
+        if tree != MOVING {
+            self.trees[tree as usize].remove(leaf);
+            let nl = self.trees[MOVING as usize].insert(bx.expanded(margin), index);
+            if let Some(b) = self.slot_mut(id) {
+                b.leaf = nl;
+                b.tree = MOVING;
+            }
+        } else if !self.trees[MOVING as usize].aabb(leaf).contains(bx) {
+            self.trees[MOVING as usize].update(leaf, bx.expanded(margin));
+        }
+    }
+
     /// a body's layers -> false when the id is dead
     pub fn set_layers(&mut self, id: BodyId, layers: u32) -> bool {
         match self.slot_mut(id) {
@@ -349,24 +370,7 @@ impl World {
 
     /// the first hit of the ray origin + dir * t, 0 <= t <= max_t
     pub fn ray_cast(&self, origin: Vec3, dir: Vec3, max_t: f64, filter: &Filter) -> Option<(BodyId, RayHit)> {
-        let mut best: Option<(BodyId, RayHit)> = None;
-        self.ray_trees(origin, dir, Vec3::ZERO, max_t, |item, tmax| {
-            let id = self.id_of(item);
-            let Some(b) = self.slots[item as usize].body.as_ref() else {
-                return tmax;
-            };
-            if !filter.sees(id, b.layers) {
-                return tmax;
-            }
-            if let Some(h) = query::ray(&b.shape, &b.iso, origin, dir, tmax) {
-                if best.as_ref().is_none_or(|(bid, bh)| earlier(h.t, id, h.triangle, bh.t, *bid, bh.triangle)) {
-                    best = Some((id, h));
-                    return h.t;
-                }
-            }
-            tmax
-        });
-        best
+        self.ray_cast_where(origin, dir, max_t, |item, b| filter.sees(self.id_of(item), b.layers))
     }
 
     /// every hit of the ray (one per convex body, one per triangle of a mesh), appended to `out` sorted by
@@ -392,31 +396,7 @@ impl World {
 
     /// the first body convex `shape`, moved from `iso` by `motion`, touches (see [`query::cast`])
     pub fn cast(&self, shape: &Shape, iso: &Iso, motion: Vec3, filter: &Filter) -> Option<(BodyId, CastHit)> {
-        if !shape.is_convex() {
-            return None;
-        }
-        let bx = shape.aabb(iso);
-        let c = bx.center();
-        let pad = CAST_SKIN + 1e-9 + 1e-12 * max(c.abs().max_elem(), bx.half_extents().max_elem());
-        let ext = bx.half_extents() + Vec3::splat(pad);
-        let mut best: Option<(BodyId, CastHit)> = None;
-        self.ray_trees(c, motion, ext, 1.0, |item, tmax| {
-            let id = self.id_of(item);
-            let Some(b) = self.slots[item as usize].body.as_ref() else {
-                return tmax;
-            };
-            if !filter.sees(id, b.layers) {
-                return tmax;
-            }
-            if let Some(h) = query::cast(shape, iso, motion, &b.shape, &b.iso) {
-                if best.as_ref().is_none_or(|(bid, bh)| earlier(h.fraction, id, h.triangle, bh.fraction, *bid, bh.triangle)) {
-                    best = Some((id, h));
-                    return h.fraction;
-                }
-            }
-            tmax
-        });
-        best
+        self.cast_where(shape, iso, motion, |item, b| filter.sees(self.id_of(item), b.layers))
     }
 
     /// the candidates of a box query, by body

@@ -460,8 +460,9 @@ impl Quat {
         Quat::new(v.x * k, v.y * k, v.z * k, c)
     }
 
-    /// the rotation vector of a unit quaternion: its axis times its angle in [0, pi] (the inverse of
-    /// [`Quat::from_scaled_axis`])
+    /// the rotation vector of a unit quaternion: its axis times its angle in [0, pi].  The inverse of
+    /// [`Quat::from_scaled_axis`] for vectors up to pi long; a longer one gives the same rotation by its angle
+    /// in [0, pi]
     pub fn to_scaled_axis(self) -> Vec3 {
         let q = if self.w < 0.0 { Quat::new(-self.x, -self.y, -self.z, -self.w) } else { self };
         let v = Vec3::new(q.x, q.y, q.z);
@@ -567,15 +568,29 @@ impl Mat3 {
 
     /// the inverse, None when the matrix is singular (or not finite)
     pub fn inverse(&self) -> Option<Mat3> {
-        let [a, b, c] = self.cols;
+        if !self.is_finite() {
+            return None;
+        }
+        // scaled first by the power of two that brings the largest entry into [1, 2): exact, so a matrix of
+        // ordinary size gives the same bits as without, and the determinant of a tiny or a huge one neither
+        // under- nor overflows
+        let big = self.cols.iter().fold(0.0, |m, v| max(m, max(abs(v.x), max(abs(v.y), abs(v.z)))));
+        if !(big > 0.0) {
+            return None;
+        }
+        let e = ((big.to_bits() >> 52) & 0x7ff) as i64;
+        let k = (1023 - e).clamp(-1022, 1022);
+        let s = f64::from_bits(((k + 1023) as u64) << 52);
+        let [a, b, c] = self.cols.map(|v| v * s);
         let (bc, ca, ab) = (b.cross(c), c.cross(a), a.cross(b));
         let det = a.dot(bc);
         if !(det != 0.0 && det.is_finite()) {
             return None;
         }
-        let inv = 1.0 / det;
-        // the rows of the inverse are the cross products of the columns
-        Some(Mat3 { cols: [bc * inv, ca * inv, ab * inv] }.transpose())
+        // the rows of the inverse are the cross products of the columns divided by the determinant, and the
+        // scale undone: inv(M) = s inv(s M)
+        let m = Mat3 { cols: [bc * (s / det), ca * (s / det), ab * (s / det)] }.transpose();
+        if m.is_finite() { Some(m) } else { None }
     }
 
     /// R M R^T: a tensor of a body's frame (its inertia) in the frame rotated by `q`

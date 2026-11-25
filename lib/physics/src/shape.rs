@@ -20,7 +20,7 @@ pub enum Shape {
     Box { half: Vec3 },
     /// a convex hull (shared)
     Hull(Arc<ConvexHull>),
-    /// a static triangle mesh (only as a body, not as a query shape)
+    /// a triangle mesh: a static or kinematic body (never dynamic), not a query shape
     Mesh(Arc<TriMesh>),
 }
 
@@ -54,7 +54,7 @@ impl Shape {
         Ok(Shape::hull(ConvexHull::new(points)?))
     }
 
-    /// a static triangle mesh, shared
+    /// a triangle mesh (for a static or kinematic body), shared
     #[inline]
     pub fn mesh(mesh: TriMesh) -> Shape {
         Shape::Mesh(Arc::new(mesh))

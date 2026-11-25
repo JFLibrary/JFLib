@@ -51,25 +51,48 @@ impl MassProps {
         MassProps { mass: self.mass * factor, center: self.center, inertia: self.inertia.scale(factor) }
     }
 
-    /// mass, centre and tensor finite, the mass positive, the tensor symmetric with non-negative principal
-    /// moments that keep the triangle inequality (what a solid body can have; within a relative 1e-9)
+    /// mass, centre and tensor finite, the mass positive, the tensor symmetric with principal moments that are
+    /// non-negative and keep the triangle inequality, in its own axes (what a solid body can have; within a
+    /// relative 1e-9; the zero tensor of [`MassProps::point`] is one)
     pub fn is_valid(&self) -> bool {
         if !(self.mass > 0.0 && self.mass.is_finite() && self.center.is_finite() && self.inertia.is_finite()) {
             return false;
         }
         let i = &self.inertia;
-        let scale = i.trace().abs() * 1e-9 + f64::MIN_POSITIVE;
-        let sym = (i.at(0, 1) - i.at(1, 0)).abs() <= scale && (i.at(0, 2) - i.at(2, 0)).abs() <= scale && (i.at(1, 2) - i.at(2, 1)).abs() <= scale;
-        let (a, b, c) = (i.at(0, 0), i.at(1, 1), i.at(2, 2));
-        sym && a >= -scale && b >= -scale && c >= -scale && a + b + scale >= c && a + c + scale >= b && b + c + scale >= a
+        let t = i.trace().abs();
+        let tol = t * 1e-9 + f64::MIN_POSITIVE;
+        let sym = (i.at(0, 1) - i.at(1, 0)).abs() <= tol && (i.at(0, 2) - i.at(2, 0)).abs() <= tol && (i.at(1, 2) - i.at(2, 1)).abs() <= tol;
+        if !sym {
+            return false;
+        }
+        // a solid body's tensor is tr(C) 1 - C for the second moment C of its mass, which is positive
+        // semidefinite; that holds the principal moments non-negative and in the triangle inequality, in any
+        // frame.  C is positive semidefinite when all its principal minors are (the zero tensor of a point too).
+        let c = Mat3::IDENTITY.scale(i.trace() * 0.5).sub(i);
+        let e = |r: usize, k: usize| c.at(r, k);
+        let minors_1 = [e(0, 0), e(1, 1), e(2, 2)];
+        let minors_2 = [e(0, 0) * e(1, 1) - e(0, 1) * e(1, 0), e(0, 0) * e(2, 2) - e(0, 2) * e(2, 0), e(1, 1) * e(2, 2) - e(1, 2) * e(2, 1)];
+        minors_1.iter().all(|&m| m >= -tol) && minors_2.iter().all(|&m| m >= -tol * (t + tol)) && c.determinant() >= -tol * (t + tol) * (t + tol)
     }
 }
 
 impl Shape {
-    /// the mass properties of the shape filled with `density` (kg/m³), None for a mesh (static only) and for
-    /// a density that is not positive and finite
+    /// the mass properties of the shape filled with `density` (kg/m³), None for a mesh (never dynamic), for a
+    /// density that is not positive and finite and for sizes that are not (a radius, a box's half sizes; a
+    /// capsule's half height may be 0)
     pub fn mass_properties(&self, density: f64) -> Option<MassProps> {
         if !(density > 0.0 && density.is_finite()) {
+            return None;
+        }
+        // the sizes: positive and finite (a capsule's half height may be 0, a ball)
+        let ok = |x: f64| x > 0.0 && x.is_finite();
+        let sizes = match self {
+            Shape::Sphere { radius } => ok(*radius),
+            Shape::Capsule { half_height, radius } => ok(*radius) && *half_height >= 0.0 && half_height.is_finite(),
+            Shape::Box { half } => ok(half.x) && ok(half.y) && ok(half.z),
+            _ => true,
+        };
+        if !sizes {
             return None;
         }
         let m = match self {
