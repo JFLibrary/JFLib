@@ -2,10 +2,12 @@
 # files take the same way for every secret, traced under ptrace and run under valgrind's memcheck with the
 # secret marked undefined, at the five optimization levels of JFLib's builds -- on x86-64 and on a real
 # ARM64 machine (ubuntu-24.04-arm, Neoverse N2), where ptrace has no branch trap and the trace follows every
-# instruction (about ten minutes a level; also on an x86-64 runner whose virtual machine has no branch trap,
+# instruction (15 to 40 minutes a level; also on an x86-64 runner whose virtual machine has no branch trap,
 # the probe then switches by itself). The machine code is what is checked, and it changes with the
 # compiler: hence Mondays as well, and x86-64 with both the rust-version and the newest stable Rust.
-# A third job checks the wasm the compiler makes for the browser (ct_check.py --wasm, WABT's wasm-interp).
+# A third set checks the wasm the compiler makes for the browser (ct_check.py --wasm, WABT's wasm-interp).
+# Every level is a job of its own (ct_check.py --opt LEVEL): a level takes 15 to 70 minutes, the five in
+# one job took up to 215 (x86-64, 1.98.1, 2026-11-24) of the 240 minutes it had.
 # On a push to main or a pull request that touches the crypto, the key files or the tool; by hand.
 name: Constant time
 
@@ -48,19 +50,23 @@ env:
 
 jobs:
   ct_check:
-    name: ct_check ${{ matrix.os }} (${{ matrix.toolchain }})
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: ${{ matrix.minutes }}
+    name: ct_check ${{ matrix.machine.os }} (${{ matrix.machine.toolchain }}) ${{ matrix.level }}
+    runs-on: ${{ matrix.machine.os }}
+    # the longest level seen took 66 minutes (z on an x86-64 runner without the branch trap)
+    timeout-minutes: 120
     strategy:
       fail-fast: false
+      # the organization's plan runs 20 jobs at a time across its repositories: 9 here and 3 for wasm
+      # leave the rest to the other workflows
+      max-parallel: 9
       matrix:
-        include:
-          # 1.98.1: the rust-version of the root Cargo.toml. x86-64 takes 80 to 190 minutes (a level 15 to
-          # 45, z the longest; the runners differ in speed); 90 cut both off in z on 2026-11-22, and 150
-          # the stable one in z on 2026-11-24 (s done after 147)
-          - { os: ubuntu-latest, toolchain: "1.98.1", minutes: 240 }
-          - { os: ubuntu-latest, toolchain: stable, minutes: 240 }
-          - { os: ubuntu-24.04-arm, toolchain: stable, minutes: 180 }
+        # the longest levels first, so that the short ones fill the gaps after them
+        level: [z, s, o3, release, dev]
+        # 1.98.1: the rust-version of the root Cargo.toml
+        machine:
+          - { os: ubuntu-latest, toolchain: "1.98.1" }
+          - { os: ubuntu-latest, toolchain: stable }
+          - { os: ubuntu-24.04-arm, toolchain: stable }
     steps:
       - uses: actions/checkout@v6
       - name: valgrind, binutils
@@ -70,17 +76,17 @@ jobs:
           valgrind --version; addr2line --version | head -1
       - name: Rust
         run: |
-          rustup toolchain install ${{ matrix.toolchain }} --profile minimal --no-self-update
-          rustup default ${{ matrix.toolchain }}
+          rustup toolchain install ${{ matrix.machine.toolchain }} --profile minimal --no-self-update
+          rustup default ${{ matrix.machine.toolchain }}
           rustc --version
-      - name: ct_check (trace and memcheck, all levels)
-        run: python3 tools/ct_check.py
+      - name: ct_check (trace and memcheck, ${{ matrix.level }})
+        run: python3 tools/ct_check.py --opt ${{ matrix.level }}
       # what a report needs to be read elsewhere: memcheck's logs and the probes they came from
       # (addr2line or llvm-symbolizer on another machine, any architecture)
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: ct_check-${{ matrix.os }}-${{ matrix.toolchain }}
+          name: ct_check-${{ matrix.machine.os }}-${{ matrix.machine.toolchain }}-${{ matrix.level }}
           retention-days: 7
           path: |
             build/ct_check/*/memcheck-*.log
@@ -89,9 +95,15 @@ jobs:
   wasm:
     # the wasm the compiler makes for the browser (wasm32-unknown-unknown) in WABT's wasm-interp: the
     # executed instructions and the addresses of the memory accesses (ct_check.py --wasm)
-    name: ct_check --wasm (stable)
+    name: ct_check --wasm (stable) ${{ matrix.level }}
     runs-on: ubuntu-latest
-    timeout-minutes: 150
+    # a level takes 18 to 30 minutes
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        level: [z, s, o3, release, dev]
     steps:
       - uses: actions/checkout@v6
       - name: WABT
@@ -104,5 +116,5 @@ jobs:
           rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown --no-self-update
           rustup default stable
           rustc --version
-      - name: ct_check --wasm (all levels)
-        run: python3 tools/ct_check.py --wasm
+      - name: ct_check --wasm (${{ matrix.level }})
+        run: python3 tools/ct_check.py --wasm --opt ${{ matrix.level }}
