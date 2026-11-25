@@ -674,6 +674,7 @@ fn script_run(src: &str, params: &[(&str, &str)]) -> (run::Run, String) {
             "lib/teil.jfs" => Ok(String::from("fn wuerfel(a) { return geom.box(a, a, a) }\nlet _privat = 1\n")),
             "lib/kaputt.jfs" => Ok(String::from("let x = 1\nlet y = geom.box(1, 0, 1)\n")),
             "lib/regel.jfs" => Ok(String::from("fn regel() {\n  model.expect_size(nil, 1, nil)\n}\n")),
+            "lib/warnt.jfs" => Ok(String::from("fn f() {\n  return geom.box(1, 1, 1).flatt()\n}\n")),
             _ => Err(String::from("die Datei gibt es nicht")),
         }
     };
@@ -688,26 +689,85 @@ fn json_has(r: &run::Run, s: &str) -> bool {
     crate::json::write(&run::report(r, None, None, None)).contains(s)
 }
 
-/// the most arguments one of --api's parameter lists names: its forms apart at "|", arguments apart at ","
-/// (both outside brackets and braces)
-fn listed_args(params: &str) -> usize {
-    if params.trim().is_empty() {
-        return 0;
-    }
-    let (mut depth, mut n, mut most) = (0i32, 1usize, 0usize);
-    for ch in params.chars() {
-        match ch {
-            '[' | '{' => depth += 1,
-            ']' | '}' => depth -= 1,
-            ',' if depth == 0 => n += 1,
-            '|' if depth == 0 => {
-                most = most.max(n);
-                n = 1;
-            }
-            _ => {}
-        }
-    }
-    most.max(n)
+/// (S2) meshes and vectors as host objects, meshes freed during the run, the language services' warnings
+fn host_objects(c: &mut Ctx) {
+    // a mesh: its type, its text, the property tris, identity; nothing of it changes, the map's methods and fields
+    // are not its, and a wrong member names what there is
+    let src = "let m = geom.box(2, 1, 1)\nassert(type(m) == \"mesh\" && str(m) == \"mesh(12 Dreiecke)\" && m.tris == 12, \"mesh\")\nassert(m == m && m != m.move(0, 0, 0) && [m].contains(m), \"identity\")\nlet e = []\nfor f in [fn() { m.tris = 3 }, fn() { m.keys() }, fn() { m.tris() }, fn() { m.move }, fn() { m.mesh }] {\n  try { f() } catch x { e.push(x) }\n}\nprint(e.join(\"|\"))\nmodel.add(m)\n";
+    let (r, text) = script_run(src, &[]);
+    let got: Vec<&str> = r.output.trim_end().split('|').collect();
+    let want = [
+        "mesh.tris ist nur lesbar: ein mesh ändert sich nie; jede Methode gibt ein neues",
+        "mesh hat keine Methode keys (es gibt: move, place, center, rotate_x, rotate_y, rotate_z, rotate, scale, mirror, flip, weld, array, radial, flat, smooth, bevel, bounds, area, volume, check)",
+        "tris ist eine Eigenschaft von mesh, keine Methode – ohne Klammern: .tris",
+        "move ist eine Methode von mesh, keine Eigenschaft – mit Klammern: move(..)",
+        "mesh hat keine Eigenschaft mesh (es gibt: tris)",
+    ];
+    c.check(r.ok() && got == want, || format!("mesh object: {text} {:?}", got));
+    // the language services saw the same members: warnings with their lines, before the run's
+    let lines: Vec<(u32, u32)> = r.warnings.iter().map(|w| (w.line, w.col)).collect();
+    c.check(lines == [(5, 20), (5, 41), (5, 60), (5, 79), (5, 96)], || format!("mesh members: {:?}", r.warnings));
+    // a vec: made from three numbers or a list, x / y / z, + - between vectors, * / with a number, the minus, ==
+    // by the numbers; its methods; vec.* on vecs and lists (a list of 2 stays a list); every point and vector of
+    // the host takes it
+    let src = concat!(
+        "let v = vec(1, 2, 3)\n",
+        "let w = vec([4, 5, 6])\n",
+        "assert(type(v) == \"vec\" && v.x == 1 && v.y == 2 && v.z == 3 && str(v) == \"vec(1.0, 2.0, 3.0)\", \"vec\")\n",
+        "assert(v + w == vec(5, 7, 9) && w - v == vec(3, 3, 3) && v * 2 == vec(2, 4, 6) && 2 * v == v * 2 && v / 2 == vec(0.5, 1, 1.5) && -v == vec(-1, -2, -3), \"operators\")\n",
+        "assert(v == vec(1.0, 2.0, 3.0) && v != w && [w].contains(vec(4, 5, 6)) && vec(v) == v, \"equal\")\n",
+        "assert(v.dot(w) == 32 && v.cross(w) == vec(-3, 6, -3) && vec(3, 4, 0).length() == 5 && vec(0, 0, 2).normalized() == vec(0, 0, 1) && v.distance(v + vec(0, 3, 4)) == 5 && v.lerp(w, 0.5) == vec(2.5, 3.5, 4.5) && v.dot([0, 1, 0]) == 2, \"methods\")\n",
+        "assert(vec.add(v, [1, 1, 1]) == vec(2, 3, 4) && vec.sub([1, 2, 3], [1, 1, 1]) == vec(0, 1, 2) && type(vec.add([1, 2], [3, 4])) == \"list\" && vec.add([1, 2], [3, 4])[1] == 6 && vec.len(v - v) == 0 && vec.norm(w).length() == vec.len(vec.norm([4, 5, 6])), \"vec.*\")\n",
+        "let m = geom.box(1, 1, 1)\n",
+        "assert(m.move(v).bounds().min == m.move(1, 2, 3).bounds().min && m.move([1, 2, 3]).bounds().max == vec(1.5, 3, 3.5), \"move\")\n",
+        "assert(m.bounds().size == vec(1, 1, 1) && m.bounds().center == vec(0, 0.5, 0), \"bounds\")\n",
+        "let e = []\n",
+        "for f in [fn() { v.x = 5 }, fn() { v[0] }, fn() { v * v }, fn() { v / 0 }, fn() { v + [1, 2, 3] }, fn() { vec(1, 2) }, fn() { vec(0, 0, 0).normalized() }, fn() { v.q }, fn() { m.move([1, 2]) }, fn() { m.move(1, 2) }, fn() { vec(1e300, 0, 0) * 1e10 }] {\n",
+        "  try { f() } catch x { e.push(x) }\n",
+        "}\n",
+        "print(e.join(\"|\"))\n",
+        "model.add(geom.sweep(profile.circle(0.1, 8), [vec(0, 0, 0), [1, 0, 0], vec(1, 1, 0)]).rotate(30, vec(0, 1, 0)).scale(vec(1, 2, 1)).array(2, vec(3, 0, 0)).place(v))\n",
+        "model.expect_size(vec(1, 1, 1), 10)\n",
+    );
+    let (r, text) = script_run(src, &[]);
+    let got: Vec<&str> = r.output.trim_end().split('|').collect();
+    let want = [
+        "vec.x ist nur lesbar: ein vec ändert sich nie; einen neuen macht vec(x, y, z)",
+        "vec lässt sich nicht indizieren",
+        "Der Operator * passt nicht zu vec und vec",
+        "vec / int: das Ergebnis ist keine endliche Zahl (geteilt durch 0 oder zu groß)",
+        "Der Operator + passt nicht zu vec und list",
+        "vec: z muss eine Zahl sein, nicht nil",
+        "normalized(): ein Nullvektor hat keine Richtung",
+        "vec hat keine Eigenschaft q (es gibt: x, y, z)",
+        "move(): die Verschiebung muss ein vec oder eine Liste aus 3 Zahlen sein, nicht list [1, 2]",
+        "move(): die Verschiebung muss eine Zahl sein, nicht nil",
+        "vec * float: das Ergebnis ist keine endliche Zahl (geteilt durch 0 oder zu groß)",
+    ];
+    c.check(r.ok() && got == want, || format!("vec: {text} {:?}", got));
+    c.check(r.model.expects.first().is_some_and(|e| e.size == [1.0, 1.0, 1.0] && e.tolerance == 10.0), || "expect_size(vec)".into());
+    // meshes the script no longer holds are freed during the run, but never a part's, and an id freed and used
+    // again is another mesh; the triangle limit counts every mesh made (above: m.array in a loop)
+    let src = "let keep = geom.box(1, 2, 3)\nfor i in 0..20000 { let t = geom.box(1, 1, 1) }\nassert(keep.bounds().size == vec(1, 2, 3), \"keep\")\nfor i in 0..200 { model.add(geom.box(1, 1, 1).move(i, 0, 0)) }\nfor i in 0..20000 { let t = geom.box(1, 1, 1) }\n";
+    let (r, text) = script_run(src, &[]);
+    let min_x = |i: usize| r.model.parts.get(i).and_then(|p| p.mesh.bounds()).map_or(f64::NAN, |b| b.min.x);
+    c.check(r.ok() && r.meshes == 40_401 && r.meshes_peak < 10_000 && r.model.parts.len() == 200, || format!("drops: {text} made {} peak {}", r.meshes, r.meshes_peak));
+    c.check(min_x(0) == -0.5 && min_x(199) == 198.5 && r.model.parts.iter().all(|p| p.mesh.triangle_count() == 12), || format!("drops: parts {} .. {}", min_x(0), min_x(199)));
+    // the language services' warnings (ls::check with host::api): a member a mesh does not have, a name of a
+    // namespace that is not there, a division of two ints, in the script and in a module; before the run's
+    let src = "let m = geom.box(1, 1, 1)\nif false {\n  m.mov(1, 0, 0)\n  print(m.trs, vec.ad([1, 2, 3], [0, 0, 0]))\n}\nlet k = 7 / 2\nlet t = import(\"lib/warnt.jfs\")\nmodel.add(m.move(k, 0, 0))\nmodel.name(\"A\")\nmodel.name(\"B\")\n";
+    let (r, text) = script_run(src, &[]);
+    let got: Vec<String> = r.warnings.iter().map(|w| format!("{}:{}:{}: {}", w.file, w.line, w.col, w.msg)).collect();
+    let want = [
+        "test.jfs:3:5: mesh hat keine Methode mov – meinst du move?",
+        "test.jfs:4:11: mesh hat keine Eigenschaft trs – meinst du tris?",
+        "test.jfs:4:20: Unbekannter Name vec.ad – meinst du vec.add?",
+        "test.jfs:6:9: Ganzzahlige Division: 7 / 2 schneidet ab (7 / 2 ist 3) – float(7) / 2 rechnet mit Komma, int(7 / 2) schneidet ausdrücklich ab",
+        "lib/warnt.jfs:2:28: mesh hat keine Methode flatt – meinst du flat?",
+        "test.jfs:10:7: model.name: \"B\" ersetzt den Namen \"A\" aus test.jfs:9",
+    ];
+    c.check(r.ok() && got == want, || format!("ls warnings: {text} {:#?}", got));
+    c.check(json_has(&r, "{\"file\": \"lib/warnt.jfs\", \"line\": 2, \"col\": 28, \"message\": \"mesh hat keine Methode flatt"), || "ls warning in the report".into());
 }
 
 fn script(c: &mut Ctx) {
@@ -725,7 +785,7 @@ fn script(c: &mut Ctx) {
         ("let a = geom.box(1, -2, 1)\nmodel.add(a)\n", "test.jfs:1:", "geom.box: die Höhe muss eine Zahl größer 0 sein, nicht -2"),
         ("let a = 1\nlet b = geom.box(\"x\", 1, 1)\n", "test.jfs:2:", "geom.box: w muss eine Zahl sein, nicht str \"x\""),
         ("let a = 1\n\nmodel.add(boks(1, 1, 1))\n", "test.jfs:3:", "Unbekannter Name boks"),
-        ("let m = geom.box(1, 1, 1)\nmodel.add(m.spin(3))\n", "test.jfs:2:", "Ein Mesh hat keine Methode spin"),
+        ("let m = geom.box(1, 1, 1)\nmodel.add(m.spin(3))\n", "test.jfs:2:", "mesh hat keine Methode spin (es gibt: move, place, center,"),
         ("model.add(geom.box(1, 1, 1), \"plastik\")\n", "test.jfs:1:", "das Material \"plastik\" gibt es nicht"),
         ("let p = geom.extrude([[0, 0], [2, 2], [2, 0], [0, 1]], 1)\n", "test.jfs:1:", "schneiden sich"),
         ("let x = 1\n", "test.jfs: Fehler: Das Skript hat dem Modell nichts hinzugefügt", ""),
@@ -810,27 +870,56 @@ fn script(c: &mut Ctx) {
             && json_has(&r, "\"warnings_dropped\": 99"),
         || format!("many warnings: {text} {} kept, {} dropped, {:?}", r.warnings.len(), r.warnings_dropped, console.last()),
     );
-    // the names of --api are English (decision G9.3), the German ones are gone; every function with a fixed number of
-    // parameters has its most arguments (for the warning), at least as many as --api lists
-    let api = crate::host::api_text();
-    for want in ["geom.box(w, h, d)", "geom.cone(r, h, segments = 32, r_top = 0)", "geom.sphere(r, segments = 32, rings = segments / 2)", "geom.sweep(profile, path, closed = false, smooth = 30)", "m.bevel(width, segments = 1, axis = nil)", "m.radial(count, step = 360 / count)", "profile.arc(r, start, end, n = 16)", "model.budget(triangles)", "model.expect_size(x, y, z, tolerance = 0.001 | [x, y, z], tolerance)", "model.uv_scale(meters = 1)"] {
-        c.check(api.contains(want), || format!("--api lacks {want}"));
+    // the description (host::api) is whole (no unknown type, no name twice); its names are English (decision G9.3),
+    // the German ones are gone; --api is made from it; only merge and the Boolean operations take any number of
+    // arguments, every other function and method reads at most its parameters (the warning about extra ones)
+    let api = crate::host::api();
+    c.check(api.validate().is_empty(), || format!("api: {:?}", api.validate()));
+    let text = crate::host::api_text();
+    for want in [
+        "geom.box(w: float, h: float, d: float): mesh",
+        "geom.cone(r: float, h: float, segments: int = 32, r_top: float = 0): mesh",
+        "geom.sphere(r: float, segments: int = 32, rings: int = segments / 2): mesh",
+        "geom.sweep(profile: list, path: list, closed: bool = false, smooth: float = 30): mesh",
+        "geom.difference(m: mesh, ...cuts: mesh): mesh",
+        "m.bevel(width: float, segments: int = 1, axis: str = nil): mesh",
+        "m.radial(count: int, step: float = 360 / count): mesh",
+        "m.tris: int, nur lesbar",
+        "profile.arc(r: float, start: float, end: float, n: int = 16): list",
+        "model.budget(triangles: int): nil",
+        "model.expect_size(x: float, y: float, z: float, tolerance: float = 0.001): nil",
+        "vec(x: float, y: float, z: float): vec",
+        "v.x: float, nur lesbar",
+        "v.normalized(): vec",
+        "float * vec: vec",
+        "-vec: vec",
+        "Materialien: grau, weiss",
+    ] {
+        c.check(text.contains(want), || format!("--api lacks {want}"));
     }
-    let german = ["segmente", "r_oben", "ringe", "seiten", "stufen", "staerke", "profil,", "tiefe", "grundriss", "pfad", "geschlossen", "glatt", "grad", "toleranz", "anzahl", "schritt", "breite", "achse", "dreiecke", "meter =", "von", "bis", "abzug", "b, h"];
-    for e in crate::host::API {
-        let old: Vec<&&str> = german.iter().filter(|g| e.params.contains(**g)).collect();
-        c.check(old.is_empty(), || format!("--api: {}({}) has German names {:?}", e.name, e.params, old));
-        let variadic = matches!(e.name, "geom.merge" | "geom.union" | "geom.difference" | "geom.intersection" | "m.tris" | "params");
-        let max = crate::host::max_args(e.name);
-        let listed = listed_args(e.params);
-        c.check(max.is_none() == variadic && max.is_none_or(|m| listed <= m), || format!("max_args({}) = {:?}, --api lists {}", e.name, max, listed));
+    let german = ["segmente", "r_oben", "ringe", "seiten", "stufen", "staerke", "profil", "tiefe", "grundriss", "pfad", "geschlossen", "glatt", "grad", "toleranz", "anzahl", "schritt", "breite", "hoehe", "achse", "dreiecke", "meter", "von", "bis", "abzug", "abzug1"];
+    let mut sigs: Vec<(String, &script::api::Sig)> = api.globals.iter().filter_map(|g| match &g.kind {
+        script::api::GlobalKind::Func(s) => Some((g.name.clone(), s)),
+        _ => None,
+    }).collect();
+    for t in &api.types {
+        sigs.extend(t.methods.iter().map(|m| (format!("{}.{}", t.name, m.name), &m.sig)));
     }
-    // queries
+    c.check(sigs.len() == 65, || format!("{} functions and methods", sigs.len()));
+    for (name, sig) in &sigs {
+        let params = sig.params.iter().map(|p| p.name.as_str()).collect::<Vec<_>>().join(", ");
+        let old: Vec<&&str> = german.iter().filter(|g| sig.params.iter().any(|p| p.name == **g)).collect();
+        c.check(old.is_empty(), || format!("--api: {}({}) has German names {:?}", name, params, old));
+        let variadic = matches!(name.as_str(), "geom.merge" | "geom.union" | "geom.difference" | "geom.intersection");
+        c.check(crate::host::max_args(sig).is_none() == variadic, || format!("max_args({}) = {:?}", name, crate::host::max_args(sig)));
+    }
+    // queries (since S2 the points of bounds are vecs, as is the result of vec.* in 3D)
     let (r, text) = script_run(
-        "let m = geom.box(2, 1, 1)\nlet b = m.bounds()\nassert(b.size[0] == 2 && b.max[1] == 1, \"bounds\")\nassert(m.area() == 10 && m.volume() == 2, \"area\")\nassert(m.check().closed && m.tris == 12, \"check\")\nassert(vec.len([3, 4]) == 5 && vec.cross([1, 0, 0], [0, 1, 0])[2] == 1, \"vec\")\nassert(profile.area(profile.rect(2, 3)) == 6, \"profile\")\nmodel.add(m.place(0, 1, 0).center().weld().smooth(45).flat())\n",
+        "let m = geom.box(2, 1, 1)\nlet b = m.bounds()\nassert(b.size.x == 2 && b.max.y == 1, \"bounds\")\nassert(m.area() == 10 && m.volume() == 2, \"area\")\nassert(m.check().closed && m.tris == 12, \"check\")\nassert(vec.len([3, 4]) == 5 && vec.cross([1, 0, 0], [0, 1, 0]).z == 1, \"vec\")\nassert(profile.area(profile.rect(2, 3)) == 6, \"profile\")\nmodel.add(m.place(0, 1, 0).center().weld().smooth(45).flat())\n",
         &[],
     );
     c.check(r.ok(), || format!("queries: {text}"));
+    host_objects(c);
     // Boolean operations and bevels from a script: a wall with a window (a ring: Euler 0), the result turned and
     // cut again (its cells go along), a rounded block
     let (r, text) = script_run(

@@ -1,7 +1,7 @@
 {
   "tool": "modeltool 0.1.0",
   "script": "turm.jfs",
-  "key": "55fa80dda10e8aa0eb2ede135b0c76a0",
+  "key": "3e2e168d0406fae5708136c63f871901",
   "ok": true,
   "errors": [],
   "warnings": [],
@@ -61,5 +61,5 @@
   "imports": [],
   "files": {"report": "report.json", "glb": "model.glb", "sheet": "sheet.png", "front": "front.png", "side": "side.png", "top": "top.png", "iso": "iso.png"},
   "views": {"images": true, "size": 512, "grid_on": true, "grid": 1, "sheet": "front | side over top | iso", "cameras": "front: from +Z; side: from +X; top: from +Y, front at the bottom; the three at one scale; iso: from front right above", "adapter": "NVIDIA GeForce RTX 2070 SUPER"},
-  "timing": {"script_ms": 1.491, "geometry_ms": 329.643, "checks_ms": 4.217, "render_ms": 292.484, "export_ms": 0.533, "total_ms": 657.119, "fuel": 9485}
+  "timing": {"script_ms": 1.155, "geometry_ms": 207.095, "checks_ms": 2.721, "render_ms": 182.913, "export_ms": 0.398, "total_ms": 411.484, "fuel": 9485, "meshes": 33, "meshes_peak": 33}
 }
