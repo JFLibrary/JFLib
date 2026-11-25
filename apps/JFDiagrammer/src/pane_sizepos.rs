@@ -5,8 +5,9 @@
 //                            places on the frame or Benutzerdefiniert); 1D: Anfang X/Y, Ende X/Y,
 //                            Länge, Winkel
 //   parse(text, metric)      what was typed: a number with the region's decimal sign or a dot,
-//                            optionally a unit (mm, cm, m, in or ", pt, ft; deg or ° for angles);
-//                            without one the page's unit (mm metric, in US)
+//                            optionally a unit (mm, cm, m, in or ", pt, ft; since JD15 also km,
+//                            yd, mi, p / pc / pica, c / cicero, dd / didot, PG-07; deg or ° for
+//                            angles); without one the page's unit (mm metric, in US)
 //
 // A field shows the cell's value while it does not have the keyboard; typing edits a copy, Enter
 // or leaving the field writes it (one undo step "Größe und Position"), Esc or a value that does
@@ -69,21 +70,21 @@ pub(crate) fn parse(text: &str, angle: bool, metric: bool) -> Option<(f64, Unit)
         "in" | "\"" | "zoll" => Unit::Inches,
         "pt" => Unit::Points,
         "ft" | "'" => Unit::Feet,
+        // (JD15, PG-07) the other lengths of Visio's list
+        "km" => Unit::Kilometers,
+        "yd" => Unit::Yards,
+        "mi" => Unit::Miles,
+        "p" | "pc" | "pica" => Unit::Picas,
+        "c" | "cicero" => Unit::Ciceros,
+        "dd" | "didot" => Unit::Didots,
         _ => return None,
     };
     Some((v, unit))
 }
 
-// a value in inches to inches of `unit`
+// a value in `unit` to inches
 fn to_inches(v: f64, unit: Unit) -> f64 {
-    v * match unit {
-        Unit::Millimeters => 1.0 / 25.4,
-        Unit::Centimeters => 1.0 / 2.54,
-        Unit::Meters => 1000.0 / 25.4,
-        Unit::Points => 1.0 / 72.0,
-        Unit::Feet => 12.0,
-        _ => 1.0,
-    }
+    unit.to_internal(v)
 }
 
 // a length (inches) in the page's unit, as the status bar shows it

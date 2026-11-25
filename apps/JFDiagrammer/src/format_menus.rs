@@ -111,8 +111,9 @@ pub(crate) fn set_color(app: &mut Diagrammer, ui: &mut Ui, target: Target, formu
 const WEIGHTS: [(f64, &str); 9] = [(0.25, "¼ pt"), (0.5, "½ pt"), (0.75, "¾ pt"), (1.0, "1 pt"), (1.5, "1½ pt"), (2.25, "2¼ pt"), (3.0, "3 pt"), (4.5, "4½ pt"), (6.0, "6 pt")];
 /// Visio's line patterns with a picture in text: (pattern, picture)
 pub(crate) const DASHES: [(u32, &str); 8] = [(1, "———————"), (2, "– – – – –"), (3, "· · · · · · ·"), (4, "— · — · —"), (5, "— · · — · ·"), (9, "——  ——  ——"), (10, "- - - - - - -"), (16, "—   —   —   —")];
-/// line ends offered at once: (begin, end, picture)
-pub(crate) const ARROWS: [(u32, u32, &str); 10] = [
+/// line ends offered at once: (begin, end, picture); (JD15, RS-21) 13 as Visio's, the last
+/// three the begin-only forms of 4, 1 and 20
+pub(crate) const ARROWS: [(u32, u32, &str); 13] = [
     (0, 0, "————"),
     (0, 13, "———→"),
     (13, 0, "←———"),
@@ -123,6 +124,9 @@ pub(crate) const ARROWS: [(u32, u32, &str); 10] = [
     (1, 1, "<——>  1"),
     (0, 20, "———•"),
     (20, 20, "•——•"),
+    (4, 0, "←———  4"),
+    (1, 0, "<———  1"),
+    (20, 0, "•———"),
 ];
 
 /// a flyout of the ribbon this module fills -> handled

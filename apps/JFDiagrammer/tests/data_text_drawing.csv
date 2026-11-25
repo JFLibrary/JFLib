@@ -1,0 +1,16 @@
+; Testdatei für Daten › Zeichnung aus Text (IM-08, data_text_drawing.uis): ein Organigramm
+;Shape,ID,Master,Text,X,Y,Width,Height,Kosten,Raum
+Shape,CHEF,Rechteck,Geschäftsleitung,,,,,1200,A 1.01
+Shape,EINKAUF,Rechteck,Einkauf,,,,,800,A 1.02
+Shape,TECHNIK,Rechteck,"Technik
+und Entwicklung",,,,,950,B 2.01
+Shape,WERKSTATT,Ellipse,Werkstatt,,,,,400,C 0.10
+Shape,LABOR,Ellipse,Labor,,,,,Leitung=Dr. Muster,B 2.14
+Shape,ARCHIV,,Archiv,250,40,40,20
+;Link,ID,Master,Text,From,To
+Link,L1,,,CHEF,EINKAUF
+Link,L2,,leitet,CHEF,TECHNIK
+Link,L3,,,TECHNIK,WERKSTATT
+Link,L4,,,TECHNIK,LABOR
+Link,L5,,,LABOR,NIRGENDWO
+Kreis,K1,,Unbekannte Art

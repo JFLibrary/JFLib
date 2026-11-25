@@ -1,0 +1,79 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD15: context menus -- Shape-Name in the shape's menu (SP-01: Name and Name
+# universell, one undo step, a name another shape has is refused; derived names stay "Sheet.n");
+# Bahn davor / danach einfügen in a lane's menu only (ST-05); the task pane Shape-Daten has a menu
+# of its own (AB-03: Shape-Daten definieren)
+cmd 4404
+drag 500,330 640,420
+drag 820,430 960,520
+cmd 4400
+# Shape-Name: the shown names, typed over
+rclick listitem:"Sheet.4"
+click menuitem:"Shape-Name"
+move 900,700
+expect dialog:"Shape-Name" exists
+expect #2031091713 text "Sheet.4"
+expect #2031091714 text "Sheet.4"
+type "Prozess A"
+click #2031091714
+key ctrl+a
+type "Process A"
+click button:"OK"
+expect dialog:"Shape-Name" missing
+expect listitem:"Prozess A" exists
+expect listitem:"Sheet.4" missing
+key ctrl+z
+expect listitem:"Sheet.4" exists
+key ctrl+y
+expect listitem:"Prozess A" exists
+# the other shape may not take the name
+rclick listitem:"Sheet.5"
+click menuitem:"Shape-Name"
+move 900,700
+type "prozess a"
+click button:"OK"
+expect dialog:"Shape-Name" exists
+expect text:"Ein anderes Shape der Seite hat diesen Namen schon." exists
+click button:"Abbrechen"
+expect listitem:"Sheet.5" exists
+# Shape-Daten: a right click in the pane opens its menu
+cmd 5139
+click listitem:"Sheet.5"
+rclick 1135,500
+expect menuitem:"Shape-Daten definieren" exists
+click menuitem:"Shape-Daten definieren"
+move 900,700
+expect dialog:"Shape-Daten definieren" exists
+click button:"Abbrechen"
+cmd 5139
+# a cross-functional flowchart: the lanes' menu has Bahn davor / danach einfügen, a shape's not
+key ctrl+a
+key delete
+cmd 5424
+cmd 4404
+drag 600,510 680,550
+cmd 4400
+rclick 640,525
+expect menuitem:"Shape-Name" exists
+expect menuitem:"Bahn davor einfügen" missing
+key esc
+# before the upper lane: the new lane on top (selected), the others and the shape down
+rclick 525,430
+expect menuitem:"Bahn davor einfügen" exists
+expect menuitem:"Bahn danach einfügen" exists
+click menuitem:"Bahn davor einfügen"
+move 900,700
+expect listitem:"Titel" rect 518 334 502 347
+expect #1359341195 selected
+expect #1359341195 rect 518 380 502 100
+expect #1372675387 rect 518 480 502 101
+expect #1405578773 rect 518 581 502 100
+expect listitem:"Sheet.12" rect 601 600 75 51
+# after the old upper lane (now the second): the new lane third, the lower lane and its shape down
+rclick 525,530
+click menuitem:"Bahn danach einfügen"
+move 900,700
+expect #1393500605 selected
+expect #1393500605 rect 518 581 502 100
+expect #1372675387 rect 518 480 502 101
+expect listitem:"Sheet.12" rect 601 701 75 *

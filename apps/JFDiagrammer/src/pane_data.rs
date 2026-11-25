@@ -13,6 +13,8 @@
 //                              value, prompt, sort key, ask on drop, invisible; new, delete.
 //                              OK writes them to every selected shape (one undo step).
 //   define_dialog(app, ui)     every pass
+//   (JD15, AB-03) a right click in the pane opens its menu: Shape-Daten definieren, the pane
+//                              off (Shape-Datensätze come with JD18)
 //
 // Visio's cells (the Property section; names and codes are Visio's for the file's sake): Label,
 // Prompt, Type (0 text, 1 fixed list, 2 number, 3 Boolean, 4 variable list, 5 date, 6 duration,
@@ -34,6 +36,9 @@ use ui::*;
 use crate::{edit_canvas, edit_doc, Diagrammer};
 
 const ID_DLG: u32 = 0x5C10_0000;
+
+// (JD15, AB-03) the pane's context menu
+static DATA_MENU: [Mi; 3] = [Mi::Cmd(crate::commands::SHAPE_DATA_DEFINE), Mi::Sep, Mi::Cmd(crate::commands::PANE_DATA)];
 
 // i18n
 const TYPES: [&str; 8] = ["Zeichenfolge", "Feste Liste", "Zahl", "Boolesch", "Variable Liste", "Datum", "Dauer", "Währung"];
@@ -82,7 +87,7 @@ struct Field {
 }
 
 // a value as text: a text as it is, a number with the region's decimal sign
-fn value_text(doc: &Document, v: Value) -> String {
+pub(crate) fn value_text(doc: &Document, v: Value) -> String {
     match v {
         Value::Text(s) => String::from(doc.str(s)),
         Value::Num(x) => {
@@ -196,7 +201,8 @@ pub(crate) fn pane(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
             3 => {
                 let mut v = f.flag as i32;
                 if ui.checkbox(fid, &f.label, &mut v) & EV_ACT != 0 {
-                    change = Some((f.name.clone(), 3, Input::Formula(if v != 0 { "TRUE" } else { "FALSE" }), String::new()));
+                    // (JD18) the text carries the value: set_value writes formula_for(kind, text)
+                    change = Some((f.name.clone(), 3, Input::Formula(""), String::from(if v != 0 { "TRUE" } else { "FALSE" })));
                 }
             }
             1 => {
@@ -251,13 +257,21 @@ pub(crate) fn pane(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
         }
     }
     ui.scroll_end();
+    // (JD15, AB-03) a right click in the pane that no field took: the pane's menu
+    let area = ui.last_rect();
+    if ui.released() & (1 << BTN_RIGHT) != 0 && ui.popup_count() == 0 {
+        let (mx, my) = ui.mouse();
+        if mx >= area[0] && mx < area[0] + area[2] && my >= area[1] && my < area[1] + area[3] {
+            ui.menu_popup(i18n::menu(&DATA_MENU));
+        }
+    }
     if let Some((name, kind, input, text)) = change {
         set_value(app, ui, &shapes, &name, kind, input, &text);
     }
 }
 
 // a value typed for a field of type `kind` as a formula
-fn formula_for(kind: i32, text: &str) -> String {
+pub(crate) fn formula_for(kind: i32, text: &str) -> String {
     let t = text.trim();
     let number = t.replace(',', ".");
     match kind {
@@ -289,6 +303,8 @@ fn set_value(app: &mut Diagrammer, ui: &mut Ui, shapes: &[ShapeRef], name: &str,
                 Ok(_) | Err(EditError::Guarded) => {}
                 Err(e) => return Err(e),
             }
+            // (JD18, DA-05) a linked value the user changed stays the user's at a refresh
+            diagram_core::data::user_edited(tx, sheet, name)?;
         }
         Ok(())
     });
@@ -513,6 +529,10 @@ fn define_apply(app: &mut Diagrammer, ui: &mut Ui) {
                     match res {
                         Ok(_) | Err(EditError::Guarded) => {}
                         Err(e) => return Err(e),
+                    }
+                    // (JD18, DA-05) as in the pane: the user's value now
+                    if has {
+                        diagram_core::data::user_edited(tx, sheet, &name)?;
                     }
                 }
             }

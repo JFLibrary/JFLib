@@ -1,0 +1,364 @@
+# Einführungskurve (SH-030, JD26, in Visio „Einführung…“): die Glockenkurve der Diffusion von
+# Innovationen, geteilt bei -2, -1, 0 und +1 Standardabweichung in die fünf Gruppen Innovatoren,
+# Frühe Adoptoren, Frühe Mehrheit, Späte Mehrheit, Nachzügler.  Jede Gruppe ist eine Fläche unter
+# der Kurve (Teil mit Variantenfarbe 100 bis 104, 1 mm Fuge zur nächsten), die Kurve oben eine
+# Polylinie in Schritten von 0,1 Standardabweichung (exp(-x²/2), im Skript ausgewertet, als
+# Anteile der Kurvenfläche).  Darunter eine Grundlinie (Connector) und die Namen der Gruppen
+# (Text Only) im Band unten; die Fläche der Innovatoren ist für Text zu klein.
+master: Adoption curve
+name.de: Einführungskurve
+name.en: Adoption curve
+name.es: Curva de adopción
+name.it: Curva di adozione
+name.fr: Courbe d'adoption
+prompt.de: Kurve der Markteinführung mit den fünf Gruppen der Käufer von den Innovatoren bis zu den Nachzüglern. Klicken Sie eine Fläche oder einen Text zweimal an, um ihn zu ändern.
+prompt.en: Adoption curve of a market launch with the five groups of buyers from innovators to laggards. Click an area or a text twice to change it.
+prompt.es: Curva de adopción de un lanzamiento con los cinco grupos de compradores, de los innovadores a los rezagados. Haga clic dos veces en un área o un texto para cambiarlo.
+prompt.it: Curva di adozione di un lancio con i cinque gruppi di acquirenti, dagli innovatori ai ritardatari. Fai clic due volte su un'area o un testo per modificarlo.
+prompt.fr: Courbe d'adoption d'un lancement avec les cinq groupes d'acheteurs, des innovateurs aux retardataires. Cliquez deux fois sur une zone ou un texte pour le modifier.
+keywords.de: Einführung, Adoption, Diffusion, Innovatoren, Nachzügler, Markteinführung, Rogers, Glockenkurve
+keywords.en: adoption, diffusion, innovators, early adopters, laggards, launch, Rogers, bell curve
+keywords.es: adopción, difusión, innovadores, rezagados, lanzamiento, Rogers, campana
+keywords.it: adozione, diffusione, innovatori, ritardatari, lancio, Rogers, curva a campana
+keywords.fr: adoption, diffusion, innovateurs, retardataires, lancement, Rogers, courbe en cloche
+
+[Shape]
+Width = 140 mm
+Width.us = 5.5 in
+Height = 60 mm
+Height.us = 2.25 in
+
+[User]
+# das Band unten für die Namen, die Höhe der Kurvenfläche, die Fuge
+MB:  Value = 10 mm
+     Value.us = 0.4 in
+CH:  Value = Height-User.MB
+Gp:  Value = 1 mm
+     Value.us = 0.04 in
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = User.MB+User.CH*0.25; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = User.MB+User.CH*0.05; DirX = 1; DirY = 0
+
+# Gruppe 1: Innovatoren, von -3 bis -2 Standardabweichungen
+[Part G1]
+
+[Shape]
+Width = GUARD(Sheet.1!Width)
+Height = GUARD(Sheet.1!User.CH)
+PinX = GUARD(Width*0.5)
+PinY = GUARD(Sheet.1!User.MB+Height*0.5)
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+
+[Geometry]
+MoveTo  X = Width*0; Y = 0
+LineTo  X = Width*0; Y = Height*0.0106
+LineTo  X = Width*0.0167; Y = Height*0.0142
+LineTo  X = Width*0.0333; Y = Height*0.0188
+LineTo  X = Width*0.05; Y = Height*0.0248
+LineTo  X = Width*0.0667; Y = Height*0.0323
+LineTo  X = Width*0.0833; Y = Height*0.0417
+LineTo  X = Width*0.1; Y = Height*0.0533
+LineTo  X = Width*0.1167; Y = Height*0.0675
+LineTo  X = Width*0.1333; Y = Height*0.0845
+LineTo  X = Width*0.15; Y = Height*0.1047
+LineTo  X = Width*0.1667-Sheet.1!User.Gp*0.5; Y = Height*0.1286
+LineTo  X = Width*0.1667-Sheet.1!User.Gp*0.5; Y = 0
+LineTo  X = Width*0; Y = 0
+
+# Gruppe 2: Frühe Adoptoren, von -2 bis -1 Standardabweichungen
+[Part G2]
+
+[Shape]
+Width = GUARD(Sheet.1!Width)
+Height = GUARD(Sheet.1!User.CH)
+PinX = GUARD(Width*0.5)
+PinY = GUARD(Sheet.1!User.MB+Height*0.5)
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+
+[Geometry]
+MoveTo  X = Width*0.1667+Sheet.1!User.Gp*0.5; Y = 0
+LineTo  X = Width*0.1667+Sheet.1!User.Gp*0.5; Y = Height*0.1286
+LineTo  X = Width*0.1833; Y = Height*0.1563
+LineTo  X = Width*0.2; Y = Height*0.188
+LineTo  X = Width*0.2167; Y = Height*0.224
+LineTo  X = Width*0.2333; Y = Height*0.2641
+LineTo  X = Width*0.25; Y = Height*0.3084
+LineTo  X = Width*0.2667; Y = Height*0.3565
+LineTo  X = Width*0.2833; Y = Height*0.4081
+LineTo  X = Width*0.3; Y = Height*0.4624
+LineTo  X = Width*0.3167; Y = Height*0.5188
+LineTo  X = Width*0.3333-Sheet.1!User.Gp*0.5; Y = Height*0.5762
+LineTo  X = Width*0.3333-Sheet.1!User.Gp*0.5; Y = 0
+LineTo  X = Width*0.1667+Sheet.1!User.Gp*0.5; Y = 0
+
+# Gruppe 3: Frühe Mehrheit, von -1 bis 0 Standardabweichungen
+[Part G3]
+
+[Shape]
+Width = GUARD(Sheet.1!Width)
+Height = GUARD(Sheet.1!User.CH)
+PinX = GUARD(Width*0.5)
+PinY = GUARD(Sheet.1!User.MB+Height*0.5)
+QuickStyleLineColor = 102
+QuickStyleFillColor = 102
+
+[Geometry]
+MoveTo  X = Width*0.3333+Sheet.1!User.Gp*0.5; Y = 0
+LineTo  X = Width*0.3333+Sheet.1!User.Gp*0.5; Y = Height*0.5762
+LineTo  X = Width*0.35; Y = Height*0.6336
+LineTo  X = Width*0.3667; Y = Height*0.6898
+LineTo  X = Width*0.3833; Y = Height*0.7436
+LineTo  X = Width*0.4; Y = Height*0.7935
+LineTo  X = Width*0.4167; Y = Height*0.8384
+LineTo  X = Width*0.4333; Y = Height*0.877
+LineTo  X = Width*0.45; Y = Height*0.9082
+LineTo  X = Width*0.4667; Y = Height*0.9312
+LineTo  X = Width*0.4833; Y = Height*0.9453
+LineTo  X = Width*0.5-Sheet.1!User.Gp*0.5; Y = Height*0.95
+LineTo  X = Width*0.5-Sheet.1!User.Gp*0.5; Y = 0
+LineTo  X = Width*0.3333+Sheet.1!User.Gp*0.5; Y = 0
+
+# Gruppe 4: Späte Mehrheit, von 0 bis 1 Standardabweichungen
+[Part G4]
+
+[Shape]
+Width = GUARD(Sheet.1!Width)
+Height = GUARD(Sheet.1!User.CH)
+PinX = GUARD(Width*0.5)
+PinY = GUARD(Sheet.1!User.MB+Height*0.5)
+QuickStyleLineColor = 103
+QuickStyleFillColor = 103
+
+[Geometry]
+MoveTo  X = Width*0.5+Sheet.1!User.Gp*0.5; Y = 0
+LineTo  X = Width*0.5+Sheet.1!User.Gp*0.5; Y = Height*0.95
+LineTo  X = Width*0.5167; Y = Height*0.9453
+LineTo  X = Width*0.5333; Y = Height*0.9312
+LineTo  X = Width*0.55; Y = Height*0.9082
+LineTo  X = Width*0.5667; Y = Height*0.877
+LineTo  X = Width*0.5833; Y = Height*0.8384
+LineTo  X = Width*0.6; Y = Height*0.7935
+LineTo  X = Width*0.6167; Y = Height*0.7436
+LineTo  X = Width*0.6333; Y = Height*0.6898
+LineTo  X = Width*0.65; Y = Height*0.6336
+LineTo  X = Width*0.6667-Sheet.1!User.Gp*0.5; Y = Height*0.5762
+LineTo  X = Width*0.6667-Sheet.1!User.Gp*0.5; Y = 0
+LineTo  X = Width*0.5+Sheet.1!User.Gp*0.5; Y = 0
+
+# Gruppe 5: Nachzügler, von 1 bis 3 Standardabweichungen
+[Part G5]
+
+[Shape]
+Width = GUARD(Sheet.1!Width)
+Height = GUARD(Sheet.1!User.CH)
+PinX = GUARD(Width*0.5)
+PinY = GUARD(Sheet.1!User.MB+Height*0.5)
+QuickStyleLineColor = 104
+QuickStyleFillColor = 104
+
+[Geometry]
+MoveTo  X = Width*0.6667+Sheet.1!User.Gp*0.5; Y = 0
+LineTo  X = Width*0.6667+Sheet.1!User.Gp*0.5; Y = Height*0.5762
+LineTo  X = Width*0.6833; Y = Height*0.5188
+LineTo  X = Width*0.7; Y = Height*0.4624
+LineTo  X = Width*0.7167; Y = Height*0.4081
+LineTo  X = Width*0.7333; Y = Height*0.3565
+LineTo  X = Width*0.75; Y = Height*0.3084
+LineTo  X = Width*0.7667; Y = Height*0.2641
+LineTo  X = Width*0.7833; Y = Height*0.224
+LineTo  X = Width*0.8; Y = Height*0.188
+LineTo  X = Width*0.8167; Y = Height*0.1563
+LineTo  X = Width*0.8333; Y = Height*0.1286
+LineTo  X = Width*0.85; Y = Height*0.1047
+LineTo  X = Width*0.8667; Y = Height*0.0845
+LineTo  X = Width*0.8833; Y = Height*0.0675
+LineTo  X = Width*0.9; Y = Height*0.0533
+LineTo  X = Width*0.9167; Y = Height*0.0417
+LineTo  X = Width*0.9333; Y = Height*0.0323
+LineTo  X = Width*0.95; Y = Height*0.0248
+LineTo  X = Width*0.9667; Y = Height*0.0188
+LineTo  X = Width*0.9833; Y = Height*0.0142
+LineTo  X = Width*1; Y = Height*0.0106
+LineTo  X = Width*1; Y = 0
+LineTo  X = Width*0.6667+Sheet.1!User.Gp*0.5; Y = 0
+
+# die Grundlinie
+[Part Base]
+style: Connector
+
+[Shape]
+BeginArrow = 0
+EndArrow = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
+QuickStyleType = 3
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = Sheet.1!User.MB
+LineTo  X = Width; Y = Sheet.1!User.MB
+
+# die Namen der Gruppen im Band unten (je 4 mm breiter als die Fläche, damit längere Wörter nicht brechen)
+[Part T1]
+text.de: Innovatoren
+text.en: Innovators
+text.es: Innovadores
+text.it: Innovatori
+text.fr: Innovateurs
+style: Text Only
+
+[Shape]
+Width = GUARD(Sheet.1!Width*0.1667-1 mm)
+Height = GUARD(Sheet.1!User.MB)
+PinX = GUARD(Sheet.1!Width*0.0833)
+PinY = GUARD(Height*0.5)
+LeftMargin = 0.5 mm
+LeftMargin.us = 0.02 in
+RightMargin = 0.5 mm
+RightMargin.us = 0.02 in
+TopMargin = 0.5 mm
+TopMargin.us = 0.02 in
+BottomMargin = 0.5 mm
+BottomMargin.us = 0.02 in
+VerticalAlign = 0
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part T2]
+text.de: Frühe Adoptoren
+text.en: Early adopters
+text.es: Primeros adoptantes
+text.it: Primi utilizzatori
+text.fr: Adopteurs précoces
+style: Text Only
+
+[Shape]
+Width = GUARD(Sheet.1!Width*0.1667-1 mm)
+Height = GUARD(Sheet.1!User.MB)
+PinX = GUARD(Sheet.1!Width*0.25)
+PinY = GUARD(Height*0.5)
+LeftMargin = 0.5 mm
+LeftMargin.us = 0.02 in
+RightMargin = 0.5 mm
+RightMargin.us = 0.02 in
+TopMargin = 0.5 mm
+TopMargin.us = 0.02 in
+BottomMargin = 0.5 mm
+BottomMargin.us = 0.02 in
+VerticalAlign = 0
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part T3]
+text.de: Frühe Mehrheit
+text.en: Early majority
+text.es: Mayoría temprana
+text.it: Maggioranza anticipata
+text.fr: Majorité précoce
+style: Text Only
+
+[Shape]
+Width = GUARD(Sheet.1!Width*0.1667-1 mm)
+Height = GUARD(Sheet.1!User.MB)
+PinX = GUARD(Sheet.1!Width*0.4167)
+PinY = GUARD(Height*0.5)
+LeftMargin = 0.5 mm
+LeftMargin.us = 0.02 in
+RightMargin = 0.5 mm
+RightMargin.us = 0.02 in
+TopMargin = 0.5 mm
+TopMargin.us = 0.02 in
+BottomMargin = 0.5 mm
+BottomMargin.us = 0.02 in
+VerticalAlign = 0
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part T4]
+text.de: Späte Mehrheit
+text.en: Late majority
+text.es: Mayoría tardía
+text.it: Maggioranza tardiva
+text.fr: Majorité tardive
+style: Text Only
+
+[Shape]
+Width = GUARD(Sheet.1!Width*0.1667-1 mm)
+Height = GUARD(Sheet.1!User.MB)
+PinX = GUARD(Sheet.1!Width*0.5833)
+PinY = GUARD(Height*0.5)
+LeftMargin = 0.5 mm
+LeftMargin.us = 0.02 in
+RightMargin = 0.5 mm
+RightMargin.us = 0.02 in
+TopMargin = 0.5 mm
+TopMargin.us = 0.02 in
+BottomMargin = 0.5 mm
+BottomMargin.us = 0.02 in
+VerticalAlign = 0
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part T5]
+text.de: Nachzügler
+text.en: Laggards
+text.es: Rezagados
+text.it: Ritardatari
+text.fr: Retardataires
+style: Text Only
+
+[Shape]
+Width = GUARD(Sheet.1!Width*0.3333+4 mm)
+Height = GUARD(Sheet.1!User.MB)
+PinX = GUARD(Sheet.1!Width*0.8333)
+PinY = GUARD(Height*0.5)
+LeftMargin = 0.5 mm
+LeftMargin.us = 0.02 in
+RightMargin = 0.5 mm
+RightMargin.us = 0.02 in
+TopMargin = 0.5 mm
+TopMargin.us = 0.02 in
+BottomMargin = 0.5 mm
+BottomMargin.us = 0.02 in
+VerticalAlign = 0
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0

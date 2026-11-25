@@ -10,10 +10,15 @@
 //   client     Client::request(...): blocking, timeouts, size limit
 //   tls        TLS 1.3 servers and clients (ChaCha20-Poly1305, AES-GCM; X25519MLKEM768,
 //              X25519, P-256, P-384; Ed25519, ECDSA, RSA keys; SNI, ALPN, mutual auth;
-//              resumption with tickets, 0-RTT where the server allows it) and the TLS 1.2
+//              resumption with tickets, 0-RTT where the server allows it, OCSP stapling) and the TLS 1.2
 //              fallback for public servers: connect / accept -> TlsStream (a Stream)
 //   x509 / der the crate jflib-x509 (re-exported): certificates (parse, build with any key,
-//              verify chains) of a private CA and of the web PKI; PrivateKey (PKCS #8 ...)
+//              verify chains) of a private CA and of the web PKI; PrivateKey (PKCS #8 ...);
+//              OCSP responses and certificate requests
+//   ocsp       a certificate's status from its CA's responder; the stapled responses of a TLS
+//              server kept current (tls::Staples)
+//   acme       certificates from an ACME CA (RFC 8555: Let's Encrypt, ...): accounts, orders,
+//              http-01 / tls-alpn-01 / dns-01, renewal information, revocation
 //   pem        PEM blocks
 //   roots      the system's certificate authorities (Windows: CryptoAPI; Linux: the bundle)
 //   ssh        SSH-2 client (curve25519, ssh-ed25519, chacha20-poly1305): run commands with
@@ -33,9 +38,11 @@
 
 extern crate alloc;
 
+pub mod acme;
 pub mod client;
 pub mod dns;
 pub mod http;
+pub mod ocsp;
 pub mod pem;
 pub mod roots;
 pub mod server;

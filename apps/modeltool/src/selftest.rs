@@ -673,6 +673,7 @@ fn script_run(src: &str, params: &[(&str, &str)]) -> (run::Run, String) {
         match p {
             "lib/teil.jfs" => Ok(String::from("fn wuerfel(a) { return geom.box(a, a, a) }\nlet _privat = 1\n")),
             "lib/kaputt.jfs" => Ok(String::from("let x = 1\nlet y = geom.box(1, 0, 1)\n")),
+            "lib/regel.jfs" => Ok(String::from("fn regel() {\n  model.expect_size(nil, 1, nil)\n}\n")),
             _ => Err(String::from("die Datei gibt es nicht")),
         }
     };
@@ -680,6 +681,33 @@ fn script_run(src: &str, params: &[(&str, &str)]) -> (run::Run, String) {
     let sources = vec![(String::from("test.jfs"), String::from(src))];
     let text: String = r.problems.iter().map(|p| run::format_problem(p, &sources)).collect();
     (r, text)
+}
+
+/// whether the report of a run (without the model's measurements) has this text
+fn json_has(r: &run::Run, s: &str) -> bool {
+    crate::json::write(&run::report(r, None, None, None)).contains(s)
+}
+
+/// the most arguments one of --api's parameter lists names: its forms apart at "|", arguments apart at ","
+/// (both outside brackets and braces)
+fn listed_args(params: &str) -> usize {
+    if params.trim().is_empty() {
+        return 0;
+    }
+    let (mut depth, mut n, mut most) = (0i32, 1usize, 0usize);
+    for ch in params.chars() {
+        match ch {
+            '[' | '{' => depth += 1,
+            ']' | '}' => depth -= 1,
+            ',' if depth == 0 => n += 1,
+            '|' if depth == 0 => {
+                most = most.max(n);
+                n = 1;
+            }
+            _ => {}
+        }
+    }
+    most.max(n)
 }
 
 fn script(c: &mut Ctx) {
@@ -695,7 +723,7 @@ fn script(c: &mut Ctx) {
     // the messages name the file, line and column, show the line and point at it
     let cases: [(&str, &str, &str); 12] = [
         ("let a = geom.box(1, -2, 1)\nmodel.add(a)\n", "test.jfs:1:", "geom.box: die Höhe muss eine Zahl größer 0 sein, nicht -2"),
-        ("let a = 1\nlet b = geom.box(\"x\", 1, 1)\n", "test.jfs:2:", "geom.box: b muss eine Zahl sein, nicht str \"x\""),
+        ("let a = 1\nlet b = geom.box(\"x\", 1, 1)\n", "test.jfs:2:", "geom.box: w muss eine Zahl sein, nicht str \"x\""),
         ("let a = 1\n\nmodel.add(boks(1, 1, 1))\n", "test.jfs:3:", "Unbekannter Name boks"),
         ("let m = geom.box(1, 1, 1)\nmodel.add(m.spin(3))\n", "test.jfs:2:", "Ein Mesh hat keine Methode spin"),
         ("model.add(geom.box(1, 1, 1), \"plastik\")\n", "test.jfs:1:", "das Material \"plastik\" gibt es nicht"),
@@ -720,11 +748,83 @@ fn script(c: &mut Ctx) {
     // a module and its private names
     let (r, text) = script_run("let t = import(\"lib/teil.jfs\")\nmodel.add(t.wuerfel(2))\nprint(t._privat)\n", &[]);
     c.check(r.ok() && r.imports.len() == 1 && r.output.trim() == "nil", || format!("import: {text} output {:?}", r.output));
-    // expectations and budget that fail are findings, not errors
+    // expectations and budget that fail are findings, not errors; each names the line of its rule, and the report's
+    // rules carry their file and line
     let (r, _) = script_run("model.add(geom.box(1, 1, 1))\nmodel.expect_size(1, 2, 1)\nmodel.budget(4)\n", &[]);
     let a = run::analyse(&r.model);
     let f = run::findings(&r.model, &a);
     c.check(r.ok() && !a.ok() && a.within_budget == Some(false) && f.len() == 2, || format!("findings: {:?}", f));
+    c.check(
+        f.len() == 2 && f[0].starts_with("test.jfs:2: Maße 1 x 2 x 1 m erwartet (Toleranz 0.001), sind 1 x 1 x 1 m") && f[1] == "test.jfs:3: über dem Budget: 12 Dreiecke, erlaubt 4",
+        || format!("findings with lines: {:?}", f),
+    );
+    let rep = crate::json::write(&run::report(&r, Some(&a), None, None));
+    c.check(
+        rep.contains("{\"rule\": \"size\", \"file\": \"test.jfs\", \"line\": 2, \"expected\": [1, 2, 1]")
+            && rep.contains("{\"rule\": \"budget\", \"file\": \"test.jfs\", \"line\": 3, \"expected\": 4, \"actual\": 12, \"ok\": false}"),
+        || format!("rules in the report: {rep}"),
+    );
+    // a rule in a module: the module's path and line
+    let (r, text) = script_run("let r = import(\"lib/regel.jfs\")\nmodel.add(geom.box(1, 2, 1))\nr.regel()\n", &[]);
+    let f = run::findings(&r.model, &run::analyse(&r.model));
+    c.check(r.ok() && f.first().is_some_and(|s| s.starts_with("lib/regel.jfs:2: Maße beliebig x 1 x beliebig m erwartet")), || format!("rule in a module: {text} {:?}", f));
+    // warnings (cx.warn): the script goes on; each with the file, line and column of the call (the column of the
+    // called name, as errors have it), on the console like an error, in the report; a warning before an error stays
+    let src = "model.name(\"A\")\nmodel.add(geom.box(1, 1, 1, 9))\nmodel.name(\"B\")\nmodel.budget(100)\nmodel.budget(200)\nmodel.uv_scale(2)\nmodel.uv_scale(0.5)\nmodel.material(\"m\", {color: \"#ff0000\"})\nmodel.material(\"m\", {color: \"#00ff00\"})\nmodel.add(geom.sweep(profile.rect(0.1, 0.1), [[0, 0, 0], [1, 0, 0], [1, 0, 1], [0, 0, 1]], 1))\nmodel.add(geom.box(1, 1, 1).flat(1), \"m\")\nmodel.name(\"B\")\nmodel.material(\"m\", {color: \"#00ff00\"})\n";
+    let (r, text) = script_run(src, &[]);
+    let lines: Vec<u32> = r.warnings.iter().map(|w| w.line).collect();
+    c.check(r.ok() && lines == [2, 3, 5, 7, 9, 10, 11] && r.warnings.iter().all(|w| w.file == "test.jfs"), || format!("warnings: {text} {:?}", r.warnings));
+    let msgs: Vec<&str> = r.warnings.iter().map(|w| w.msg.as_str()).collect();
+    let want = [
+        "geom.box: 4 Argumente, nimmt aber höchstens 3 (w, h, d); das letzte bleibt unbeachtet",
+        "model.name: \"B\" ersetzt den Namen \"A\" aus test.jfs:1",
+        "model.budget: 200 ersetzt das Budget 100 aus test.jfs:4",
+        "model.uv_scale: 0.5 ersetzt 2 aus test.jfs:6; alle Teile bekommen den letzten Wert",
+        "model.material: das Material \"m\" ist schon in test.jfs:8 anders festgelegt; ab hier gilt das neue, Teile davor behalten das alte",
+        "geom.sweep: closed sollte true oder false sein, nicht int 1 (gilt als true)",
+        "flat(): 1 Argument, nimmt aber keine; es bleibt unbeachtet",
+    ];
+    c.check(msgs == want, || format!("warning texts: {:?}", msgs));
+    let sources = vec![(String::from("test.jfs"), String::from(src))];
+    let console: String = run::format_warnings(&r, &sources).concat();
+    c.check(
+        console.contains("test.jfs:3:7: Warnung: model.name: \"B\" ersetzt den Namen \"A\" aus test.jfs:1\n  3 | model.name(\"B\")\n    |       ^\n")
+            && console.contains("test.jfs:2:16: Warnung: geom.box: 4 Argumente"),
+        || format!("warnings on the console: {console}"),
+    );
+    let rep = crate::json::write(&run::report(&r, Some(&run::analyse(&r.model)), None, None));
+    c.check(
+        rep.contains("\"warnings\": [\n    {\"file\": \"test.jfs\", \"line\": 2, \"col\": 16, \"message\": \"geom.box: 4 Argumente")
+            && rep.contains("{\"file\": \"test.jfs\", \"line\": 3, \"col\": 7, \"message\": \"model.name: \\\"B\\\" ersetzt den Namen \\\"A\\\" aus test.jfs:1\"}")
+            && !rep.contains("warnings_dropped"),
+        || format!("warnings in the report: {rep}"),
+    );
+    let (r, text) = script_run("model.name(\"A\")\nmodel.name(\"B\")\nlet b = geom.box(1, 0, 1)\n", &[]);
+    c.check(!r.ok() && r.warnings.len() == 1 && r.warnings[0].line == 2 && json_has(&r, "\"line\": 2, \"col\": 7"), || format!("warning before an error: {text} {:?}", r.warnings));
+    // more than script::MAX_WARNINGS: the rest counted, the console shows the first ones and how many more
+    let (r, text) = script_run("model.add(geom.box(1, 1, 1))\nfor i in 0..1100 { model.name(i) }\n", &[]);
+    let console = run::format_warnings(&r, &[]);
+    c.check(
+        r.ok() && r.warnings.len() == script::MAX_WARNINGS && r.warnings_dropped == 99 && console.len() == run::WARNINGS_SHOWN + 1
+            && console.last().is_some_and(|l| l == "  ... und 1089 weitere Warnungen (990 im Bericht; 99 nicht aufgehoben, höchstens 1000 je Lauf)\n")
+            && json_has(&r, "\"warnings_dropped\": 99"),
+        || format!("many warnings: {text} {} kept, {} dropped, {:?}", r.warnings.len(), r.warnings_dropped, console.last()),
+    );
+    // the names of --api are English (decision G9.3), the German ones are gone; every function with a fixed number of
+    // parameters has its most arguments (for the warning), at least as many as --api lists
+    let api = crate::host::api_text();
+    for want in ["geom.box(w, h, d)", "geom.cone(r, h, segments = 32, r_top = 0)", "geom.sphere(r, segments = 32, rings = segments / 2)", "geom.sweep(profile, path, closed = false, smooth = 30)", "m.bevel(width, segments = 1, axis = nil)", "m.radial(count, step = 360 / count)", "profile.arc(r, start, end, n = 16)", "model.budget(triangles)", "model.expect_size(x, y, z, tolerance = 0.001 | [x, y, z], tolerance)", "model.uv_scale(meters = 1)"] {
+        c.check(api.contains(want), || format!("--api lacks {want}"));
+    }
+    let german = ["segmente", "r_oben", "ringe", "seiten", "stufen", "staerke", "profil,", "tiefe", "grundriss", "pfad", "geschlossen", "glatt", "grad", "toleranz", "anzahl", "schritt", "breite", "achse", "dreiecke", "meter =", "von", "bis", "abzug", "b, h"];
+    for e in crate::host::API {
+        let old: Vec<&&str> = german.iter().filter(|g| e.params.contains(**g)).collect();
+        c.check(old.is_empty(), || format!("--api: {}({}) has German names {:?}", e.name, e.params, old));
+        let variadic = matches!(e.name, "geom.merge" | "geom.union" | "geom.difference" | "geom.intersection" | "m.tris" | "params");
+        let max = crate::host::max_args(e.name);
+        let listed = listed_args(e.params);
+        c.check(max.is_none() == variadic && max.is_none_or(|m| listed <= m), || format!("max_args({}) = {:?}, --api lists {}", e.name, max, listed));
+    }
     // queries
     let (r, text) = script_run(
         "let m = geom.box(2, 1, 1)\nlet b = m.bounds()\nassert(b.size[0] == 2 && b.max[1] == 1, \"bounds\")\nassert(m.area() == 10 && m.volume() == 2, \"area\")\nassert(m.check().closed && m.tris == 12, \"check\")\nassert(vec.len([3, 4]) == 5 && vec.cross([1, 0, 0], [0, 1, 0])[2] == 1, \"vec\")\nassert(profile.area(profile.rect(2, 3)) == 6, \"profile\")\nmodel.add(m.place(0, 1, 0).center().weld().smooth(45).flat())\n",
@@ -753,7 +853,7 @@ fn script(c: &mut Ctx) {
         ("model.add(geom.intersection(geom.box(1, 1, 1), geom.box(1, 1, 1).move(5, 0, 0)))\n", "geom.intersection: das Ergebnis ist leer"),
         ("model.add(geom.difference(geom.box(1, 1, 1)))\n", "geom.difference: braucht mindestens 2 Meshes"),
         ("model.add(geom.box(1, 1, 1).bevel(0.6, 2))\n", "bevel(): die Breite 0.6 ist zu groß"),
-        ("model.add(geom.box(1, 1, 1).bevel(0.1, 2, \"w\"))\n", "bevel(): achse muss"),
+        ("model.add(geom.box(1, 1, 1).bevel(0.1, 2, \"w\"))\n", "bevel(): axis muss"),
     ];
     for (src, msg) in bad {
         let (r, text) = script_run(src, &[]);
@@ -831,17 +931,21 @@ fn watch_tests(c: &mut Ctx) {
     let st = &w.state;
     c.check(st.ok == Some(true) && st.title == "A" && st.summary == "1 Teile, 12 Dreiecke, 1 x 1 x 1 m" && st.builds == 1, || format!("first build: {:?} {} {}", st.ok, st.title, st.summary));
     c.check(!w.changed(), || "nothing changed, but changed".into());
-    // saved with another size
-    write("a.jfs", "model.name(\"A\")\nmodel.add(geom.box(1, 2, 1))\n");
+    c.check(st.warnings.is_empty() && st.warning_count == 0, || format!("first build: warnings {:?}", st.warnings));
+    // saved with another size, and a second name: a warning with its place and line
+    write("a.jfs", "model.name(\"A\")\nmodel.add(geom.box(1, 2, 1))\nmodel.name(\"A2\")\n");
     c.check(w.changed(), || "saved: not changed".into());
     w.build();
     c.check(w.state.summary == "1 Teile, 12 Dreiecke, 1 x 2 x 1 m", || format!("second build: {}", w.state.summary));
-    // an error: its place, the old model stays
+    let warned = format!("{a}:3:7: Warnung: model.name: \"A2\" ersetzt den Namen \"A\" aus {a}:1");
+    let st = &w.state;
+    c.check(st.warning_count == 1 && st.warnings.first().is_some_and(|l| l[0] == warned && l[1] == "  3 | model.name(\"A2\")"), || format!("warning: {:?}", st.warnings));
+    // an error: its place, the old model stays (the warnings are the new run's: none)
     write("a.jfs", "model.name(\"A\")\nmodel.add(geom.box(1, 0, 1))\n");
     w.build();
     let st = &w.state;
     let place = format!("{a}:2:");
-    c.check(st.ok.is_none() && st.errors.first().is_some_and(|e| e[0].starts_with(&place) && e[0].contains("die Höhe")) && st.model.is_some(), || format!("error: {:?}", st.errors));
+    c.check(st.ok.is_none() && st.errors.first().is_some_and(|e| e[0].starts_with(&place) && e[0].contains("die Höhe")) && st.model.is_some() && st.warning_count == 0, || format!("error: {:?} {:?}", st.errors, st.warnings));
     c.check(!w.changed(), || "after the failed build: changed".into());
     // a module: watched too
     write("m.jfs", "fn teil() { return geom.box(2, 1, 1) }\n");

@@ -3,7 +3,8 @@
 // Weitere Seitenformate), Automatisch anpassen; Zeichnungsmaßstab; the automatic size after a
 // gesture (FEATURES RW-01 .. RW-03, PG-04, PG-05, PR-07)
 //
-//   SIZES                     the paper sizes of the menu (commands SIZE_*, 0x1800 ..)
+//   SIZES                     the paper sizes of the menu (commands SIZE_*, 0x1800 ..; since JD15
+//                             also the envelopes and the US government sizes, RW-02)
 //   orientation(app, ui, landscape)   Hochformat / Querformat of the page shown
 //   size(app, ui, id)         a size of the menu for the page shown
 //   size_note(id)             the measures a size row shows ("21 × 29,7 cm", "8.5 × 11 in")
@@ -43,7 +44,7 @@ use crate::viewer::DIP;
 use crate::Diagrammer;
 
 /// the paper sizes of Entwurf › Größe: command, width and height in mm (portrait)
-pub(crate) static SIZES: [(u32, f64, f64); 9] = [
+pub(crate) static SIZES: [(u32, f64, f64); 17] = [
     (SIZE_LETTER, 215.9, 279.4),
     (SIZE_LEGAL, 215.9, 355.6),
     (SIZE_TABLOID, 279.4, 431.8),
@@ -53,6 +54,16 @@ pub(crate) static SIZES: [(u32, f64, f64); 9] = [
     (SIZE_A3, 297.0, 420.0),
     (SIZE_B5, 182.0, 257.0),
     (SIZE_B4, 257.0, 364.0),
+    // (JD15, RW-02) envelopes (ISO 269 C4 / C5 / C6 / DL, US #10 and Monarch) and the US
+    // government sizes (8 x 10.5 in, 8.5 x 13 in)
+    (SIZE_ENV_10, 104.775, 241.3),
+    (SIZE_ENV_DL, 110.0, 220.0),
+    (SIZE_ENV_C4, 229.0, 324.0),
+    (SIZE_ENV_C5, 162.0, 229.0),
+    (SIZE_ENV_C6, 114.0, 162.0),
+    (SIZE_ENV_MONARCH, 98.425, 190.5),
+    (SIZE_GOV_LETTER, 203.2, 266.7),
+    (SIZE_GOV_LEGAL, 215.9, 330.2),
 ];
 
 fn mm(v: f64) -> f64 {

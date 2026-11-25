@@ -7,8 +7,9 @@
 //                       a .vsdx, .vsdm, .vstx, .vstm, .vssx or .vssm file into a Document:
 //                       styles, the document sheet, colours and fonts, pages with shapes and
 //                       connects, masters, themes (raw), windows.xml, properties, media,
-//                       comments and data recordsets (kept as parts); unknown items in the
-//                       Extras where they stood (DF-03); nothing recomputed or rerouted
+//                       comments (kept as parts), data connections and recordsets (JD18:
+//                       doc.data, data.rs); unknown items in the Extras where they stood
+//                       (DF-03); nothing recomputed or rerouted
 //   vsdx::write(&doc, &vsdx::WriteOptions::DEFAULT) -> Result<Vec<u8>, vsdx::WriteError>
 //                       the model as a file of any of the six formats, with everything it does
 //                       not know where it stood; deterministic, DEFLATE; a file read and written
@@ -28,9 +29,31 @@
 //                       set and the catalogue's cells; template::stencil_windows,
 //                       set_stencil_windows, info, registers and to_drawing for the app
 //
-// What is to come here, by stage of the plan:
-//   JD12  exports: SVG, PNG and PDF through the library's writers
-//   later the XML formats of 2003-2010 (.vdx, .vsx) and importing the binary .vss / .vsd
+//   vdx::read(&bytes, DocKind::Drawing, &vsdx::Limits::VSDX) -> Result<vsdx::Loaded, vsdx::Error>
+//                       (JD16) the XML formats of Visio 2003-2010 (.vdx drawing, .vsx stencil,
+//                       .vtx template) into the same model: cells with formula and value,
+//                       sections, masters, pages, pictures as parts, fonts by name, document
+//                       properties, windows, the macro project; vdx::kind_of, vdx::sniff
+//   props::read(&doc) / props::write(&mut doc, &props)
+//                       (JD16) the document properties (docProps core, app and custom)
+//   windows::drawing_window(&doc) / set_drawing_window(&mut doc, &w)
+//                       (JD16) the drawing window of windows.xml: page, zoom, centre, what is
+//                       shown; vsdx::remove_macros takes a macro project out
+//   data::ado(&recordset) -> String
+//                       (JD18) a recordset's rows as an ADO persisted recordset (the recordset
+//                       parts of a .vsdx; Visio's DataAsXML format)
+//   textdraw::parse(text, &opts, &limits) / textdraw::apply(tx, eng, page, &plan, &masters, &b)
+//                       (JD18, IM-08) a connected drawing from a text file: Shape and Link
+//                       records (Visio's text import) into a plan with problems per line, then
+//                       shapes, shape data and glued dynamic connectors, laid out in layers
+//
+//   vss::read(&bytes, DocKind::Stencil, &vsdx::Limits::VSDX) -> Result<vsdx::Loaded, vsdx::Error>
+//                       (JD17) the binary formats of Visio 2003-2010 (.vss; .vsd, .vst as far
+//                       as their masters and styles go), import only: the compound file
+//                       (archive::cfb), the VisioDocument stream's compressed tree of streams and
+//                       chunks become the XML of 2003-2010 and go through vdx::read; cells with
+//                       formula and value, formulas in Visio's text, texts with fields, styles,
+//                       masters; vss::to_vdx, vss::kind_of, vss::sniff
 //
 // The ZIP and OPC parts come from archive (archive::opc, JD1), shared with doc_io's DOCX.
 // Every file is untrusted input: sizes, counts and nesting are bounded, a file that breaks a
@@ -42,7 +65,9 @@
 extern crate alloc;
 
 mod blank;
+pub mod data;
 mod pack;
+pub mod props;
 mod read;
 pub mod stencil;
 mod stencil_icon;
@@ -50,7 +75,11 @@ mod stencil_src;
 mod stencil_svg;
 pub mod template;
 mod template_src;
+pub mod textdraw;
+pub mod vdx;
+pub mod vss;
 pub mod vsdx;
+pub mod windows;
 mod write;
 mod xml;
 

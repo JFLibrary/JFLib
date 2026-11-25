@@ -58,6 +58,8 @@ from tools.host_exec import linux_path, run_linux  # noqa: E402
 FLATPAK_RUNTIME = "org.freedesktop.Platform"
 FLATPAK_SDK = "org.freedesktop.Sdk"
 FLATPAK_VERSION = "26.08"
+# the Flatpak that knows --device=input (the manifest's gamepad: 1.15.6 added it; older ones refuse to build with it)
+FLATPAK_INPUT = (1, 15, 6)
 UPD_INFO_SIZE = 1024
 # the sections of a type-2 runtime: name, size (the runtime of AppImage/type2-runtime has them)
 RUNTIME_SECTIONS = ((".upd_info", UPD_INFO_SIZE), (".sha256_sig", 1024), (".sig_key", 8192))
@@ -520,7 +522,9 @@ def finish_args(perms, extra=()):
     session bus, net.* the network, audio.output the sound server (--socket=pulseaudio, which
     also allows recording: only apps that play sound get it), recent the host's list of recent
     files (--filesystem=xdg-data/recently-used.xbel: plat::recent_add reaches the desktop's
-    list; the file lists every program's recent files)"""
+    list; the file lists every program's recent files), gamepad /dev/input (--device=input: every
+    input device, keyboards and mice too; Flatpak 1.15.6 and newer, FLATPAK_INPUT; older ones
+    refuse to build with it and run an installed app without /dev/input)"""
     args = ["--share=ipc", "--socket=wayland", "--socket=fallback-x11"]
     notes = []
     if perms is None:
@@ -562,6 +566,11 @@ def finish_args(perms, extra=()):
         elif key == "sensors":
             notes.append("sensors: unter Linux noch nicht gebaut (später iio-sensor-proxy über "
                          "--system-talk-name=net.hadess.SensorProxy)")
+        elif key == "gamepad":
+            if "--device=input" not in args:
+                args.append("--device=input")
+                notes.append("gamepad: --device=input (alle Eingabegeräte in /dev/input, auch Tastaturen; ab Flatpak "
+                             "1.15.6, ältere bauen es nicht und starten die App ohne /dev/input: keine Pads)")
         elif key == "recent":
             if "--filesystem=xdg-data/recently-used.xbel" not in args:
                 args.append("--filesystem=xdg-data/recently-used.xbel")
@@ -678,6 +687,10 @@ def make_flatpak(job):
             return job.skip("flatpak", f"Runtime für {fa} fehlt: " + ", ".join(missing).replace("/", "//")
                             + f" (flatpak install --user --arch={fa} flathub …: Download); nur das Manifest "
                             f"{mf.relative_to(job.root).as_posix()} geschrieben")
+    have = tuple(int(x) for x in re.findall(r"\d+", p.get("flatpak_version", ""))[:3])
+    if "--device=input" in man["finish-args"] and have and have < FLATPAK_INPUT:
+        return job.skip("flatpak", f"Flatpak {'.'.join(map(str, have))} kennt --device=input nicht (gamepad; ab "
+                        f"{'.'.join(map(str, FLATPAK_INPUT))}); nur das Manifest {mf.relative_to(job.root).as_posix()} geschrieben")
     foreign = flatpak_foreign(p, pkgmeta.arch_name(job.arch, "flatpak"))
     if foreign:
         return job.skip("flatpak", f"{foreign}; nur das Manifest {mf.relative_to(job.root).as_posix()} geschrieben")

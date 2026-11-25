@@ -148,8 +148,9 @@ fn timing(r: &run::Run, a: Option<&run::Analysis>, render_us: u64, export_us: u6
     ])
 }
 
-/// whether DIR's report is of this key with these options and every file is there: (ok, its findings)
-fn cached(dir: &str, src: &str, params: &[(String, String)], o: &Options) -> Option<(bool, Vec<String>)> {
+/// whether DIR's report is of this key with these options and every file is there: (ok, its findings, its warnings
+/// as console lines)
+fn cached(dir: &str, src: &str, params: &[(String, String)], o: &Options) -> Option<(bool, Vec<String>, Vec<String>)> {
     let text = plat::read_file(&format!("{dir}report.json"))?;
     let big = usize::MAX / 2;
     let limits = agent_core::json::Limits { bytes: big, depth: 32, values: big, string_bytes: big, members: big };
@@ -180,7 +181,18 @@ fn cached(dir: &str, src: &str, params: &[(String, String)], o: &Options) -> Opt
         return None;
     }
     let findings = v.get("findings")?.as_array()?.iter().filter_map(|f| f.as_str().map(String::from)).collect();
-    Some((v.get("ok")?.as_bool()?, findings))
+    let mut warnings = Vec::new();
+    let list = v.get("warnings").and_then(|w| w.as_array()).unwrap_or(&[]);
+    for w in list.iter().take(run::WARNINGS_SHOWN) {
+        let n = |k: &str| w.get(k).and_then(|x| x.as_u64()).unwrap_or(0);
+        let s = |k: &str| w.get(k).and_then(|x| x.as_str()).unwrap_or("");
+        warnings.push(format!("{}:{}:{}: Warnung: {}\n", s("file"), n("line"), n("col"), s("message")));
+    }
+    let more = list.len().saturating_sub(run::WARNINGS_SHOWN) as u64 + v.get("warnings_dropped").and_then(|x| x.as_u64()).unwrap_or(0);
+    if more > 0 {
+        warnings.push(format!("  ... und {} weitere Warnungen (im Bericht)\n", more));
+    }
+    Some((v.get("ok")?.as_bool()?, findings, warnings))
 }
 
 /// build one script into `dir` (ending in "/"): report, glTF, pictures
@@ -191,8 +203,12 @@ fn build(file: &str, src: &str, dir: &str, params: &[(String, String)], o: &Opti
         err(&format!("modeltool: kann den Ordner {} nicht anlegen\n", dir));
         return 2;
     }
+    // the warnings first (they came before an error and before the summary)
+    let sources = sources_of(&r, src);
+    for w in run::format_warnings(&r, &sources) {
+        out(&w);
+    }
     if !r.ok() {
-        let sources = sources_of(&r, src);
         for p in &r.problems {
             out(&run::format_problem(p, &sources));
         }
@@ -272,12 +288,7 @@ fn run_main() -> i32 {
         return 0;
     }
     if has("--api") {
-        for e in host::API {
-            out(&format!("{}({})\n    {}\n", e.name, e.params, e.doc));
-        }
-        out("Materialien: ");
-        out(&host::PALETTE.iter().map(|p| p.0).collect::<Vec<_>>().join(", "));
-        out("\n");
+        out(&host::api_text());
         return 0;
     }
     if has("--checksum") {
@@ -382,8 +393,11 @@ fn run_main() -> i32 {
     let mut loader = |p: &str| run::file_loader(&dir, p);
     if has("--report") {
         let r = run::run_script(&file, &src, &params, &mut loader);
+        let sources = sources_of(&r, &src);
+        for w in run::format_warnings(&r, &sources) {
+            err(&w);
+        }
         if !r.ok() {
-            let sources = sources_of(&r, &src);
             for p in &r.problems {
                 err(&run::format_problem(p, &sources));
             }
@@ -399,7 +413,10 @@ fn run_main() -> i32 {
         None => format!("{}.out/", file.strip_suffix(".jfs").unwrap_or(&file)),
     };
     if !o.force {
-        if let Some((ok, findings)) = cached(&dir, &src, &params, &o) {
+        if let Some((ok, findings, warnings)) = cached(&dir, &src, &params, &o) {
+            for w in &warnings {
+                out(w);
+            }
             out(&format!("{}: {} - unverändert seit dem letzten Lauf (derselbe Schlüssel), nicht neu gebaut\n", file, if ok { "ok" } else { "PRÜFUNG FEHLGESCHLAGEN" }));
             for f in &findings {
                 out(&format!("  FEHLER: {}\n", f));

@@ -1,0 +1,23 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD15: Auto-Bemaßung of the stencil Beschriftungen (SH-272, TX-06) -- a 1-D dimension
+# line whose text is a field: its own length in mm.  Dropped it shows 50 mm; dragging its end
+# makes it longer, shorter and right-to-left, and the field follows each time (the text stays
+# upright, Winkel 179°); undo takes the last change back.  #24577 is the panel's search box
+# (stencils_panel.rs ID_PANEL + 1)
+focus #24577
+type "Auto-Bemaßung"
+expect button:"Auto-Bemaßung" exists
+drag button:"Auto-Bemaßung" 600,400
+a11y expect announced "„Auto-Bemaßung“ abgelegt"
+expect listitem:"50 mm" rect 537 395 126 10
+wait 600
+drag 663,400 726,400
+expect listitem:"75 mm" exists
+wait 600
+drag 726,400 474,400
+expect listitem:"25 mm" exists
+expect listitem:"75 mm" missing
+expect button:"Länge: 25 mm  Winkel: 179°" exists
+key ctrl+z
+expect listitem:"75 mm" exists
+expect listitem:"25 mm" missing

@@ -4,6 +4,7 @@
 # logs://) and app:// need no line.  The build checks the syntax; the packages follow the file
 # (Flatpak finish-args, MSIX capabilities: docs/PACKAGING.md).
 fs.user                              # the files the user picks (file dialog, drops, "Open with")
+gamepad                              # the section "Gamepads" (ui.gamepads; a Flatpak gets --device=input)
 #
 # Remove the # of a rule the app needs:
 # fs.read  $DOCUMENTS/**             read below the documents folder (documents://)
@@ -18,5 +19,6 @@ fs.user                              # the files the user picks (file dialog, dr
 # screen.capture                     pictures of the screen (picking one pixel needs nothing)
 # location                           where the device is (plat::sensors; Android: ACCESS_*_LOCATION in the manifest)
 # sensors                            motion sensors: accelerometer, gyroscope, compass (plat::sensors)
+# gamepad                            game pads (plat::pad_watch; Flatpak: --device=input, every input device)
 # ask fs.read $PICTURES/** "Bilder öffnen"   ask the user at the first access instead
 # sandbox                            let the OS enforce this manifest too (Landlock+seccomp / mitigations)

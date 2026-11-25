@@ -1,0 +1,43 @@
+# Farbiger Block (SH-030, JD26): ein Rechteck mit kräftiger Füllung über die Schnellformatvorlage:
+# die dritte Formatvariante des Designs (QuickStyleLineMatrix, …FillMatrix, …EffectsMatrix und
+# …FontMatrix 102, wie die Kachel in Schnellformatvorlagen), in NetLab die volle Variantenfarbe
+# mit heller Schrift.
+master: Coloured block
+name.de: Farbiger Block
+name.en: Coloured block
+name.es: Bloque de color
+name.it: Blocco colorato
+name.fr: Bloc coloré
+prompt.de: Block mit kräftiger Füllung aus der Schnellformatvorlage des Designs.
+prompt.en: Block with an intense fill from the quick style of the design.
+prompt.es: Bloque con relleno intenso del estilo rápido del diseño.
+prompt.it: Blocco con riempimento intenso dallo stile rapido del tema.
+prompt.fr: Bloc avec remplissage intense issu du style rapide du thème.
+keywords.de: Block, Farbe, farbig, Fläche, Hervorhebung, kräftig
+keywords.en: block, colour, coloured, area, highlight, intense
+keywords.es: bloque, color, área, resaltado, intenso
+keywords.it: blocco, colore, colorato, area, evidenziazione, intenso
+keywords.fr: bloc, couleur, coloré, zone, mise en valeur, intense
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 20 mm
+Height.us = 0.75 in
+QuickStyleLineMatrix = 102
+QuickStyleFillMatrix = 102
+QuickStyleEffectsMatrix = 102
+QuickStyleFontMatrix = 102
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

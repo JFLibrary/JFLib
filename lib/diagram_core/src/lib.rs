@@ -47,6 +47,9 @@
 //                                 orientation, sizes, fit to the drawing, automatic size in
 //                                 tiles of the printed sheet; Transaction::add_page_like and
 //                                 duplicate_page insert pages with settings or content
+//   data::*                       (JD18) external data: connections, recordsets with their
+//                                 cached rows, rows bound to shapes (Prop rows, DataLinked),
+//                                 refresh with conflicts, automatic linking (DA-04, DA-05)
 //   field::*                      (JD8) text fields: a Field row's value in its format picture,
 //                                 new fields, the text with its fields, the document's
 //                                 properties (Document::fields: the app's locale and clock)
@@ -62,6 +65,7 @@
 extern crate alloc;
 
 mod cell;
+pub mod data;
 pub mod design;
 pub mod dock;
 mod document;

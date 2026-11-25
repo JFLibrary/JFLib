@@ -1,0 +1,189 @@
+# Matrix mit Beschriftungen (SH-031, JD26): eine Vierfeldermatrix mit Achsen.  Teile der Gruppe:
+# vier Felder mit 2 mm Abstand und eigenem Text, die waagrechte Achse unten und die senkrechte
+# links, je ein Pfeil (offene Spitze) mit Text; der senkrechte Text ist um 90° gedreht.  Der Rand
+# für die Achsen ist User.M breit.  Die Teile folgen der Größe der Gruppe.  Die Achsen nehmen die
+# Formatvorlage Connector (sichtbar auch in Designs ohne Shape-Linien) ohne deren Pfeilspitzen.
+master: Matrix with labels
+name.de: Matrix mit Beschriftungen
+name.en: Matrix with labels
+name.es: Matriz con etiquetas
+name.it: Matrice con etichette
+name.fr: Matrice avec étiquettes
+prompt.de: Vierfeldermatrix mit beschrifteten Achsen. Klicken Sie ein Feld oder eine Achse zweimal an, um den Text zu ändern.
+prompt.en: Four-field matrix with labelled axes. Click a field or an axis twice to change its text.
+prompt.es: Matriz de cuatro campos con ejes etiquetados. Haga clic dos veces en un campo o un eje para cambiar el texto.
+prompt.it: Matrice a quattro campi con assi etichettati. Fai clic due volte su un campo o un asse per cambiarne il testo.
+prompt.fr: Matrice à quatre champs avec axes étiquetés. Cliquez deux fois sur un champ ou un axe pour modifier le texte.
+keywords.de: Matrix, Vierfeldermatrix, Achsen, Portfolio, Quadrant, Einordnung, Beschriftung
+keywords.en: matrix, four-field matrix, axes, portfolio, quadrant, classification, labels
+keywords.es: matriz, cuatro cuadrantes, ejes, cartera, cuadrante, clasificación, etiquetas
+keywords.it: matrice, quattro quadranti, assi, portafoglio, quadrante, classificazione, etichette
+keywords.fr: matrice, quatre quadrants, axes, portefeuille, quadrant, classement, étiquettes
+
+[Shape]
+Width = 80 mm
+Width.us = 3 in
+Height = 70 mm
+Height.us = 2.75 in
+
+[User]
+# der Rand für die Achsen, der Abstand der Felder, Breite und Höhe eines Felds
+M:   Value = 12 mm
+     Value.us = 0.5 in
+G:   Value = 2 mm
+     Value.us = 0.08 in
+QW:  Value = (Width-User.M-User.G)*0.5
+QH:  Value = (Height-User.M-User.G)*0.5
+
+[Connection]
+Row  X = User.M+(Width-User.M)*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = User.M+(Height-User.M)*0.5; DirX = -1; DirY = 0
+Row  X = User.M+(Width-User.M)*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = User.M+(Height-User.M)*0.5; DirX = 1; DirY = 0
+
+[Part Q1]
+text.de: Feld 1
+text.en: Field 1
+text.es: Campo 1
+text.it: Campo 1
+text.fr: Champ 1
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD(Sheet.1!User.M+Width*0.5)
+PinY = GUARD(Sheet.1!Height-Height*0.5)
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part Q2]
+text.de: Feld 2
+text.en: Field 2
+text.es: Campo 2
+text.it: Campo 2
+text.fr: Champ 2
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD(Sheet.1!Width-Width*0.5)
+PinY = GUARD(Sheet.1!Height-Height*0.5)
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part Q3]
+text.de: Feld 3
+text.en: Field 3
+text.es: Campo 3
+text.it: Campo 3
+text.fr: Champ 3
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD(Sheet.1!User.M+Width*0.5)
+PinY = GUARD(Sheet.1!User.M+Height*0.5)
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part Q4]
+text.de: Feld 4
+text.en: Field 4
+text.es: Campo 4
+text.it: Campo 4
+text.fr: Champ 4
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD(Sheet.1!Width-Width*0.5)
+PinY = GUARD(Sheet.1!User.M+Height*0.5)
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# die waagrechte Achse: der Pfeil oben im Rand, der Text darunter
+[Part AX]
+text.de: x-Achse
+text.en: x axis
+text.es: Eje x
+text.it: Asse x
+text.fr: Axe x
+style: Connector
+
+[Shape]
+Width = GUARD(Sheet.1!Width-Sheet.1!User.M)
+Height = GUARD(Sheet.1!User.M)
+PinX = GUARD(Sheet.1!User.M+Width*0.5)
+PinY = GUARD(Height*0.5)
+TxtPinX = Width*0.5
+TxtPinY = Height*0.35
+TxtWidth = Width
+TxtHeight = Height*0.6
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+BeginArrow = 0
+EndArrow = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
+QuickStyleType = 3
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = Height*0.8
+LineTo  X = Width; Y = Height*0.8
+MoveTo  X = Width-Height*0.25; Y = Height*0.92
+LineTo  X = Width; Y = Height*0.8
+LineTo  X = Width-Height*0.25; Y = Height*0.68
+
+# die senkrechte Achse: der Pfeil rechts im Rand, der Text links davon, um 90° gedreht
+[Part AY]
+text.de: y-Achse
+text.en: y axis
+text.es: Eje y
+text.it: Asse y
+text.fr: Axe y
+style: Connector
+
+[Shape]
+Width = GUARD(Sheet.1!User.M)
+Height = GUARD(Sheet.1!Height-Sheet.1!User.M)
+PinX = GUARD(Width*0.5)
+PinY = GUARD(Sheet.1!User.M+Height*0.5)
+TxtPinX = Width*0.35
+TxtPinY = Height*0.5
+TxtWidth = Height
+TxtHeight = Width*0.6
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+TxtAngle = 90 deg
+BeginArrow = 0
+EndArrow = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
+QuickStyleType = 3
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*0.8; Y = 0
+LineTo  X = Width*0.8; Y = Height
+MoveTo  X = Width*0.68; Y = Height-Width*0.25
+LineTo  X = Width*0.8; Y = Height
+LineTo  X = Width*0.92; Y = Height-Width*0.25

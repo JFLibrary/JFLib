@@ -1,0 +1,79 @@
+# Startdiagramm „Fischgräte (6M)“ des Ursache-Wirkung-Diagramms: die Wirkung (Hauptgräte) und die
+# sechs Kategorien Mensch, Maschine, Methode oben bzw. Material, Messung, Mitwelt unten; ihre
+# Enden kleben an den Punkten 3, 8 und 13 der Gräte (EndOn/EndPoint), zwei Ursachen kleben an
+# der Mitte (Punkt 5) einer Kategorie.  Koordinaten aus den Maßen der Master (A4 bzw. Letter quer).
+starter: fishbone
+name.de: Fischgräte (6M)
+name.en: Fishbone (6M)
+name.es: Espina de pescado (6M)
+name.it: Lisca di pesce (6M)
+name.fr: Arête de poisson (6M)
+description.de: Hauptgräte mit den sechs Kategorien Mensch, Maschine, Methode, Material, Messung und Mitwelt.
+description.en: Main bone with the six categories people, machine, method, material, measurement and environment.
+description.es: Espina principal con las seis categorías personas, máquina, método, material, medición y entorno.
+description.it: Lisca principale con le sei categorie persone, macchina, metodo, materiale, misura e ambiente.
+description.fr: Arête principale avec les six catégories personnel, machine, méthode, matière, mesure et milieu.
+
+[Shapes]
+title:  Stencil = "standard"; Master = "Text box"
+        PinX = 148 mm; PinY = 180 mm; Width = 200 mm; Height = 12 mm
+        PinX.us = 5.5 in; PinY.us = 7.6 in; Width.us = 7 in; Height.us = 0.5 in
+        Text.de = "Ursache-Wirkung-Analyse"; Text.en = "Cause and effect analysis"; Text.es = "Análisis de causa y efecto"
+        Text.it = "Analisi causa-effetto"; Text.fr = "Analyse de cause à effet"
+effect: Stencil = "cause_effect"; Master = "Effect"
+        PinX = 170 mm; PinY = 100 mm
+        PinX.us = 6.2 in; PinY.us = 3.9 in
+        Text.de = "Wirkung (Problem)"; Text.en = "Effect (problem)"; Text.es = "Efecto (problema)"
+        Text.it = "Effetto (problema)"; Text.fr = "Effet (problème)"
+c1:     Stencil = "cause_effect"; Master = "Category 1"
+        BeginX = 93.62 mm; BeginY = 136 mm; EndX = 115.62 mm; EndY = 100 mm
+        BeginX.us = 3.18 in; BeginY.us = 5.3 in; EndX.us = 4.03 in; EndY.us = 3.9 in
+        EndOn = "effect"; EndPoint = 3
+        Text.de = "Mensch"; Text.en = "People"; Text.es = "Personas"
+        Text.it = "Persone"; Text.fr = "Personnel"
+c2:     Stencil = "cause_effect"; Master = "Category 1"
+        BeginX = 128 mm; BeginY = 136 mm; EndX = 150 mm; EndY = 100 mm
+        BeginX.us = 4.564 in; BeginY.us = 5.3 in; EndX.us = 5.414 in; EndY.us = 3.9 in
+        EndOn = "effect"; EndPoint = 8
+        Text.de = "Maschine"; Text.en = "Machine"; Text.es = "Máquina"
+        Text.it = "Macchina"; Text.fr = "Machine"
+c3:     Stencil = "cause_effect"; Master = "Category 1"
+        BeginX = 162.38 mm; BeginY = 136 mm; EndX = 184.38 mm; EndY = 100 mm
+        BeginX.us = 5.948 in; BeginY.us = 5.3 in; EndX.us = 6.798 in; EndY.us = 3.9 in
+        EndOn = "effect"; EndPoint = 13
+        Text.de = "Methode"; Text.en = "Method"; Text.es = "Método"
+        Text.it = "Metodo"; Text.fr = "Méthode"
+c4:     Stencil = "cause_effect"; Master = "Category 2"
+        BeginX = 93.62 mm; BeginY = 64 mm; EndX = 115.62 mm; EndY = 100 mm
+        BeginX.us = 3.18 in; BeginY.us = 2.5 in; EndX.us = 4.03 in; EndY.us = 3.9 in
+        EndOn = "effect"; EndPoint = 3
+        Text.de = "Material"; Text.en = "Material"; Text.es = "Material"
+        Text.it = "Materiale"; Text.fr = "Matière"
+c5:     Stencil = "cause_effect"; Master = "Category 2"
+        BeginX = 128 mm; BeginY = 64 mm; EndX = 150 mm; EndY = 100 mm
+        BeginX.us = 4.564 in; BeginY.us = 2.5 in; EndX.us = 5.414 in; EndY.us = 3.9 in
+        EndOn = "effect"; EndPoint = 8
+        Text.de = "Messung"; Text.en = "Measurement"; Text.es = "Medición"
+        Text.it = "Misura"; Text.fr = "Mesure"
+c6:     Stencil = "cause_effect"; Master = "Category 2"
+        BeginX = 162.38 mm; BeginY = 64 mm; EndX = 184.38 mm; EndY = 100 mm
+        BeginX.us = 5.948 in; BeginY.us = 2.5 in; EndX.us = 6.798 in; EndY.us = 3.9 in
+        EndOn = "effect"; EndPoint = 13
+        Text.de = "Mitwelt"; Text.en = "Environment"; Text.es = "Entorno"
+        Text.it = "Ambiente"; Text.fr = "Milieu"
+p1:     Stencil = "cause_effect"; Master = "Primary cause 1"
+        BeginX = 72.62 mm; BeginY = 118 mm; EndX = 104.62 mm; EndY = 118 mm
+        BeginX.us = 2.355 in; BeginY.us = 4.6 in; EndX.us = 3.605 in; EndY.us = 4.6 in
+        EndOn = "c1"; EndPoint = 5
+p2:     Stencil = "cause_effect"; Master = "Primary cause 1"
+        BeginX = 72.62 mm; BeginY = 82 mm; EndX = 104.62 mm; EndY = 82 mm
+        BeginX.us = 2.355 in; BeginY.us = 3.2 in; EndX.us = 3.605 in; EndY.us = 3.2 in
+        EndOn = "c4"; EndPoint = 5
+tip:    Stencil = "callouts"; Master = "Tip"; Tip = TRUE
+        PinX = 75 mm; PinY = 30 mm; Width = 120 mm; Height = 26 mm
+        PinX.us = 2.8 in; PinY.us = 1.1 in; Width.us = 4.6 in; Height.us = 1 in
+        Text.de = "Tipp: Ziehen Sie weitere Kategorien mit ihrem Ende auf die Hauptgräte und Ursachen auf die Gräten der Kategorien; sie kleben dort und wandern mit. Diesen Hinweis können Sie löschen."
+        Text.en = "Tip: Drag more categories with their end onto the main bone and causes onto the bones of the categories; they glue there and move along. You can delete this note."
+        Text.es = "Consejo: arrastre más categorías con su extremo sobre la espina principal y causas sobre las espinas de las categorías; se pegan allí y se mueven con ellas. Puede eliminar esta nota."
+        Text.it = "Suggerimento: trascinare altre categorie con la loro estremità sulla lisca principale e le cause sulle lische delle categorie; vi si incollano e si spostano con esse. È possibile eliminare questa nota."
+        Text.fr = "Astuce : faites glisser d'autres catégories par leur extrémité sur l'arête principale et des causes sur les arêtes des catégories ; elles s'y collent et suivent. Vous pouvez supprimer cette note."

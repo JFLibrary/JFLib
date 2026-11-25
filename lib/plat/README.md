@@ -46,7 +46,11 @@ sticks in -1..=1) and `E_GAMEPAD` says that one came, went or changed. Windows r
 (Xbox-compatible pads), Linux the evdev nodes of game controllers (Xbox, PlayStation and Nintendo
 pads mapped to the layout, hotplug through inotify), macOS GameController, the browser the Gamepad
 API; Android and iOS have none yet. Pads speak only to the app that has the focus, as the keyboard
-does, and need no permission; inside a Flatpak they need `--device=input`.
+does. An app with a `PERMISSIONS` file reads them only with the line `gamepad` (else `pad_watch`
+says `false` and opens nothing, `PERMDENY gamepad`); without the file they work as always. Inside a
+Flatpak they need `--device=input`, which the packages derive from `gamepad` (Flatpak 1.15.6 and
+newer; it shows the nodes of every input device, keyboards too); MSIX and the macOS sandbox need nothing more
+([PERMISSIONS.md](https://github.com/JFLibrary/JFLib/blob/main/docs/PERMISSIONS.md)).
 
 ## Files, the app's folders and permissions
 
@@ -101,7 +105,9 @@ worker threads: there the pool's jobs run between frames.
 
 On Windows, Linux, macOS and iOS plat has TCP, UDP and Unix domain sockets for IPv4 and IPv6 with
 timeouts, name lookups, and the system's trusted certificate authorities, on which `jflib-netio`
-builds HTTP and TLS. Child processes start without a shell, with pipes, and dropping one ends its
+builds HTTP and TLS. With a `PERMISSIONS` file a UDP socket that `net.listen` allows answers the
+addresses that wrote to it in the last minute without a `net.connect` rule (at most 1024 per socket,
+`net::AnswerSet`); every other datagram still needs `net.connect`. Child processes start without a shell, with pipes, and dropping one ends its
 whole process tree. A program can run as a system service (the Windows service control manager,
 systemd, launchd) and keep one instance per user that later starts hand their arguments to; on
 Windows and Linux it can start a helper with administrator rights after the system's prompt.

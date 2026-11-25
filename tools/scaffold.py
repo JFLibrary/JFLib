@@ -795,6 +795,7 @@ fs.user                              # the files the user picks (file dialog, dr
 # screen.capture                     pictures of the screen (picking one pixel needs nothing)
 # location                           where the device is (plat::sensors; Android: ACCESS_*_LOCATION in the manifest)
 # sensors                            motion sensors: accelerometer, gyroscope, compass (plat::sensors)
+# gamepad                            game pads (plat::pad_watch; Flatpak: --device=input, every input device)
 # ask fs.read $PICTURES/** "Bilder öffnen"   ask the user at the first access instead
 # sandbox                            let the OS enforce this manifest too (Landlock+seccomp / mitigations)
 """

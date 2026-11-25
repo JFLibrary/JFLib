@@ -184,6 +184,13 @@ pub mod sysmenu;
 /// Keeping the computer awake: no standby, no screen saver while a guard lives.
 pub mod power;
 pub use power::{INHIBIT_IDLE, INHIBIT_SUSPEND, Inhibit, inhibit, inhibited};
+// the system's share sheet: a text, a link or files to another app
+pub mod share;
+pub use share::{SHARE_CANCELLED, SHARE_DONE, SHARE_FAILED, SHARE_NONE, SHARE_PENDING, Share, share, share_open, share_poll};
+#[cfg(windows)]
+pub use share::win_share_dismiss;
+#[cfg(target_os = "ios")]
+pub use power::ios_idle_timer_off;
 
 pub mod sensors;
 

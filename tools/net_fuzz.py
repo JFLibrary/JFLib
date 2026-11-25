@@ -21,6 +21,9 @@ build/net_fuzz and runs every target on its own thread for N seconds (default 60
   x509, x509_netpkt             the certificate parser (the crate jflib-x509) with names,
                                 fingerprint and verify_chain; netpkt's check_chain over it;
                                 seeds: the system's CA bundle
+  ocsp                          OCSP responses checked against a certificate and its CA (the
+                                issuer's, a delegated responder's), requests read as a responder
+  csr                           certificate requests (PKCS #10) of each key kind
   dns, dns_netpkt               netio's answer parser and netpkt's message parser
   http_netio, http_netpkt       netio's request reader over a stream in pieces, netpkt's heads
   tls_server                    netio's TLS server fed a mutated ClientHello

@@ -86,6 +86,10 @@ pub use pad_os::{gc_test_disconnect, gc_test_pad};
 #[path = "apple_mac_gpu.rs"]
 mod gpu;
 pub use gpu::*;
+// the share sheet (share.rs): NSSharingServicePicker
+#[path = "apple_mac_share.rs"]
+pub(crate) mod share_sheet;
+pub use share_sheet::{mac_share_close, mac_share_shown};
 // the accessibility tree for VoiceOver (a11y.rs, docs/VOICEOVER.md)
 #[path = "apple_mac_a11y.rs"]
 pub(crate) mod a11y_mac;

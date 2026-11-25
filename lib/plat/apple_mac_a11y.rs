@@ -1134,7 +1134,7 @@ pub enum AxTestText {
 }
 
 /// f on the main thread (where AppKit serves the assistive technology), inside a pool
-fn on_main<R>(f: impl FnOnce() -> R) -> R {
+pub(crate) fn on_main<R>(f: impl FnOnce() -> R) -> R {
     let mut f = Some(f);
     let mut out: Option<R> = None;
     let mut call = || {

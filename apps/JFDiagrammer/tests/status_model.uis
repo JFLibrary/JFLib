@@ -1,0 +1,68 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD15 (stock-taking): editing details of FEATURES 2.5 and 2.6 that no other script
+# checks -- the arrow keys nudge the selection (SP-14), a yellow control point changes its shape
+# (SP-04), the vertices of a shape under the line tool (SP-05, the P1 part), the line ends of
+# Start › Linie › Pfeile (FM-02)
+# SP-14: a rectangle; an arrow key moves it by a grid step (10 mm at the fitted zoom: 25 DIP),
+# Shift + arrow by a pixel, Alt while dragging leaves the grid
+cmd 4404
+drag 500,330 640,420
+cmd 4400
+expect listitem:"Sheet.4" rect 500 324 151 100
+key right
+expect listitem:"Sheet.4" rect 525 324 151 100
+key shift+right
+expect listitem:"Sheet.4" rect 526 324 151 100
+key down
+expect listitem:"Sheet.4" rect 526 349 151 100
+drag 570,375 600,390 alt
+expect listitem:"Sheet.4" rect 556 364 151 100
+# SP-05 (P1 part): with the line tool the selected shape shows its vertices; dragging the lower
+# right corner moves that vertex alone (the outline grows, the vertex snaps to the grid);
+# Ctrl + click on an edge adds one: an undo step of its own (the first undo leaves the outline)
+cmd 4406
+click 600,400
+wait 600
+drag 707,464 757,514
+expect listitem:"Sheet.4" rect 556 364 196 161
+click 576,364 ctrl
+wait 600
+key ctrl+z
+expect listitem:"Sheet.4" rect 556 364 196 161
+key ctrl+z
+expect listitem:"Sheet.4" rect 556 364 151 100
+cmd 4400
+key esc
+key ctrl+a
+key delete
+expect listitem:"Sheet.4" missing
+# SP-04: the rounded rectangle of Standard-Shapes; its control point (yellow) dragged to the right
+# rounds the corners more; undo puts it back
+click button:"Weitere Shapes"
+click "Allgemein"
+click "Standard-Shapes"
+focus button:"Abgerundetes Rechteck"
+key enter
+expect button:"Steuerpunkt 1" rect 730 432 10 10
+drag 735,437 755,437
+expect button:"Steuerpunkt 1" rect 747 432 10 10
+key ctrl+z
+expect button:"Steuerpunkt 1" rect 730 432 10 10
+key ctrl+a
+key delete
+# FM-02: a line; Start › Linie › Pfeile puts an arrow at its end (the menu marks the choice);
+# undo takes it back
+cmd 4406
+drag 500,330 700,330
+cmd 4400
+cmd 4423
+expect menuitem:"————" checked
+click menuitem:"———→"
+move 600,600
+cmd 4423
+expect menuitem:"———→" checked
+key esc
+key ctrl+z
+cmd 4423
+expect menuitem:"————" checked
+key esc

@@ -1,0 +1,93 @@
+#!args apps/JFDiagrammer/tests/jd18-link.vsdx --no-system-fonts
+# JFDiagrammer, JD18: Daten › Daten verknüpfen, the wizard „Automatisch verknüpfen“ (RD-09, AS-04,
+# DA-04 automatically by matching columns) -- jd18-link.vsdx (diagramiotest
+# --write-link-fixture) has six boxes named by their text and the recordset „Geräte“ (Name,
+# IP-Adresse, Standort) with four rows, nothing linked.  The page: the rows go to the boxes whose
+# text is the row's Name (four of six), their shape data follow, one undo step takes it back;
+# the selection alone; a second pair that matches nothing; shapes linked already are kept
+# unless „Vorhandene Verknüpfungen ersetzen“
+wait 100
+expect listitem:"Server A" exists
+expect listitem:"Firewall" exists
+cmd 6413
+expect dialog:"Automatisch verknüpfen" exists
+expect #2082471938 text "Geräte"
+expect radio:"Ausgewählte Shapes" disabled
+expect radio:"Alle Shapes dieser Seite" checked
+click button:"Weiter"
+expect text:"Datenspalte" exists
+expect #2082472000 text "Name"
+expect #2082472001 text "Shape-Text"
+click button:"Fertig stellen"
+expect text:"4 Shapes wurden verknüpft." exists
+a11y expect announced "4 Shapes wurden verknüpft."
+click button:"Schließen"
+expect dialog:"Automatisch verknüpfen" missing
+# Server B carries its row as shape data
+click listitem:"Server B"
+cmd 5139
+expect tab:"Shape-Daten" selected
+expect text:"IP-Adresse" exists
+expect #20784 text "Server B"
+expect #20788 text "10.0.0.2"
+expect #20792 text "Raum 2"
+click listitem:"Drucker"
+expect #20788 text "10.0.0.50"
+# Firewall has no row
+click listitem:"Firewall"
+expect text:"Das Shape hat keine Shape-Daten." exists
+# one undo step takes every link back
+key ctrl+z
+click listitem:"Server B"
+expect text:"Das Shape hat keine Shape-Daten." exists
+# the selection only: Router and Firewall chosen, Router linked
+click listitem:"Router"
+click listitem:"Firewall" shift
+cmd 6413
+expect radio:"Ausgewählte Shapes" checked
+click button:"Weiter"
+click button:"Fertig stellen"
+expect text:"1 Shape wurde verknüpft." exists
+click button:"Schließen"
+click listitem:"Router"
+expect #20788 text "10.0.0.254"
+# the whole page again: a field of the shapes is offered (Router's Name) and comes first
+click listitem:"Server A"
+cmd 6413
+click radio:"Alle Shapes dieser Seite"
+click button:"Weiter"
+expect #2082472001 text "Name"
+click #2082472001
+click "Shape-Text"
+expect #2082472001 text "Shape-Text"
+# a second pair: Standort = Shape-Name matches no shape
+click button:"Und"
+click #2082472004
+click "Standort"
+click #2082472005
+click "Shape-Name"
+click button:"Fertig stellen"
+expect text:"Kein Shape wurde verknüpft: zu keinem Shape passt eine Zeile." exists
+click button:"Schließen"
+# Name = Shape-Text alone: Router keeps its link, the other three are linked
+cmd 6413
+click radio:"Alle Shapes dieser Seite"
+click button:"Weiter"
+click #2082472001
+click "Shape-Text"
+click button:"Fertig stellen"
+expect text:"3 Shapes wurden verknüpft." exists
+click button:"Schließen"
+# replacing: all four again
+cmd 6413
+click radio:"Alle Shapes dieser Seite"
+click button:"Weiter"
+click #2082472001
+click "Shape-Text"
+click checkbox:"Vorhandene Verknüpfungen ersetzen"
+click button:"Fertig stellen"
+expect text:"4 Shapes wurden verknüpft." exists
+click button:"Schließen"
+click listitem:"Server A"
+expect #20788 text "10.0.0.1"
+shot build/JFDiagrammer-data-link.png

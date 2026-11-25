@@ -2,8 +2,8 @@
 // build_rs.py checks them, with the same messages (PERM_CASES there are the tests below).
 
 const KEYS_ARGS: [&str; 7] = ["fs.read", "fs.write", "process", "plugins", "url", "net.connect", "net.listen"];
-const KEYS_FLAG: [&str; 9] =
-    ["fs.user", "print", "secrets", "autostart", "audio.output", "input.global", "screen.capture", "location", "sensors"];
+const KEYS_FLAG: [&str; 10] =
+    ["fs.user", "print", "secrets", "autostart", "audio.output", "input.global", "screen.capture", "location", "sensors", "gamepad"];
 const KEYS_AGENT: [&str; 2] = ["agent.confirm", "agent.deny"];
 const KEYS_SANDBOX: [&str; 1] = ["sandbox"];
 const KEYS_PACKAGE: [&str; 1] = ["recent"];
@@ -214,6 +214,8 @@ mod tests {
         ("audio.output\nask audio.output \"Klänge\"", None),
         ("audio.output on", Some("audio.output takes no arguments")),
         ("ask audio.input", Some("audio.input cannot be asked for")),
+        ("gamepad\nask gamepad \"Mit dem Pad spielen\"", None),
+        ("gamepad 0", Some("gamepad takes no arguments")),
     ];
 
     #[test]

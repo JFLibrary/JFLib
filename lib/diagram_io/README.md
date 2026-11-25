@@ -1,8 +1,8 @@
 # jflib-diagram-io
 
 The file formats of [JFLib](https://jflib.org)'s diagram model: Visio's VSDX family (drawings,
-stencils and templates), later the older XML formats and the binary stencils, and exports of
-diagrams. It reads and writes the documents of
+stencils and templates), the older XML formats of Visio 2003-2010 (read), the binary stencils
+of Visio 2003-2010 (import), and exports of diagrams. It reads and writes the documents of
 [`jflib-diagram-core`](https://crates.io/crates/jflib-diagram-core). It is plain Rust, without
 the standard library and without a line of `unsafe` code.
 
@@ -23,6 +23,21 @@ The codecs are being built in stages; the plan is
   file read and written unchanged reads back as the same model. A drawing can be saved as a
   template, a stencil's masters as a `.vssx`. A document without `windows.xml` gets one, since
   desktop Visio opens no file without it.
+- **Reading the XML formats of 2003-2010:** `vdx::read` takes a `.vdx` drawing, `.vsx`
+  stencil or `.vtx` template ("DatadiagramML", one XML file with base64 pictures) into the same
+  model, so that it is saved as a file of the VSDX family: cells with formula and stored value,
+  sections and rows by VSDX's names, font IDs as font names, pictures as parts, masters, pages,
+  document properties, windows and the macro project. What a VSDX file has no place for (tab
+  stops, solution XML, data connections) is left out with a warning.
+- **Importing the binary stencils of 2003-2010:** `vss::read` takes a `.vss` (Visio 2003-2010,
+  version 11) into the same model: styles, masters and their shapes with cells, formulas as
+  Visio writes them, texts and fields. Microsoft published no specification of this format;
+  the reader comes from our own analysis of files, the container (`archive::cfb`) from the open
+  specification [MS-CFB]. Nothing is ever written in the binary formats: a stencil read this way
+  is saved as `.vssx`.
+- **Document properties and the window state:** `props` reads and writes the core, extended and
+  custom properties (title, author, company, dates, custom fields), `windows` the drawing window
+  (page, zoom, centre, what is shown); `vsdx::remove_macros` takes a macro project out.
 - **New documents of its own:** `vsdx::new_document` makes a drawing, template or stencil (A4
   and millimetres or Letter and inches) with JFLib's own styles and document sheet and the own
   DrawingML theme "NetLab"; nothing in it comes from Visio's files.

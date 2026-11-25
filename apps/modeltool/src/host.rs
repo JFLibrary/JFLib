@@ -2,10 +2,14 @@
 // methods of a mesh.  The script only describes; every vertex is computed here in Rust.  A mesh is a map
 // {mesh: id, tris: n} (JFScript has no host objects yet: docs/GEOM.md, "Was JFScript braucht"), whose
 // methods reach the host as "map.move" and so on; meshes never change, every operation makes a new one.
-// Wrong arguments throw a German message that names the function and the parameter; the VM adds the line
-// and column of the call.  A mesh made by a Boolean operation keeps its convex cells (geom::Solid) beside it,
-// moved, turned, scaled and mirrored with it, so it can go into the next Boolean operation; any other mesh
-// goes in as one convex solid.
+// Names are English, parameters included (decision G9.3 of JFScript's docs/RICHTUNG.md: with named arguments
+// they become part of the interface); the descriptions and messages are German.  Wrong arguments throw a
+// message that names the function and the parameter; the VM adds the line and column of the call.  What the
+// host accepts but is very likely a mistake (arguments beyond the last parameter, a value for `closed` that is
+// no bool, a second model.name / budget / uv_scale or material definition that replaces the first) is a
+// warning at the call (cx.warn); the script goes on.  A mesh made by a Boolean operation keeps its convex cells
+// (geom::Solid) beside it, moved, turned, scaled and mirrored with it, so it can go into the next Boolean
+// operation; any other mesh goes in as one convex solid.
 
 use alloc::format;
 use alloc::rc::Rc;
@@ -14,7 +18,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use geom::{Affine, Axis, Mesh, Solid, Vec3};
-use script::{Cx, Fail, Host, Value};
+use script::{Cx, Fail, Host, Position, Value};
 
 /// the names the host answers (compile_with: any other unknown name is an error before the run)
 pub const GLOBALS: &[&str] = &["geom", "model", "profile", "vec", "params"];
@@ -31,47 +35,47 @@ pub struct ApiEntry {
 
 /// every host function and method with its parameters (optional ones with their default) and what it does
 pub const API: &[ApiEntry] = &[
-    ApiEntry { name: "geom.box", params: "b, h, t", doc: "Quader b x h x t (x, y, z) in Metern; steht auf y = 0, mittig über dem Ursprung" },
-    ApiEntry { name: "geom.cylinder", params: "r, h, segmente = 32", doc: "Zylinder um die Y-Achse auf y = 0; glatte Seiten, flache Deckel" },
-    ApiEntry { name: "geom.cone", params: "r, h, segmente = 32, r_oben = 0", doc: "Kegel (mit r_oben > 0 ein Kegelstumpf) um die Y-Achse auf y = 0" },
-    ApiEntry { name: "geom.sphere", params: "r, segmente = 32, ringe = segmente / 2", doc: "Kugel, liegt auf y = 0 (Mitte bei y = r)" },
-    ApiEntry { name: "geom.torus", params: "R, r, segmente = 32, seiten = 16", doc: "Torus, liegt flach auf y = 0; R zur Mitte des Rings, r der Ring" },
-    ApiEntry { name: "geom.stairs", params: "b, h, t, stufen", doc: "Treppe b breit (x), h hoch, t tief (z); erste Stufe vorn (z = t/2), steigt nach hinten" },
-    ApiEntry { name: "geom.arch", params: "b, h, t, staerke, segmente = 16", doc: "Torbogen: zwei Pfeiler der Stärke, Öffnung mit Halbkreis, darüber die Stärke" },
-    ApiEntry { name: "geom.extrude", params: "profil, tiefe", doc: "Profil [[x, y], ...] (Ansicht von vorn) entlang Z, mittig um z = 0" },
-    ApiEntry { name: "geom.prism", params: "grundriss, h", doc: "Grundriss [[x, z], ...] (Ansicht von oben) von y = 0 um h nach oben" },
-    ApiEntry { name: "geom.sweep", params: "profil, pfad, geschlossen = false, glatt = 30", doc: "Profil [[x, y], ...] entlang eines Pfads [[x, y, z], ...]; Ecken auf Gehrung" },
-    ApiEntry { name: "geom.lathe", params: "profil, segmente = 32, glatt = 30", doc: "Drehkörper: Profil [[radius, y], ...] um die Y-Achse" },
+    ApiEntry { name: "geom.box", params: "w, h, d", doc: "Quader w x h x d (x, y, z) in Metern; steht auf y = 0, mittig über dem Ursprung" },
+    ApiEntry { name: "geom.cylinder", params: "r, h, segments = 32", doc: "Zylinder um die Y-Achse auf y = 0; glatte Seiten, flache Deckel" },
+    ApiEntry { name: "geom.cone", params: "r, h, segments = 32, r_top = 0", doc: "Kegel (mit r_top > 0 ein Kegelstumpf) um die Y-Achse auf y = 0" },
+    ApiEntry { name: "geom.sphere", params: "r, segments = 32, rings = segments / 2", doc: "Kugel, liegt auf y = 0 (Mitte bei y = r)" },
+    ApiEntry { name: "geom.torus", params: "R, r, segments = 32, sides = 16", doc: "Torus, liegt flach auf y = 0; R zur Mitte des Rings, r der Ring" },
+    ApiEntry { name: "geom.stairs", params: "w, h, d, steps", doc: "Treppe w breit (x), h hoch, d tief (z); erste Stufe vorn (z = d/2), steigt nach hinten" },
+    ApiEntry { name: "geom.arch", params: "w, h, d, thickness, segments = 16", doc: "Torbogen: zwei Pfeiler der Stärke thickness, Öffnung mit Halbkreis, darüber die Stärke" },
+    ApiEntry { name: "geom.extrude", params: "profile, depth", doc: "Profil [[x, y], ...] (Ansicht von vorn) entlang Z, mittig um z = 0" },
+    ApiEntry { name: "geom.prism", params: "footprint, h", doc: "Grundriss [[x, z], ...] (Ansicht von oben) von y = 0 um h nach oben" },
+    ApiEntry { name: "geom.sweep", params: "profile, path, closed = false, smooth = 30", doc: "Profil [[x, y], ...] entlang eines Pfads [[x, y, z], ...]; Ecken auf Gehrung" },
+    ApiEntry { name: "geom.lathe", params: "profile, segments = 32, smooth = 30", doc: "Drehkörper: Profil [[radius, y], ...] um die Y-Achse" },
     ApiEntry { name: "geom.merge", params: "m1, m2, ... | [m1, m2, ...]", doc: "Meshes zu einem zusammenfügen (Teile bleiben getrennt, auch wenn sie sich durchdringen)" },
     ApiEntry { name: "geom.union", params: "m1, m2, ... | [m1, m2, ...]", doc: "Vereinigung zu einem geschlossenen Körper (konvexe Körper oder Ergebnisse Boolescher Operationen)" },
-    ApiEntry { name: "geom.difference", params: "m, abzug1, abzug2, ... | [m, abzug1, ...]", doc: "m ohne die Abzüge (ein Fenster aus einer Wand, ein Loch durch eine Platte)" },
+    ApiEntry { name: "geom.difference", params: "m, cut1, cut2, ... | [m, cut1, ...]", doc: "m ohne die Abzüge (ein Fenster aus einer Wand, ein Loch durch eine Platte)" },
     ApiEntry { name: "geom.intersection", params: "m1, m2, ... | [m1, m2, ...]", doc: "was in allen liegt" },
     ApiEntry { name: "m.move", params: "x, y, z | [x, y, z]", doc: "verschoben" },
     ApiEntry { name: "m.place", params: "x, y, z | [x, y, z]", doc: "so verschoben, dass die Mitte der Unterseite der Box bei (x, y, z) liegt" },
     ApiEntry { name: "m.center", params: "", doc: "so verschoben, dass die Mitte der Box im Ursprung liegt" },
-    ApiEntry { name: "m.rotate_x", params: "grad", doc: "um die X-Achse gedreht (rechtshändig; Vielfache von 90 exakt); ebenso rotate_y, rotate_z" },
-    ApiEntry { name: "m.rotate", params: "grad, [ax, ay, az]", doc: "um eine Achse durch den Ursprung gedreht" },
+    ApiEntry { name: "m.rotate_x", params: "deg", doc: "um die X-Achse gedreht (rechtshändig; Vielfache von 90 exakt); ebenso rotate_y, rotate_z" },
+    ApiEntry { name: "m.rotate", params: "deg, [ax, ay, az]", doc: "um eine Achse durch den Ursprung gedreht" },
     ApiEntry { name: "m.scale", params: "s | sx, sy, sz | [sx, sy, sz]", doc: "skaliert um den Ursprung" },
     ApiEntry { name: "m.mirror", params: "\"x\" | \"y\" | \"z\"", doc: "gespiegelt an der Ebene durch den Ursprung (x -> -x für \"x\"), Flächen bleiben außen" },
     ApiEntry { name: "m.flip", params: "", doc: "Flächen umgedreht (innen nach außen)" },
-    ApiEntry { name: "m.weld", params: "toleranz = 0", doc: "Ecken an derselben Stelle zu einem Punkt verbunden (eine Hälfte und ihr Spiegelbild zu einer Fläche)" },
-    ApiEntry { name: "m.array", params: "anzahl, dx, dy, dz | anzahl, [dx, dy, dz]", doc: "anzahl Kopien, Kopie i um i * (dx, dy, dz) verschoben" },
-    ApiEntry { name: "m.radial", params: "anzahl, schritt = 360 / anzahl", doc: "anzahl Kopien um die Y-Achse, Kopie i um i * schritt Grad gedreht" },
+    ApiEntry { name: "m.weld", params: "tolerance = 0", doc: "Ecken an derselben Stelle zu einem Punkt verbunden (eine Hälfte und ihr Spiegelbild zu einer Fläche)" },
+    ApiEntry { name: "m.array", params: "count, dx, dy, dz | count, [dx, dy, dz]", doc: "count Kopien, Kopie i um i * (dx, dy, dz) verschoben" },
+    ApiEntry { name: "m.radial", params: "count, step = 360 / count", doc: "count Kopien um die Y-Achse, Kopie i um i * step Grad gedreht" },
     ApiEntry { name: "m.flat", params: "", doc: "flache Normalen (harte Kanten)" },
-    ApiEntry { name: "m.smooth", params: "grad = 30", doc: "glatte Normalen über Kanten flacher als grad" },
-    ApiEntry { name: "m.bevel", params: "breite, segmente = 1, achse = nil", doc: "Kanten und Ecken abgeschrägt (segmente 1) oder gerundet (Flächen je Viertelkreis), breite = Radius; achse \"x\" | \"y\" | \"z\": nur die Kanten entlang dieser Achse; nur konvexe Körper" },
+    ApiEntry { name: "m.smooth", params: "deg = 30", doc: "glatte Normalen über Kanten flacher als deg Grad" },
+    ApiEntry { name: "m.bevel", params: "width, segments = 1, axis = nil", doc: "Kanten und Ecken abgeschrägt (segments 1) oder gerundet (Flächen je Viertelkreis), width = Radius; axis \"x\" | \"y\" | \"z\": nur die Kanten entlang dieser Achse; nur konvexe Körper" },
     ApiEntry { name: "m.bounds", params: "", doc: "{min, max, size, center} in Metern" },
     ApiEntry { name: "m.area", params: "", doc: "Oberfläche in m²" },
     ApiEntry { name: "m.volume", params: "", doc: "Volumen in m³ (bei geschlossenen Meshes)" },
     ApiEntry { name: "m.check", params: "", doc: "{ok, closed, outward, open_edges, flipped_edges, degenerate, triangles}" },
     ApiEntry { name: "m.tris", params: "", doc: "(Feld) die Zahl der Dreiecke" },
-    ApiEntry { name: "profile.rect", params: "b, h", doc: "Rechteck um den Ursprung" },
+    ApiEntry { name: "profile.rect", params: "w, h", doc: "Rechteck um den Ursprung" },
     ApiEntry { name: "profile.circle", params: "r, n = 32", doc: "Vieleck mit n Ecken auf einem Kreis um den Ursprung" },
-    ApiEntry { name: "profile.rounded", params: "b, h, r, n = 4", doc: "Rechteck mit abgerundeten Ecken (n Segmente je Ecke)" },
-    ApiEntry { name: "profile.arc", params: "r, von, bis, n = 16", doc: "Punkte eines Kreisbogens (Grad), beide Enden dabei: ein offener Linienzug" },
+    ApiEntry { name: "profile.rounded", params: "w, h, r, n = 4", doc: "Rechteck mit abgerundeten Ecken (n Segmente je Ecke)" },
+    ApiEntry { name: "profile.arc", params: "r, start, end, n = 16", doc: "Punkte eines Kreisbogens von start bis end (Grad), beide Enden dabei: ein offener Linienzug" },
     ApiEntry { name: "profile.move", params: "p, dx, dy", doc: "verschoben" },
     ApiEntry { name: "profile.scale", params: "p, sx, sy = sx", doc: "skaliert um den Ursprung" },
-    ApiEntry { name: "profile.rotate", params: "p, grad", doc: "gedreht um den Ursprung" },
+    ApiEntry { name: "profile.rotate", params: "p, deg", doc: "gedreht um den Ursprung" },
     ApiEntry { name: "profile.area", params: "p", doc: "Fläche (positiv gegen den Uhrzeigersinn)" },
     ApiEntry { name: "vec.add", params: "a, b", doc: "a + b (Listen aus 2 oder 3 Zahlen); ebenso vec.sub" },
     ApiEntry { name: "vec.mul", params: "a, s", doc: "a * s" },
@@ -83,9 +87,9 @@ pub const API: &[ApiEntry] = &[
     ApiEntry { name: "model.add", params: "m, material = \"grau\", name", doc: "Teil des Modells; material: Name oder {color, roughness, metallic}" },
     ApiEntry { name: "model.material", params: "name, {color: \"#rrggbb\" | [r, g, b], roughness = 0.8, metallic = 0}", doc: "Material festlegen (Farben in sRGB, 0 bis 1)" },
     ApiEntry { name: "model.name", params: "text", doc: "Name des Modells" },
-    ApiEntry { name: "model.budget", params: "dreiecke", doc: "höchstens so viele Dreiecke (Prüfung im Bericht)" },
-    ApiEntry { name: "model.expect_size", params: "x, y, z, toleranz = 0.001 | [x, y, z], toleranz", doc: "erwartete Maße der Box in Metern (Prüfung im Bericht); nil: diese Achse nicht prüfen" },
-    ApiEntry { name: "model.uv_scale", params: "meter = 1", doc: "Meter je UV-Einheit der Box-Projektion" },
+    ApiEntry { name: "model.budget", params: "triangles", doc: "höchstens so viele Dreiecke (Prüfung im Bericht, mit der Zeile der Regel)" },
+    ApiEntry { name: "model.expect_size", params: "x, y, z, tolerance = 0.001 | [x, y, z], tolerance", doc: "erwartete Maße der Box in Metern (Prüfung im Bericht, mit der Zeile der Regel); nil: diese Achse nicht prüfen" },
+    ApiEntry { name: "model.uv_scale", params: "meters = 1", doc: "Meter je UV-Einheit der Box-Projektion" },
     ApiEntry { name: "params", params: "", doc: "Map der Parameter von --param NAME=WERT; params.get(\"b\", 0.8)" },
 ];
 
@@ -130,6 +134,8 @@ pub struct Part {
 pub struct Expect {
     pub size: [f64; 3],
     pub tolerance: f64,
+    /// where the script states it (the file as errors name it)
+    pub at: Position,
 }
 
 /// what the script built
@@ -140,6 +146,8 @@ pub struct Model {
     /// the materials the parts use, in the order of first use
     pub materials: Vec<MaterialDef>,
     pub budget: Option<u64>,
+    /// where the script set the budget (its last model.budget)
+    pub budget_at: Position,
     pub expects: Vec<Expect>,
     /// metres per UV unit (1)
     pub uv_scale: f64,
@@ -151,7 +159,11 @@ pub struct ModelHost<'a> {
     /// the convex cells of a mesh made by a Boolean operation (moved with it), by mesh id
     solids: Vec<Option<Rc<Solid>>>,
     arena: usize,
-    defined: Vec<MaterialDef>,
+    /// the materials of model.material with where they were set
+    defined: Vec<(MaterialDef, Position)>,
+    /// where model.name and model.uv_scale were called last (for the warning when a second call replaces them)
+    name_at: Option<Position>,
+    uv_at: Option<Position>,
     pub model: Model,
     loader: &'a mut dyn FnMut(&str) -> Result<String, String>,
     /// (path, source) of every module the script imported, in order
@@ -167,6 +179,8 @@ impl<'a> ModelHost<'a> {
             solids: Vec::new(),
             arena: 0,
             defined: Vec::new(),
+            name_at: None,
+            uv_at: None,
             model: Model { uv_scale: 1.0, ..Model::default() },
             loader,
             imports: Vec::new(),
@@ -179,6 +193,9 @@ impl Host for ModelHost<'_> {
     fn call(&mut self, cx: &mut Cx, name: &str, args: &[Value]) -> Result<Value, Fail> {
         let t0 = plat::time_us();
         let r = self.dispatch(cx, name, args);
+        if r.is_ok() {
+            extra_arguments(cx, name, args);
+        }
         self.host_us += plat::time_us().saturating_sub(t0);
         r
     }
@@ -189,6 +206,74 @@ impl Host for ModelHost<'_> {
         self.imports.push((String::from(path), src.clone()));
         Ok(src)
     }
+}
+
+/// `modeltool --api`: every function with its parameters and what it does, then the built-in materials
+pub fn api_text() -> String {
+    let mut s = String::new();
+    for e in API {
+        s.push_str(&format!("{}({})\n    {}\n", e.name, e.params, e.doc));
+    }
+    s.push_str("Materialien: ");
+    s.push_str(&PALETTE.iter().map(|p| p.0).collect::<Vec<_>>().join(", "));
+    s.push('\n');
+    s
+}
+
+/// "haus.jfs:71" (the line alone when the file is not known)
+pub fn place(at: &Position) -> String {
+    if at.file.is_empty() { format!("Zeile {}", at.line) } else { format!("{}:{}", at.file, at.line) }
+}
+
+/// The most arguments a host function reads (a method of a mesh: besides the mesh, under its API name "m.NAME"),
+/// over all its forms; None for the ones that take any number (merge and the Boolean operations).
+pub fn max_args(api: &str) -> Option<usize> {
+    Some(match api {
+        "geom.extrude" | "geom.prism" => 2,
+        "geom.box" | "geom.cylinder" | "geom.sphere" | "geom.lathe" => 3,
+        "geom.cone" | "geom.torus" | "geom.stairs" | "geom.sweep" => 4,
+        "geom.arch" => 5,
+        "m.center" | "m.flip" | "m.flat" | "m.bounds" | "m.area" | "m.volume" | "m.check" => 0,
+        "m.rotate_x" | "m.rotate_y" | "m.rotate_z" | "m.mirror" | "m.weld" | "m.smooth" => 1,
+        "m.radial" => 2,
+        "m.move" | "m.place" | "m.scale" | "m.bevel" => 3,
+        "m.rotate" | "m.array" => 4,
+        "profile.area" => 1,
+        "profile.rect" | "profile.circle" | "profile.rotate" => 2,
+        "profile.move" | "profile.scale" => 3,
+        "profile.rounded" | "profile.arc" => 4,
+        "vec.len" | "vec.norm" => 1,
+        "vec.add" | "vec.sub" | "vec.mul" | "vec.dot" | "vec.cross" | "vec.dist" => 2,
+        "vec.lerp" => 3,
+        "model.name" | "model.budget" | "model.uv_scale" => 1,
+        "model.material" => 2,
+        "model.add" => 3,
+        "model.expect_size" => 4,
+        _ => return None,
+    })
+}
+
+/// A warning when a call that worked got more arguments than the function reads: the others were never looked at
+/// (`geom.cylinder(0.3, 1.2, 32, 0.1)` with a radius for the top meant for geom.cone).
+fn extra_arguments(cx: &mut Cx, name: &str, args: &[Value]) {
+    let (ns, f) = name.split_once('.').unwrap_or(("", name));
+    let functions = ["box", "cylinder", "cone", "sphere", "torus", "stairs", "arch", "extrude", "prism", "sweep", "lathe", "merge", "union", "difference", "intersection"];
+    // a method: map.move(m, ..), also geom.move(m, ..); its messages name it "move()"
+    let method = ns == "map" || (ns == "geom" && !functions.contains(&f));
+    let (api, shown_as, given) = if method { (format!("m.{f}"), format!("{f}()"), args.len().saturating_sub(1)) } else { (String::from(name), String::from(name), args.len()) };
+    let Some(max) = max_args(&api) else { return };
+    if given <= max {
+        return;
+    }
+    let params = API.iter().find(|e| e.name == api).map_or("", |e| e.params);
+    let count = if given == 1 { String::from("1 Argument") } else { format!("{} Argumente", given) };
+    let takes = if max == 0 { String::from("nimmt aber keine") } else { format!("nimmt aber höchstens {} ({})", max, params) };
+    let rest = match given - max {
+        1 if given == 1 => "es bleibt unbeachtet",
+        1 => "das letzte bleibt unbeachtet",
+        _ => "die übrigen bleiben unbeachtet",
+    };
+    cx.warn(&format!("{}: {}, {}; {}", shown_as, count, takes, rest));
 }
 
 // ---------------------------------------------------------------- arguments
@@ -429,64 +514,71 @@ impl ModelHost<'_> {
     fn construct(&mut self, cx: &mut Cx, name: &str, f: &str, args: &[Value]) -> Result<Value, Fail> {
         let r = match f {
             "box" => {
-                let (w, h, d) = (num(cx, name, args, 0, "b")?, num(cx, name, args, 1, "h")?, num(cx, name, args, 2, "t")?);
+                let (w, h, d) = (num(cx, name, args, 0, "w")?, num(cx, name, args, 1, "h")?, num(cx, name, args, 2, "d")?);
                 geom::cuboid(w, h, d)
             }
             "cylinder" => {
                 let (r, h) = (num(cx, name, args, 0, "r")?, num(cx, name, args, 1, "h")?);
-                let n = count_or(cx, name, args, 2, Some(32), "segmente")?;
+                let n = count_or(cx, name, args, 2, Some(32), "segments")?;
                 geom::cylinder(r, h, n)
             }
             "cone" => {
                 let (r, h) = (num(cx, name, args, 0, "r")?, num(cx, name, args, 1, "h")?);
-                let n = count_or(cx, name, args, 2, Some(32), "segmente")?;
-                let top = num_or(cx, name, args, 3, 0.0, "r_oben")?;
+                let n = count_or(cx, name, args, 2, Some(32), "segments")?;
+                let top = num_or(cx, name, args, 3, 0.0, "r_top")?;
                 geom::cone(r, h, n, top)
             }
             "sphere" => {
                 let r = num(cx, name, args, 0, "r")?;
-                let n = count_or(cx, name, args, 1, Some(32), "segmente")?;
-                let stacks = count_or(cx, name, args, 2, Some((n / 2).max(2)), "ringe")?;
+                let n = count_or(cx, name, args, 1, Some(32), "segments")?;
+                let stacks = count_or(cx, name, args, 2, Some((n / 2).max(2)), "rings")?;
                 geom::sphere(r, n, stacks)
             }
             "torus" => {
                 let (big, small) = (num(cx, name, args, 0, "R")?, num(cx, name, args, 1, "r")?);
-                let n = count_or(cx, name, args, 2, Some(32), "segmente")?;
-                let sides = count_or(cx, name, args, 3, Some(16), "seiten")?;
+                let n = count_or(cx, name, args, 2, Some(32), "segments")?;
+                let sides = count_or(cx, name, args, 3, Some(16), "sides")?;
                 geom::torus(big, small, n, sides)
             }
             "stairs" => {
-                let (w, h, d) = (num(cx, name, args, 0, "b")?, num(cx, name, args, 1, "h")?, num(cx, name, args, 2, "t")?);
-                let steps = count_or(cx, name, args, 3, None, "stufen")?;
+                let (w, h, d) = (num(cx, name, args, 0, "w")?, num(cx, name, args, 1, "h")?, num(cx, name, args, 2, "d")?);
+                let steps = count_or(cx, name, args, 3, None, "steps")?;
                 geom::stairs(w, h, d, steps)
             }
             "arch" => {
-                let (w, h, d) = (num(cx, name, args, 0, "b")?, num(cx, name, args, 1, "h")?, num(cx, name, args, 2, "t")?);
-                let t = num(cx, name, args, 3, "staerke")?;
-                let n = count_or(cx, name, args, 4, Some(16), "segmente")?;
+                let (w, h, d) = (num(cx, name, args, 0, "w")?, num(cx, name, args, 1, "h")?, num(cx, name, args, 2, "d")?);
+                let t = num(cx, name, args, 3, "thickness")?;
+                let n = count_or(cx, name, args, 4, Some(16), "segments")?;
                 geom::arch(w, h, d, t, n)
             }
             "extrude" => {
-                let p = points2(cx, name, arg(args, 0), "profil")?;
-                let d = num(cx, name, args, 1, "tiefe")?;
+                let p = points2(cx, name, arg(args, 0), "profile")?;
+                let d = num(cx, name, args, 1, "depth")?;
                 geom::extrude(&p, d)
             }
             "prism" => {
-                let p = points2(cx, name, arg(args, 0), "grundriss")?;
+                let p = points2(cx, name, arg(args, 0), "footprint")?;
                 let h = num(cx, name, args, 1, "h")?;
                 geom::prism(&p, h)
             }
             "sweep" => {
-                let p = points2(cx, name, arg(args, 0), "profil")?;
-                let path = points3(cx, name, arg(args, 1), "pfad")?;
-                let closed = arg(args, 2).truthy();
-                let smooth = num_or(cx, name, args, 3, geom::DEFAULT_SMOOTH_DEG, "glatt")?;
+                let p = points2(cx, name, arg(args, 0), "profile")?;
+                let path = points3(cx, name, arg(args, 1), "path")?;
+                // any value is true but nil and false: a number here is very likely the smoothing angle one place
+                // too early (geom.sweep(p, path, 30)), and 0 does not mean false
+                let closed_v = arg(args, 2);
+                let closed = closed_v.truthy();
+                if !matches!(closed_v, Value::Nil | Value::Bool(_)) {
+                    let s = shown(cx, closed_v);
+                    cx.warn(&format!("{}: closed sollte true oder false sein, nicht {} (gilt als {})", name, s, closed));
+                }
+                let smooth = num_or(cx, name, args, 3, geom::DEFAULT_SMOOTH_DEG, "smooth")?;
                 geom::sweep(&p, &path, closed, smooth)
             }
             _ => {
-                let p = points2(cx, name, arg(args, 0), "profil")?;
-                let n = count_or(cx, name, args, 1, Some(32), "segmente")?;
-                let smooth = num_or(cx, name, args, 2, geom::DEFAULT_SMOOTH_DEG, "glatt")?;
+                let p = points2(cx, name, arg(args, 0), "profile")?;
+                let n = count_or(cx, name, args, 1, Some(32), "segments")?;
+                let smooth = num_or(cx, name, args, 2, geom::DEFAULT_SMOOTH_DEG, "smooth")?;
                 geom::lathe(&p, n, smooth)
             }
         };
@@ -598,7 +690,7 @@ impl ModelHost<'_> {
                 Some(Affine::translation(-b.center()))
             }
             "rotate_x" | "rotate_y" | "rotate_z" => {
-                let deg = num(cx, name, rest, 0, "grad")?;
+                let deg = num(cx, name, rest, 0, "deg")?;
                 let axis = match f {
                     "rotate_x" => Axis::X,
                     "rotate_y" => Axis::Y,
@@ -607,7 +699,7 @@ impl ModelHost<'_> {
                 Some(Affine::rotation(axis, deg))
             }
             "rotate" => {
-                let deg = num(cx, name, rest, 0, "grad")?;
+                let deg = num(cx, name, rest, 0, "deg")?;
                 let axis = vec3(cx, name, rest, 1, "die Achse")?;
                 match Affine::rotation_about(axis, deg) {
                     Some(a) => Some(a),
@@ -651,14 +743,14 @@ impl ModelHost<'_> {
         let out = match f {
             "flip" => m.flipped(),
             "weld" => {
-                let tol = num_or(cx, name, rest, 0, 0.0, "toleranz")?;
+                let tol = num_or(cx, name, rest, 0, 0.0, "tolerance")?;
                 if tol < 0.0 {
                     return Err(throw(cx, name, "die Toleranz darf nicht negativ sein"));
                 }
                 self.meshes[id].weld(tol)
             }
             "array" => {
-                let n = count_or(cx, name, rest, 0, None, "anzahl")?;
+                let n = count_or(cx, name, rest, 0, None, "count")?;
                 let step = vec3(cx, name, rest, 1, "der Abstand")?;
                 match self.meshes[id].array(n, step) {
                     Ok(x) => x,
@@ -666,8 +758,8 @@ impl ModelHost<'_> {
                 }
             }
             "radial" => {
-                let n = count_or(cx, name, rest, 0, None, "anzahl")?;
-                let step = num_or(cx, name, rest, 1, 360.0 / n.max(1) as f64, "schritt")?;
+                let n = count_or(cx, name, rest, 0, None, "count")?;
+                let step = num_or(cx, name, rest, 1, 360.0 / n.max(1) as f64, "step")?;
                 match self.meshes[id].radial(n, step) {
                     Ok(x) => x,
                     Err(e) => return Err(throw(cx, name, e.message())),
@@ -675,12 +767,12 @@ impl ModelHost<'_> {
             }
             "flat" => m.flat(),
             "smooth" => {
-                let deg = num_or(cx, name, rest, 0, geom::DEFAULT_SMOOTH_DEG, "grad")?;
+                let deg = num_or(cx, name, rest, 0, geom::DEFAULT_SMOOTH_DEG, "deg")?;
                 self.meshes[id].smooth(deg)
             }
             "bevel" => {
-                let r = num(cx, name, rest, 0, "breite")?;
-                let k = count_or(cx, name, rest, 1, Some(1), "segmente")?;
+                let r = num(cx, name, rest, 0, "width")?;
+                let k = count_or(cx, name, rest, 1, Some(1), "segments")?;
                 let only = match arg(rest, 2) {
                     Value::Nil => None,
                     v => match cx.str(v) {
@@ -689,7 +781,7 @@ impl ModelHost<'_> {
                         Some("z") | Some("Z") => Some(Axis::Z),
                         _ => {
                             let s = shown(cx, v);
-                            return Err(throw(cx, name, &format!("achse muss \"x\", \"y\", \"z\" oder nil sein, nicht {}", s)));
+                            return Err(throw(cx, name, &format!("axis muss \"x\", \"y\", \"z\" oder nil sein, nicht {}", s)));
                         }
                     },
                 };
@@ -732,7 +824,7 @@ impl ModelHost<'_> {
     fn profile(&mut self, cx: &mut Cx, name: &str, f: &str, args: &[Value]) -> Result<Value, Fail> {
         let pts: Vec<[f64; 2]> = match f {
             "rect" => {
-                let (w, h) = (num(cx, name, args, 0, "b")?, num(cx, name, args, 1, "h")?);
+                let (w, h) = (num(cx, name, args, 0, "w")?, num(cx, name, args, 1, "h")?);
                 geom::poly::rect(w, h)
             }
             "circle" => {
@@ -744,7 +836,7 @@ impl ModelHost<'_> {
                 geom::poly::circle(r, n)
             }
             "rounded" => {
-                let (w, h, r) = (num(cx, name, args, 0, "b")?, num(cx, name, args, 1, "h")?, num(cx, name, args, 2, "r")?);
+                let (w, h, r) = (num(cx, name, args, 0, "w")?, num(cx, name, args, 1, "h")?, num(cx, name, args, 2, "r")?);
                 let n = count_or(cx, name, args, 3, Some(4), "n")?;
                 if !(1..=256).contains(&n) {
                     return Err(throw(cx, name, "n muss zwischen 1 und 256 liegen"));
@@ -753,7 +845,7 @@ impl ModelHost<'_> {
             }
             "arc" => {
                 let r = num(cx, name, args, 0, "r")?;
-                let (from, to) = (num(cx, name, args, 1, "von")?, num(cx, name, args, 2, "bis")?);
+                let (from, to) = (num(cx, name, args, 1, "start")?, num(cx, name, args, 2, "end")?);
                 let n = count_or(cx, name, args, 3, Some(16), "n")?;
                 if !(1..=geom::MAX_SEGMENTS).contains(&n) {
                     return Err(throw(cx, name, &format!("n muss zwischen 1 und {} liegen", geom::MAX_SEGMENTS)));
@@ -773,7 +865,7 @@ impl ModelHost<'_> {
             }
             "rotate" => {
                 let p = points2(cx, name, arg(args, 0), "p")?;
-                let (s, c) = geom::math::sin_cos_deg(num(cx, name, args, 1, "grad")?);
+                let (s, c) = geom::math::sin_cos_deg(num(cx, name, args, 1, "deg")?);
                 p.iter().map(|q| [q[0] * c - q[1] * s + 0.0, q[0] * s + q[1] * c + 0.0]).collect()
             }
             "area" => {
@@ -809,13 +901,13 @@ impl ModelHost<'_> {
     }
 
     fn named_material(&mut self, cx: &mut Cx, f: &str, n: &str) -> Result<MaterialDef, Fail> {
-        if let Some(m) = self.defined.iter().find(|m| m.name == n) {
+        if let Some((m, _)) = self.defined.iter().find(|(m, _)| m.name == n) {
             return Ok(m.clone());
         }
         if let Some(&(name, color, roughness, metallic)) = PALETTE.iter().find(|p| p.0 == n) {
             return Ok(MaterialDef { name: String::from(name), color, roughness, metallic });
         }
-        let mut names: Vec<&str> = self.defined.iter().map(|m| m.name.as_str()).collect();
+        let mut names: Vec<&str> = self.defined.iter().map(|(m, _)| m.name.as_str()).collect();
         names.extend(PALETTE.iter().map(|p| p.0));
         Err(throw(cx, f, &format!("das Material \"{}\" gibt es nicht (model.material legt eins fest; es gibt: {})", n, names.join(", "))))
     }
@@ -841,17 +933,41 @@ impl ModelHost<'_> {
                     return Err(throw(cx, name, &format!("name muss ein str sein, nicht {}", s)));
                 };
                 let def = material_from_map(cx, name, &n, arg(args, 1))?;
-                self.defined.retain(|m| m.name != n);
-                self.defined.push(def);
+                // a second definition with other values: the first is lost, or the parts added in between keep it
+                // (two materials of one name); redefining a built-in one that no part uses yet is what it is for
+                if let Some((old, at)) = self.defined.iter().find(|(m, _)| m.name == n) {
+                    if *old != def {
+                        let msg = format!("{}: das Material \"{}\" ist schon in {} anders festgelegt; ab hier gilt das neue, Teile davor behalten das alte", name, n, place(at));
+                        cx.warn(&msg);
+                    }
+                } else if self.model.materials.iter().any(|m| m.name == n && *m != def) {
+                    cx.warn(&format!("{}: das Material \"{}\" haben schon Teile mit anderen Werten; sie behalten sie, das neue gilt erst für Teile danach", name, n));
+                }
+                let here = cx.position();
+                self.defined.retain(|(m, _)| m.name != n);
+                self.defined.push((def, here));
                 cx.new_str(&n)
             }
             "name" => {
-                self.model.name = cx.display(arg(args, 0));
+                let n = cx.display(arg(args, 0));
+                if let Some(at) = &self.name_at {
+                    if self.model.name != n {
+                        let msg = format!("{}: \"{}\" ersetzt den Namen \"{}\" aus {}", name, n, self.model.name, place(at));
+                        cx.warn(&msg);
+                    }
+                }
+                self.model.name = n;
+                self.name_at = Some(cx.position());
                 Ok(Value::Nil)
             }
             "budget" => {
-                let n = count_or(cx, name, args, 0, None, "dreiecke")?;
-                self.model.budget = Some(n as u64);
+                let n = count_or(cx, name, args, 0, None, "triangles")? as u64;
+                if let Some(old) = self.model.budget.filter(|&b| b != n) {
+                    let msg = format!("{}: {} ersetzt das Budget {} aus {}", name, n, old, place(&self.model.budget_at));
+                    cx.warn(&msg);
+                }
+                self.model.budget = Some(n);
+                self.model.budget_at = cx.position();
                 Ok(Value::Nil)
             }
             "expect_size" => {
@@ -872,19 +988,27 @@ impl ModelHost<'_> {
                         }
                     }
                 }
-                let tol = num_or(cx, name, args, ti, 0.001, "toleranz")?;
+                let tol = num_or(cx, name, args, ti, 0.001, "tolerance")?;
                 if tol < 0.0 {
                     return Err(throw(cx, name, "die Toleranz darf nicht negativ sein"));
                 }
-                self.model.expects.push(Expect { size, tolerance: tol });
+                self.model.expects.push(Expect { size, tolerance: tol, at: cx.position() });
                 Ok(Value::Nil)
             }
             "uv_scale" => {
-                let s = num(cx, name, args, 0, "meter")?;
+                let s = num(cx, name, args, 0, "meters")?;
                 if !(s > 0.0) {
-                    return Err(throw(cx, name, "meter muss größer 0 sein"));
+                    return Err(throw(cx, name, "meters muss größer 0 sein"));
+                }
+                // (the parts get their UV at the end of the run, all with the last value)
+                if let Some(at) = &self.uv_at {
+                    if self.model.uv_scale != s {
+                        let msg = format!("{}: {} ersetzt {} aus {}; alle Teile bekommen den letzten Wert", name, geom::fnum(s), geom::fnum(self.model.uv_scale), place(at));
+                        cx.warn(&msg);
+                    }
                 }
                 self.model.uv_scale = s;
+                self.uv_at = Some(cx.position());
                 Ok(Value::Nil)
             }
             _ => Err(Fail::Unknown),

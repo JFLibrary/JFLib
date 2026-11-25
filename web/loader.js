@@ -53,6 +53,22 @@ function flush() {
   inFlight=true;
   worker.postMessage({type:"batch",messages:outgoing.splice(0,128)});
 }
+// The next tick the app asks for, by its deadline after a batch (the worker's jfgui_frame_delay; none: an older bundle,
+// the idle ticks alone).  0: at once, with the next animation frame (a finger is down, something moves).  A timer due
+// before the next idle tick: a tick at its time, with the frame after it, in place of the next idle tick -- so a view that
+// draws through ui.timer(id, 1) runs at the display's rate, while a caret that blinks or a clock wakes the app no more
+// often than the idle ticks did (one tick replaced by one).  Later deadlines wait for the idle ticks, as before.
+const IDLE_MS=33;
+let dueTimer=0, idleSkip=false;
+function due(delay) {
+  if(typeof delay!=="number" || delay>=IDLE_MS) return;
+  if(delay<=0) {if(!outgoing.length)send({type:"tick"});return;}
+  idleSkip=true;
+  clearTimeout(dueTimer);dueTimer=0;
+  const tick=()=>{dueTimer=0;if(started && !inFlight && !outgoing.length)send({type:"tick"});};
+  // (a timer of 1 ms, an animation's: the animation frame is the wait)
+  if(delay<=2) tick(); else dueTimer=setTimeout(tick,delay);
+}
 function send(message) {
   if(message.type==="start") {worker.postMessage(message);return;}
   const last=outgoing[outgoing.length-1];
@@ -423,6 +439,18 @@ function dialogPayload(data) {
   for(let n=u32();n>0;n--) exts.push(str());
   return {flags,name,start,exts};
 }
+// the share sheet's request (lib/plat/web_share.rs): title, text, link, then the files (name, bytes)
+function sharePayload(data) {
+  const v=new DataView(data.buffer,data.byteOffset,data.byteLength);let at=0;
+  const u32=()=>{const x=v.getUint32(at,true);at+=4;return x;};
+  const raw=()=>{const n=u32();const b=data.slice(at,at+n);at+=n;return b;};
+  const str=()=>text.decode(raw());
+  const s={},title=str(),body=str(),url=str();
+  if(title)s.title=title;if(body)s.text=body;if(url)s.url=url;
+  const files=[];for(let n=u32();n>0;n--){const name=str();files.push(new File([raw()],name||"Datei"));}
+  if(files.length)s.files=files;
+  return s;
+}
 document.querySelector("#open").onclick=()=>{fileInput.value="";fileInput.click();};
 fileInput.onchange=async()=>{try{await importFiles(fileInput.files);complete(openRequest,2);}catch(e){complete(openRequest,errorCode(e));report(e.message);}openRequest=0;};
 fileInput.oncancel=()=>{complete(openRequest,-4);openRequest=0;};
@@ -504,6 +532,14 @@ async function service(m) {
     else if(m.kind===30) watchGpuCanvas(gpuCanvas);
     else if(m.kind===9) {const url=new URL(value());if(!["https:","http:","mailto:"].includes(url.protocol))throw new Error("URL nicht unterstützt");if(!window.open(url.href,"_blank","noopener,noreferrer"))complete(m.id,-1);else complete(m.id,2);}
     else if(m.kind===10) {const on=data[0]===1;if(on!==enabled)activate(on);}
+    // the share sheet (lib/plat/web_share.rs): navigator.share, from the user's gesture; 2 shared, -4 closed
+    else if(m.kind===34) {
+      if(!navigator.share) {complete(m.id,-3);return;}
+      const s=sharePayload(data);
+      if(s.files && !navigator.canShare?.({files:s.files})) {complete(m.id,-3);return;}
+      try {await navigator.share(s);complete(m.id,2);}
+      catch(error) {complete(m.id,error?.name==="AbortError"?-4:error?.name==="NotAllowedError"?-1:-5);}
+    }
     // a change of the secret store (secrets.js): encrypted and committed in order
     else if(m.kind===13) {
       if(!secretStore) {data.fill(0);complete(m.id,-3);return;}
@@ -538,7 +574,7 @@ worker.onmessage=({data:m})=>{
     worker.postMessage({type:"recycle",buffers},buffers);
   }
   // (while a finger is down or something moves the next frame comes with the display's)
-  else if(m.type==="batch-complete") {inFlight=false;if(m.busy&&!outgoing.length)send({type:"tick"});schedule();}
+  else if(m.type==="batch-complete") {inFlight=false;due(m.delay);schedule();}
   else if(m.type==="ready") {window.__jfguiCompute=m.compute;document.body.dataset.compute=m.compute?.mode || "scalar";document.body.dataset.computeWorkers=String(m.compute?.workers || 0);started=true;activate(enabled);screens();system.ready();if(shadow)send({type:"a11y",on:2});input.focus({preventScroll:true});window.dispatchEvent(new Event("jfgui-ready"));}
   else if(m.type==="service") service(m);
   // (a test) the GPU output's counters
@@ -549,8 +585,12 @@ worker.onmessage=({data:m})=>{
   else if(m.type==="exit") report(`${L("Anwendung beendet")} (${m.code})`);
 };
 worker.onerror=e=>report(e.message);
-// Idle ticks drive caret blink, animations and cooperative jobs without building a queue.
-setInterval(()=>{if(started && !inFlight && !outgoing.length)send({type:"tick"});},33);
+// Idle ticks drive caret blink, animations and cooperative jobs without building a queue; one that an early tick (due)
+// stands in for is left out.
+setInterval(()=>{
+  if(idleSkip) {idleSkip=false;return;}
+  if(started && !inFlight && !outgoing.length && !dueTimer)send({type:"tick"});
+},IDLE_MS);
 let initialFiles=[];
 try {
   const restored=await storage();database=restored.database;initialFiles=restored.entries.filter(f=>f.app===app);
@@ -584,5 +624,5 @@ const handheld=navigator.userAgentData?.mobile||/Android|iPhone|iPad|iPod|Mobile
 const env=[];if(params.get("gpu"))env.push(`jfgui_GPU=${params.get("gpu")}`);else if(handheld)env.push("jfgui_GPU=0");
 for(const pair of (params.get("gpuenv")||"").split(",")) if(/^jfgui_GPU_[A-Z_]+=[\w.]*$/.test(pair)) env.push(pair);
 lastScreens=screenLine(screen,true); // the first frame knows the monitor already
-send({type:"start",env,languages:[...(navigator.languages||[])],url:`${app}.wasm`,mode:params.get("compute") || "auto",workers:Number(params.get("workers")) || undefined,...sizes(),args,files:initialFiles,screens:lastScreens,system:system.snapshot(),secrets:initialSecrets,capabilities:(database?4:0)|(navigator.clipboard?8:0)|(handleStore?65536:0)|(window.EyeDropper?131072:0)|(matchMedia("(pointer: coarse)").matches?262144:0)});
+send({type:"start",env,languages:[...(navigator.languages||[])],url:`${app}.wasm`,mode:params.get("compute") || "auto",workers:Number(params.get("workers")) || undefined,...sizes(),args,files:initialFiles,screens:lastScreens,system:system.snapshot(),secrets:initialSecrets,capabilities:(database?4:0)|(navigator.clipboard?8:0)|(handleStore?65536:0)|(window.EyeDropper?131072:0)|(navigator.share?8192:0)|(matchMedia("(pointer: coarse)").matches?262144:0)});
 initialSecrets?.fill(0); // postMessage copied them

@@ -1,0 +1,19 @@
+# Diagramme und Grafiken / Marketingdiagramme (VL-38, JD26): Schaubilder für Strategie und
+# Marketing – Marketingdiagramme, Matrizen, Pyramiden, Zyklen, Venn-Diagramme und
+# Diagramm-Shapes, A4 bzw. Letter quer.  Quellformat: ../README.md
+template: Charts and Graphs
+file: charts
+name.de: Diagramme und Grafiken
+name.en: Charts and Graphs
+name.es: Gráficos y diagramas
+name.it: Grafici e diagrammi
+name.fr: Graphiques et diagrammes
+description.de: Marketingdiagramme, Matrizen, Pyramiden, Kreisläufe, Venn-Diagramme und Kreisdiagramme für Präsentationen.
+description.en: Marketing diagrams, matrices, pyramids, cycles, Venn diagrams and pie charts for presentations.
+description.es: Diagramas de marketing, matrices, pirámides, ciclos, diagramas de Venn y gráficos circulares para presentaciones.
+description.it: Diagrammi di marketing, matrici, piramidi, cicli, diagrammi di Venn e grafici a torta per presentazioni.
+description.fr: Diagrammes marketing, matrices, pyramides, cycles, diagrammes de Venn et graphiques en secteurs pour les présentations.
+category: business
+order: 80
+stencils: marketing, matrix, pyramid, cycle, venn, charting
+starters: strategy

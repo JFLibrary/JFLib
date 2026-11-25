@@ -1,0 +1,83 @@
+# Zielscheibe (SH-033, JD26): zwei bis sechs Kreise (gestreckt Ellipsen) gleicher Mitte in
+# gleichen Abständen; Visio füllt nach der Gerade-Ungerade-Regel, die Ringe sind also
+# abwechselnd gefüllt und frei.  Die Zahl der Ringe steht in den Shape-Daten (Prop.Rings);
+# Kreise über der Zahl sind verborgen.  Der Text steht in der Mitte.
+master: Target
+name.de: Zielscheibe
+name.en: Target
+name.es: Diana
+name.it: Bersaglio
+name.fr: Cible
+prompt.de: Zielscheibe aus Ringen für Ziele und Schwerpunkte. Die Zahl der Ringe stellen Sie in den Shape-Daten ein.
+prompt.en: Target of rings for goals and focus areas. Set the number of rings in the shape data.
+prompt.es: Diana de anillos para objetivos y prioridades. Defina el número de anillos en los datos de la forma.
+prompt.it: Bersaglio ad anelli per obiettivi e priorità. Imposta il numero di anelli nei dati della forma.
+prompt.fr: Cible en anneaux pour les objectifs et les priorités. Définissez le nombre d'anneaux dans les données de la forme.
+keywords.de: Zielscheibe, Ziel, Ringe, konzentrisch, Fokus, Schwerpunkt, Zielgruppe
+keywords.en: target, goal, rings, concentric, focus, bullseye, audience
+keywords.es: diana, objetivo, anillos, concéntrico, enfoque, público objetivo
+keywords.it: bersaglio, obiettivo, anelli, concentrico, focus, pubblico
+keywords.fr: cible, objectif, anneaux, concentrique, focus, public cible
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 40 mm
+Height.us = 1.5 in
+TxtWidth = Width/User.N
+TxtHeight = Height/User.N*0.5
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# die Zahl der Ringe (2 bis 6); Kreis k hat den Radius k/N des äußeren
+N:  Value = MIN(MAX(ROUND(Prop.Rings,0),2),6)
+
+[Property]
+Rings:  Type = 2; Format = "0"; Value = 4
+        Label.de = Ringe
+        Label.en = Rings
+        Label.es = Anillos
+        Label.it = Anelli
+        Label.fr = Anneaux
+        Prompt.de = Anzahl der Ringe (2 bis 6)
+        Prompt.en = Number of rings (2 to 6)
+        Prompt.es = Número de anillos (de 2 a 6)
+        Prompt.it = Numero di anelli (da 2 a 6)
+        Prompt.fr = Nombre d'anneaux (de 2 à 6)
+
+# der äußere Kreis, dann nach innen
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width*0.5*(1+(User.N-1)/User.N); B = Height*0.5
+         C = Width*0.5; D = Height*0.5*(1+(User.N-1)/User.N)
+
+[Geometry]
+NoShow = User.N<3
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width*0.5*(1+MAX(User.N-2,0.5)/User.N); B = Height*0.5
+         C = Width*0.5; D = Height*0.5*(1+MAX(User.N-2,0.5)/User.N)
+
+[Geometry]
+NoShow = User.N<4
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width*0.5*(1+MAX(User.N-3,0.5)/User.N); B = Height*0.5
+         C = Width*0.5; D = Height*0.5*(1+MAX(User.N-3,0.5)/User.N)
+
+[Geometry]
+NoShow = User.N<5
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width*0.5*(1+MAX(User.N-4,0.5)/User.N); B = Height*0.5
+         C = Width*0.5; D = Height*0.5*(1+MAX(User.N-4,0.5)/User.N)
+
+[Geometry]
+NoShow = User.N<6
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width*0.5*(1+MAX(User.N-5,0.5)/User.N); B = Height*0.5
+         C = Width*0.5; D = Height*0.5*(1+MAX(User.N-5,0.5)/User.N)
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

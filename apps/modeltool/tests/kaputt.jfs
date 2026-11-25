@@ -1,5 +1,5 @@
-// kaputt.jfs: ein Skript mit einem Fehler in Zeile 4, für tests/watch_fehler.uis (der Beobachtungsmodus zeigt den
-// Fehler mit seiner Stelle; ein Modell gibt es nicht)
+// kaputt.jfs: für tests/watch_fehler.uis, eine Warnung in Zeile 3 und ein Fehler in Zeile 4 (ein Modell gibt es nicht)
+model.name("Erst")
 model.name("Kaputt")
 let b = geom.box(1, -1, 1)
 model.add(b)

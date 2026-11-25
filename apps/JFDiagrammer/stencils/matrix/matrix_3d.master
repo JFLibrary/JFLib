@@ -1,0 +1,293 @@
+# 3D-Matrix (SH-031, JD26): vier Blöcke im Raster 2 x 2 mit Tiefe (Schrägbild nach rechts oben,
+# 45°).  Jeder Block besteht aus drei Teilen der Gruppe: Vorderseite (mit Text), Oberseite und
+# rechte Seite; die Flächen eines Blocks haben dieselbe Variantenfarbe (100 bis 103), die Oberseite
+# um 40 Einheiten heller, die Seite um 40 dunkler (TINT/SHADE auf THEMEVAL("FillColor"), unter
+# THEMEGUARD) – so bleibt der Körper auch in Designs ohne Shape-Linien räumlich.  Zuerst die
+# Rückflächen in der Reihenfolge, in der sie einander verdecken (links unten, links oben, rechts
+# unten, rechts oben), dann alle Vorderseiten.  Row_1 an der oberen rechten Ecke der Vorderseiten
+# ändert die Tiefe (Abstand vom rechten Rand, nur waagrecht; die Tiefe bleibt beim Strecken).
+# 3 mm Abstand zwischen den Blöcken.  Rounding 0 wäre für 3D-Flächen sinnvoll, kommt aber wie überall
+# aus dem Design.
+master: 3D matrix
+name.de: 3D-Matrix
+name.en: 3D matrix
+name.es: Matriz 3D
+name.it: Matrice 3D
+name.fr: Matrice 3D
+prompt.de: Vierfeldermatrix aus Blöcken mit Tiefe. Die Tiefe ändern Sie mit dem gelben Steuerpunkt.
+prompt.en: Four-field matrix of blocks with depth. Drag the yellow control handle to change the depth.
+prompt.es: Matriz de cuatro campos de bloques con profundidad. Arrastre el controlador amarillo para cambiar la profundidad.
+prompt.it: Matrice a quattro campi di blocchi con profondità. Trascina la maniglia di controllo gialla per cambiare la profondità.
+prompt.fr: Matrice à quatre champs de blocs en relief. Faites glisser la poignée de contrôle jaune pour modifier la profondeur.
+keywords.de: Matrix, 3D, Tiefe, Blöcke, Vierfeldermatrix, räumlich, Quadranten
+keywords.en: matrix, 3D, depth, blocks, four-field matrix, three-dimensional, quadrants
+keywords.es: matriz, 3D, profundidad, bloques, cuatro cuadrantes, tridimensional, cuadrantes
+keywords.it: matrice, 3D, profondità, blocchi, quattro quadranti, tridimensionale, quadranti
+keywords.fr: matrice, 3D, profondeur, blocs, quatre quadrants, relief, quadrants
+
+[Shape]
+Width = 70 mm
+Width.us = 2.75 in
+Height = 60 mm
+Height.us = 2.25 in
+
+[User]
+# die Tiefe, der Abstand der Blöcke, Breite und Höhe der Vorderseiten zusammen und eines Blocks
+D:   Value = MIN(MAX(Width-Controls.Row_1,1 mm),Width*0.2,Height*0.2)
+G:   Value = 3 mm
+     Value.us = 0.12 in
+FW:  Value = Width-User.D
+FH:  Value = Height-User.D
+BW:  Value = (User.FW-User.G)*0.5
+BH:  Value = (User.FH-User.G)*0.5
+
+[Controls]
+Row_1:  X = Width-6 mm; Y = Height-User.D
+        X.us = Width-0.25 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 4; YCon = 1; CanGlue = FALSE
+        Tip.de = "Tiefe ändern"
+        Tip.en = "Change the depth"
+        Tip.es = "Cambiar la profundidad"
+        Tip.it = "Cambia la profondità"
+        Tip.fr = "Modifier la profondeur"
+
+[Connection]
+Row  X = User.FW*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = User.FW*0.5+User.D; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = User.FH*0.5; DirX = 1; DirY = 0
+
+# die Rückflächen: Oberseite (heller) und rechte Seite (dunkler) je Block
+[Part LL_Top]
+
+[Shape]
+Width = GUARD(Sheet.1!User.BW+Sheet.1!User.D)
+Height = GUARD(Sheet.1!User.D)
+PinX = GUARD(Width*0.5)
+PinY = GUARD(Sheet.1!User.BH+Height*0.5)
+QuickStyleLineColor = 102
+QuickStyleFillColor = 102
+FillForegnd = THEMEGUARD(TINT(THEMEVAL("FillColor"),40))
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width-Height; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = Height; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part LL_Side]
+
+[Shape]
+Width = GUARD(Sheet.1!User.D)
+Height = GUARD(Sheet.1!User.BH+Sheet.1!User.D)
+PinX = GUARD(Sheet.1!User.BW+Width*0.5)
+PinY = GUARD(Height*0.5)
+QuickStyleLineColor = 102
+QuickStyleFillColor = 102
+FillForegnd = THEMEGUARD(SHADE(THEMEVAL("FillColor"),40))
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = Width
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height-Width
+LineTo  X = 0; Y = 0
+
+[Part UL_Top]
+
+[Shape]
+Width = GUARD(Sheet.1!User.BW+Sheet.1!User.D)
+Height = GUARD(Sheet.1!User.D)
+PinX = GUARD(Width*0.5)
+PinY = GUARD(Sheet.1!User.BH+Sheet.1!User.G+Sheet.1!User.BH+Height*0.5)
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+FillForegnd = THEMEGUARD(TINT(THEMEVAL("FillColor"),40))
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width-Height; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = Height; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part UL_Side]
+
+[Shape]
+Width = GUARD(Sheet.1!User.D)
+Height = GUARD(Sheet.1!User.BH+Sheet.1!User.D)
+PinX = GUARD(Sheet.1!User.BW+Width*0.5)
+PinY = GUARD(Sheet.1!User.BH+Sheet.1!User.G+Height*0.5)
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+FillForegnd = THEMEGUARD(SHADE(THEMEVAL("FillColor"),40))
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = Width
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height-Width
+LineTo  X = 0; Y = 0
+
+[Part LR_Top]
+
+[Shape]
+Width = GUARD(Sheet.1!User.BW+Sheet.1!User.D)
+Height = GUARD(Sheet.1!User.D)
+PinX = GUARD(Sheet.1!User.BW+Sheet.1!User.G+Width*0.5)
+PinY = GUARD(Sheet.1!User.BH+Height*0.5)
+QuickStyleLineColor = 103
+QuickStyleFillColor = 103
+FillForegnd = THEMEGUARD(TINT(THEMEVAL("FillColor"),40))
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width-Height; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = Height; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part LR_Side]
+
+[Shape]
+Width = GUARD(Sheet.1!User.D)
+Height = GUARD(Sheet.1!User.BH+Sheet.1!User.D)
+PinX = GUARD(Sheet.1!User.BW+Sheet.1!User.G+Sheet.1!User.BW+Width*0.5)
+PinY = GUARD(Height*0.5)
+QuickStyleLineColor = 103
+QuickStyleFillColor = 103
+FillForegnd = THEMEGUARD(SHADE(THEMEVAL("FillColor"),40))
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = Width
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height-Width
+LineTo  X = 0; Y = 0
+
+[Part UR_Top]
+
+[Shape]
+Width = GUARD(Sheet.1!User.BW+Sheet.1!User.D)
+Height = GUARD(Sheet.1!User.D)
+PinX = GUARD(Sheet.1!User.BW+Sheet.1!User.G+Width*0.5)
+PinY = GUARD(Sheet.1!User.BH+Sheet.1!User.G+Sheet.1!User.BH+Height*0.5)
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+FillForegnd = THEMEGUARD(TINT(THEMEVAL("FillColor"),40))
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width-Height; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = Height; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part UR_Side]
+
+[Shape]
+Width = GUARD(Sheet.1!User.D)
+Height = GUARD(Sheet.1!User.BH+Sheet.1!User.D)
+PinX = GUARD(Sheet.1!User.BW+Sheet.1!User.G+Sheet.1!User.BW+Width*0.5)
+PinY = GUARD(Sheet.1!User.BH+Sheet.1!User.G+Height*0.5)
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+FillForegnd = THEMEGUARD(SHADE(THEMEVAL("FillColor"),40))
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = Width
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height-Width
+LineTo  X = 0; Y = 0
+
+# die Vorderseiten mit dem Text
+[Part UL_Front]
+text.de: Feld 1
+text.en: Field 1
+text.es: Campo 1
+text.it: Campo 1
+text.fr: Champ 1
+
+[Shape]
+Width = GUARD(Sheet.1!User.BW)
+Height = GUARD(Sheet.1!User.BH)
+PinX = GUARD(Width*0.5)
+PinY = GUARD(Sheet.1!User.BH+Sheet.1!User.G+Height*0.5)
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part UR_Front]
+text.de: Feld 2
+text.en: Field 2
+text.es: Campo 2
+text.it: Campo 2
+text.fr: Champ 2
+
+[Shape]
+Width = GUARD(Sheet.1!User.BW)
+Height = GUARD(Sheet.1!User.BH)
+PinX = GUARD(Sheet.1!User.BW+Sheet.1!User.G+Width*0.5)
+PinY = GUARD(Sheet.1!User.BH+Sheet.1!User.G+Height*0.5)
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part LL_Front]
+text.de: Feld 3
+text.en: Field 3
+text.es: Campo 3
+text.it: Campo 3
+text.fr: Champ 3
+
+[Shape]
+Width = GUARD(Sheet.1!User.BW)
+Height = GUARD(Sheet.1!User.BH)
+PinX = GUARD(Width*0.5)
+PinY = GUARD(Height*0.5)
+QuickStyleLineColor = 102
+QuickStyleFillColor = 102
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part LR_Front]
+text.de: Feld 4
+text.en: Field 4
+text.es: Campo 4
+text.it: Campo 4
+text.fr: Champ 4
+
+[Shape]
+Width = GUARD(Sheet.1!User.BW)
+Height = GUARD(Sheet.1!User.BH)
+PinX = GUARD(Sheet.1!User.BW+Sheet.1!User.G+Width*0.5)
+PinY = GUARD(Height*0.5)
+QuickStyleLineColor = 103
+QuickStyleFillColor = 103
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0

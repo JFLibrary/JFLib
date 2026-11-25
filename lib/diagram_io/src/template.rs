@@ -745,6 +745,10 @@ struct ShapeSrc {
     angle: Option<(f64, Option<Unit>)>,
     text: Option<[String; 5]>,
     tip: bool,
+    // (JD26) a 1-D master placed by its ends: BeginX, BeginY, EndX, EndY (inches)
+    ends: Option<[f64; 4]>,
+    // (JD26) the ends glued to a connection point: (row index of the target, point from 0, line)
+    glued: [Option<(usize, u32, u32)>; 2],
 }
 
 struct Starter {
@@ -756,7 +760,10 @@ struct Starter {
     shapes: Vec<ShapeSrc>,
 }
 
-const SHAPE_CELLS: &[&str] = &["Stencil", "Master", "PinX", "PinY", "Width", "Height", "Angle", "Tip", "From", "To", "Cff", "Lanes", "Phases"];
+const SHAPE_CELLS: &[&str] = &[
+    "Stencil", "Master", "PinX", "PinY", "Width", "Height", "Angle", "Tip", "From", "To", "Cff", "Lanes", "Phases", "BeginX", "BeginY", "EndX", "EndY",
+    "BeginOn", "BeginPoint", "EndOn", "EndPoint",
+];
 
 fn starter_of(file: &str, text: &str, m: Measure) -> Result<Starter, SourceError> {
     let src = template_src::parse(file, text, STARTER_SECS)?;
@@ -802,7 +809,7 @@ fn starter_of(file: &str, text: &str, m: Measure) -> Result<Starter, SourceError
             let (kind, shape) = if get("From").is_some() || get("To").is_some() {
                 only(&["From", "To", "Text"], "einem Verbinder (From, To)")?;
                 let (from, to) = (row_of("From")?, row_of("To")?);
-                let s = ShapeSrc { line: row.line, kind: ShapeKind0::Connector { from, to }, pin: [0.0; 2], size: [None, None], angle: None, text, tip: false };
+                let s = ShapeSrc { line: row.line, kind: ShapeKind0::Connector { from, to }, pin: [0.0; 2], size: [None, None], angle: None, text, tip: false, ends: None, glued: [None, None] };
                 (true, s)
             } else if let Some(c) = get("Cff") {
                 only(&["Cff", "PinX", "PinY", "Lanes", "Phases", "Text"], "einem funktionsübergreifenden Flussdiagramm (Cff)")?;
@@ -813,10 +820,13 @@ fn starter_of(file: &str, text: &str, m: Measure) -> Result<Starter, SourceError
                 };
                 let lanes = get("Lanes").map_or(Ok(2), |c| count(file, c, MAX_LANES))?.max(1);
                 let phases = get("Phases").map_or(Ok(1), |c| count(file, c, MAX_LANES))?;
-                let s = ShapeSrc { line: row.line, kind: ShapeKind0::Cff { horizontal, lanes, phases }, pin: pin(&cells)?, size: [None, None], angle: None, text, tip: false };
+                let s = ShapeSrc { line: row.line, kind: ShapeKind0::Cff { horizontal, lanes, phases }, pin: pin(&cells)?, size: [None, None], angle: None, text, tip: false, ends: None, glued: [None, None] };
                 (false, s)
             } else {
-                only(&["Stencil", "Master", "PinX", "PinY", "Width", "Height", "Angle", "Text", "Tip"], "einem Shape")?;
+                only(
+                    &["Stencil", "Master", "PinX", "PinY", "Width", "Height", "Angle", "Text", "Tip", "BeginX", "BeginY", "EndX", "EndY", "BeginOn", "BeginPoint", "EndOn", "EndPoint"],
+                    "einem Shape",
+                )?;
                 let st = get("Stencil").ok_or_else(|| err(file, row.line, format!("{}: Stencil und Master fehlen (oder From/To, Cff)", row.head)))?;
                 let ms = get("Master").ok_or_else(|| err(file, row.line, format!("{}: Master fehlt", row.head)))?;
                 let size_of = |n: &str| -> Result<Option<(f64, Option<Unit>)>, SourceError> {
@@ -848,7 +858,40 @@ fn starter_of(file: &str, text: &str, m: Measure) -> Result<Starter, SourceError
                     None => false,
                 };
                 let kind = ShapeKind0::Master { stencil: string(file, st)?, master: string(file, ms)? };
-                let s = ShapeSrc { line: row.line, kind, pin: pin(&cells)?, size: [size_of("Width")?, size_of("Height")?], angle, text, tip };
+                // (JD26) a 1-D master by its ends instead of its pin, each end glued to a
+                // connection point of a shape in an earlier row (BeginOn / BeginPoint, from 1)
+                let ends = match ["BeginX", "BeginY", "EndX", "EndY"].map(get) {
+                    [None, None, None, None] => None,
+                    [Some(bx), Some(by), Some(ex), Some(ey)] => {
+                        if let Some(c) = get("PinX").or(get("PinY")).or(get("Width")).or(get("Angle")) {
+                            return Err(err(file, c.line, format!("{}: {} gibt es neben BeginX … EndY nicht", row.head, c.name)));
+                        }
+                        Some([length(file, bx)?, length(file, by)?, length(file, ex)?, length(file, ey)?])
+                    }
+                    _ => return Err(err(file, row.line, format!("{}: BeginX, BeginY, EndX und EndY gehören zusammen", row.head))),
+                };
+                let mut glued = [None, None];
+                for (k, (on, at)) in [("BeginOn", "BeginPoint"), ("EndOn", "EndPoint")].into_iter().enumerate() {
+                    match (get(on), get(at)) {
+                        (None, None) => {}
+                        (Some(o), Some(p)) => {
+                            if ends.is_none() {
+                                return Err(err(file, o.line, format!("{}: {on} braucht BeginX … EndY", row.head)));
+                            }
+                            let n = count(file, p, 10_000)?;
+                            if n == 0 {
+                                return Err(err(file, p.line, format!("{at} zählt ab 1")));
+                            }
+                            glued[k] = Some((row_of(on)?, n as u32 - 1, o.line));
+                        }
+                        (Some(c), None) | (None, Some(c)) => return Err(err(file, c.line, format!("{}: {on} und {at} gehören zusammen", row.head))),
+                    }
+                }
+                let pin = match ends {
+                    Some(e) => [(e[0] + e[2]) * 0.5, (e[1] + e[3]) * 0.5],
+                    None => pin(&cells)?,
+                };
+                let s = ShapeSrc { line: row.line, kind, pin, size: [size_of("Width")?, size_of("Height")?], angle, text, tip, ends, glued };
                 (false, s)
             };
             heads.push((row.head.clone(), kind));
@@ -1020,6 +1063,13 @@ fn sheets_of(doc: &Document, s: ShapeRef) -> Vec<SheetRef> {
     out
 }
 
+// (JD26) whether a document measures in millimetres (the first page's PageWidth unit)
+fn doc_metric(doc: &Document) -> bool {
+    let Some(page) = doc.pages().next() else { return true };
+    let Some(sym) = doc.sym("PageWidth") else { return true };
+    doc.resolve(SheetRef::Page(page), &CellAddr::single(sym)).unit() != Some(Unit::Inches)
+}
+
 // a text in five languages on a shape: the build language's as its text, all in JFD_Text
 fn shape_text(tx: &mut Transaction, s: ShapeRef, t: &[String; 5], lang: usize, file: &str, line: u32) -> Result<(), SourceError> {
     tx.set_text(s, Some(Text::plain(&t[lang]))).map_err(|e| fail(file, line, "der Text", e))?;
@@ -1054,8 +1104,25 @@ fn place_starter(doc: &mut Document, st: &Starter, lang: usize, stencils: &mut S
                 if s.tip {
                     tx.set_user(SheetRef::Shape(shape), JFD_TIP, Value::Num(1.0), Some(Unit::Bool)).map_err(|e| fail(file, line, JFD_TIP, e))?;
                 }
+                // (JD26) a 1-D master by its ends: the ends as written (the pin follows them)
+                if let Some(e) = s.ends {
+                    let u = if doc_metric(tx.doc()) { Unit::Millimeters } else { Unit::Inches };
+                    for (name, v) in [("BeginX", e[0]), ("BeginY", e[1]), ("EndX", e[2]), ("EndY", e[3])] {
+                        let a = tx.single(name);
+                        tx.force_constant(SheetRef::Shape(shape), &a, Value::Num(v), Some(u)).map_err(|e| fail(file, line, name, e))?;
+                    }
+                }
                 let sheets = sheets_of(tx.doc(), shape);
                 eng.recalc(&mut tx, &sheets).map_err(|e| fail(file, line, "die Formeln", e))?;
+                // (JD26) and glued to the connection points named
+                for (k, g) in s.glued.iter().enumerate() {
+                    let Some((row, point, gline)) = *g else { continue };
+                    let Some(&target) = made.get(row) else { return Err(err(file, gline, "die Zeile fehlt")) };
+                    let at = glue::connection_points(tx.doc(), target).into_iter().find(|p| p.row == point).map(|p| p.at);
+                    let at = at.ok_or_else(|| err(file, gline, format!("das Ziel hat keinen Verbindungspunkt {}", point + 1)))?;
+                    let end = if k == 0 { glue::End::Begin } else { glue::End::End };
+                    glue::glue(&mut tx, &mut eng, shape, end, at, Target::Point { shape: target, row: point }).map_err(|e| fail(file, gline, "das Kleben", e))?;
+                }
                 shape
             }
             ShapeKind0::Connector { from, to } => {
@@ -1456,6 +1523,10 @@ fn localize_shape(tx: &mut Transaction, s: ShapeRef, lang: usize) -> bool {
     }
     let Some(m) = tx.doc().shape(s).and_then(|x| x.header().master).and_then(|id| tx.doc().master_by_id(id)) else { return changed };
     let texts = MasterTexts::of(tx.doc(), m);
+    // (JD26) the texts of a group master's parts
+    if instance::localize_parts(tx, s, lang).is_ok_and(|v| !v.is_empty()) {
+        changed = true;
+    }
     // the name: the master's in this language, with the ".ID" a second instance got
     let name_u = tx.doc().shape(s).and_then(|x| x.header().name_u).map(|n| String::from(tx.doc().str(n)));
     if let Some(nu) = name_u.filter(|_| !texts.name_u.is_empty()) {

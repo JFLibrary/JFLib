@@ -65,6 +65,11 @@ pub mod ttf;
 mod shaping;
 pub mod var;
 
+// the test binary of the unit tests (tests.rs): plat's start of a std program refers to the
+// jfgui_main a program defines
+#[cfg(test)]
+rt::test_main!();
+
 #[cfg(test)]
 mod tests;
 

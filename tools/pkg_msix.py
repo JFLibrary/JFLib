@@ -92,7 +92,9 @@ def capabilities(perms):
     full-trust desktop app is not confined by them (they are shown in the Store); runFullTrust
     is always declared, PERMISSIONS stays what plat enforces.  audio.output needs none: playing
     sound is no capability in MSIX (only recording would be: microphone).  location: the device
-    capability, as a Store listing shows it; sensors need none (Windows.Devices.Sensors)"""
+    capability, as a Store listing shows it; sensors need none (Windows.Devices.Sensors); gamepad
+    needs none: the capability list has nothing for XInput (humaninterfacedevice is the HID API's,
+    which plat does not use), and a full-trust app runs outside an AppContainer"""
     if perms is None:
         return ["internetClient", "internetClientServer", "privateNetworkClientServer"], \
             ["kein PERMISSIONS: alle Netz-Fähigkeiten angegeben"]
@@ -108,6 +110,8 @@ def capabilities(perms):
         notes.append("location: DeviceCapability location (plat liefert unter Windows noch keinen Standort)")
     if "sensors" in keys:
         notes.append("sensors: keine Fähigkeit nötig (plat liest unter Windows noch keine Sensoren)")
+    if "gamepad" in keys:
+        notes.append("gamepad: keine Fähigkeit nötig (XInput in einer Full-Trust-App)")
     return caps, notes
 
 

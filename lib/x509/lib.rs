@@ -16,8 +16,12 @@
 //   CertBuilder { .. }.sign(&issuer_cert_or_self, &issuer_key) -> DER     (Ed25519)
 //   CertBuilder { spki, .. }.sign_key(issuer, &PrivateKey, extra) -> DER   any key, signed by any
 //   PrivateKey: Ed25519, ECDSA (P-256 / P-384), RSA; PKCS #8 / SEC 1 / PKCS #1 (key.rs)
+//   ocsp::check(der, &cert, &issuer, now)   an OCSP response (RFC 6960); request, CertId,
+//                                           ResponseBuilder for a private CA's responder (ocsp.rs)
+//   CsrBuilder { dns, .. }.sign(&key), Csr::parse   certificate requests (PKCS #10, csr.rs)
 //
-// Not checked: revocation (CRL / OCSP), certificate policies.  Name constraints are processed
+// Not checked: CRLs, certificate policies (OCSP: the ocsp module; a certificate's responders,
+// caIssuers and TLS features are read).  Name constraints are processed
 // for DNS names, IP addresses, e-mail addresses (rfc822Name), URIs (their host) and directory
 // names (a byte-wise prefix of the subject's RDNs); a CA that constrains another form refuses
 // every certificate below it that has a name of that form (RFC 5280 4.2.1.10).  They apply to
@@ -28,10 +32,13 @@
 
 extern crate alloc;
 
+pub mod csr;
 pub mod der;
 mod ip;
 mod key;
+pub mod ocsp;
 
+pub use csr::{Csr, CsrBuilder};
 pub use ip::IpAddr;
 pub use key::{spki_of, PrivateKey};
 
@@ -76,6 +83,16 @@ const OID_SHA512: &[u64] = &[2, 16, 840, 1, 101, 3, 4, 2, 3];
 const OID_SERVER_AUTH: &[u64] = &[1, 3, 6, 1, 5, 5, 7, 3, 1];
 const OID_CLIENT_AUTH: &[u64] = &[1, 3, 6, 1, 5, 5, 7, 3, 2];
 const OID_ANY_EKU: &[u64] = &[2, 5, 29, 37, 0];
+const OID_OCSP_SIGNING: &[u64] = &[1, 3, 6, 1, 5, 5, 7, 3, 9];
+const OID_AIA: &[u64] = &[1, 3, 6, 1, 5, 5, 7, 1, 1];
+const OID_AD_OCSP: &[u64] = &[1, 3, 6, 1, 5, 5, 7, 48, 1];
+const OID_AD_CA_ISSUERS: &[u64] = &[1, 3, 6, 1, 5, 5, 7, 48, 2];
+const OID_TLS_FEATURE: &[u64] = &[1, 3, 6, 1, 5, 5, 7, 1, 24];
+const OID_OCSP_NOCHECK: &[u64] = &[1, 3, 6, 1, 5, 5, 7, 48, 1, 5];
+
+/// the TLS feature of a certificate that must come with a stapled OCSP response (RFC 7633:
+/// status_request)
+pub const TLS_FEATURE_STATUS_REQUEST: u16 = 5;
 
 /// key usage bits as they appear in the first byte
 pub const KU_DIGITAL_SIGNATURE: u8 = 0x80;
@@ -181,6 +198,21 @@ pub struct Cert {
     /// ediPartyName 0xa5, registeredID 0x88)
     pub other_names: Vec<u8>,
     pub ski: Vec<u8>,
+    /// the keyIdentifier of the authority key identifier (empty without one): which key of the
+    /// issuer signed it (ACME's renewal information names a certificate by it)
+    pub aki: Vec<u8>,
+    /// the OCSP responders of the authority information access (URIs, RFC 5280 4.2.2.1)
+    pub ocsp_urls: Vec<String>,
+    /// where the issuer's certificate is (caIssuers URIs of the authority information access)
+    pub ca_issuers: Vec<String>,
+    /// the TLS features the certificate demands (RFC 7633): TLS_FEATURE_STATUS_REQUEST is
+    /// "must staple", a TLS client that asks for a stapled OCSP response refuses it without one
+    /// (netio: Revocation::Stapled or Required with Trust::Anchors, System or Custom; with
+    /// Revocation::Off, Trust::Pinned or Trust::Any it asks for none and does not look)
+    pub tls_features: Vec<u16>,
+    /// id-pkix-ocsp-nocheck (RFC 6960 4.2.2.2.1): an OCSP responder's certificate that is not
+    /// checked for revocation itself
+    pub ocsp_nocheck: bool,
     /// a critical extension this code does not understand (such a certificate is rejected)
     pub unknown_critical: bool,
 }
@@ -195,7 +227,7 @@ fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
     era * 146_097 + doe - 719_468
 }
 
-fn civil_from_days(z: i64) -> (i64, i64, i64) {
+pub(crate) fn civil_from_days(z: i64) -> (i64, i64, i64) {
     let z = z + 719_468;
     let era = z.div_euclid(146_097);
     let doe = z - era * 146_097;
@@ -216,7 +248,7 @@ fn digits(s: &[u8]) -> Option<i64> {
 }
 
 /// UTCTime / GeneralizedTime (Z, seconds) -> seconds since 1970
-fn parse_time(tag: u8, c: &[u8]) -> Option<i64> {
+pub(crate) fn parse_time(tag: u8, c: &[u8]) -> Option<i64> {
     let (y, rest) = match tag {
         der::UTC_TIME if c.len() == 13 => {
             let yy = digits(&c[..2])?;
@@ -257,7 +289,7 @@ fn is_ed25519_alg(alg: &[u8]) -> bool {
     d.read(der::OID) == Some(&der::oid_bytes(OID_ED25519)[..]) && d.is_empty()
 }
 
-fn oid_is(o: &[u8], arcs: &[u64]) -> bool {
+pub(crate) fn oid_is(o: &[u8], arcs: &[u64]) -> bool {
     o == der::oid_bytes(arcs)
 }
 
@@ -282,7 +314,7 @@ fn hash_alg_id(alg: &[u8]) -> Option<HashAlg> {
 }
 
 /// the signature algorithm of an AlgorithmIdentifier's content
-fn sig_alg(alg: &[u8]) -> SigAlg {
+pub(crate) fn sig_alg(alg: &[u8]) -> SigAlg {
     if is_ed25519_alg(alg) {
         return SigAlg::Ed25519;
     }
@@ -325,7 +357,7 @@ fn sig_alg(alg: &[u8]) -> SigAlg {
 }
 
 /// the key of a SubjectPublicKeyInfo
-fn pub_key(alg: &[u8], key: &[u8]) -> PubKey {
+pub(crate) fn pub_key(alg: &[u8], key: &[u8]) -> PubKey {
     if is_ed25519_alg(alg) {
         return match <[u8; 32]>::try_from(key) {
             Ok(k) => PubKey::Ed25519(k),
@@ -399,14 +431,14 @@ fn subtrees(b: &[u8], out: &mut Subtrees, other: &mut Vec<u8>) -> Option<()> {
 }
 
 /// an IA5String's bytes as text (None for bytes above 0x7f)
-fn ascii(v: &[u8]) -> Option<String> {
+pub(crate) fn ascii(v: &[u8]) -> Option<String> {
     v.is_ascii().then(|| String::from_utf8_lossy(v).into_owned())
 }
 
 /// a dNSName of a subject alternative name in the preferred name syntax (RFC 5280 4.2.1.6,
 /// RFC 1034 3.5 with RFC 1123 2.1): labels of letters, digits and inner hyphens, at most 63
 /// bytes each and 253 in all; "*" only as the whole first label
-fn dns_name_ok(n: &str) -> bool {
+pub(crate) fn dns_name_ok(n: &str) -> bool {
     let rest = n.strip_prefix("*.").unwrap_or(n);
     if n.is_empty() || n.len() > 253 || rest.is_empty() {
         return false;
@@ -438,7 +470,7 @@ fn emails_of(name: &[u8]) -> Vec<String> {
 }
 
 /// the common name of a Name
-fn cn_of(name: &[u8]) -> String {
+pub(crate) fn cn_of(name: &[u8]) -> String {
     attr_of(name, OID_CN)
 }
 
@@ -631,7 +663,59 @@ impl Cert {
                     });
                 } else if is(OID_AKI) && critical {
                     return None; // MUST be non-critical (RFC 5280 4.2.1.1)
-                } else if is(OID_AKI) || is(OID_POLICIES) || is(OID_POLICY_CONSTRAINTS) || is(OID_INHIBIT_ANY) {
+                } else if is(OID_AKI) {
+                    // keyIdentifier [0], when there is one; the rest is not looked at
+                    if let Some(mut k) = Der::new(val).seq() {
+                        if let Some(id) = k.optional(0x80) {
+                            c.aki = Vec::from(id);
+                        }
+                    }
+                } else if is(OID_AIA) {
+                    // AuthorityInfoAccessSyntax: SEQUENCE SIZE (1..MAX) OF AccessDescription
+                    // (accessMethod, accessLocation); MUST be non-critical (RFC 5280 4.2.2.1)
+                    if critical {
+                        return None;
+                    }
+                    let mut top = Der::new(val);
+                    let mut k = top.seq()?;
+                    if k.is_empty() || !top.is_empty() {
+                        return None;
+                    }
+                    while !k.is_empty() {
+                        let mut ad = k.seq()?;
+                        let method = ad.read(der::OID)?;
+                        let (tag, loc, _) = ad.next()?;
+                        // a GeneralName: [0] to [8] (only URIs are used)
+                        if !ad.is_empty() || !matches!(tag, 0xa0 | 0x81 | 0x82 | 0xa3 | 0xa4 | 0xa5 | 0x86 | 0x87 | 0x88) {
+                            return None;
+                        }
+                        if tag == 0x86 {
+                            let uri = ascii(loc)?;
+                            if oid_is(method, OID_AD_OCSP) {
+                                c.ocsp_urls.push(uri);
+                            } else if oid_is(method, OID_AD_CA_ISSUERS) {
+                                c.ca_issuers.push(uri);
+                            }
+                        }
+                    }
+                } else if is(OID_TLS_FEATURE) {
+                    // Features ::= SEQUENCE OF INTEGER (RFC 7633 6), each a TLS extension type
+                    let mut top = Der::new(val);
+                    let mut k = top.seq()?;
+                    if !top.is_empty() {
+                        return None;
+                    }
+                    while !k.is_empty() {
+                        let v = k.u64()?;
+                        c.tls_features.push(u16::try_from(v).ok()?);
+                    }
+                } else if is(OID_OCSP_NOCHECK) {
+                    // its value is NULL
+                    if val != [der::NULL, 0] {
+                        return None;
+                    }
+                    c.ocsp_nocheck = true;
+                } else if is(OID_POLICIES) || is(OID_POLICY_CONSTRAINTS) || is(OID_INHIBIT_ANY) {
                     // known; policies are not enforced
                 } else if critical {
                     c.unknown_critical = true;
@@ -642,6 +726,37 @@ impl Cert {
             return None;
         }
         Some(c)
+    }
+
+    /// its SubjectPublicKeyInfo as it stands in the certificate (DER): what keys are pinned by
+    /// and a certificate request carries
+    pub fn spki(&self) -> Vec<u8> {
+        self.spki_parts().map(|(whole, _)| Vec::from(whole)).unwrap_or_default()
+    }
+
+    /// the SubjectPublicKeyInfo and the bytes of its subjectPublicKey (the BIT STRING's)
+    pub(crate) fn spki_parts(&self) -> Option<(&[u8], &[u8])> {
+        let mut t = Der::new(&self.tbs).seq()?;
+        t.optional(0xa0);
+        for tag in [der::INTEGER, der::SEQUENCE, der::SEQUENCE, der::SEQUENCE, der::SEQUENCE] {
+            t.read(tag)?;
+        }
+        let whole = t.read_raw(der::SEQUENCE)?;
+        let mut s = Der::new(whole).seq()?;
+        s.read(der::SEQUENCE)?;
+        Some((whole, s.bits()?))
+    }
+
+    /// whether its extended key usage allows signing OCSP responses (id-kp-OCSPSigning: a
+    /// responder its CA delegated to, RFC 6960 4.2.2.2)
+    pub fn ocsp_signer(&self) -> bool {
+        let want = der::oid_bytes(OID_OCSP_SIGNING);
+        self.eku.iter().any(|e| *e == want)
+    }
+
+    /// whether it must come with a stapled OCSP response (RFC 7633)
+    pub fn must_staple(&self) -> bool {
+        self.tls_features.contains(&TLS_FEATURE_STATUS_REQUEST)
     }
 
     /// SHA-256 of the certificate
@@ -1006,7 +1121,7 @@ fn path(chain: &[Cert], anchors: &[Cert], now: i64, usage: Usage, used: &mut [bo
     false
 }
 
-fn name(cn: &str, org: &str) -> Vec<u8> {
+pub(crate) fn name(cn: &str, org: &str) -> Vec<u8> {
     let mut rdns = Vec::new();
     if !org.is_empty() {
         rdns.push(der::set(&[&der::seq(&[&der::oid(OID_O), &der::utf8(org)])]));
@@ -1016,7 +1131,7 @@ fn name(cn: &str, org: &str) -> Vec<u8> {
     der::seq(&parts)
 }
 
-fn ext(oid: &[u64], critical: bool, value: &[u8]) -> Vec<u8> {
+pub(crate) fn ext(oid: &[u64], critical: bool, value: &[u8]) -> Vec<u8> {
     if critical {
         der::seq(&[&der::oid(oid), &der::boolean(true), &der::octets(value)])
     } else {
@@ -1041,10 +1156,18 @@ pub struct CertBuilder {
     /// the subject's key as a SubjectPublicKeyInfo (PrivateKey::spki, spki_of); empty: the
     /// Ed25519 key `public_key`
     pub spki: Vec<u8>,
+    /// OCSP responders to name in the authority information access (http URIs)
+    pub ocsp_urls: Vec<String>,
+    /// a leaf that must come with a stapled OCSP response (the TLS feature status_request,
+    /// RFC 7633)
+    pub must_staple: bool,
+    /// a leaf that signs OCSP responses for its issuer (id-kp-OCSPSigning, with
+    /// id-pkix-ocsp-nocheck)
+    pub ocsp_signing: bool,
 }
 
 /// the AlgorithmIdentifier of a signature (None for PSS, which certificates here do not use)
-fn alg_id(alg: SigAlg) -> Option<Vec<u8>> {
+pub(crate) fn alg_id(alg: SigAlg) -> Option<Vec<u8>> {
     let hash_oid = |h: HashAlg, rsa: bool| match (h, rsa) {
         (HashAlg::Sha256, true) => Some(OID_RSA_SHA256),
         (HashAlg::Sha384, true) => Some(OID_RSA_SHA384),
@@ -1120,6 +1243,13 @@ impl CertBuilder {
             if self.client_auth {
                 eku.push(der::oid(OID_CLIENT_AUTH));
             }
+            if self.ocsp_signing {
+                eku.push(der::oid(OID_OCSP_SIGNING));
+                exts.push(ext(OID_OCSP_NOCHECK, false, &[der::NULL, 0]));
+            }
+            if self.must_staple {
+                exts.push(ext(OID_TLS_FEATURE, false, &der::seq(&[&der::small_int(TLS_FEATURE_STATUS_REQUEST as u64)])));
+            }
             if !eku.is_empty() {
                 let parts: Vec<&[u8]> = eku.iter().map(|v| v.as_slice()).collect();
                 exts.push(ext(OID_EKU, false, &der::seq(&parts)));
@@ -1135,6 +1265,11 @@ impl CertBuilder {
             }
             let parts: Vec<&[u8]> = names.iter().map(|v| v.as_slice()).collect();
             exts.push(ext(OID_SAN, false, &der::seq(&parts)));
+        }
+        if !self.ocsp_urls.is_empty() {
+            let ads: Vec<Vec<u8>> = self.ocsp_urls.iter().map(|u| der::seq(&[&der::oid(OID_AD_OCSP), &der::tlv(0x86, u.as_bytes())])).collect();
+            let parts: Vec<&[u8]> = ads.iter().map(|v| v.as_slice()).collect();
+            exts.push(ext(OID_AIA, false, &der::seq(&parts)));
         }
         exts.push(ext(OID_SKI, false, &der::octets(&ski[..20])));
         let aki_src = issuer.map_or(ski[..20].to_vec(), |i| if i.ski.is_empty() { crypto::sha256(&i.public_key)[..20].to_vec() } else { i.ski.clone() });

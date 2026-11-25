@@ -37,6 +37,19 @@ fn clear() {
     }
 }
 
+// iOS: the text size of the system (Dynamic Type) as the host's traits sent it (UIFontMetrics: the
+// default "Large" is 100 %).  Under UIKit's host (tools/apple.py simapp) after `xcrun simctl ui
+// DEVICE content_size SIZE`, jfgui_EXPECT_TEXT_SCALE names the percentage that size gives
+#[cfg(target_os = "ios")]
+fn ios_text_scale(t: &mut T) {
+    let s = sys_settings().text_scale;
+    t.info(&format!("  settings: iOS text scale (Dynamic Type): {s} %\n"));
+    t.check((50..=300).contains(&s), "settings: iOS: the text scale within 50..300 %");
+    if let Some(e) = plat::env("jfgui_EXPECT_TEXT_SCALE").and_then(|v| v.parse::<u32>().ok()) {
+        t.expect_i(s as i64, e as i64, "settings: iOS: the text size of the system");
+    }
+}
+
 pub fn t_settings(t: &mut T) {
     clear();
     t.check(sys_settings_env() == SysSettings::default(), "settings: no overrides: the defaults");
@@ -44,6 +57,8 @@ pub fn t_settings(t: &mut T) {
     t.check(d.text_scale == 100 && d.double_click_ms == 500 && d.caret_blink_ms == 530 && d.dark.is_none() && !d.high_contrast, "settings: the defaults");
     t.check(d.wheel_lines == 3 && d.wheel_chars == 3, "settings: the wheel's defaults: three lines, three characters");
     wheel(t);
+    #[cfg(target_os = "ios")]
+    ios_text_scale(t);
     for (k, v) in [
         ("jfgui_THEME", "dark"),
         ("jfgui_ACCENT", "#123456"),

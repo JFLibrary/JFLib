@@ -5,14 +5,15 @@
 //      installed)
 //   3. a manifest for a scratch tree, installed in this process: reads, writes, traversal,
 //      fs.rs, locks, a grant of the user's file, Key::trusted, processes, URLs, plugins,
-//      print, secrets, autostart, audio.output, capabilities(), the network (connect, listen, UDP, names, resolved addresses,
-//      DNS, Unix sockets) and the denial records
+//      print, secrets, autostart, audio.output, capabilities(), the network (connect, listen, UDP, UDP answers without
+//      net.connect, names, resolved addresses, DNS, Unix sockets) and the denial records
+//   (before 3) net::AnswerSet with its own clock: the time limit, renewal, forged senders, spellings of an address
 // A policy stays installed until the process ends: this test is not part of "all".
 
 use alloc::format;
 use alloc::vec::Vec;
 
-use plat::net::{IpAddr, NetErrorKind, SocketAddr, TcpListener, TcpStream, UdpSocket};
+use plat::net::{AnswerSet, IpAddr, NetErrorKind, SocketAddr, TcpListener, TcpStream, UdpSocket};
 use plat::policy::{self, FS_READ};
 use plat::{FO_READ, FO_WRITE, File, FileLock};
 
@@ -26,6 +27,7 @@ pub fn t_policy(t: &mut T) {
     t.check(!policy::url_allowed("C:\\Windows\\notepad.exe") && !policy::url_allowed("\\\\server\\share\\x.exe")
             && !policy::url_allowed("x.exe") && !policy::url_allowed("1x:y") && policy::url_allowed("https://example.org"),
             "policy: a path is no URL (without a manifest too)");
+    answer_set(t);
     installed(t);
 }
 
@@ -132,11 +134,18 @@ fn installed(t: &mut T) {
     let listener = TcpListener::bind(&SocketAddr::new(IpAddr::LOCALHOST_V4, 0)).ok();
     let port = listener.as_ref().and_then(|l| l.local_addr().ok()).map_or(0, |a| a.port);
     t.check(port != 0, "policy: a loopback listener before the policy");
+    // a free UDP port for a server the manifest lets listen (not the TCP port, nor the one after it the checks refuse)
+    let uport = (0..8)
+        .filter_map(|_| UdpSocket::bind(&SocketAddr::new(IpAddr::LOCALHOST_V4, 0)).ok()?.local_addr().ok().map(|a| a.port))
+        .find(|&u| u != port && u != port.wrapping_add(1))
+        .unwrap_or(0);
+    t.check(uport != 0, "policy: a free UDP port before the policy");
     let here = cwd.replace('\\', "/");
     let manifest = format!(
         "# plattest --test policy\nfs.read {base}/ro/**\nfs.write {base}/rw/**   # writes imply reads\nfs.write {base}/one.txt\nfs.user\n\
          process plattest-no-such-program {here}/plattest-tool\nurl https MailTo\n\
-         net.connect 127.0.0.1:{port} *.example.test:443 printer.lan:631-632 app.localhost:8080\nnet.listen 127.0.0.1:0\n"
+         net.connect 127.0.0.1:{port} *.example.test:443 printer.lan:631-632 app.localhost:8080 127.0.0.1:{uport}\n\
+         net.listen 127.0.0.1:0 127.0.0.1:{uport}\n"
     );
     let key = match policy::install(&manifest) {
         Ok(k) => k,
@@ -262,6 +271,7 @@ fn installed(t: &mut T) {
         t.check(u.send_to(b"x", &at(port)).is_ok(), "policy: a datagram to a net.connect address");
         t.check(denied(u.send_to(b"x", &at(9)).map(|_| ()).map_err(|e| e.kind)), "policy: a datagram elsewhere is Denied");
     }
+    let cport = answers(t, uport, &at);
     t.check(policy::net_name_allowed("a.example.test") && policy::net_name_allowed("b.a.example.test.") && policy::net_name_allowed("PRINTER.lan"),
         "policy: names of the rules");
     t.check(!policy::net_name_allowed("example.test") && !policy::net_name_allowed("evil.org") && !policy::net_name_allowed("xexample.test"),
@@ -301,10 +311,87 @@ fn installed(t: &mut T) {
     t.check(has("fs.read", "secret.txt") && has("fs.write", "b.txt") && has("process", "plattest-other-program")
         && has("url", "ftp://example.org") && has("plugins", "plugin.dll") && has("print", "") && has("secrets", "plattest-policy") && has("autostart", "")
         && has("audio.output", "")
-        && has("net.connect", &format!(":{other}")) && has("net.listen", "0.0.0.0:0") && has("net.connect", "evil.org"),
+        && has("net.connect", &format!(":{other}")) && has("net.listen", "0.0.0.0:0") && has("net.connect", "evil.org")
+        && (cport == 0 || has("net.connect", &format!(":{cport}"))),
         "policy: denials recorded");
     t.info(&format!("  {} denial(s) recorded\n", d.len()));
 
     key.trusted(|| rm_tree(&base));
     t.check(key.trusted(|| plat::file_exists(&base)) == 0, "policy: scratch tree removed");
+}
+
+/// the table of a UDP socket's answers (net::AnswerSet) with the test's own clock: the time limit, renewal by a
+/// datagram (not by sending), forged addresses that cannot grow it, which spellings of an address match
+fn answer_set(t: &mut T) {
+    let v4 = |a: u8, p: u16| SocketAddr::new(IpAddr::V4([192, 0, 2, a]), p);
+    let mut s = AnswerSet::new(1000);
+    t.check(!s.may_answer(&v4(1, 5000), 1000) && s.is_empty(), "answers: none before a datagram");
+    s.heard(&v4(1, 5000), 1000);
+    t.check(s.may_answer(&v4(1, 5000), 1000) && s.may_answer(&v4(1, 5000), 1000 + AnswerSet::KEEP_MS - 1), "answers: the sender within KEEP_MS");
+    t.check(!s.may_answer(&v4(1, 5000), 1000 + AnswerSet::KEEP_MS), "answers: not after KEEP_MS");
+    t.check(!s.may_answer(&v4(1, 5001), 1000) && !s.may_answer(&v4(2, 5000), 1000), "answers: another port or address is no answer");
+    // a datagram renews it; asking (sending) does not
+    let mut s = AnswerSet::new(0);
+    s.heard(&v4(1, 5000), 0);
+    for k in 1..=10 {
+        let _ = s.may_answer(&v4(1, 5000), k * AnswerSet::KEEP_MS / 20);
+    }
+    t.check(!s.may_answer(&v4(1, 5000), AnswerSet::KEEP_MS), "answers: sending keeps nothing alive");
+    s.heard(&v4(1, 5000), AnswerSet::KEEP_MS + 10);
+    s.heard(&v4(1, 5000), AnswerSet::KEEP_MS * 3 / 2);
+    t.check(s.may_answer(&v4(1, 5000), AnswerSet::KEEP_MS * 5 / 2 - 1), "answers: renewed by the latest datagram (across a generation)");
+    // the spellings of one address: IPv4 and IPv4-mapped IPv6 match, another zone does not
+    let mut s = AnswerSet::new(0);
+    s.heard(&v4(7, 27960), 0);
+    let mapped = SocketAddr::new(IpAddr::V6([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, 192, 0, 2, 7]), 27960);
+    t.check(s.may_answer(&mapped, 1), "answers: an IPv4 sender matches its IPv4-mapped IPv6 address");
+    let ll = |scope: u32| SocketAddr::with_scope(IpAddr::V6([0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]), 9, scope);
+    s.heard(&ll(2), 0);
+    t.check(s.may_answer(&ll(2), 1) && !s.may_answer(&ll(3), 1), "answers: a link-local sender only on its own interface");
+    s.heard(&SocketAddr::new(IpAddr::V4([192, 0, 2, 9]), 0), 0);
+    s.heard(&SocketAddr::new(IpAddr::UNSPECIFIED_V4, 9), 0);
+    t.check(s.len() == 2, "answers: port 0 and the unspecified address are no peers");
+    // forged source addresses: a flood never grows the table past MAX; it pushes the oldest out, and a datagram brings
+    // a peer back
+    let mut s = AnswerSet::new(0);
+    s.heard(&v4(1, 5000), 0);
+    let (mut most, mut still) = (0, 0);
+    for i in 0..100_000u32 {
+        s.heard(&SocketAddr::new(IpAddr::V4([10, (i >> 16) as u8, (i >> 8) as u8, i as u8]), 1024 + (i % 7) as u16), 1);
+        most = most.max(s.len());
+        if i < AnswerSet::MAX as u32 / 2 && s.may_answer(&v4(1, 5000), 1) {
+            still += 1;
+        }
+    }
+    t.check(most <= AnswerSet::MAX, &format!("answers: 100000 forged senders keep at most {} addresses (most {most})", AnswerSet::MAX));
+    t.check(still > 0 && !s.may_answer(&v4(1, 5000), 1), "answers: the old peer stays until the flood pushes it out");
+    s.heard(&v4(1, 5000), 2);
+    t.check(s.may_answer(&v4(1, 5000), 2), "answers: its next datagram brings it back");
+}
+
+/// (in the installed manifest) a UDP server on the net.listen port answers whoever wrote to it without a net.connect
+/// rule for their address; nobody else.  -> the client's port (refused before it wrote; 0 when the sockets failed)
+fn answers(t: &mut T, uport: u16, at: &dyn Fn(u16) -> SocketAddr) -> u16 {
+    let denied = |r: Result<usize, plat::net::NetError>| r.err().map(|e| e.kind) == Some(NetErrorKind::Denied);
+    let (Ok(srv), Ok(cli)) = (UdpSocket::bind(&at(uport)), UdpSocket::bind(&at(0))) else {
+        t.check(false, "policy answers: a server on the net.listen port and a client");
+        return 0;
+    };
+    let ca = cli.local_addr().unwrap_or(at(0));
+    t.check(srv.answer_peers() == Some(0), "policy answers: the server keeps answers (net.listen covers it)");
+    t.check(denied(srv.send_to(b"first", &ca)), "policy answers: to a client that never wrote: Denied (no net.connect rule)");
+    t.check(cli.send_to(b"hello", &at(uport)).is_ok(), "policy answers: the client writes (net.connect)");
+    let mut buf = [0u8; 64];
+    let got = srv.recv_from(&mut buf, 2000);
+    t.check(got.as_ref().is_ok_and(|(n, from)| &buf[..*n] == b"hello" && *from == ca), "policy answers: the server hears the client");
+    t.check(srv.answer_peers() == Some(1) && srv.answers_to(&ca), "policy answers: the client is kept");
+    t.check(srv.send_to(b"answer", &ca).is_ok(), "policy answers: the answer goes without a net.connect rule");
+    let back = cli.recv_from(&mut buf, 2000);
+    t.check(back.is_ok_and(|(n, _)| &buf[..n] == b"answer"), "policy answers: the client gets it");
+    t.check(denied(srv.send_to(b"x", &at(9))) && !srv.answers_to(&at(9)), "policy answers: to an address that never wrote: Denied");
+    // which sockets keep answers: port 0 only where a net.listen rule covers it (127.0.0.1:0 does, 0.0.0.0:0 not)
+    t.check(cli.answer_peers() == Some(1), "policy answers: a port-0 socket that net.listen covers keeps answers (the server's)");
+    let any = UdpSocket::bind(&SocketAddr::new(IpAddr::UNSPECIFIED_V4, 0));
+    t.check(any.is_ok_and(|s| s.answer_peers().is_none()), "policy answers: a port-0 socket outside net.listen keeps none");
+    ca.port
 }

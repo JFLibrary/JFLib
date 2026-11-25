@@ -21,6 +21,9 @@
 // the command runs with the text being edited, the editor gets the focus back; the File register
 // ends it (cmds_text::frame).  TextCmds::caret places the caret of the next start.  A vertical text
 // (TextDirection 1) is edited in a box across the shape.
+//
+// (JD15, TX-01) With the option Eingabetaste beendet die Textbearbeitung Enter ends the editing
+// and Shift+Enter makes a new line; without it both make a new line (Visio's default).
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -175,6 +178,14 @@ pub(crate) fn frame(app: &mut Diagrammer, ui: &mut Ui) {
             ui.key_take();
             ui.cmd_run(id, 0);
         }
+    }
+    // (JD15, TX-01, KB-10) Datei › Optionen › Erweitert › Eingabetaste beendet die
+    // Textbearbeitung: Enter ends the editing (the keyboard back to the canvas), Shift+Enter
+    // makes a new line (the editor's Enter)
+    if app.opts.get(&crate::options::ENTER_ENDS) && app.text.as_ref().is_some_and(|te| te.focused) && ui.focused() == ID_TEXT && ui.capture_shortcut(VK_RETURN, 0) {
+        end(app, ui);
+        ui.focus(crate::panes::ID_CANVAS);
+        return;
     }
     let Some(te) = app.text.as_mut() else { return };
     let Some(sh) = app.model.shapes.iter().find(|s| s.key == te.key) else {

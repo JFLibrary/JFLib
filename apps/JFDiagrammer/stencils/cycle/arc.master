@@ -1,0 +1,90 @@
+# Kreisbogen (SH-033, JD26): ein Bogenstück eines Rings (Fläche), im Kasten des ganzen Kreises.
+# Row_1 und Row_2 bestimmen Anfang und Ende: der Winkel des Steuerpunkts von der Mitte aus
+# (gestreckt auf die Ellipse bezogen); der Bogen läuft vom Anfang gegen den Uhrzeigersinn zum
+# Ende, 3° bis 357°.  Row_3 bestimmt die Breite: sein Abstand von der Mitte ist der Innenradius
+# (Anteil des äußeren, 0,1 bis 0,95).  Alle drei anteilig und frei beweglich.  Jeder Rand besteht
+# aus zwei Ellipsenbögen durch Zwischenpunkte (je höchstens 180°).  Anfangs die obere Hälfte des
+# Rings.  Der Text steht in der Mitte des Bogens.
+master: Arc
+name.de: Kreisbogen
+name.en: Arc
+name.es: Arco
+name.it: Arco
+name.fr: Arc
+prompt.de: Bogenstück eines Rings. Anfang, Ende und Breite des Bogens ändern Sie mit den gelben Steuerpunkten.
+prompt.en: Arc segment of a ring. Drag the yellow control handles to change the start, the end and the width of the arc.
+prompt.es: Segmento de arco de un anillo. Arrastre los controladores amarillos para cambiar el inicio, el final y el ancho del arco.
+prompt.it: Segmento d'arco di un anello. Trascina le maniglie di controllo gialle per cambiare l'inizio, la fine e la larghezza dell'arco.
+prompt.fr: Segment d'arc d'un anneau. Faites glisser les poignées de contrôle jaunes pour modifier le début, la fin et la largeur de l'arc.
+keywords.de: Bogen, Kreisbogen, Ring, Segment, Winkel, Halbkreis, Zyklus
+keywords.en: arc, ring, segment, angle, semicircle, cycle, curve
+keywords.es: arco, anillo, segmento, ángulo, semicírculo, ciclo
+keywords.it: arco, anello, segmento, angolo, semicerchio, ciclo
+keywords.fr: arc, anneau, segment, angle, demi-cercle, cycle
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 40 mm
+Height.us = 1.5 in
+TxtPinX = Width*0.5*(1+User.Rm*COS(User.Am))
+TxtPinY = Height*0.5*(1+User.Rm*SIN(User.Am))
+TxtWidth = Width*0.35
+TxtHeight = Height*0.5*(1-User.K)*0.9
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# Anfang und Ende (mathematisch, im Bogenmaß) aus Row_1 und Row_2, der Bogen dazwischen gegen den
+# Uhrzeigersinn, der Innenradius aus Row_3 als Anteil des äußeren, Mitte des Bogens und des Rings
+A0:  Value = ATAN2((Controls.Row_1.Y-Height*0.5)/Height,(Controls.Row_1-Width*0.5)/Width)
+A1:  Value = ATAN2((Controls.Row_2.Y-Height*0.5)/Height,(Controls.Row_2-Width*0.5)/Width)
+Sw:  Value = MIN(MAX(MODULUS(User.A1-User.A0,2*PI()),0.05),2*PI()-0.05)
+K:   Value = MIN(MAX(SQRT(((Controls.Row_3-Width*0.5)/(Width*0.5))^2+((Controls.Row_3.Y-Height*0.5)/(Height*0.5))^2),0.1),0.95)
+Am:  Value = User.A0+User.Sw*0.5
+Rm:  Value = (1+User.K)*0.5
+
+[Geometry]
+MoveTo           X = Width*0.5*(1+COS(User.A0)); Y = Height*0.5*(1+SIN(User.A0))
+EllipticalArcTo  X = Width*0.5*(1+COS(User.Am)); Y = Height*0.5*(1+SIN(User.Am))
+                 A = Width*0.5*(1+COS(User.A0+User.Sw*0.25)); B = Height*0.5*(1+SIN(User.A0+User.Sw*0.25)); C = 0 deg; D = Width/Height
+EllipticalArcTo  X = Width*0.5*(1+COS(User.A0+User.Sw)); Y = Height*0.5*(1+SIN(User.A0+User.Sw))
+                 A = Width*0.5*(1+COS(User.A0+User.Sw*0.75)); B = Height*0.5*(1+SIN(User.A0+User.Sw*0.75)); C = 0 deg; D = Width/Height
+LineTo           X = Width*0.5*(1+User.K*COS(User.A0+User.Sw)); Y = Height*0.5*(1+User.K*SIN(User.A0+User.Sw))
+EllipticalArcTo  X = Width*0.5*(1+User.K*COS(User.Am)); Y = Height*0.5*(1+User.K*SIN(User.Am))
+                 A = Width*0.5*(1+User.K*COS(User.A0+User.Sw*0.75)); B = Height*0.5*(1+User.K*SIN(User.A0+User.Sw*0.75)); C = 0 deg; D = Width/Height
+EllipticalArcTo  X = Width*0.5*(1+User.K*COS(User.A0)); Y = Height*0.5*(1+User.K*SIN(User.A0))
+                 A = Width*0.5*(1+User.K*COS(User.A0+User.Sw*0.25)); B = Height*0.5*(1+User.K*SIN(User.A0+User.Sw*0.25)); C = 0 deg; D = Width/Height
+LineTo           X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = Width*0.9; Y = Height*0.5
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 0; YCon = 0; CanGlue = FALSE
+        Tip.de = "Anfang des Bogens ändern"
+        Tip.en = "Change the start of the arc"
+        Tip.es = "Cambiar el inicio del arco"
+        Tip.it = "Cambia l'inizio dell'arco"
+        Tip.fr = "Modifier le début de l'arc"
+Row_2:  X = Width*0.1; Y = Height*0.5
+        XDyn = Controls.Row_2; YDyn = Controls.Row_2.Y
+        XCon = 0; YCon = 0; CanGlue = FALSE
+        Tip.de = "Ende des Bogens ändern"
+        Tip.en = "Change the end of the arc"
+        Tip.es = "Cambiar el final del arco"
+        Tip.it = "Cambia la fine dell'arco"
+        Tip.fr = "Modifier la fin de l'arc"
+Row_3:  X = Width*0.5; Y = Height*0.8
+        XDyn = Controls.Row_3; YDyn = Controls.Row_3.Y
+        XCon = 0; YCon = 0; CanGlue = FALSE
+        Tip.de = "Breite des Bogens ändern"
+        Tip.en = "Change the width of the arc"
+        Tip.es = "Cambiar el ancho del arco"
+        Tip.it = "Cambia la larghezza dell'arco"
+        Tip.fr = "Modifier la largeur de l'arc"
+
+# die Enden in der Mitte des Rings, die Mitte des Bogens außen
+[Connection]
+Row  X = Width*0.5*(1+User.Rm*COS(User.A0)); Y = Height*0.5*(1+User.Rm*SIN(User.A0)); DirX = 0; DirY = 0
+Row  X = Width*0.5*(1+User.Rm*COS(User.A0+User.Sw)); Y = Height*0.5*(1+User.Rm*SIN(User.A0+User.Sw)); DirX = 0; DirY = 0
+Row  X = Width*0.5*(1+COS(User.Am)); Y = Height*0.5*(1+SIN(User.Am)); DirX = -COS(User.Am); DirY = -SIN(User.Am)

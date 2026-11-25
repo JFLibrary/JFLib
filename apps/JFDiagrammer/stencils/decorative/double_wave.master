@@ -1,0 +1,68 @@
+# Doppelte Welle (SH-003, JD26): ein Band, dessen Ober- und Unterkante gleich verlaufende Wellen
+# mit zwei Perioden sind (links zuerst nach oben), die Welle (wave.master) zweimal
+# nebeneinander.  Jede Periode ist eine kubische Bézierkurve (RelCubBezTo, Anteile des Kastens)
+# mit den Kontrollpunkten bei 1/3 und 2/3 der Periode, um ±K über und unter der Grundlinie;
+# K = A x 3,4641 gibt genau die Höhe A der Welle; in der Mitte gehen beide Perioden ohne Knick
+# ineinander über.  Row_1 an der linken unteren Ecke des Bands ändert die Höhe der Welle
+# (anteilig, nur senkrecht, bis 20 % der Höhe).  Der Text steht in der Mitte.
+master: Double wave
+name.de: Doppelte Welle
+name.en: Double wave
+name.es: Onda doble
+name.it: Onda doppia
+name.fr: Double vague
+prompt.de: Band mit doppelt gewellten Kanten. Mit dem gelben Steuerpunkt ändern Sie die Höhe der Wellen.
+prompt.en: Band with doubly waved edges. Drag the yellow control handle to change the height of the waves.
+prompt.es: Banda con los bordes doblemente ondulados. Arrastre el controlador amarillo para cambiar la altura de las ondas.
+prompt.it: Banda con i bordi doppiamente ondulati. Trascina la maniglia di controllo gialla per cambiare l'altezza delle onde.
+prompt.fr: Bande aux bords doublement ondulés. Faites glisser la poignée de contrôle jaune pour modifier la hauteur des vagues.
+keywords.de: Welle, doppelt, Fahne, Band, gewellt, Banner, Dekor
+keywords.en: wave, double, flag, band, wavy, banner, decoration
+keywords.es: onda, doble, bandera, banda, ondulado, decoración
+keywords.it: onda, doppia, bandiera, banda, ondulato, decorazione
+keywords.fr: vague, double, drapeau, bande, ondulé, décoration
+
+[Shape]
+Width = 50 mm
+Width.us = 2 in
+Height = 25 mm
+Height.us = 1 in
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtWidth = Width*0.8
+TxtHeight = Height-User.A*4
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# die Höhe der Welle (0 bis 20 % der Höhe), als Anteil der Höhe, der Abstand der Kontrollpunkte
+# von der Grundlinie als Anteil
+A:   Value = MIN(MAX(Controls.Row_1.Y, 0), Height*0.2)
+Ay:  Value = User.A/Height
+K:   Value = User.Ay*3.4641
+
+# Unterkante von links nach rechts, rechte Kante, Oberkante zurück
+[Geometry]
+RelMoveTo    X = 0; Y = User.Ay
+RelCubBezTo  X = 0.5; Y = User.Ay; A = 0.1667; B = User.Ay+User.K; C = 0.3333; D = User.Ay-User.K
+RelCubBezTo  X = 1; Y = User.Ay; A = 0.6667; B = User.Ay+User.K; C = 0.8333; D = User.Ay-User.K
+RelLineTo    X = 1; Y = 1-User.Ay
+RelCubBezTo  X = 0.5; Y = 1-User.Ay; A = 0.8333; B = 1-User.Ay-User.K; C = 0.6667; D = 1-User.Ay+User.K
+RelCubBezTo  X = 0; Y = 1-User.Ay; A = 0.3333; B = 1-User.Ay-User.K; C = 0.1667; D = 1-User.Ay+User.K
+RelLineTo    X = 0; Y = User.Ay
+
+[Controls]
+Row_1:  X = 0; Y = Height*0.12
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 1; YCon = 0; CanGlue = FALSE
+        Tip.de = "Höhe der Welle ändern"
+        Tip.en = "Change the height of the wave"
+        Tip.es = "Cambiar la altura de la onda"
+        Tip.it = "Cambia l'altezza dell'onda"
+        Tip.fr = "Modifier la hauteur de la vague"
+
+[Connection]
+Row  X = Width*0.5; Y = User.A; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height-User.A; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

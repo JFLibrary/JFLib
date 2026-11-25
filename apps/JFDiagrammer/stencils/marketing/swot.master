@@ -1,0 +1,129 @@
+# SWOT (SH-030, JD26): vier Felder für Stärken, Schwächen, Chancen und Risiken als Teile einer
+# Gruppe, mit 2 mm Abstand; jedes Feld hat seinen Text oben (für Stichpunkte darunter) und eine
+# eigene Variantenfarbe des Designs (Schnellformatvorlage 101, 103, 100, 102: in NetLab Petrol,
+# Ziegel, Signalblau, Ocker).  Die Felder folgen der Größe der Gruppe.
+master: SWOT
+name.de: SWOT
+name.en: SWOT
+name.es: DAFO
+name.it: SWOT
+name.fr: SWOT
+prompt.de: SWOT-Analyse mit Stärken, Schwächen, Chancen und Risiken. Klicken Sie ein Feld zweimal an, um seinen Text zu ändern.
+prompt.en: SWOT analysis with strengths, weaknesses, opportunities and threats. Click a field twice to change its text.
+prompt.es: Análisis DAFO con fortalezas, debilidades, oportunidades y amenazas. Haga clic dos veces en un campo para cambiar su texto.
+prompt.it: Analisi SWOT con punti di forza, punti di debolezza, opportunità e minacce. Fai clic due volte su un campo per cambiarne il testo.
+prompt.fr: Analyse SWOT avec forces, faiblesses, opportunités et menaces. Cliquez deux fois sur un champ pour modifier son texte.
+keywords.de: SWOT, Stärken, Schwächen, Chancen, Risiken, Analyse, Strategie, Matrix
+keywords.en: SWOT, strengths, weaknesses, opportunities, threats, analysis, strategy, matrix
+keywords.es: DAFO, FODA, SWOT, fortalezas, debilidades, oportunidades, amenazas, estrategia
+keywords.it: SWOT, punti di forza, punti di debolezza, opportunità, minacce, analisi, strategia
+keywords.fr: SWOT, forces, faiblesses, opportunités, menaces, analyse, stratégie, matrice
+
+[Shape]
+Width = 80 mm
+Width.us = 3 in
+Height = 60 mm
+Height.us = 2.25 in
+
+[User]
+# der Abstand der Felder
+G:  Value = 2 mm
+     Value.us = 0.08 in
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+
+[Part S]
+text.de: Stärken
+text.en: Strengths
+text.es: Fortalezas
+text.it: Punti di forza
+text.fr: Forces
+
+[Shape]
+Width = GUARD((Sheet.1!Width-Sheet.1!User.G)*0.5)
+Height = GUARD((Sheet.1!Height-Sheet.1!User.G)*0.5)
+PinX = GUARD(Width*0.5)
+PinY = GUARD(Sheet.1!Height-Height*0.5)
+VerticalAlign = 0
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part W]
+text.de: Schwächen
+text.en: Weaknesses
+text.es: Debilidades
+text.it: Punti di debolezza
+text.fr: Faiblesses
+
+[Shape]
+Width = GUARD((Sheet.1!Width-Sheet.1!User.G)*0.5)
+Height = GUARD((Sheet.1!Height-Sheet.1!User.G)*0.5)
+PinX = GUARD(Sheet.1!Width-Width*0.5)
+PinY = GUARD(Sheet.1!Height-Height*0.5)
+VerticalAlign = 0
+QuickStyleLineColor = 103
+QuickStyleFillColor = 103
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part O]
+text.de: Chancen
+text.en: Opportunities
+text.es: Oportunidades
+text.it: Opportunità
+text.fr: Opportunités
+
+[Shape]
+Width = GUARD((Sheet.1!Width-Sheet.1!User.G)*0.5)
+Height = GUARD((Sheet.1!Height-Sheet.1!User.G)*0.5)
+PinX = GUARD(Width*0.5)
+PinY = GUARD(Height*0.5)
+VerticalAlign = 0
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part T]
+text.de: Risiken
+text.en: Threats
+text.es: Amenazas
+text.it: Minacce
+text.fr: Menaces
+
+[Shape]
+Width = GUARD((Sheet.1!Width-Sheet.1!User.G)*0.5)
+Height = GUARD((Sheet.1!Height-Sheet.1!User.G)*0.5)
+PinX = GUARD(Sheet.1!Width-Width*0.5)
+PinY = GUARD(Height*0.5)
+VerticalAlign = 0
+QuickStyleLineColor = 102
+QuickStyleFillColor = 102
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0

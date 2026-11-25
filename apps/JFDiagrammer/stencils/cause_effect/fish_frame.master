@@ -1,0 +1,73 @@
+# Fischrahmen (SH-041, JD26): ein großer, eckiger Fischumriss (200 x 100 mm) als Hintergrund für
+# ein Fischgrätdiagramm: links die gegabelte Schwanzflosse, dann der Rumpf, rechts der Kopf mit
+# spitzer Schnauze und Maul.  Rumpf und Kopf sind getrennte Flächen; die Kieme dazwischen ist eine
+# Fuge von 1,5 mm (sichtbar auch in einem Design ohne Shape-Linien), als stumpfer Winkel nach
+# rechts.  Das Auge ist ein Loch (Gerade-Ungerade-Regel), rund mit 3 mm Radius.  Alle Ecken
+# anteilig.  Die Füllung ist die Designfarbe, aufgehellt (TINT um 70): darauf bleiben Gräten,
+# Kästen und Texte lesbar, auch in einem Design mit kräftiger Füllung (Kontrast).  Als Hintergrund
+# hat der Rahmen keine Verbindungspunkte (Verbinder und Gräten sollen nicht an ihm kleben) und
+# keinen Text (LockTextEdit: ein Doppelklick auf eine freie Stelle öffnet keine Texteingabe);
+# beides begründete Ausnahmen von der Stilregel.
+master: Fish frame
+name.de: Fischrahmen
+name.en: Fish frame
+name.es: Marco de pez
+name.it: Cornice a pesce
+name.fr: Cadre en forme de poisson
+prompt.de: Fischumriss als Hintergrund für ein Fischgrätdiagramm. Legen Sie Wirkung und Kategorien darauf.
+prompt.en: Fish outline as the background of a fishbone diagram. Place the effect and the categories on it.
+prompt.es: Silueta de pez como fondo de un diagrama de espina de pescado. Coloque encima el efecto y las categorías.
+prompt.it: Sagoma di pesce come sfondo di un diagramma a lisca di pesce. Posiziona sopra l'effetto e le categorie.
+prompt.fr: Silhouette de poisson comme arrière-plan d'un diagramme en arête de poisson. Placez dessus l'effet et les catégories.
+keywords.de: Fischrahmen, Fisch, Ishikawa, Fischgräte, Hintergrund, Rahmen, Ursache-Wirkung
+keywords.en: fish frame, fish, Ishikawa, fishbone, background, frame, cause and effect
+keywords.es: marco de pez, pez, Ishikawa, espina de pescado, fondo, marco, causa y efecto
+keywords.it: cornice a pesce, pesce, Ishikawa, lisca di pesce, sfondo, cornice, causa-effetto
+keywords.fr: cadre en forme de poisson, poisson, Ishikawa, arête de poisson, arrière-plan, cadre, cause à effet
+
+[Shape]
+Width = 200 mm
+Width.us = 8 in
+Height = 100 mm
+Height.us = 4 in
+FillForegnd = THEMEGUARD(TINT(THEMEVAL("FillColor"),70))
+LockTextEdit = 1
+
+[User]
+# die Fuge der Kieme, der Radius des Auges
+G:  Value = 1.5 mm
+    Value.us = 0.06 in
+E:  Value = 3 mm
+    Value.us = 0.12 in
+
+# 1 Schwanzflosse und Rumpf bis zur Kieme
+[Geometry]
+MoveTo  X = Width*0.14; Y = Height*0.62
+LineTo  X = Width*0.32; Y = Height*0.87
+LineTo  X = Width*0.55; Y = Height*0.95
+LineTo  X = Width*0.78; Y = Height*0.93
+LineTo  X = Width*0.82; Y = Height*0.5
+LineTo  X = Width*0.78; Y = Height*0.07
+LineTo  X = Width*0.55; Y = Height*0.05
+LineTo  X = Width*0.32; Y = Height*0.13
+LineTo  X = Width*0.14; Y = Height*0.38
+LineTo  X = Width*0.02; Y = Height*0.1
+LineTo  X = Width*0.08; Y = Height*0.5
+LineTo  X = Width*0.02; Y = Height*0.9
+LineTo  X = Width*0.14; Y = Height*0.62
+
+# 2 der Kopf hinter der Kieme, mit Schnauze und Maul
+[Geometry]
+MoveTo  X = Width*0.78+User.G; Y = Height*0.93
+LineTo  X = Width*0.9; Y = Height*0.82
+LineTo  X = Width; Y = Height*0.56
+LineTo  X = Width*0.94; Y = Height*0.5
+LineTo  X = Width*0.99; Y = Height*0.42
+LineTo  X = Width*0.9; Y = Height*0.18
+LineTo  X = Width*0.78+User.G; Y = Height*0.07
+LineTo  X = Width*0.82+User.G; Y = Height*0.5
+LineTo  X = Width*0.78+User.G; Y = Height*0.93
+
+# 3 das Auge (Loch im Kopf)
+[Geometry]
+Ellipse  X = Width*0.9; Y = Height*0.66; A = Width*0.9+User.E; B = Height*0.66; C = Width*0.9; D = Height*0.66+User.E

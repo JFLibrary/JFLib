@@ -2,7 +2,8 @@
 
 Stand 2026-11-17, auf Basis von `main` ab7e77e1. Umgesetzt sind die ersten Teile von G7a, G7c und G7f (Welle 1), von G7b, G7d und G7g (Welle 2), von G7e und die
 zweiten Teile von G7c und G7f (Welle 3), der zweite Teil von G7a und der erste von G7h (Welle 4), die zweiten Teile
-von G7b, G7e und G7g (Welle 5), siehe dort; Stand 2026-11-20. Die Zahl der Läufe je Stufe ist
+von G7b, G7e und G7g (Welle 5), siehe dort; Stand 2026-11-20, die Entscheidungen nach Welle 5 vom 24.11.2026
+stehen bei G7a, G7b, G7d, G7e und G7h. Die Zahl der Läufe je Stufe ist
 geschätzt (ein Lauf ist eine Arbeitsrunde eines Agenten mit Durchsicht, wie bei G5 und G6).
 
 ## Ziel
@@ -175,6 +176,11 @@ anfassen:
   je 80, auf macOS 76 Prüfungen, die Eingabe-Aktionen auf allen vier Zielen, der Browser in Chromium und Firefox;
   die Prüfsumme von `gametest` unverändert. Offen: die Prüfung von Hand mit echten Pads, Vibration, Pads ohne
   XInput unter Windows (PlayStation nur über Steam Input), im Flatpak `--device=input`.
+- Vom Nutzer entschieden am 24.11.2026 (Fragen nach Teil 2): ein Pad spielt ohne Pointer-Lock, wie gebaut. Mit einer
+  PERMISSIONS-Datei liest eine App Pads nur mit dem eigenen Schlüssel `gamepad`, und nur damit setzt das Flatpak
+  `--device=input` (das zeigt der App alle Eingabegeräte, auch die Tastatur). Umgesetzt am 24.11.2026 (PERMISSIONS.md,
+  PACKAGING.md; `ask gamepad` fragt beim ersten Zugriff). Vibration kommt später als eigener
+  Schritt für alle Systeme (XInput, evdev, Gamepad API, Core Haptics).
 
 **G7b Spielkern und Spielfenster** (`lib/game`)
 
@@ -224,6 +230,12 @@ anfassen:
   (`Voice::set_gains`). Prüfungen: `assets` 75, `audio` 44 (Probe für Probe), `uigputest` 62; die Prüfsummen von
   `gametest` unverändert. Nicht gemessen: Iris Xe, HD 610, der Mac (dort ist die GPU-Ausgabe der UI aus, Ansichten
   lesen jedes Bild zurück), echte Fenster unter Linux.
+- Vom Nutzer entschieden am 24.11.2026 (Fragen nach Teil 2): Spiele nehmen Weg a, die `gpu_view` mit der UI darüber;
+  auf dem Mac fehlt dafür noch die GPU-Ausgabe der UI. Im Browser zeichnet eine laufende Ansicht mit der Bildrate
+  des Bildschirms (die Zeile in `web/worker.js`), ruhende Apps bleiben dabei ruhig. Umgesetzt am 24.11.2026: der Worker meldet die
+  nächste Frist der App, die Seite gibt die Runde zu ihr (in Chrome bei 165 Hz 147–161 Bilder/s statt 30); eine App
+  in Ruhe bekommt weiter die 30 Runden je Sekunde des Leerlauf-Takts, ein langsamer Zeitgeber ersetzt einen davon
+  ([GAMECORE.md](GAMECORE.md)).
 
 **G7c Physik 1** (`lib/physics`)
 
@@ -289,6 +301,10 @@ anfassen:
   laufenden Stände bleiben mit Delta-Kompression unter 1200 Bytes (neu zu entscheiden, wenn G7e zeigt, dass sie
   nicht passen); die Grenzen je Client (300 Pakete/s, 256 KiB/s, 64 Verbindungen, 16 je Adresse, 5 s) gelten als
   Anfang und werden in Teil 2 mit Messungen abgestimmt.
+- Vom Nutzer entschieden am 24.11.2026 (Frage nach G7e Teil 2): ein UDP-Socket, den `net.listen` erlaubt hat,
+  darf Gegenstellen antworten, die ihm zuerst gesendet haben, ohne `net.connect`-Regel; `game1-server` braucht
+  `net.connect` dann nur noch für den eigenen Client auf Loopback (`--check`). Umgesetzt am 24.11.2026: Antworten an Absender der
+  letzten 60 s, höchstens 1024 je Socket ([TRANSPORT.md](TRANSPORT.md)); im LAN geprüft, ohne `PERMDENY`.
 
 **G7e Netcode** (`lib/game`)
 
@@ -336,6 +352,10 @@ anfassen:
   5,7 s auf freie HTTP-Worker. Die Grenze des Lag-Ausgleichs bleibt 300 ms. Offen: ein Lauf mit Fedora als Server,
   WLAN an beiden Enden, Telefone, Deltas gegen eine Vorhersage. Die Verschlüsselung über UDP kam am 21.11.2026 mit
   U3 (TRANSPORT.md „Verschlüsselung“).
+- Vom Nutzer entschieden am 24.11.2026 (Fragen nach Teil 2): der eine Tick mehr Marge für Clients über WebSocket
+  bleibt (16,7 ms mehr Verzögerung nur im Browser, über WLAN 2,7 statt 12 Korrekturen je Minute); die Grenze des
+  Lag-Ausgleichs bleibt 300 ms, bis Messungen im echten Netz (Fedora als Server, WLAN an beiden Enden) etwas
+  anderes zeigen.
 
 **G7f `render3d` für Spiel 1**
 
@@ -424,6 +444,13 @@ anfassen:
   Beobachtungsmodus von Hand, Tempo bei runden Körpern (ein Turm 311 ms), ebene Teilflächen zusammenführen, Abschrägen
   nichtkonvexer Körper; welche Wünsche an JFScript gebaut werden (Rangfolge des Laufs: Vektoren mit Operatoren,
   Mathematik in Grad, benannte Argumente, bedingter Ausdruck, Position des Aufrufs).
+- **Stand 2026-11-24:** `modeltool` nimmt Stufe S1 von JFScript (dort `docs/RICHTUNG.md`, die Richtung der Sprache
+  für alle JF-Apps): die Namen der Skript-API sind englisch, auch die Parameter (`m.bevel(width, segments, axis)`);
+  Warnungen des Hosts kommen mit ihrer Zeile in Konsole, `report.json` und Beobachtungsmodus; eine fehlgeschlagene
+  Regel (`model.expect_size`, `model.budget`) nennt ihre Zeile; Mathematik in Grad, `list.range` und
+  `list.linspace` kommen aus JFScript ([GEOM.md](GEOM.md)). Die Prüfsumme blieb `0fae175a31a0f15e`. Die übrigen
+  Wünsche folgen dem Richtungspapier (Vektoren und Host-Objekte mit S2, benannte Argumente und der bedingte
+  Ausdruck mit S3).
 
 **G7h Spiel 1**
 
@@ -453,6 +480,12 @@ anfassen:
   Server 140 µs je Tick mit 16 Bots; je Spieler 2,75 KB/s hinauf, 5 KB/s herunter. Offen: Teil 2 (weitere Karten
   und Waffen, Teams und Runden, Tastenbelegung, Klang), Messungen auf Iris Xe, HD 610 und dem Mac, ein echter
   Browser gegen den Server, die Runde des Nutzers mit Mitspielern.
+- Vom Nutzer entschieden am 24.11.2026 (Fragen nach Teil 1): der Arbeitsname `game1` und `org.jfreund.game1`
+  bleiben bis zur ersten Veröffentlichung (danach kostet ein Wechsel den Umzug gespeicherter Einstellungen); die
+  Waffe vor der Kamera wird kleiner und rückt nach rechts unten, die Mitte bleibt frei (umgesetzt am 24.11.2026:
+  Variante B, 0,7 der alten Größe, in jedem Fensterformat rechts unten; [GAME1.md](GAME1.md)); die Werft wird in Teil 2
+  mit den Booleschen Operationen aus G7g gebaut (echte Öffnungen statt Kisten, die Prüfsumme der Karte ändert
+  sich dabei gewollt).
 
 ### Phase 2: Bewegung und große Welten
 
@@ -499,10 +532,9 @@ PaintCraft zu JFPainter. `render3d` bleibt (E2); für `physics`, `anim` und `geo
 
 ## Offen
 
-Später zu entscheiden: der Weg des Spielfensters (gemessen in G7b Teil 2, Vorschlag: Weg a, die `gpu_view` mit der
-UI darüber), der Faktor der Mausbewegung unter macOS
-(G7b Teil 2, von Hand), Name und Server von Spiel 1 (G7h), Kartendaten aus OpenStreetMap für G7n (Lizenz ODbL), welche Crates beim
-Auszug in JFLib bleiben (G7p).
+Später zu entscheiden: der Faktor der Mausbewegung unter macOS (G7b Teil 2, von Hand), Name (vor der ersten
+Veröffentlichung) und Server von Spiel 1 (G7h), Kartendaten aus OpenStreetMap für G7n (Lizenz ODbL), welche Crates
+beim Auszug in JFLib bleiben (G7p).
 
 ## Arbeitsweise und Tests
 

@@ -1,0 +1,12 @@
+#!args --no-system-fonts --lang en
+# JFDiagrammer, JD15: the region decides the units (LG-07) -- English without a region of its own
+# is en-US: the drawing at start measures in inches (as the Shapes panel's US stencils do), and
+# File › New offers US units first
+cmd 4404
+drag 500,330 640,420
+cmd 4400
+expect button:"Width: 2.50 in  Height: 1.50 in  Angle: 0°" exists
+click tab:"File"
+click button:"Basic Flowchart"
+expect radio:"US Units" checked
+expect radio:"Metric Units" unchecked

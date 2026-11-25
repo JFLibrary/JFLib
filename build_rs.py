@@ -422,7 +422,7 @@ def app_targets(name):
 # agent.confirm / agent.deny name agent actions (patterns) the user confirms / an agent may not run.
 PERM_KEYS_ARGS = ("fs.read", "fs.write", "process", "plugins", "url", "net.connect", "net.listen")
 PERM_KEYS_FLAG = ("fs.user", "print", "secrets", "autostart", "audio.output", "input.global", "screen.capture",
-                  "location", "sensors")
+                  "location", "sensors", "gamepad")
 PERM_KEYS_AGENT = ("agent.confirm", "agent.deny")                  # agent actions: confirmed / refused
 PERM_KEYS_SANDBOX = ("sandbox",)                                   # OS sandbox: "sandbox [strict]"
 PERM_KEYS_PACKAGE = ("recent",)                                    # only the packages read it (Flatpak)
@@ -587,6 +587,8 @@ PERM_CASES = [
     ('audio.output\nask audio.output "Klänge"', None),
     ("audio.output on", "audio.output takes no arguments"),
     ("ask audio.input", "audio.input cannot be asked for"),
+    ('gamepad\nask gamepad "Mit dem Pad spielen"', None),
+    ("gamepad 0", "gamepad takes no arguments"),
 ]
 
 

@@ -1,0 +1,3 @@
+#!args --test pad-policy
+# (Rust only) plattest --test pad-policy: a manifest without gamepad refuses game pads (PERMDENY gamepad),
+# the right parses.

@@ -1,0 +1,69 @@
+# Divisionszeichen (SH-004, JD26): das Geteiltzeichen (÷): ein waagrechter Balken in halber Höhe,
+# so lang (80 % der Breite) und so dick wie die Balken des Ungleichheitszeichens
+# (not_equal.master), darüber und darunter ein Punkt (Kreis, beim Strecken rund) mit dem
+# 1,4-fachen der Strichstärke als Durchmesser, 10 % der Höhe vom Balken entfernt.  Drei getrennte
+# Flächen.  Row_1 an der rechten oberen Ecke des Balkens ändert die Strichstärke und mit ihr die
+# Punkte (anteilig, nur senkrecht; bis 20 % der Höhe, damit die Punkte im Kasten bleiben).
+master: Division sign
+name.de: Divisionszeichen
+name.en: Division sign
+name.es: Signo de división
+name.it: Segno di divisione
+name.fr: Signe de division
+prompt.de: Geteiltzeichen (÷). Mit dem gelben Steuerpunkt ändern Sie die Strichstärke.
+prompt.en: Division sign (÷). Drag the yellow control handle to change the stroke width.
+prompt.es: Signo de división (÷). Arrastre el controlador amarillo para cambiar el grosor del trazo.
+prompt.it: Segno di divisione (÷). Trascina la maniglia di controllo gialla per cambiare lo spessore del tratto.
+prompt.fr: Signe de division (÷). Faites glisser la poignée de contrôle jaune pour modifier l'épaisseur du trait.
+keywords.de: geteilt, Divisionszeichen, Division, Rechenzeichen, Mathematik, Symbol, teilen
+keywords.en: divided by, division sign, obelus, division, operator, math, symbol
+keywords.es: dividido, signo de división, división, operador, matemáticas, símbolo
+keywords.it: diviso, segno di divisione, divisione, operatore, matematica, simbolo
+keywords.fr: divisé par, signe de division, division, opérateur, mathématiques, symbole
+
+[Shape]
+Width = 20 mm
+Width.us = 0.75 in
+Height = 20 mm
+Height.us = 0.75 in
+
+[User]
+# die Strichstärke (4 bis 20 % der Höhe), ihre Hälfte, der Radius der Punkte, der Abstand ihrer
+# Mitten von der Mitte des Balkens
+T:  Value = MIN(MAX((Controls.Row_1.Y-Height*0.5)*2, Height*0.04), Height*0.2)
+H:  Value = User.T*0.5
+R:  Value = User.T*0.7
+D:  Value = User.H+Height*0.1+User.R
+
+# 1 der Balken
+[Geometry]
+MoveTo  X = Width*0.1; Y = Height*0.5-User.H
+LineTo  X = Width*0.9; Y = Height*0.5-User.H
+LineTo  X = Width*0.9; Y = Height*0.5+User.H
+LineTo  X = Width*0.1; Y = Height*0.5+User.H
+LineTo  X = Width*0.1; Y = Height*0.5-User.H
+
+# 2, 3 die Punkte oben und unten
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5+User.D; A = Width*0.5+User.R; B = Height*0.5+User.D
+         C = Width*0.5; D = Height*0.5+User.D+User.R
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5-User.D; A = Width*0.5+User.R; B = Height*0.5-User.D
+         C = Width*0.5; D = Height*0.5-User.D+User.R
+
+[Controls]
+Row_1:  X = Width*0.9; Y = Height*0.57
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 1; YCon = 0; CanGlue = FALSE
+        Tip.de = "Strichstärke ändern"
+        Tip.en = "Change the stroke width"
+        Tip.es = "Cambiar el grosor del trazo"
+        Tip.it = "Cambia lo spessore del tratto"
+        Tip.fr = "Modifier l'épaisseur du trait"
+
+[Connection]
+Row  X = Width*0.5; Y = Height*0.5-User.D-User.R; DirX = 0; DirY = 1
+Row  X = Width*0.9; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height*0.5+User.D+User.R; DirX = 0; DirY = -1
+Row  X = Width*0.1; Y = Height*0.5; DirX = 1; DirY = 0

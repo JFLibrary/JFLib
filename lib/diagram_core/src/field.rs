@@ -15,6 +15,10 @@
 //                                              each field with the text it shows (editing in
 //                                              place, Find and Replace)
 //   plain(doc, shape) -> String                the text as it shows, fields included
+//   marked("Länge: {fld 0}") -> Text / marks(&text)   (JD15) a text written with field marks as
+//                                              characters and fields (the stencil build tool's
+//                                              master texts, the instance of such a master) / the
+//                                              Field rows a text names
 //   Kind / Spec / insert(tx, eng, shape, at, &spec) -> ix   a new field: its Field row (Value
 //                                              formula, Format, Type) and its mark in the text,
 //                                              computed at once
@@ -790,6 +794,51 @@ fn place(doc: &Document, sheet: SheetRef, text: &Text, at: Option<usize>) -> (us
         }
     }
     end()
+}
+
+/// the mark of Field row N in a text written as source (MARK_OPEN N MARK_CLOSE: "{fld 0}"), as
+/// the stencil build tool reads a master's text and the instance of such a master gets it (JD15)
+pub const MARK_OPEN: &str = "{fld ";
+/// the end of a field mark (MARK_OPEN)
+pub const MARK_CLOSE: char = '}';
+
+/// a text written with field marks ("Länge: {fld 0}") as characters and fields: "{fld N}" with N
+/// a row index (decimal digits) is the mark of Field row N, everything else stays characters
+/// (also a "{" that starts no such mark)
+pub fn marked(s: &str) -> Text {
+    let mut items = Vec::new();
+    let mut chars = String::new();
+    let mut rest = s;
+    while let Some(i) = rest.find(MARK_OPEN) {
+        let after = &rest[i + MARK_OPEN.len()..];
+        let digits = after.bytes().take_while(u8::is_ascii_digit).count();
+        let ix = after[..digits].parse::<u32>().ok().filter(|_| after[digits..].starts_with(MARK_CLOSE));
+        match ix {
+            Some(ix) => {
+                chars.push_str(&rest[..i]);
+                if !chars.is_empty() {
+                    items.push(TextItem::Chars(Box::from(chars.as_str())));
+                    chars.clear();
+                }
+                items.push(TextItem::Field(ix));
+                rest = &after[digits + MARK_CLOSE.len_utf8()..];
+            }
+            None => {
+                chars.push_str(&rest[..i + 1]);
+                rest = &rest[i + 1..];
+            }
+        }
+    }
+    chars.push_str(rest);
+    if !chars.is_empty() || items.is_empty() {
+        items.push(TextItem::Chars(Box::from(chars.as_str())));
+    }
+    Text { items, extras: crate::Extras::new() }
+}
+
+/// the Field rows a text's marks name (the IX of each TextItem::Field, in text order)
+pub fn marks(text: &Text) -> Vec<u32> {
+    text.items.iter().filter_map(|i| if let TextItem::Field(ix) = i { Some(*ix) } else { None }).collect()
 }
 
 /// a text with `item` put in at a shown position (fields count with the text they show; a

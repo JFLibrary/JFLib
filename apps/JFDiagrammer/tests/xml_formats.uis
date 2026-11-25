@@ -1,0 +1,54 @@
+#!args apps/JFDiagrammer/tests/jd16-zeichnung.vdx --no-system-fonts --save-dir build
+# JFDiagrammer, JD16: a drawing in Visio's XML format of 2003-2010 (DF-21; jd16-zeichnung.vdx is
+# diagramiotest's self-written file, --write-vdx) opens: its pages and shapes, a notice that
+# it is saved as .vsdx, the page and zoom of the file's drawing window (100 %, DF-10).  Datei ›
+# Info shows the properties (DF-09) and takes a new title.  Speichern never writes the .vdx back:
+# it asks for a name, writes a .vsdx, and that file opens again with the shapes and the title
+wait 100
+expect tab:"Seite-1" selected
+expect tab:"Hintergrund-1" exists
+expect box:"Hinweise zur Datei" exists
+expect listitem:"Prüfen & weiter" exists
+expect listitem:"Normal fett und rot" exists
+expect listitem:"Breite: 40 mm" exists
+expect listitem:"Gruppe" exists
+expect listitem:"Verbinder" exists
+expect listitem:"Bild" exists
+expect button:"100 %" exists
+# Datei › Info: the properties of the file, one changed
+click tab:"Datei"
+click button:"Info"
+expect text:"Eigenschaften" exists
+expect textbox:"JD16-Gegenprobe" exists
+expect textbox:"JFDiagrammer-Test" exists
+expect textbox:"https://example.org/" exists
+expect text:"Erstellt: 23.11.2026 10:00" exists
+click textbox:"JD16-Gegenprobe"
+key ctrl+a
+type "Aus der VDX"
+expect textbox:"Aus der VDX" exists
+key esc
+# Speichern: a name is asked for, the .vsdx written
+key ctrl+s
+expect dialog:"Speichern unter" exists
+click #28940
+key ctrl+a
+type "jd16-aus-vdx.vsdx"
+click button:"Speichern"
+expect dialog:"Speichern unter" missing
+expect text:"jd16-aus-vdx – JFDiagrammer" exists
+# a new drawing, then the saved one from Zuletzt verwendet
+cmd 4097
+click button:"Leere Zeichnung"
+click button:"Erstellen"
+expect listitem:"Prüfen & weiter" missing
+cmd 4098
+click button:"jd16-aus-vdx.vsdx"
+wait 100
+expect text:"jd16-aus-vdx – JFDiagrammer" exists
+expect listitem:"Prüfen & weiter" exists
+expect listitem:"Bild" exists
+expect tab:"Hintergrund-1" exists
+click tab:"Datei"
+click button:"Info"
+expect textbox:"Aus der VDX" exists

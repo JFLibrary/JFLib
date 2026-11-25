@@ -8,12 +8,12 @@ drag 500,430 640,520
 cmd 4400
 cmd 4886
 expect dialog:"Seite einrichten" exists
-click 734,273
+click #25916
 click "Gerade"
-click 659,381
+click #25919
 key ctrl+a
 type "150"
-click 757,381
+click #25920
 key ctrl+a
 type "150"
 click button:"OK"

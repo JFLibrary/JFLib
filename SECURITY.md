@@ -57,14 +57,18 @@ another library. They have **not had an external audit**. What has been done ins
   not checked: the machine code a browser's JIT makes, instructions whose time depends on their
   operands
 - netio's TLS 1.3 server against tlsfuzzer (`tools/tlsfuzzer_check.py`, with RSA, ECDSA and
-  Ed25519 certificates) and TLS-Anvil, its client against TLS-Anvil (`tools/tlsanvil_check.py`)
+  Ed25519 certificates) and TLS-Anvil, its client against TLS-Anvil (`tools/tlsanvil_check.py`);
+  OCSP, certificate requests and stapling against OpenSSL (`tools/tls_interop.py`); the ACME
+  client against Pebble, Let's Encrypt's ACME test server (`tools/pebble_check.py`), and against
+  an ACME server in coretest that validates every challenge and plays a misbehaving CA
 - mutation fuzzing (`tools/net_fuzz.py`, `apps/nettest`, `plattest --test wirefuzz`) and
   coverage-guided fuzzing with libFuzzer and AddressSanitizer (`tools/cov_fuzz.py`) of the parsers
-  of untrusted bytes: compress, formats, X.509, DNS, HTTP, TLS, netpkt, netchan and plat's
+  of untrusted bytes: compress, formats, X.509, OCSP, certificate requests, DNS, HTTP, TLS, netpkt, netchan and plat's
   decoders of other programs' data
 
-Limits that are documented in the crates: no revocation checks for certificates, no DNSSEC
-validation, no TLS 1.2 session resumption; TLS 1.3 0-RTT data can be replayed within its
+Limits that are documented in the crates: revocation only by stapled OCSP responses (a TLS client
+fetches no OCSP and no CRLs itself; without a staple it takes a certificate unless the certificate
+must be stapled or the program requires one), no DNSSEC validation, no TLS 1.2 session resumption; TLS 1.3 0-RTT data can be replayed within its
 freshness window to servers that do not share their replay check, which is why a server takes it
 only when it sets `ServerConfig::early_data` and gets it apart from the rest (`read_early`). Each
 crate's README says what it does and does not do.

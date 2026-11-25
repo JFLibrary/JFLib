@@ -25,9 +25,28 @@
 //                                         (containers, cff, callouts; stencil_structs.rs), (JD13)
 //                                         probeblatt.png: the shape stencils (stencil_shapes.rs),
 //                                         <folder>-alle.png: every master of each stencil
-//                                         (stencil_overview.rs)
+//                                         (stencil_overview.rs), (JD26) probeblatt-jd26.png: the
+//                                         general and business-graphics stencils
+//                                         (stencil_business.rs)
+//   diagramiotest --write-jd26-gegenprobe DIR   (JD26) the general and business-graphics
+//                                         stencils, their templates, a drawing from each and
+//                                         every master for the Visio counter-check
 //   diagramiotest --write-templates DIR  (JD13) every form of JFDiagrammer's templates as .vstx,
 //                                         metric and US (templates.rs)
+//   diagramiotest --write-data DIR [--xlsx PATH]   (JD18) jd18-verknuepft.vsdx: a drawing with
+//                                         linked data for the Visio counter-check (data.rs)
+//   diagramiotest --write-link-fixture DIR   (JD18) jd18-link.vsdx and jd18-link.csv, the fixture
+//                                         of JFDiagrammer's data_link.uis and
+//                                         data_refresh_conflict.uis (data_fixture.rs)
+//   diagramiotest --write-vdx DIR        (JD16) the self-written .vdx / .vsx files and the .vsdx /
+//                                         .vssx JFDiagrammer writes from them (vdx.rs)
+//   diagramiotest --write-vss DIR        (JD17) the sample stencil jd17-schablone.vss (three masters
+//                                        with geometry formulas; JFDiagrammer's binary_stencil.uis)
+//   diagramiotest --write-vss-hostile DIR (JD17) the synthetic .vss files and their hostile
+//                                         variants (vss.rs)
+//   diagramiotest --write-vss-overview DIR [--corpus DIR]   (JD17) every master of each local .vss
+//                                         on one sheet (<stem>-alle.png), and of each .vssx Visio
+//                                         saved from them (<stem>-visio-alle.png; vss.rs)
 //
 // Groups:
 //   samples   self-built files of all six formats: what lands where in the model (fields,
@@ -58,12 +77,25 @@
 //             (JD10, stencil_structs.rs) the structure stencils: containers, lists, lanes, callouts
 //             (JD13, stencil_shapes.rs) the shape stencils: blocks, arrows, flowchart, connectors
 //             (1-D masters, glue)
+//             (JD26, stencil_business.rs) stencils/business: the general and business-graphics
+//             stencils: parts in five languages, counts and values from shape data and control
+//             points, the fishbone's glue
 //   structures  (JD10, structures.rs) a container, a list, a cross-functional flowchart and a
 //             callout built as JFDiagrammer builds them: relationships on both sides, written and
 //             read back unchanged, members, steps and callouts carried after reading
 //   templates (JD13, templates.rs) JFDiagrammer's templates built from their sources in both
 //             measures: round trip, stencil windows, JFD_ cells, pages, the rule set, the
 //             starters (cross-functional flowcharts, connectors, tips), to_drawing
+//   data      (JD18, data.rs) external data: recordsets and connections written and read back,
+//             a package as Visio writes one, a refresh saved, parts not understood kept, hostile
+//             data parts
+//   vdx       (JD16, vdx.rs) the XML formats of 2003-2010: the self-written drawing, stencil and
+//             bitmap read into the model and written as .vsdx / .vssx, hostile files and
+//             limits; macro projects passed through unchanged; document properties
+//   vss       (JD17, vss.rs) the binary stencils of 2003-2010: compound files (cfbkit.rs) and
+//             VisioDocument streams (vsskit.rs) built here, hostile variants of both, cut and
+//             mutated files; the local .vss of SWDB_DE read, written as .vssx and read back, and
+//             drawn against Visio's .vssx of them (skipped without the files)
 //
 // Why an app of its own and not codectest: codectest is the image codecs' runner (with the
 // assembly-parity protocol and every image codec linked); the diagram codecs grow with JD5
@@ -79,7 +111,11 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 mod build;
+mod cfbkit;
 mod corpus;
+// (JD18) external data: connections, recordsets, linked shapes
+mod data;
+mod data_fixture;
 mod designs;
 mod drawings;
 mod dump;
@@ -96,6 +132,7 @@ mod pdfreader;
 mod render;
 mod roundtrip;
 mod samples;
+mod stencil_business;
 mod stencil_network;
 mod stencil_overview;
 mod stencil_shapes;
@@ -105,6 +142,11 @@ mod structures;
 mod svgdump;
 mod symbol_sheet;
 mod templates;
+mod vdx;
+mod vdx_sample;
+mod vss;
+mod vss_sample;
+mod vsskit;
 mod zipkit;
 
 /// a refusal must come within this many microseconds
@@ -189,7 +231,12 @@ fn run() -> i32 {
         return stencil_network::previews(&dir);
     }
     if let Some(dir) = arg(&args, "--write-stencil-previews") {
-        return stencil_structs::previews(&dir).max(stencil_shapes::previews(&dir)).max(stencil_overview::write_all(&dir));
+        // (JD26) probeblatt-jd26.png: the general and business-graphics stencils
+        return stencil_structs::previews(&dir).max(stencil_shapes::previews(&dir)).max(stencil_overview::write_all(&dir)).max(stencil_business::previews(&dir));
+    }
+    if let Some(dir) = arg(&args, "--write-jd26-gegenprobe") {
+        // (JD26) the stencils, templates and drawings for the Visio counter-check
+        return stencil_business::gegenprobe(&dir);
     }
     if let Some(dir) = arg(&args, "--write-gegenprobe") {
         // (JD7) the glue drawing, (JD10) the structures drawing
@@ -203,6 +250,30 @@ fn run() -> i32 {
     }
     if let Some(dir) = arg(&args, "--write-templates") {
         return templates::write(&dir);
+    }
+    if let Some(dir) = arg(&args, "--write-vdx") {
+        // (JD16) the self-written .vdx / .vsx and what JFDiagrammer writes from them
+        return vdx::write(&dir);
+    }
+    if let Some(dir) = arg(&args, "--write-link-fixture") {
+        // (JD18) the drawing and the text file of JFDiagrammer's data scripts
+        return data_fixture::write(&dir);
+    }
+    if let Some(dir) = arg(&args, "--write-data") {
+        // (JD18) the drawing with linked data for the Visio counter-check
+        return data::write_check(&dir, arg(&args, "--xlsx").as_deref());
+    }
+    if let Some(dir) = arg(&args, "--write-vss-overview") {
+        // (JD17) every master of each local .vss on one sheet
+        return vss::write_overview(&dir, arg(&args, "--corpus"));
+    }
+    if let Some(dir) = arg(&args, "--write-vss") {
+        // (JD17) the sample stencil jd17-schablone.vss (JFDiagrammer's tests/binary_stencil.uis)
+        return vss_sample::write(&dir);
+    }
+    if let Some(dir) = arg(&args, "--write-vss-hostile") {
+        // (JD17) the synthetic .vss files and their hostile variants
+        return vss::write_hostile(&dir);
     }
     if let Some(dir) = arg(&args, "--write-probe") {
         return roundtrip::write_probe(&dir, arg(&args, "--corpus").as_deref());
@@ -248,9 +319,24 @@ fn run() -> i32 {
         if h.on("stencils/network") {
             stencil_network::run(&mut h);
         }
+        // (JD26) the general and business-graphics stencils
+        if h.on("stencils/business") {
+            stencil_business::run(&mut h);
+        }
         if h.on("templates") {
             templates::run(&mut h);
         }
+        // (JD16) the XML formats of 2003-2010, the macro parts, the document properties
+        if h.on("vdx") {
+            vdx::run(&mut h);
+        }
+        // (JD18) external data (DF-12)
+        if h.on("data") {
+            data::run(&mut h);
+        }
+        // (JD17) the binary stencils of 2003-2010 (subgroups vss/cfb, vss/stream ...)
+        vss::run(&mut h);
+        vss_sample::run(&mut h);
     }
     if h.on("corpus") {
         corpus::run(&mut h, corpus_dir.clone());

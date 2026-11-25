@@ -1,0 +1,106 @@
+#!args --no-system-fonts --data-dir apps/JFDiagrammer/tests
+# JFDiagrammer, JD18: Benutzerdefinierter Import of a workbook (RD-02, AS-03, IM-05) -- the data
+# selector's four pages: Microsoft Excel-Arbeitsmappe (the databases disabled, P3), the file
+# (data_geraete.xlsx: own content made by a script, sheet "Geräte" with four devices, a sheet
+# "Notizen", the named range "Geraeteliste"), the sheet with its header row, the columns and rows
+# (Notiz and the row "Switch" left out), the key (Gerät proposed); the pane Externe Daten shows
+# the rows from the drawing alone; the import is one undo step.  Then the source's commands
+# (AB-11): umbenennen (the tab's menu), Spalteneinstellungen (label, order), entfernen (asks).
+cmd 6401
+expect dialog:"Datenauswahl" exists
+expect radio:"Microsoft Excel-Arbeitsmappe" checked
+expect radio:"Microsoft SQL Server, Access, ODBC oder OLE DB" disabled
+click button:"Weiter >"
+expect text:"Verbindung zu einer Microsoft Excel-Arbeitsmappe" exists
+# no file yet: Weiter asks for one
+click button:"Weiter >"
+expect text:"Wählen Sie eine Datei aus." exists
+# a path typed in is read only when the run may (PERMISSIONS fs.user: what the file dialog chose,
+# here also the folder named by --data-dir)
+click #2086666250
+type "apps/JFDiagrammer/PLAN.md"
+click button:"Weiter >"
+expect text:"Diese Datei darf nicht gelesen werden: wählen Sie sie über „Durchsuchen...“ aus." exists
+click #2086666250
+key ctrl+a
+key delete
+click button:"Durchsuchen..."
+expect dialog:"Öffnen" exists
+expect text:"data_geraete.xlsx" exists
+click #2087714828
+key ctrl+a
+type "data_geraete.xlsx"
+click button:"Öffnen"
+expect dialog:"Datenauswahl" exists
+# the sheets, the named range and an own range to choose from
+expect combo:"Geräte$" exists
+expect checkbox:"Erste Datenzeile enthält Spaltenüberschriften" checked
+click button:"Weiter >"
+expect text:"Spalten und Zeilen auswählen" exists
+expect checkbox:"Notiz" checked
+click checkbox:"Notiz"
+expect checkbox:"Notiz" unchecked
+click checkbox:"3"
+expect checkbox:"3" unchecked
+click button:"Weiter >"
+expect text:"Eindeutigen Bezeichner festlegen" exists
+expect radio:"Zeilen werden anhand der Werte dieser Spalten identifiziert:" checked
+expect checkbox:"Gerät (empfohlen)" checked
+click button:"Fertig stellen"
+expect dialog:"Datenauswahl" missing
+a11y expect announced "Datenquelle „Geräte“ importiert"
+# the pane Externe Daten opened on the new tab
+expect tab:"Externe Daten" selected
+expect tab:"Geräte" selected
+expect button:"Gerät" exists
+expect button:"IP-Adresse" exists
+expect button:"Notiz" missing
+expect text:"Server1" exists
+expect text:"10.0.0.254" exists
+expect text:"Switch" missing
+expect text:"Rack A" missing
+# one undo step
+key ctrl+z
+expect text:"Keine Datenquelle" exists
+expect tab:"Geräte" missing
+key ctrl+y
+expect tab:"Geräte" selected
+expect text:"Server1" exists
+# Datenquelle umbenennen from the tab's menu
+rclick tab:"Geräte"
+click "Datenquelle umbenennen"
+expect dialog:"Datenquelle umbenennen" exists
+type "Inventar"
+click button:"OK"
+expect tab:"Inventar" selected
+expect tab:"Geräte" missing
+# Spalteneinstellungen: IP-Adresse renamed to IP and moved to the front
+rclick text:"Server1"
+click "Spalteneinstellungen..."
+expect dialog:"Spalteneinstellungen" exists
+click listitem:"IP-Adresse"
+click #2088632832
+key ctrl+a
+type "IP"
+click button:"Nach oben"
+click button:"OK"
+expect button:"IP" exists
+expect button:"IP-Adresse" missing
+expect button:"IP" rect 274 * * *
+# Datenquelle entfernen asks first; the shapes would keep their data
+rclick text:"Server1"
+click "Datenquelle"
+click "Datenquelle entfernen"
+expect dialog:"Datenquelle entfernen" exists
+expect text:"Datenquelle „Inventar“ entfernen? Die verknüpften Shapes behalten ihre Shape-Daten." exists
+click button:"Abbrechen"
+expect tab:"Inventar" selected
+rclick text:"Server1"
+click "Datenquelle"
+click "Datenquelle entfernen"
+click button:"Entfernen"
+expect text:"Keine Datenquelle" exists
+key ctrl+z
+expect tab:"Inventar" selected
+expect text:"Server2" exists
+shot build/JFDiagrammer-data-import-xlsx.png

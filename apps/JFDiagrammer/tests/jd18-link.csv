@@ -1,0 +1,5 @@
+Name,IP-Adresse,Standort
+Server A,10.0.0.11,Raum 1
+Server B,10.0.0.2,Raum 3
+Router,10.0.0.254,Raum 1
+Switch,10.0.0.253,Raum 2

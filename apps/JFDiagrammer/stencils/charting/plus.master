@@ -1,0 +1,63 @@
+# Plus (SH-004, JD26): das Pluszeichen nach DIN 1302 / ISO 80000-2 (+): ein waagrechter und ein
+# senkrechter Balken gleicher Dicke, so lang (80 % des Kastens) und so dick wie die Balken des
+# Ungleichheitszeichens (not_equal.master).  Ein Umriss (die Vereinigung, keine Überlappung,
+# sonst spart die Gerade-Ungerade-Regel die Mitte aus).  Row_1 an der rechten oberen Ecke des
+# waagrechten Balkens ändert die Strichstärke (anteilig, nur senkrecht).
+master: Plus
+name.de: Plus
+name.en: Plus
+name.es: Más
+name.it: Più
+name.fr: Plus
+prompt.de: Pluszeichen (+). Mit dem gelben Steuerpunkt ändern Sie die Strichstärke.
+prompt.en: Plus sign (+). Drag the yellow control handle to change the stroke width.
+prompt.es: Signo más (+). Arrastre el controlador amarillo para cambiar el grosor del trazo.
+prompt.it: Segno più (+). Trascina la maniglia di controllo gialla per cambiare lo spessore del tratto.
+prompt.fr: Signe plus (+). Faites glisser la poignée de contrôle jaune pour modifier l'épaisseur du trait.
+keywords.de: plus, Pluszeichen, Addition, Rechenzeichen, Mathematik, Symbol, hinzufügen
+keywords.en: plus, plus sign, addition, operator, math, symbol, add
+keywords.es: más, signo más, suma, operador, matemáticas, símbolo
+keywords.it: più, segno più, addizione, operatore, matematica, simbolo
+keywords.fr: plus, signe plus, addition, opérateur, mathématiques, symbole
+
+[Shape]
+Width = 20 mm
+Width.us = 0.75 in
+Height = 20 mm
+Height.us = 0.75 in
+
+[User]
+# die Strichstärke (wie not_equal.master: 4 bis 25 % der Höhe), ihre Hälfte
+T:  Value = MIN(MAX((Controls.Row_1.Y-Height*0.5)*2, Height*0.04), Height*0.25, Width*0.25)
+H:  Value = User.T*0.5
+
+[Geometry]
+MoveTo  X = Width*0.1; Y = Height*0.5-User.H
+LineTo  X = Width*0.5-User.H; Y = Height*0.5-User.H
+LineTo  X = Width*0.5-User.H; Y = Height*0.1
+LineTo  X = Width*0.5+User.H; Y = Height*0.1
+LineTo  X = Width*0.5+User.H; Y = Height*0.5-User.H
+LineTo  X = Width*0.9; Y = Height*0.5-User.H
+LineTo  X = Width*0.9; Y = Height*0.5+User.H
+LineTo  X = Width*0.5+User.H; Y = Height*0.5+User.H
+LineTo  X = Width*0.5+User.H; Y = Height*0.9
+LineTo  X = Width*0.5-User.H; Y = Height*0.9
+LineTo  X = Width*0.5-User.H; Y = Height*0.5+User.H
+LineTo  X = Width*0.1; Y = Height*0.5+User.H
+LineTo  X = Width*0.1; Y = Height*0.5-User.H
+
+[Controls]
+Row_1:  X = Width*0.9; Y = Height*0.57
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 1; YCon = 0; CanGlue = FALSE
+        Tip.de = "Strichstärke ändern"
+        Tip.en = "Change the stroke width"
+        Tip.es = "Cambiar el grosor del trazo"
+        Tip.it = "Cambia lo spessore del tratto"
+        Tip.fr = "Modifier l'épaisseur du trait"
+
+[Connection]
+Row  X = Width*0.5; Y = Height*0.1; DirX = 0; DirY = 1
+Row  X = Width*0.9; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height*0.9; DirX = 0; DirY = -1
+Row  X = Width*0.1; Y = Height*0.5; DirX = 1; DirY = 0

@@ -1,0 +1,133 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD15 (status of FEATURES 3.2/3.3, the register Start): the commands without a
+# check of their own -- font and size boxes, Kursiv, Unterstrichen, Durchgestrichen, Schriftfarbe
+# (the Text dialog shows what the ribbon wrote), the text block's alignment, Ausschneiden,
+# Bleistift and Linie, Keine Linie, the arrow choices, Links ausrichten, Horizontal verteilen,
+# the tools from their keys, and Rückgängig naming its step in the quick access toolbar
+theme light
+cmd 4404
+drag 500,330 700,450
+cmd 4400
+key f2
+type "Box Text"
+click 1000,700
+click 600,390
+expect listitem:"Box Text" selected
+# RS-04: Schriftart and Schriftgrad
+click #4368
+click listitem:"Georgia"
+click #4369
+click listitem:"24"
+expect #4368 text "Georgia"
+expect #4369 text "24"
+# RS-06: Kursiv, Unterstrichen, Durchgestrichen
+click button:"Kursiv"
+expect button:"Kursiv" checked
+click button:"Unterstrichen"
+expect button:"Unterstrichen" checked
+click button:"Durchgestrichen"
+# RS-08: Schriftfarbe -- a standard colour (red), the menu then marks it and lists it as recent
+click button:"Schriftfarbe: Weitere Optionen"
+expect text:"Designfarben" exists
+expect text:"Standardfarben" exists
+click 434,329
+click button:"Schriftfarbe: Weitere Optionen"
+expect text:"Zuletzt verwendet" exists
+key esc
+# the Text dialog (F11) shows what the ribbon wrote: font, size, styles, colour
+key f11
+expect #2014314506 text "Georgia"
+expect #2014314507 text "24,0"
+expect checkbox:"Kursiv" checked
+expect checkbox:"Unterstrichen" checked
+expect checkbox:"Durchgestrichen" checked
+expect checkbox:"Fett" unchecked
+expect #2014314752 value -3790808
+click button:"Abbrechen"
+# RS-10: Oben / Unten ausrichten (the text block)
+click button:"Oben ausrichten"
+expect button:"Oben ausrichten" checked
+click button:"Unten ausrichten"
+expect button:"Unten ausrichten" checked
+expect button:"Oben ausrichten" unchecked
+# RS-11: Zentriert, Blocksatz, Linksbündig
+click button:"Blocksatz"
+expect button:"Blocksatz" checked
+click button:"Linksbündig"
+expect button:"Linksbündig" checked
+expect button:"Blocksatz" unchecked
+# UI-30: Rückgängig names the step it takes back
+move button:"Rückgängig"
+wait 1500
+expect text:"Rückgängig: Ausrichtung (Strg+Z)" exists
+move 1000,700
+# RS-21: Linie › Keine Linie (one undo step of that name), Linie › Pfeile (the quick choices)
+click button:"Linie"
+click "Keine Linie"
+move button:"Rückgängig"
+wait 1500
+expect text:"Rückgängig: Keine Linie (Strg+Z)" exists
+move 1000,700
+click button:"Linie"
+click "Pfeile"
+expect menuitem:"———→" exists
+expect menuitem:"•——•" exists
+# (JD15) 13 quick choices as Visio's: the begin-only forms of 4, 1 and 20 too
+expect menuitem:"←———  4" exists
+expect menuitem:"<———  1" exists
+expect menuitem:"•———" exists
+key esc
+key esc
+key ctrl+z
+# RS-02: Ausschneiden takes the shape away, Strg+V brings it back
+click button:"Ausschneiden"
+expect listitem:"Box Text" missing
+key ctrl+v
+expect listitem:"Box Text" selected
+key ctrl+z
+key ctrl+z
+expect listitem:"Box Text" exists
+# RS-24, RS-25: three boxes -- Links ausrichten, then Horizontal verteilen (equal gaps)
+click 1000,700
+cmd 4404
+drag 400,180 500,230
+drag 560,250 660,300
+drag 760,320 860,370
+cmd 4400
+click 450,205
+click 610,275 shift
+click 810,345 shift
+click button:"Ausrichten"
+click "Links ausrichten"
+expect listitem:"Sheet.7" rect 400 255 100 50
+expect listitem:"Sheet.8" rect 400 331 100 50
+key ctrl+z
+expect listitem:"Sheet.7" rect 550 255 101 50
+click 1000,700
+drag 600,275 520,275
+click 450,205
+click 500,275 shift
+click 810,345 shift
+click button:"Positionieren"
+click "Horizontal verteilen"
+expect listitem:"Sheet.7" rect 576 255 100 50
+# RS-16: Bleistift and Linie draw shapes of their own
+click 1000,700
+cmd 4409
+drag 300,550 450,600
+expect listitem:"Sheet.9" selected
+cmd 4406
+drag 300,650 450,700
+expect listitem:"Sheet.10" selected
+cmd 4400
+# RS-13, RS-14, RS-15: the tools from their keys (Strg+1, Strg+3, Strg+2); the connector tool
+# stays on after drawing a connector
+key ctrl+3
+expect button:"Verbinder" checked
+drag 450,280 800,356
+expect listitem:"Sheet.11" selected
+expect button:"Verbinder" checked
+key ctrl+2
+expect button:"Text" checked
+key ctrl+1
+expect button:"Zeigertool" checked

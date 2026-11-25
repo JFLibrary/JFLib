@@ -1,0 +1,116 @@
+#!args --no-system-fonts --data-dir apps/JFDiagrammer/tests
+# JFDiagrammer, JD18: Daten › Zeichnung aus Text (IM-08, AS-20) -- a CSV file with Shape and Link
+# records (data_text_drawing.csv: an organisation chart, a multi-line text, shape data by the
+# heading comment and as Name=Wert, one shape placed by X and Y, a link to an unknown ID and an
+# unknown record type) through the wizard: Vorschau (records, problems, separator), Master-
+# Zuordnung (preselected by name from the open Standard-Shapes), the drawing in one undo step --
+# laid out in layers, the links as glued dynamic connectors; a second time onto a new page
+click button:"Weitere Shapes"
+click "Allgemein"
+click "Standard-Shapes"
+expect tab:"Standard-Shapes" selected
+cmd 6404
+expect dialog:"Öffnen" exists
+expect text:"data_text_drawing.csv" exists
+click #35660
+key ctrl+a
+type "data_text_drawing.csv"
+click button:"Öffnen"
+expect dialog:"Öffnen" missing
+# step 1: the records, the problems with their lines
+expect dialog:"Zeichnung aus Text" exists
+expect text:"Schritt 1 von 2: Vorschau" exists
+expect text:"Datei: data_text_drawing.csv (UTF-8)" exists
+expect #2069889026 text "Automatisch (Komma)"
+expect #2069889027 text "Millimeter"
+expect text:"6 Shapes, 4 Verbinder, 2 Fehler, 0 Warnungen" exists
+expect tab:"Shapes (6)" selected
+expect text:"Technik und Entwicklung" exists
+expect text:"250; 40" exists
+expect text:"40 × 20" exists
+# the shape data of the row chosen (the first at first)
+expect text:"Shape-Daten in Zeile 3: Kosten=1200; Raum=A 1.01" exists
+click text:"LABOR"
+expect text:"Shape-Daten in Zeile 8: Leitung=Dr. Muster; Raum=B 2.14" exists
+shot build/JFDiagrammer-data-text-drawing-1.png
+click tab:"Verbinder (4)"
+expect text:"leitet" exists
+expect text:"WERKSTATT" exists
+click tab:"Probleme (2)"
+expect text:"Kein Shape hat die ID „NIRGENDWO“." exists
+expect text:"Unbekannte Datensatzart „Kreis“ (erwartet: Shape oder Link)." exists
+# another separator reads nothing; back to the detected one
+click #2069889026
+click "Semikolon"
+expect text:"0 Shapes, 0 Verbinder, 13 Fehler, 0 Warnungen" exists
+expect text:"Die Datei enthält keine Shapes: es gibt nichts zu zeichnen." exists
+click #2069889026
+click "Automatisch (Komma)"
+expect text:"6 Shapes, 4 Verbinder, 2 Fehler, 0 Warnungen" exists
+# step 2: the masters preselected by name, the defaults for the empty ones
+click button:"Weiter"
+expect text:"Schritt 2 von 2: Master-Zuordnung" exists
+expect text:"„Rechteck“" exists
+expect #2069954560 text "Standard-Shapes: Rechteck"
+expect #2069954561 text "Standard-Shapes: Ellipse"
+expect #2069954562 text "Einfaches Rechteck"
+expect #2069954563 text "Dynamischer Verbinder"
+expect radio:"der angezeigten Seite" checked
+shot build/JFDiagrammer-data-text-drawing-2.png
+# Zurück and Weiter keep the dialog
+click button:"Zurück"
+expect text:"Schritt 1 von 2: Vorschau" exists
+click button:"Weiter"
+click button:"Fertigstellen"
+expect dialog:"Zeichnung aus Text" missing
+a11y expect announced "6 Shapes und 4 Verbinder erstellt"
+# the organisation chart in layers, Archiv where X and Y put it, the connectors between them
+expect listitem:"Geschäftsleitung" rect 488 223 100 50
+expect listitem:"Einkauf" rect 425 311 100 50
+expect listitem:"Technik" rect 550 311 101 50
+expect listitem:"Werkstatt" rect 513 399 75 50
+expect listitem:"Labor" rect 613 399 76 50
+expect listitem:"Archiv" rect 978 600 100 51
+expect listitem:"leitet" exists
+expect listitem:"Sheet.10" exists
+expect listitem:"Sheet.12" exists
+expect listitem:"Sheet.13" rect 629 361 6 42
+shot build/JFDiagrammer-data-text-drawing-3.png
+# the connectors are glued: Labor moved down, its connector follows
+drag 651,424 651,474
+expect listitem:"Labor" rect 613 449 76 51
+expect listitem:"Sheet.13" rect 629 361 6 92
+key ctrl+z
+expect listitem:"Sheet.13" rect 629 361 6 42
+# the shape data of a shape
+click listitem:"Labor"
+cmd 5139
+expect tab:"Shape-Daten" selected
+expect text:"Leitung" exists
+expect #20784 text "Dr. Muster"
+expect text:"Raum" exists
+expect #20788 text "B 2.14"
+# one undo step takes the whole drawing back, redo brings it
+key esc
+key ctrl+z
+expect listitem:"Geschäftsleitung" missing
+expect listitem:"leitet" missing
+expect listitem:"Archiv" missing
+key ctrl+y
+expect listitem:"Geschäftsleitung" exists
+expect listitem:"leitet" exists
+# a second time: the page has shapes now, so a new page is offered and taken
+cmd 6404
+click #35660
+key ctrl+a
+type "data_text_drawing.csv"
+click button:"Öffnen"
+click button:"Weiter"
+expect radio:"einer neuen Seite" checked
+click button:"Fertigstellen"
+expect tab:"Seite-2" selected
+expect listitem:"Geschäftsleitung" exists
+expect listitem:"leitet" exists
+key ctrl+z
+expect tab:"Seite-2" missing
+expect listitem:"Geschäftsleitung" exists

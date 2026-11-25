@@ -1,0 +1,105 @@
+# Nach oben gekrümmtes Band (SH-003, JD26): ein Spruchband, dessen Mittelteil nach oben gekrümmt
+# ist (die Seiten höher als die Mitte) und dessen Enden hinter dem Mittelteil nach oben stehen;
+# das gekrümmte Gegenstück zum Band nach oben (ribbon_up.master).  Ober- und Unterkante des
+# Mittelteils sind Bögen derselben Ellipse (Halbachsen 0,5525 der Breite und 1,105 der Höhe, bei
+# 60 x 30 mm ein Kreis), um die Dicke T = halbe Höhe gegeneinander verschoben; an den Seiten liegt
+# das Band 1/4 der Höhe höher als in der Mitte.  Die Enden sind waagrecht, getrennt vom Band
+# durch eine Fuge von 0,8 mm (die Kante über dem Band folgt dem Bogen als Sehne, die Fuge ist
+# dort nie schmaler); die Falten sind ein Abschnitt ohne Füllung.  Row_1 an der Kerbe des linken
+# Endes ändert die Tiefe beider Kerben (anteilig, nur waagrecht).  Der Text steht auf der Mitte
+# des Bands.  Gegenstück: curved_ribbon_down.master, gleich halten.
+master: Curved ribbon up
+name.de: Nach oben gekrümmtes Band
+name.en: Curved ribbon up
+name.es: Cinta curvada hacia arriba
+name.it: Nastro curvo verso l'alto
+name.fr: Ruban incurvé vers le haut
+prompt.de: Nach oben gekrümmtes Spruchband mit Enden nach oben für Überschriften. Mit dem gelben Steuerpunkt ändern Sie die Kerben der Enden.
+prompt.en: Banner curved upwards with its ends raised, for headings. Drag the yellow control handle to change the notches of the ends.
+prompt.es: Cinta curvada hacia arriba con los extremos hacia arriba para títulos. Arrastre el controlador amarillo para cambiar las muescas de los extremos.
+prompt.it: Nastro curvo verso l'alto con le estremità verso l'alto per titoli. Trascina la maniglia di controllo gialla per cambiare le tacche delle estremità.
+prompt.fr: Ruban incurvé vers le haut aux extrémités relevées pour les titres. Faites glisser la poignée de contrôle jaune pour modifier les encoches des extrémités.
+keywords.de: Band, Spruchband, gekrümmt, gewölbt, Banner, Überschrift, Titel, Dekor
+keywords.en: ribbon, banner, curved, arched, heading, title, decoration
+keywords.es: cinta, pancarta, curvada, arqueada, título, encabezado, decoración
+keywords.it: nastro, striscione, curvo, arcuato, titolo, intestazione, decorazione
+keywords.fr: ruban, banderole, incurvé, arqué, titre, en-tête, décoration
+
+[Shape]
+Width = 60 mm
+Width.us = 2.5 in
+Height = 30 mm
+Height.us = 1.25 in
+TxtPinX = Width*0.5
+TxtPinY = User.T*0.5+User.S*0.25
+TxtWidth = Width*0.5
+TxtHeight = User.T*0.8
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+
+[User]
+# die Tiefe der Kerben, die Fuge zwischen Band und Enden, die Dicke des Bands
+N:   Value = MIN(MAX(Controls.Row_1, 0), Width*0.12)
+G:   Value = MIN(0.8 mm, Height*0.04)
+T:   Value = Height*0.5
+# die Halbachsen der Ellipse der Kanten; der Abstand der Kante von ihrem Scheitel an den Enden des
+# Bands (x = 0,15 Breite), an der Fuge davor und bei x = 0,25 Breite
+Rx:  Value = Width*0.5525
+Ry:  Value = Height*1.105
+S:   Value = User.Ry*(1-SQRT(1-(Width*0.35/User.Rx)^2))
+Fg:  Value = User.Ry*(1-SQRT(1-((Width*0.35+User.G)/User.Rx)^2))
+Fq:  Value = User.Ry*(1-SQRT(1-(Width*0.25/User.Rx)^2))
+
+# 1 das Band: Unterkante, rechte Seite, Oberkante, linke Seite
+[Geometry]
+MoveTo           X = Width*0.15; Y = User.S
+EllipticalArcTo  X = Width*0.85; Y = User.S; A = Width*0.5; B = 0; C = 0 deg; D = User.Rx/User.Ry
+LineTo           X = Width*0.85; Y = User.S+User.T
+EllipticalArcTo  X = Width*0.15; Y = User.S+User.T; A = Width*0.5; B = User.T; C = 0 deg; D = User.Rx/User.Ry
+LineTo           X = Width*0.15; Y = User.S
+
+# 2 das linke Ende, ein L um die Ecke des Bands
+[Geometry]
+MoveTo  X = 0; Y = Height*0.5
+LineTo  X = Width*0.15-User.G; Y = Height*0.5
+LineTo  X = Width*0.15-User.G; Y = User.Fg+User.T+User.G
+LineTo  X = Width*0.25; Y = User.Fq+User.T+User.G
+LineTo  X = Width*0.25; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = User.N; Y = Height*0.75
+LineTo  X = 0; Y = Height*0.5
+
+# 3 das rechte Ende
+[Geometry]
+MoveTo  X = Width; Y = Height*0.5
+LineTo  X = Width-User.N; Y = Height*0.75
+LineTo  X = Width; Y = Height
+LineTo  X = Width*0.75; Y = Height
+LineTo  X = Width*0.75; Y = User.Fq+User.T+User.G
+LineTo  X = Width*0.85+User.G; Y = User.Fg+User.T+User.G
+LineTo  X = Width*0.85+User.G; Y = Height*0.5
+LineTo  X = Width; Y = Height*0.5
+
+# 4 die Falten
+[Geometry]
+NoFill = TRUE
+MoveTo  X = Width*0.15-User.G; Y = User.Fg+User.T+User.G
+LineTo  X = Width*0.25; Y = Height
+MoveTo  X = Width*0.85+User.G; Y = User.Fg+User.T+User.G
+LineTo  X = Width*0.75; Y = Height
+
+[Controls]
+Row_1:  X = Width*0.05; Y = Height*0.75
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 0; YCon = 1; CanGlue = FALSE
+        Tip.de = "Tiefe der Kerben ändern"
+        Tip.en = "Change the depth of the notches"
+        Tip.es = "Cambiar la profundidad de las muescas"
+        Tip.it = "Cambia la profondità delle tacche"
+        Tip.fr = "Modifier la profondeur des encoches"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.75; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = User.T; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.75; DirX = 1; DirY = 0

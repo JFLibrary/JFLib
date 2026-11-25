@@ -16,6 +16,8 @@ its state in data://system-state.txt, read with run-as) and works it as a user w
   gone at once (UIC_NOTE_GONE); granted (pm grant) and swiped away -> UIC_NOTE_GONE;
 - the screen kept on: the switch -> FLAG_KEEP_SCREEN_ON (`dumpsys window`) and the partial
   WakeLock (`dumpsys power`), off again -> both gone;
+- the share sheet: the button "Teilen" (plat::share: a text, a link, a file) -> SHARE_PENDING and
+  the system's chooser in front; Back closes it -> SHARE_CANCELLED, the gallery in front again;
 - the lifecycle: `input keyevent KEYCODE_HOME` -> UIC_ACTIVE 0, UIC_SUSPEND 2; started again from
   the launcher's intent -> UIC_SUSPEND 0, UIC_ACTIVE 1.
 Every setting it changes is restored at the end (also after a failure or Ctrl+C): night mode,
@@ -424,6 +426,26 @@ def main():
         ok(wait(lambda s: s["keep"] == "0" and num(s, "inhibited") == 0, "released") is not None, "the guard dropped")
         ok(keeps_screen_on() is False, "dumpsys window: no FLAG_KEEP_SCREEN_ON")
         ok(f"jfgui:{PKG}" not in wake_locks(), "dumpsys power: the WakeLock released")
+
+        # ------------------------------------------------------------ the share sheet
+        print("the share sheet:", flush=True)
+        awake()
+        ok(tap_label("Teilen"), "tap \"Teilen\"")
+        s = wait(lambda s: num(s, "shares") == 1 and s["share"] == "2", "share asked for")
+        ok(s is not None, "plat::share: SHARE_PENDING (a text, a link and a file to the chooser)")
+
+        def chooser_in_front():
+            w = d.sh("dumpsys", "window")
+            return any("mCurrentFocus" in line and ("Chooser" in line or "intentresolver" in line or "ResolverActivity" in line)
+                       for line in w.splitlines())
+        end = time.time() + 10
+        while time.time() < end and not chooser_in_front():
+            time.sleep(0.3)
+        ok(chooser_in_front(), "the system's chooser is in front")
+        d.sh("input", "keyevent", "KEYCODE_BACK")
+        s = wait(lambda s: s["share"] == "0", "share closed")
+        ok(s is not None, "closed with Back: SHARE_CANCELLED (no target chosen)")
+        ok(focused(), "the gallery is in front again")
 
         # ------------------------------------------------------------ the lifecycle
         print("the lifecycle:", flush=True)

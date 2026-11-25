@@ -70,7 +70,7 @@ fn frames(quick: bool) {
         if k % 7 == 0 {
             v.fx.push(Fx::MuzzleOwn);
             let to = game::Vec3::new(-6.0 + (k % 13) as f64, 0.0, 2.0);
-            v.fx.push(Fx::Tracer { from: game::Vec3::new(0.2, 1.5, 17.4), to });
+            v.fx.push(Fx::TracerOwn { to });
             v.fx.push(Fx::Impact { at: to, normal: game::Vec3::new(0.0, 1.0, 0.0) });
         }
         if k % 5 == 0 {

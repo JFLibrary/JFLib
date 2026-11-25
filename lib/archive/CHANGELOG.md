@@ -29,6 +29,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   `Relationship`, `Rules` (macros, exact names, XML limits), `normalize` and `same_part` (part
   names compared ASCII case-insensitive and percent-escape aware), `rels_name`, `rels_source`,
   `parse_relationships` and `relationships_xml`.
+- (JD17) archive::cfb reads compound files ([MS-CFB], Microsoft's open specification; the container of Office's binary formats): File::read(bytes, cfb::Limits) checks header, allocation tables and directory (sector numbers inside the file, every chain without loops, the sibling tree without cycles and each entry once, names as the specification allows, file, stream and directory bounded by Limits) and gives entries, children, find(&[path]) and stream(i); version 3 and 4, read only
 
 ### Changed
 

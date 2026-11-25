@@ -1,0 +1,429 @@
+# Marktanalyse (SH-030, JD26): ein Säulendiagramm aus zwei bis sechs Säulen.  Zahl (Prop.Bars), die
+# Werte (Prop.Value1 bis Value6) und das Ende der Skala (Prop.Scale) stehen in den Shape-Daten;
+# die Höhe einer Säule ist Wert / Skala der Zeichenfläche, die Skala wächst mit, wenn ein Wert
+# darüber liegt.  Jede Säule ist ein Teil mit eigener Variantenfarbe (Schnellformatvorlage 100 bis
+# 105), darunter ein Teil mit ihrem Namen (A bis F, Text Only), eine Grundlinie (Connector).
+# Säulen und Namen über der Zahl liegen verborgen (NoShow, HideText) deckungsgleich unter der
+# letzten (die Teile stehen von hinten nach vorn in der Datei).  Gezeichnet wird nach Width/N.
+master: Market analysis
+name.de: Marktanalyse
+name.en: Market analysis
+name.es: Análisis de mercado
+name.it: Analisi di mercato
+name.fr: Analyse de marché
+prompt.de: Säulen für Marktdaten, bis zu sechs. Zahl und Werte der Säulen sowie das Ende der Skala stellen Sie in den Shape-Daten ein.
+prompt.en: Bars for market data, up to six. Set the number and values of the bars and the end of the scale in the shape data.
+prompt.es: Barras para datos de mercado, hasta seis. Defina el número y los valores de las barras y el final de la escala en los datos de la forma.
+prompt.it: Barre per dati di mercato, fino a sei. Imposta il numero e i valori delle barre e la fine della scala nei dati della forma.
+prompt.fr: Barres pour données de marché, jusqu'à six. Définissez le nombre et les valeurs des barres ainsi que la fin de l'échelle dans les données de la forme.
+keywords.de: Marktanalyse, Balken, Säulen, Diagramm, Marktdaten, Vergleich, Werte
+keywords.en: market analysis, bars, columns, chart, market data, comparison, values
+keywords.es: análisis de mercado, barras, columnas, gráfico, datos de mercado, comparación, valores
+keywords.it: analisi di mercato, barre, colonne, grafico, dati di mercato, confronto, valori
+keywords.fr: analyse de marché, barres, colonnes, graphique, données de marché, comparaison, valeurs
+
+[Shape]
+Width = 80 mm
+Width.us = 3 in
+Height = 50 mm
+Height.us = 2 in
+
+[User]
+# die Zahl der Säulen (2 bis 6), der Rand unten für die Namen, die Höhe der Zeichenfläche, die
+# Breite je Säule und der Säule selbst, das Ende der Skala, der Wert der letzten Säule
+N:   Value = MIN(MAX(ROUND(Prop.Bars,0),2),6)
+MB:  Value = 7 mm
+     Value.us = 0.3 in
+PH:  Value = Height-User.MB
+SW:  Value = Width/User.N
+BW:  Value = User.SW*0.7
+Mx:  Value = MAX(Prop.Scale,Prop.Value1,Prop.Value2,IF(User.N>=3,Prop.Value3,0),IF(User.N>=4,Prop.Value4,0),IF(User.N>=5,Prop.Value5,0),IF(User.N>=6,Prop.Value6,0),0.001)
+VN:  Value = IF(User.N=2,Prop.Value2,IF(User.N=3,Prop.Value3,IF(User.N=4,Prop.Value4,IF(User.N=5,Prop.Value5,Prop.Value6))))
+
+[Property]
+Bars:  Type = 2; Format = "0"; Value = 4
+       Label.de = Säulen
+       Label.en = Bars
+       Label.es = Barras
+       Label.it = Barre
+       Label.fr = Barres
+       Prompt.de = Anzahl der Säulen (2 bis 6)
+       Prompt.en = Number of bars (2 to 6)
+       Prompt.es = Número de barras (de 2 a 6)
+       Prompt.it = Numero di barre (da 2 a 6)
+       Prompt.fr = Nombre de barres (de 2 à 6)
+Value1:  Type = 2; Format = "0.0"; Value = 60
+         Label.de = Wert 1
+         Label.en = Value 1
+         Label.es = Valor 1
+         Label.it = Valore 1
+         Label.fr = Valeur 1
+Value2:  Type = 2; Format = "0.0"; Value = 85
+         Label.de = Wert 2
+         Label.en = Value 2
+         Label.es = Valor 2
+         Label.it = Valore 2
+         Label.fr = Valeur 2
+Value3:  Type = 2; Format = "0.0"; Value = 45
+         Label.de = Wert 3
+         Label.en = Value 3
+         Label.es = Valor 3
+         Label.it = Valore 3
+         Label.fr = Valeur 3
+Value4:  Type = 2; Format = "0.0"; Value = 70
+         Label.de = Wert 4
+         Label.en = Value 4
+         Label.es = Valor 4
+         Label.it = Valore 4
+         Label.fr = Valeur 4
+Value5:  Type = 2; Format = "0.0"; Value = 30
+         Label.de = Wert 5
+         Label.en = Value 5
+         Label.es = Valor 5
+         Label.it = Valore 5
+         Label.fr = Valeur 5
+Value6:  Type = 2; Format = "0.0"; Value = 55
+         Label.de = Wert 6
+         Label.en = Value 6
+         Label.es = Valor 6
+         Label.it = Valore 6
+         Label.fr = Valeur 6
+Scale:  Type = 2; Format = "0.0"; Value = 100
+        Label.de = Ende der Skala
+        Label.en = End of scale
+        Label.es = Final de la escala
+        Label.it = Fine della scala
+        Label.fr = Fin de l'échelle
+        Prompt.de = Wert, der die volle Höhe füllt
+        Prompt.en = Value that fills the full height
+        Prompt.es = Valor que llena toda la altura
+        Prompt.it = Valore che riempie tutta l'altezza
+        Prompt.fr = Valeur qui remplit toute la hauteur
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = User.MB+User.PH*0.5; DirX = 1; DirY = 0
+
+# Säule 6: sichtbar ab 6 Säulen; sonst deckungsgleich mit der letzten, verborgen
+[Part B6]
+
+[User]
+# die Säule, an deren Stelle das Teil steht, und ihr Wert
+K:   Value = MIN(6,Sheet.1!User.N)
+V:   Value = MAX(IF(6<=Sheet.1!User.N,Sheet.1!Prop.Value6,Sheet.1!User.VN),0)
+
+[Shape]
+Width = GUARD(Sheet.1!User.BW)
+Height = GUARD(Sheet.1!User.PH*User.V/Sheet.1!User.Mx)
+PinX = GUARD(Sheet.1!User.SW*(User.K-0.5))
+PinY = GUARD(Sheet.1!User.MB+Height*0.5)
+QuickStyleLineColor = 105
+QuickStyleFillColor = 105
+
+[Geometry]
+NoShow = 6>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# Säule 5: sichtbar ab 5 Säulen; sonst deckungsgleich mit der letzten, verborgen
+[Part B5]
+
+[User]
+# die Säule, an deren Stelle das Teil steht, und ihr Wert
+K:   Value = MIN(5,Sheet.1!User.N)
+V:   Value = MAX(IF(5<=Sheet.1!User.N,Sheet.1!Prop.Value5,Sheet.1!User.VN),0)
+
+[Shape]
+Width = GUARD(Sheet.1!User.BW)
+Height = GUARD(Sheet.1!User.PH*User.V/Sheet.1!User.Mx)
+PinX = GUARD(Sheet.1!User.SW*(User.K-0.5))
+PinY = GUARD(Sheet.1!User.MB+Height*0.5)
+QuickStyleLineColor = 104
+QuickStyleFillColor = 104
+
+[Geometry]
+NoShow = 5>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# Säule 4: sichtbar ab 4 Säulen; sonst deckungsgleich mit der letzten, verborgen
+[Part B4]
+
+[User]
+# die Säule, an deren Stelle das Teil steht, und ihr Wert
+K:   Value = MIN(4,Sheet.1!User.N)
+V:   Value = MAX(IF(4<=Sheet.1!User.N,Sheet.1!Prop.Value4,Sheet.1!User.VN),0)
+
+[Shape]
+Width = GUARD(Sheet.1!User.BW)
+Height = GUARD(Sheet.1!User.PH*User.V/Sheet.1!User.Mx)
+PinX = GUARD(Sheet.1!User.SW*(User.K-0.5))
+PinY = GUARD(Sheet.1!User.MB+Height*0.5)
+QuickStyleLineColor = 103
+QuickStyleFillColor = 103
+
+[Geometry]
+NoShow = 4>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# Säule 3: sichtbar ab 3 Säulen; sonst deckungsgleich mit der letzten, verborgen
+[Part B3]
+
+[User]
+# die Säule, an deren Stelle das Teil steht, und ihr Wert
+K:   Value = MIN(3,Sheet.1!User.N)
+V:   Value = MAX(IF(3<=Sheet.1!User.N,Sheet.1!Prop.Value3,Sheet.1!User.VN),0)
+
+[Shape]
+Width = GUARD(Sheet.1!User.BW)
+Height = GUARD(Sheet.1!User.PH*User.V/Sheet.1!User.Mx)
+PinX = GUARD(Sheet.1!User.SW*(User.K-0.5))
+PinY = GUARD(Sheet.1!User.MB+Height*0.5)
+QuickStyleLineColor = 102
+QuickStyleFillColor = 102
+
+[Geometry]
+NoShow = 3>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# Säule 2: sichtbar ab 2 Säulen; sonst deckungsgleich mit der letzten, verborgen
+[Part B2]
+
+[User]
+# die Säule, an deren Stelle das Teil steht, und ihr Wert
+K:   Value = MIN(2,Sheet.1!User.N)
+V:   Value = MAX(IF(2<=Sheet.1!User.N,Sheet.1!Prop.Value2,Sheet.1!User.VN),0)
+
+[Shape]
+Width = GUARD(Sheet.1!User.BW)
+Height = GUARD(Sheet.1!User.PH*User.V/Sheet.1!User.Mx)
+PinX = GUARD(Sheet.1!User.SW*(User.K-0.5))
+PinY = GUARD(Sheet.1!User.MB+Height*0.5)
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+
+[Geometry]
+NoShow = 2>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# Säule 1: sichtbar ab 1 Säulen; sonst deckungsgleich mit der letzten, verborgen
+[Part B1]
+
+[User]
+# die Säule, an deren Stelle das Teil steht, und ihr Wert
+K:   Value = MIN(1,Sheet.1!User.N)
+V:   Value = MAX(IF(1<=Sheet.1!User.N,Sheet.1!Prop.Value1,Sheet.1!User.VN),0)
+
+[Shape]
+Width = GUARD(Sheet.1!User.BW)
+Height = GUARD(Sheet.1!User.PH*User.V/Sheet.1!User.Mx)
+PinX = GUARD(Sheet.1!User.SW*(User.K-0.5))
+PinY = GUARD(Sheet.1!User.MB+Height*0.5)
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+
+[Geometry]
+NoShow = 1>Sheet.1!User.N
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# die Namen unter den Säulen (Text Only: dunkler Text in allen Designs)
+[Part N6]
+text.de: F
+text.en: F
+text.es: F
+text.it: F
+text.fr: F
+style: Text Only
+
+[User]
+K:   Value = MIN(6,Sheet.1!User.N)
+
+[Shape]
+Width = GUARD(Sheet.1!User.SW)
+Height = GUARD(Sheet.1!User.MB)
+PinX = GUARD(Sheet.1!User.SW*(User.K-0.5))
+PinY = GUARD(Sheet.1!User.MB*0.5)
+HideText = 6>Sheet.1!User.N
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part N5]
+text.de: E
+text.en: E
+text.es: E
+text.it: E
+text.fr: E
+style: Text Only
+
+[User]
+K:   Value = MIN(5,Sheet.1!User.N)
+
+[Shape]
+Width = GUARD(Sheet.1!User.SW)
+Height = GUARD(Sheet.1!User.MB)
+PinX = GUARD(Sheet.1!User.SW*(User.K-0.5))
+PinY = GUARD(Sheet.1!User.MB*0.5)
+HideText = 5>Sheet.1!User.N
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part N4]
+text.de: D
+text.en: D
+text.es: D
+text.it: D
+text.fr: D
+style: Text Only
+
+[User]
+K:   Value = MIN(4,Sheet.1!User.N)
+
+[Shape]
+Width = GUARD(Sheet.1!User.SW)
+Height = GUARD(Sheet.1!User.MB)
+PinX = GUARD(Sheet.1!User.SW*(User.K-0.5))
+PinY = GUARD(Sheet.1!User.MB*0.5)
+HideText = 4>Sheet.1!User.N
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part N3]
+text.de: C
+text.en: C
+text.es: C
+text.it: C
+text.fr: C
+style: Text Only
+
+[User]
+K:   Value = MIN(3,Sheet.1!User.N)
+
+[Shape]
+Width = GUARD(Sheet.1!User.SW)
+Height = GUARD(Sheet.1!User.MB)
+PinX = GUARD(Sheet.1!User.SW*(User.K-0.5))
+PinY = GUARD(Sheet.1!User.MB*0.5)
+HideText = 3>Sheet.1!User.N
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part N2]
+text.de: B
+text.en: B
+text.es: B
+text.it: B
+text.fr: B
+style: Text Only
+
+[User]
+K:   Value = MIN(2,Sheet.1!User.N)
+
+[Shape]
+Width = GUARD(Sheet.1!User.SW)
+Height = GUARD(Sheet.1!User.MB)
+PinX = GUARD(Sheet.1!User.SW*(User.K-0.5))
+PinY = GUARD(Sheet.1!User.MB*0.5)
+HideText = 2>Sheet.1!User.N
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part N1]
+text.de: A
+text.en: A
+text.es: A
+text.it: A
+text.fr: A
+style: Text Only
+
+[User]
+K:   Value = MIN(1,Sheet.1!User.N)
+
+[Shape]
+Width = GUARD(Sheet.1!User.SW)
+Height = GUARD(Sheet.1!User.MB)
+PinX = GUARD(Sheet.1!User.SW*(User.K-0.5))
+PinY = GUARD(Sheet.1!User.MB*0.5)
+HideText = 1>Sheet.1!User.N
+
+[Geometry]
+NoFill = TRUE
+NoLine = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# die Grundlinie
+[Part Base]
+style: Connector
+
+[Shape]
+BeginArrow = 0
+EndArrow = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
+QuickStyleType = 3
+
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = Sheet.1!User.MB
+LineTo  X = Width; Y = Sheet.1!User.MB

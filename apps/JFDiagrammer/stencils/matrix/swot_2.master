@@ -1,0 +1,172 @@
+# SWOT 2 (SH-031, JD26): eine SWOT-Matrix mit Kreuz und Mittelkreis, anders gestaltet als
+# marketing/swot.master und SWOT 1.  Vier Felder (Stärken, Schwächen, Chancen, Risiken) in den
+# Ecken, ihr Text in der Mitte des Felds; zwischen ihnen ein Kreuz aus zwei Balken (User.C breit,
+# eine Fläche ohne Überlappung, mit 1 mm Fuge zu den Feldern) und in der Mitte ein Kreis mit dem
+# Kürzel (SWOT, spanisch DAFO).  Felder in den Variantenfarben wie marketing/swot (101, 103, 100,
+# 102), Kreuz und Kreis in 106 (in NetLab Schiefer).  Der Kreis bleibt rund (Durchmesser aus der
+# kleineren Seite); alle Teile folgen der Größe der Gruppe.
+master: SWOT 2
+name.de: SWOT 2
+name.en: SWOT 2
+name.es: DAFO 2
+name.it: SWOT 2
+name.fr: SWOT 2
+prompt.de: SWOT-Analyse mit Kreuz und Mittelkreis für Stärken, Schwächen, Chancen und Risiken. Klicken Sie ein Feld zweimal an, um seinen Text zu ändern.
+prompt.en: SWOT analysis with a cross and a centre circle for strengths, weaknesses, opportunities and threats. Click a field twice to change its text.
+prompt.es: Análisis DAFO con una cruz y un círculo central para fortalezas, debilidades, oportunidades y amenazas. Haga clic dos veces en un campo para cambiar su texto.
+prompt.it: Analisi SWOT con croce e cerchio centrale per punti di forza, punti di debolezza, opportunità e minacce. Fai clic due volte su un campo per cambiarne il testo.
+prompt.fr: Analyse SWOT avec une croix et un cercle central pour les forces, faiblesses, opportunités et menaces. Cliquez deux fois sur un champ pour modifier son texte.
+keywords.de: SWOT, Stärken, Schwächen, Chancen, Risiken, Analyse, Strategie, Matrix
+keywords.en: SWOT, strengths, weaknesses, opportunities, threats, analysis, strategy, matrix
+keywords.es: DAFO, FODA, SWOT, fortalezas, debilidades, oportunidades, amenazas, estrategia
+keywords.it: SWOT, punti di forza, punti di debolezza, opportunità, minacce, analisi, strategia
+keywords.fr: SWOT, FFOM, forces, faiblesses, opportunités, menaces, analyse, stratégie
+
+[Shape]
+Width = 80 mm
+Width.us = 3 in
+Height = 55 mm
+Height.us = 2.125 in
+
+[User]
+# die Breite der Kreuzbalken, die Fuge, Breite und Höhe eines Felds, der Halbmesser des Kreises
+C:   Value = 3 mm
+     Value.us = 0.12 in
+F:   Value = 1 mm
+     Value.us = 0.04 in
+QW:  Value = (Width-User.C-2*User.F)*0.5
+QH:  Value = (Height-User.C-2*User.F)*0.5
+R:   Value = MIN(Width,Height)*0.2
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+
+[Part S]
+text.de: Stärken
+text.en: Strengths
+text.es: Fortalezas
+text.it: Punti di forza
+text.fr: Forces
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD(Width*0.5)
+PinY = GUARD(Sheet.1!Height-Height*0.5)
+QuickStyleLineColor = 101
+QuickStyleFillColor = 101
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part W]
+text.de: Schwächen
+text.en: Weaknesses
+text.es: Debilidades
+text.it: Punti di debolezza
+text.fr: Faiblesses
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD(Sheet.1!Width-Width*0.5)
+PinY = GUARD(Sheet.1!Height-Height*0.5)
+QuickStyleLineColor = 103
+QuickStyleFillColor = 103
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part O]
+text.de: Chancen
+text.en: Opportunities
+text.es: Oportunidades
+text.it: Opportunità
+text.fr: Opportunités
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD(Width*0.5)
+PinY = GUARD(Height*0.5)
+QuickStyleLineColor = 100
+QuickStyleFillColor = 100
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+[Part T]
+text.de: Risiken
+text.en: Threats
+text.es: Amenazas
+text.it: Minacce
+text.fr: Menaces
+
+[Shape]
+Width = GUARD(Sheet.1!User.QW)
+Height = GUARD(Sheet.1!User.QH)
+PinX = GUARD(Sheet.1!Width-Width*0.5)
+PinY = GUARD(Height*0.5)
+QuickStyleLineColor = 102
+QuickStyleFillColor = 102
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# das Kreuz: ein Umriss aus zwölf Ecken, so groß wie die Gruppe
+[Part Cross]
+
+[Shape]
+QuickStyleLineColor = 106
+QuickStyleFillColor = 106
+
+[Geometry]
+MoveTo  X = Width*0.5-Sheet.1!User.C*0.5; Y = 0
+LineTo  X = Width*0.5+Sheet.1!User.C*0.5; Y = 0
+LineTo  X = Geometry1.X2; Y = Height*0.5-Sheet.1!User.C*0.5
+LineTo  X = Width; Y = Geometry1.Y3
+LineTo  X = Width; Y = Height*0.5+Sheet.1!User.C*0.5
+LineTo  X = Geometry1.X2; Y = Geometry1.Y5
+LineTo  X = Geometry1.X2; Y = Height
+LineTo  X = Geometry1.X1; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y5
+LineTo  X = 0; Y = Geometry1.Y5
+LineTo  X = 0; Y = Geometry1.Y3
+LineTo  X = Geometry1.X1; Y = Geometry1.Y3
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+# der Kreis in der Mitte
+[Part Center]
+text.de: SWOT
+text.en: SWOT
+text.es: DAFO
+text.it: SWOT
+text.fr: SWOT
+
+[Shape]
+Width = GUARD(Sheet.1!User.R*2)
+Height = GUARD(Sheet.1!User.R*2)
+QuickStyleLineColor = 106
+QuickStyleFillColor = 106
+
+[Geometry]
+Ellipse  X = Width*0.5; Y = Height*0.5; A = Width; B = Height*0.5; C = Width*0.5; D = Height
