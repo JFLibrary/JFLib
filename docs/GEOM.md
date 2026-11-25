@@ -166,7 +166,7 @@ in den Ordner (ohne `--out`: der Name des Skripts mit `.out`):
 
 | Datei | Inhalt |
 | --- | --- |
-| `report.json` | `ok`, `errors` (Datei, Zeile, Spalte, Text, Aufrufe), `warnings` (Datei, Zeile, Spalte, Text; dazu `warnings_dropped`, wenn mehr als 1000 nicht aufgehoben wurden), `findings` (was nicht passt, deutsch, ein Satz je Fund; ein Fund über eine Regel des Skripts mit `datei:zeile: ` davor), `params`, `model` (Teile, Materialien, Ecken, Dreiecke, Budget, Box, Maße, Mitte, Fläche, Volumen), `checks` (der Bericht von `lib/geom` über das ganze Modell), `parts` (je Teil Material, Prüfung, Dreiecke, Box, Fläche, Volumen), `expect` (die Regeln des Skripts mit Datei und Zeile: `size` mit den erwarteten Maßen und den gemessenen, `budget` mit dem Budget und den Dreiecken), `materials`, `fingerprint` (FNV-1a über die Bits aller Teile), `output` (was das Skript gedruckt hat), `imports` (Module mit SHA-256), `files`, `views` (Größe, Gitterabstand, Kameras, GPU), `timing` (Skript, Geometrie, Prüfungen, Zeichnen, Export in ms; der Brennstoff des Skripts) |
+| `report.json` | `ok`, `errors` (Datei, Zeile, Spalte, Text, Aufrufe), `warnings` (Datei, Zeile, Spalte, Text; dazu `warnings_dropped`, wenn mehr als 1000 nicht aufgehoben wurden), `findings` (was nicht passt, deutsch, ein Satz je Fund; ein Fund über eine Regel des Skripts mit `datei:zeile: ` davor), `params`, `model` (Teile, Materialien, Ecken, Dreiecke, Budget, Box, Maße, Mitte, Fläche, Volumen), `checks` (der Bericht von `lib/geom` über das ganze Modell), `parts` (je Teil Material, Prüfung, Dreiecke, Box, Fläche, Volumen), `expect` (die Regeln des Skripts mit Datei und Zeile: `size` mit den erwarteten Maßen und den gemessenen, `budget` mit dem Budget und den Dreiecken), `materials`, `fingerprint` (FNV-1a über die Bits aller Teile), `output` (was das Skript gedruckt hat), `imports` (Module mit SHA-256), `files`, `views` (Größe, Gitterabstand, Kameras, GPU), `timing` (Skript, Geometrie, Prüfungen, Zeichnen, Export in ms; der Brennstoff des Skripts; seit S2 die Meshes des Laufs und wie viele höchstens zugleich lebten) |
 | `front.png`, `side.png`, `top.png` | von vorn (+Z), von rechts (+X), von oben (vorn unten im Bild); alle drei im selben Maßstab, mit einem Gitter dahinter |
 | `iso.png` | von vorn rechts oben, mit einem Gitter am Boden |
 | `sheet.png` | die vier in einem Bild: vorn und rechts oben, von oben und schräg unten |
@@ -641,8 +641,9 @@ dieselbe geblieben, auch die Zahl der Werte: Die Warnungen kosten keinen Brennst
 unverändert. Auf x86-64 und ARM64 rechnet die Wurzel der Prozessor, im Browser `sqrt_portable`; JFScript
 rechnet überall in Software, die exakte Arithmetik der Booleschen Operationen nur mit `+ − ×`; die Operatoren eines
 `vec` rechnet der Host in `f64` mit denselben Bits. `--check` dauert im Entwicklungs-Build rund 11 s unter Windows
-(unter Last bis 20 s), 11 s in WSL, 6 s auf dem M2 und 19 bis 25 s in Node (S1); mit S2 9 s unter Windows, 10 s in
-WSL und 12 bis 15 s in Node. Gezeichnet haben die RTX 2070 SUPER (Vulkan) und der M2 (Metal); die Release-Builds
+(unter Last bis 20 s), 11 s in WSL, 6 s auf dem M2 und 19 bis 25 s in Node (S1); am 2026-11-25 nacheinander auf
+demselben Rechner 8,0 s mit S1 und 8,7 s mit S2 unter Windows (die 35 neuen Prüfungen, darunter 40 401 Meshes), 10 s
+in WSL und 12 bis 15 s in Node. Gezeichnet haben die RTX 2070 SUPER (Vulkan) und der M2 (Metal); die Release-Builds
 sind in Teil 2 nicht verglichen.
 
 ## Messwerte
@@ -665,6 +666,14 @@ des Bewertungslaufs 60 bis 160 ms, das Haus aus Modulen 18 ms, die Tür 60 ms. T
 Zelle); ein Vorfilter über Boxen und behaltene Polytope wären der nächste Schritt. Die Rückmeldeschleife kostet sonst
 rund 0,3 s je Lauf, davon das meiste in render3d (Gerät, Szenen, vier Bilder mit Warten) und im PNG-Kodierer; im
 Beobachtungsmodus zeichnet nur die eine Ansicht.
+
+Was die Objekte von S2 kosten (Entwicklungs-Build unter Windows, je 5 Läufe der drei Stände abwechselnd, Median;
+Skript und Geometrie einer Schleife): 100 000-mal `m.tris` 9,7 ms als Eigenschaft eines `mesh` gegen 4,9 ms als Feld
+der Map vor S2 (der Host wird über einen kalten Weg der VM gefragt); 20 000-mal `m.flip()` 29 ms gegen 44 ms (die
+Methode geht direkt an den Host statt über `map.flip`); 100 000-mal `v = v + d` 18 ms, `v = vec.add(v, d)` mit
+Listen 37 bis 41 ms. `--checksum` (0,31 s) und die Beispiele (rund 220 ms) sind gleich schnell wie vorher; eine
+Schleife ohne Host (3 Mio. `s += i`) braucht mit S2 116 bis 126 ms, mit S1 107 bis 119 ms (Minimum bis Median,
+auch zwischen zwei Builds desselben Stands um einige Prozent verschieden).
 
 ## Was nicht getestet ist
 
