@@ -913,6 +913,19 @@ fn script(c: &mut Ctx) {
         let variadic = matches!(name.as_str(), "geom.merge" | "geom.union" | "geom.difference" | "geom.intersection");
         c.check(crate::host::max_args(sig).is_none() == variadic, || format!("max_args({}) = {:?}", name, crate::host::max_args(sig)));
     }
+    // the language services with it (an editor, G7o): after "m." a mesh's members, after "v." a vec's, after "vec."
+    // the namespace's functions although vec is a function too; the signature of vec(..)
+    let lcx = script::ls::Context::new(&api);
+    let labels = |src: &str| -> Vec<String> { script::ls::complete(src, src.len() as u32, &lcx).items.into_iter().map(|i| i.label).collect() };
+    let m = labels("let m = geom.box(1, 1, 1)\nm.");
+    let v = labels("let v = vec(1, 2, 3) * 2\nv.");
+    let ns = labels("vec.");
+    let has = |l: &[String], w: &[&str]| w.iter().all(|x| l.iter().any(|y| y == x));
+    c.check(has(&m, &["tris", "move", "bevel", "bounds"]) && !m.iter().any(|x| x == "keys"), || format!("complete m.: {:?}", m));
+    c.check(has(&v, &["x", "z", "length", "normalized"]) && !v.iter().any(|x| x == "tris"), || format!("complete v.: {:?}", v));
+    c.check(has(&ns, &["add", "cross", "lerp"]) && ns.len() == 9, || format!("complete vec.: {:?}", ns));
+    let sig = script::ls::signature("let v = vec(1, ", 15, &lcx).map(|s| s.label);
+    c.check(sig.as_deref() == Some("vec(x: float, y: float, z: float): vec"), || format!("signature vec(: {:?}", sig));
     // queries (since S2 the points of bounds are vecs, as is the result of vec.* in 3D)
     let (r, text) = script_run(
         "let m = geom.box(2, 1, 1)\nlet b = m.bounds()\nassert(b.size.x == 2 && b.max.y == 1, \"bounds\")\nassert(m.area() == 10 && m.volume() == 2, \"area\")\nassert(m.check().closed && m.tris == 12, \"check\")\nassert(vec.len([3, 4]) == 5 && vec.cross([1, 0, 0], [0, 1, 0]).z == 1, \"vec\")\nassert(profile.area(profile.rect(2, 3)) == 6, \"profile\")\nmodel.add(m.place(0, 1, 0).center().weld().smooth(45).flat())\n",
