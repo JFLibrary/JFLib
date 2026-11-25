@@ -60,12 +60,21 @@ pub(crate) struct Geom {
     pub key: u32,
 }
 
-/// a point on both surfaces in the frame of the second body
+/// a point on both surfaces and on both cores in the frame of the second body
 #[derive(Clone, Copy, Debug)]
 struct Raw {
     pa: Vec3,
     pb: Vec3,
+    ca: Vec3,
+    cb: Vec3,
     s: f64,
+}
+
+impl Raw {
+    /// from GJK / EPA's points on the surfaces, with its normal from b towards a
+    fn from_sep(sep: &Sep, ma: f64, mb: f64) -> Raw {
+        Raw { pa: sep.pa, pb: sep.pb, ca: sep.pa + sep.normal * ma, cb: sep.pb - sep.normal * mb, s: sep.dist }
+    }
 }
 
 /// a face of a core in the common frame: 1 vertex (a point), 2 (a segment), 3 or more (a polygon,
@@ -339,12 +348,14 @@ fn faces(a: &Placed, b: &Placed, n_ab: Vec3, spec: f64, sc: &mut Scratch, out: &
         if k < 2 {
             return false;
         }
-        for p in &buf[..2] {
+        // the axes overlap in one point only: one contact, not the same twice
+        let pts: &[Vec3] = if (buf[1] - buf[0]).length_sq() > 0.0 { &buf[..2] } else { &buf[..1] };
+        for p in pts {
             let qa = a0 + ua * crate::math::clamp((*p - a0).dot(ua), 0.0, la);
             let g = (*p - qa).dot(n_ab);
             let s = g - ma - mb;
             if s <= spec {
-                out.push(Raw { pa: qa + n_ab * ma, pb: *p - n_ab * mb, s });
+                out.push(Raw { pa: qa + n_ab * ma, pb: *p - n_ab * mb, ca: qa, cb: *p, s });
             }
         }
         return out.len() > start;
@@ -397,7 +408,7 @@ fn faces(a: &Placed, b: &Placed, n_ab: Vec3, spec: f64, sc: &mut Scratch, out: &
         if s <= spec {
             let q = *p - nref * g;
             let (p_ref, p_inc) = (q + nref * m_ref, *p - nref * m_inc);
-            out.push(if a_ref { Raw { pa: p_ref, pb: p_inc, s } } else { Raw { pa: p_inc, pb: p_ref, s } });
+            out.push(if a_ref { Raw { pa: p_ref, pb: p_inc, ca: q, cb: *p, s } } else { Raw { pa: p_inc, pb: p_ref, ca: *p, cb: q, s } });
         }
     }
     out.len() > start
@@ -497,7 +508,7 @@ pub(crate) fn convex_pair(sa: &Shape, ia: &Iso, sb: &Shape, ib: &Iso, spec: f64,
     let mut raw = core::mem::take(&mut sc.raw);
     raw.clear();
     if !faces(&a, &b, n_ab, spec, sc, &mut raw) {
-        raw.push(Raw { pa: sep.pa, pb: sep.pb, s: sep.dist });
+        raw.push(Raw::from_sep(&sep, a.margin, b.margin));
     }
     reduce(&mut raw, n_ab);
     let g = geom(&raw, n_ab, ib, NO_TRIANGLE);
@@ -526,10 +537,22 @@ pub(crate) fn mesh_pair(sa: &Shape, ia: &Iso, mesh: &TriMesh, ib: &Iso, spec: f6
             if !(sep.dist <= spec) {
                 continue;
             }
-            raw.push(Raw { pa: sep.pa, pb: sep.pb, s: sep.dist });
+            raw.push(Raw::from_sep(sep, a.margin, 0.0));
         }
         match groups[..used].iter_mut().find(|g| g.0.dot(n_ab) >= MERGE_COS) {
-            Some(g) => g.2.extend_from_slice(&raw),
+            Some(g) => {
+                if g.0 != n_ab {
+                    // the points of a triangle of a slightly other normal, along the group's: on the line
+                    // through the convex's core point (a sphere's centre) along it, with the gap along it, so
+                    // the solver finds the core where it is and pushes a sphere through its centre
+                    let ng = g.0;
+                    for r in raw.iter_mut() {
+                        let d = (r.cb - r.ca).dot(ng);
+                        *r = Raw { pa: r.ca + ng * a.margin, pb: r.ca + ng * d, ca: r.ca, cb: r.ca + ng * d, s: d - a.margin };
+                    }
+                }
+                g.2.extend_from_slice(&raw);
+            }
             None => {
                 if used == groups.len() {
                     groups.push((n_ab, *id, Vec::new()));

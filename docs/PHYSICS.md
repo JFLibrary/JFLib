@@ -235,7 +235,7 @@ Kontakt einer Bewegung kommt aus einer Dreiteilungssuche nach dem Minimum der ko
 | `fuzz` | 40 000 zufällige Paare mit Größen von 3 mm bis 300 m, ein Fünftel bei bis zu 10⁵ m: keine Panik, nichts nicht Endliches, Normalen der Länge 1, Brüche in [0, 1], `intersects` passt zum Abstand, Abstand symmetrisch | größte Asymmetrie 5 · 10⁻¹⁵ der Größe |
 | `character` | der Controller in Szenen mit genauen Erwartungen ([Tests des Controllers](#tests-des-controllers)) | 447 Prüfungen, 0 falsch |
 | `charfuzz` | 86 400 Schritte zufälliger Figuren auf 24 zufälligen, dichten Karten, Würfe bis 1000 m/s ([Tests des Controllers](#tests-des-controllers)) | 0 in etwas, 0 durch eine Wand |
-| `mass` bis `dynfuzz` | die Starrkörper ([Tests der Starrkörper](#tests-der-starrkörper)) | 1271 Prüfungen, 0 falsch |
+| `mass` bis `dynfuzz` | die Starrkörper ([Tests der Starrkörper](#tests-der-starrkörper)) | 1784 Prüfungen, 0 falsch |
 | `edge` | Netze, die verweigert werden, leere und flache Netze, ein Netz als Abfrageform, Casts ohne Bewegung, Berühren und Weggehen/Entlanggleiten/Hineinfahren, Strahl ohne Richtung, 3000 Casts bei 10⁶ m gegen dieselben am Ursprung, eine Bewegung von 1000 km, sortierte Kontakte an einer Ecke | 0 falsch |
 
 ## Prüfsummen
@@ -679,13 +679,13 @@ Tests `stack`: eine Kapsel von 2,6 cm Radius fiel durch das Netz).
 
 | Gruppe | Prüft | Ergebnis |
 | --- | --- | --- |
-| `mass` | Kugel und Quader gegen die geschlossene Form (10⁻¹⁴), Kapseln gegen Scheiben mit Simpson (400 000 Scheiben, 10⁻⁶), 200 Hüllen aus den Ecken gedrehter und verschobener Quader gegen den Quader (10⁻⁹), 500 Tetraeder gegen die Formeln von Tonon (2004, 10⁻⁸), ein Polyeder aus 3200 Punkten gegen die Kugel (1 %), Steiner, was verweigert wird | 904 Prüfungen, 0 falsch |
-| `motion` | freier Fall und Wurf gegen die genaue Summe des Integrators (y = y₀ + v₀ h k + g h² k (k+1)/2 nach k Teilschritten; 10⁻⁹), eine feste Drehung genau, Dämpfung genau, Kräfte, Impulse, ein kinematischer Körper genau auf seinem Ziel, Schwerkraftfaktor 0, Kreiselkräfte (Drehimpuls auf 2 %, die Kiste schlägt um; ohne sie bleibt ω) | 24, 0 falsch |
-| `contact` | Kugel, Quader, Kapsel kommen auf dem Boden zur Ruhe (höchstens 6 mm darin) und schlafen ein; Restitution 0,5, 0,8, 1 (Steighöhe e² h auf 4–5 %); Reibung auf 20°: 0,6 hält (unter 5 mm in 1,5 s), 0,2 und 0 gleiten mit g (sin − μ cos) (3 %); eine Kugel rollt mit 5/7 g sin (2 %); Rollwiderstand bremst mit 5/7 c g, ohne ihn rollt sie weiter; Kugeln stoßen frontal (Impuls auf 10⁻⁹, elastisch tauschen sie, plastisch gemeinsam); ein Quader auf einem Netz: ein Manifold mit vier Punkten über die Nähte; eine kinematische Plattform trägt und hebt eine Kiste; Massen 1:10 (mm) und 1:100 (bleibt oben) | 26, 0 falsch |
+| `mass` | Kugel und Quader gegen die geschlossene Form (10⁻¹⁴), Kapseln gegen Scheiben mit Simpson (400 000 Scheiben, 10⁻⁶), 200 Hüllen aus den Ecken gedrehter und verschobener Quader gegen den Quader (10⁻⁹), 500 Tetraeder gegen die Formeln von Tonon (2004, 10⁻⁸), ein Polyeder aus 3200 Punkten gegen die Kugel (1 %), Steiner; was verweigert wird: negative Größen und ein Tensor, dessen Diagonale gut aussieht, der aber ein negatives Hauptmoment hat (auch von `Simulation::add`), während ein gedrehter Quader gültig bleibt; die Inverse einer Diagonale aus 10⁻¹⁰⁵ (10⁻¹²) | 1402 Prüfungen, 0 falsch |
+| `motion` | freier Fall und Wurf gegen die genaue Summe des Integrators (y = y₀ + v₀ h k + g h² k (k+1)/2 nach k Teilschritten; 10⁻⁹), eine feste Drehung genau, Dämpfung genau, Kräfte, Impulse, ein kinematischer Körper genau auf seinem Ziel, Schwerkraftfaktor 0, Kreiselkräfte (Drehimpuls auf 2 %, die Kiste schlägt um; ohne sie bleibt ω), ein kinematischer Körper mit fester Drehung bleibt ungedreht, eine Bewegung über unendliche Zeit wird verweigert | 26, 0 falsch |
+| `contact` | Kugel, Quader, Kapsel kommen auf dem Boden zur Ruhe (höchstens 6 mm darin) und schlafen ein; Restitution 0,5, 0,8, 1 (Steighöhe e² h auf 4–5 %); Reibung auf 20°: 0,6 hält (unter 5 mm in 1,5 s), 0,2 und 0 gleiten mit g (sin − μ cos) (3 %); eine Kugel rollt mit 5/7 g sin (2 %); Rollwiderstand bremst mit 5/7 c g, ohne ihn rollt sie weiter; Kugeln stoßen frontal (Impuls auf 10⁻⁹, elastisch tauschen sie, plastisch gemeinsam); ein Quader auf einem Netz: ein Manifold mit vier Punkten über die Nähte; eine Kugel in einem Tal aus zwei Flächen 2° auseinander: ein Manifold, jeder Punkt auf der Linie durch ihren Mittelpunkt (10⁻⁹ m; ohne das Umrechnen auf die Normale der Gruppe 3,5 cm daneben); eine kinematische Plattform trägt und hebt eine Kiste; Massen 1:10 (mm) und 1:100 (bleibt oben) | 27, 0 falsch |
 | `stack` | Türme aus 5 und 12 Kisten stehen (Spitze 0,1 und 5,6 mm zur Seite) und schlafen ein, eine Pyramide aus 12 Reihen (78 Kisten), ein Haufen aus 120 Formen aller Arten mit Rollwiderstand in einer Grube auf einem Netz: nichts verlässt sie oder steckt im Boden, alles schläft ein (nach 367 Schritten) | 127, 0 falsch |
-| `joint` | Pendel (Periode gegen 2π √(I/(m g L)) mit der Reihe in der Amplitude, 5° und 60°, 0,5 %), die Kraft des Gelenks (m g auf 1 %), eine Kette aus 20 Gliedern (im Schwung 1,7 cm, in Ruhe 4,9 mm), eine Tür in ihren Grenzen (2°), Motoren (Drehzahl auf 1 %, ein schwacher auf sein Moment), Federn an Scharnier, Schieber und Abstand (Periode 3 %), Schweißen im Sturz (1 cm, 1,5°), ein Kragbalken, ein Schieber an seiner Grenze und mit Motor, Seil und Stange, Kugelgelenk mit Kegel und Verdrehung (3°), acht Ragdolls auf einem Boden mit Kisten (im Aufprall 3,5 cm und 10,9°, in Ruhe 0,9 mm und 0,9°), Gelenke außerhalb ihrer Grenzen angelegt, was verweigert wird | 35, 0 falsch |
-| `ccd` | ein Kügelchen von 1 cm mit 500 m/s gegen eine 1 mm dünne Wand und gegen ein Netz (ohne Sweep geht es durch, die Gegenprobe), ein `bullet` gegen eine leichte Kiste (sie bewegt sich; ohne `bullet` geht es durch), 200 Formen aus bis zu 20 m mit 50 bis 150 m/s und 30 rad/s auf den Boden geworfen: kein Schwerpunkt im Boden, nach 4 s keiner mehr als 2 cm darin | 7, 0 falsch |
-| `events` | ein `Begin` beim Aufprall mit der Geschwindigkeit √(2 g h) (5 %), keines in Ruhe, `End` beim Abheben und beim Entfernen; ein Sensor meldet Eintritt und Austritt und bremst nicht (die Fallgeschwindigkeit bitgenau), auch für einen kinematischen Körper | 8, 0 falsch |
+| `joint` | Pendel (Periode gegen 2π √(I/(m g L)) mit der Reihe in der Amplitude, 5° und 60°, 0,5 %), die Kraft des Gelenks (m g auf 1 %), eine Kette aus 20 Gliedern (im Schwung 1,7 cm, in Ruhe 4,9 mm), eine Tür in ihren Grenzen (2°), Motoren (Drehzahl auf 1 %, ein schwacher auf sein Moment), Federn an Scharnier, Schieber und Abstand (Periode 3 %), Schweißen im Sturz (1 cm, 1,5°), ein Kragbalken, ein Schieber an seiner Grenze und mit Motor, Seil und Stange, Kugelgelenk mit Kegel und Verdrehung (3°), acht Ragdolls auf einem Boden mit Kisten (im Aufprall 3,5 cm und 10,9°, in Ruhe 0,9 mm und 0,9°), Gelenke außerhalb ihrer Grenzen angelegt, eine Stange aus einem Punkt (kommt auf ihre Länge), ein Schieber, dem der Motor genommen wird (gleitet weiter, statt vom alten Impuls getrieben zu werden), eine Last an einem kinematischen Träger mit 0,01 m/s (bleibt wach und fährt mit), Achsen gegeneinander (der Kegel holt sie zurück); was verweigert wird, auch Grenzen, die keine Lage erfüllt, und ein Rahmen, der nicht endlich ist (eine Feder von 10²⁰⁰ Hz nicht) | 42, 0 falsch |
+| `ccd` | ein Kügelchen von 1 cm mit 500 m/s gegen eine 1 mm dünne Wand und gegen ein Netz (ohne Sweep geht es durch, die Gegenprobe), ein `bullet` gegen eine leichte Kiste (sie bewegt sich; ohne `bullet` geht es durch), 200 Formen aus bis zu 20 m mit 50 bis 150 m/s und 30 rad/s auf den Boden geworfen: kein Schwerpunkt im Boden, nach 4 s keiner mehr als 2 cm darin; zwei Kugeln 1,5 m auseinander, die je 1 m im Schritt aufeinander zufliegen (sie finden einander), ein `bullet` quer über die Bahn eines bewegten Körpers (es hält, wo sie sich treffen) | 9, 0 falsch |
+| `events` | ein `Begin` beim Aufprall mit der Geschwindigkeit √(2 g h) (5 %), keines in Ruhe, `End` beim Abheben und beim Entfernen; ein Sensor meldet Eintritt und Austritt und bremst nicht (die Fallgeschwindigkeit bitgenau), auch für einen kinematischen Körper (in dieser Reihenfolge); eine Kiste in einem Sensor schläft ein; ein Sensor, der von einer schlafenden Kiste weg und auf sie zurück versetzt wird, meldet Austritt und Eintritt; ein Boden mit neuen Ebenen beendet den Kontakt einer schlafenden Kiste | 11, 0 falsch |
 | `dynfuzz` | 24 zufällige Szenen (Kiste oder Netz als Boden, 50 Körper aller Formen, Dichten 50 bis 20 000, bis 15 m/s und 20 rad/s, Gelenke aller Arten mit Grenzen, Motoren, langen Hebeln, auch mehrere an einem Körper): nichts nicht Endliches, kein Schwerpunkt im Boden, keine Energie außer der, die Motoren geben können (2 %); dieselbe Szene zweimal Bit für Bit gleich, eine Kopie rechnet gleich weiter; Hinzufügen und Entfernen im Lauf; was verweigert wird | 140, 0 falsch |
 
 Wo eine Grenze im Test steht, ist sie gemessen und begründet; was die weichen Federn kosten, steht unter
@@ -696,16 +696,16 @@ Wo eine Grenze im Test steht, ist sie gemessen und begründet; was die weichen F
 Die dritte Zeile von `physicstest --checksum` (`physicstest dynamics checksum=`) rechnet die Szene `showcase` 600 Schritte
 lang: die Karte der Tests, ein Haufen aus 80 Formen mit Rollwiderstand, eine Pyramide aus 6 Reihen auf einem Sockel, zwei
 Ragdolls, eine Kette aus 12 Gliedern, ein Rad mit Motor, ein Schieber mit Feder, ein Ball an einem Seil, eine kinematische
-Plattform mit vier Kisten, ein Sensor. Je Schritt und Körper Lage, Drehung, beide Geschwindigkeiten und ob er wach ist, jedes
-Ereignis, alle 10 Schritte Lage und Kraft jedes Gelenks und die Zähler: 1 277 776 Werte.
+Plattform mit vier Kisten, ein Sensor. Je Schritt und Körper Schwerpunkt, Lage, Drehung, beide Geschwindigkeiten und ob er wach
+ist, jedes Ereignis, alle 10 Schritte Lage und Kraft jedes Gelenks und die Zähler: 1 547 713 Werte.
 
 | Ziel | Build | Starrkörper (U18) | Abfragen, Controller |
 | --- | --- | --- | --- |
-| Linux x86-64 (statisch ohne libc) | Entwicklung und Release (fat LTO) | `ee4c2de351b53085` | unverändert `0c7267a7636aaf7b`, `13dd288c669c6eaa` |
-| Windows x86-64 unter Wine | Entwicklung und Release | `ee4c2de351b53085` | unverändert |
-| WebAssembly in Node 22 (V8): einfach und SIMD | Entwicklung | `ee4c2de351b53085` | unverändert |
+| Linux x86-64 (statisch ohne libc) | Entwicklung und Release (fat LTO) | `aa7dc55444fa40ef` | unverändert `0c7267a7636aaf7b`, `13dd288c669c6eaa` |
+| Windows x86-64 unter Wine | Entwicklung und Release | `aa7dc55444fa40ef` | unverändert |
+| WebAssembly in Node 22 (V8): einfach und SIMD | Entwicklung | `aa7dc55444fa40ef` | unverändert |
 
-`--check` bestand auf allen drei mit 2 049 008 Prüfungen. Nicht gelaufen: macOS (kein Mac in dieser Sitzung), Android
+`--check` bestand auf allen drei mit 2 049 521 Prüfungen. Nicht gelaufen: macOS (kein Mac in dieser Sitzung), Android
 (kein Emulator), ARM64 unter `qemu-aarch64` (nicht installiert), der Threads-Build für den Browser (braucht `rust-src`).
 
 ### Messwerte der Starrkörper
@@ -716,13 +716,13 @@ fällt und stößt, der teure Teil) und die vier danach.
 
 | Szene | Körper | ms je Schritt, 1. Sekunde | ms je Schritt, danach | nach 5 s wach | Manifolds / Punkte |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| 100 Formen, Pyramide aus 8 Reihen, 4 Ragdolls | 207 | 0,62 | 0,88 | 60 | 381 / 994 |
-| 300 Formen, 12 Reihen, 8 Ragdolls | 493 | 1,7 | 2,9 | 207 | 1042 / 2664 |
-| 1000 Formen, 16 Reihen, 16 Ragdolls | 1339 | 6,0 | 13,0 | 762 | 3123 / 7201 |
-| eine Pyramide aus 10 Reihen (nie schlafend) | 55 | 0,51 | | | |
-| eine Pyramide aus 20 Reihen (nie schlafend) | 210 | 2,3 | | | |
+| 100 Formen, Pyramide aus 8 Reihen, 4 Ragdolls | 207 | 0,65 | 0,88 | 63 | 385 / 1007 |
+| 300 Formen, 12 Reihen, 8 Ragdolls | 493 | 1,8 | 3,2 | 228 | 1040 / 2685 |
+| 1000 Formen, 16 Reihen, 16 Ragdolls | 1339 | 6,8 | 14,8 | 731 | 3175 / 7330 |
+| eine Pyramide aus 10 Reihen (nie schlafend) | 55 | 0,47 | | | |
+| eine Pyramide aus 20 Reihen (nie schlafend) | 210 | 2,1 | | | |
 
-Bei 60 Schritten je Sekunde sind das für ein paar hundert Körper wenige Prozent eines Kerns. Ein Profil (callgrind) des
+Bei 60 Schritten je Sekunde brauchen 207 Körper rund 5 % eines Kerns, 493 rund 19 %, 1339 rund 90 %. Ein Profil (callgrind) des
 Benchmarks vor den letzten Umbauten: Kopien (`memcpy`) 27 %, das Lösen der Kontakte 19 % (darin die Impulse auf die Körper,
 Matrix mal Vektor, 8 %), GJK und EPA der Manifolds 17 %, die Suche der Paare in den Bäumen 14 %. Die Umbauten brachten 15 bis
 20 %: die Löserkörper werden an Ort und Stelle gelöst statt kopiert (184 Byte je Körper, acht Durchgänge je Teilschritt), die
@@ -738,8 +738,10 @@ umsortiert. Offen sind die Kopien des Simplex in GJK (rund 6 %); GJK gehört auc
 - **Weiche Gelenke geben nach**: Eine Kette aus 20 Gliedern geht im Schwung bis 1,7 cm auseinander, in Ruhe 4,9 mm; ein
   Ragdoll, der aus bis zu 4 m aufschlägt, für ein paar Schritte bis 3,5 cm und 11° über eine Grenze (der Boden wird zuletzt
   gelöst und drückt das Glied über den Kegel); in Ruhe halten sie auf 1 mm und 1°.
-- **Drehung im Sweep fehlt**: Sweeps verschieben, sie drehen nicht; eine schnell drehende Ecke kann einen Schritt lang im
-  Boden stecken, der Schwerpunkt nie.
+- **Drehung im Sweep fehlt**: Sweeps verschieben, sie drehen nicht. Die Drehung decken nur die spekulativen Kontakte ab,
+  und die reichen höchstens `max(extent_max, speculative_distance)` weit: Ein langer Körper, der sich mehr als etwa einen
+  Radiant je Schritt dreht, kann ein Ende durch eine dünne Wand schieben, eine Ecke einen Schritt lang im Boden stecken; der
+  Schwerpunkt geht nie hindurch.
 - **Kontaktereignisse** nur `Begin` und `End` je Paar (mit der Annäherung); kein Rückruf, der einen Kontakt ändert oder
   verwirft (Plattformen, durch die man von unten springt), keine Kräfte je Punkt außer über `manifolds()`.
 - Nicht gebaut: mehrere Formen je Körper, dynamische Netze und konvexe Zerlegung, ein elliptischer Kegel und ein Gelenk mit

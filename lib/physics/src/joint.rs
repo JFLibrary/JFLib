@@ -10,7 +10,7 @@
 // substep.  The impulses are kept from step to step (warm start).
 
 use crate::math::{Iso, Mat3, Quat, Vec3, atan2, clamp, max};
-use crate::solver::{NONE, SBody, Soft, apply, apply_angular, pair, relative_velocity};
+use crate::solver::{NONE, SBody, Soft, apply, apply_angular, load, pair, relative_velocity};
 use crate::world::BodyId;
 
 /// a joint of a [`crate::Simulation`]: an index and a generation, like [`BodyId`]
@@ -138,7 +138,7 @@ impl Joint {
         let range = |r: Option<(f64, f64)>| match r {
             None => Ok(()),
             Some((lo, hi)) if lo.is_nan() || hi.is_nan() => Err(JointError::NotFinite),
-            Some((lo, hi)) if lo > hi => Err(JointError::Range),
+            Some((lo, hi)) if lo > hi || lo == f64::INFINITY || hi == f64::NEG_INFINITY => Err(JointError::Range),
             Some(_) => Ok(()),
         };
         let motor = |m: Option<Motor>| match m {
@@ -228,6 +228,8 @@ pub(crate) struct JointRt {
     pub acc: Acc,
     /// the substep of the last step (for forces)
     pub h: f64,
+    /// how far a and b moved and turned in the last step (the basis its last pass solved in, for forces)
+    pub end: [(Vec3, Quat); 2],
 }
 
 /// the geometry of a joint now (in the substep)
@@ -291,6 +293,7 @@ impl JointRt {
             spring_soft: Soft::RIGID,
             acc: Acc::default(),
             h: 0.0,
+            end: [(Vec3::ZERO, Quat::IDENTITY); 2],
         }
     }
 
@@ -311,6 +314,94 @@ impl JointRt {
             _ => Soft::RIGID,
         };
         self.h = h;
+        self.end = [(Vec3::ZERO, Quat::IDENTITY); 2];
+    }
+
+    /// the axis of a distance joint: from a's anchor to b's, with the anchors together from a's centre to b's,
+    /// with those together too the frame's X axis
+    fn distance_axis(&self, g: &Geo, a: &SBody, b: &SBody) -> Vec3 {
+        if let Some(u) = g.d.try_normalize() {
+            return u;
+        }
+        (self.dc + (b.dp - a.dp)).try_normalize().unwrap_or(g.xa)
+    }
+
+    /// keep what the last pass solved in: the motion of a and b in the step (`joint_force` reads it)
+    pub(crate) fn finish(&mut self, bodies: &[SBody]) {
+        let (a, b) = (load(bodies, self.sa), load(bodies, self.sb));
+        self.end = [(a.dp, a.dq), (b.dp, b.dq)];
+    }
+
+    /// forget the impulses of parts the kind no longer has (a motor, a spring, limits taken away), so the
+    /// warm start does not apply them again; the others stay
+    pub(crate) fn drop_unused(&mut self) {
+        let acc = &mut self.acc;
+        let spring_on = |s: Option<Spring>| s.is_some_and(|s| s.hertz > 0.0);
+        match self.joint.kind {
+            JointKind::Ball { cone, twist } => {
+                acc.ang = Vec3::ZERO;
+                acc.perp = [0.0; 2];
+                acc.motor = 0.0;
+                acc.spring = 0.0;
+                if cone.is_none() {
+                    acc.cone = 0.0;
+                }
+                if twist.is_none() {
+                    acc.lower = 0.0;
+                    acc.upper = 0.0;
+                }
+            }
+            JointKind::Hinge { limits, motor, spring } | JointKind::Slider { limits, motor, spring } => {
+                acc.cone = 0.0;
+                if let JointKind::Hinge { .. } = self.joint.kind {
+                    acc.ang = Vec3::ZERO;
+                } else {
+                    acc.point = Vec3::ZERO;
+                }
+                if limits.is_none() {
+                    acc.lower = 0.0;
+                    acc.upper = 0.0;
+                }
+                if motor.is_none() {
+                    acc.motor = 0.0;
+                }
+                if !spring_on(spring) {
+                    acc.spring = 0.0;
+                }
+            }
+            JointKind::Fixed => {
+                acc.perp = [0.0; 2];
+                acc.lower = 0.0;
+                acc.upper = 0.0;
+                acc.motor = 0.0;
+                acc.spring = 0.0;
+                acc.cone = 0.0;
+            }
+            JointKind::Distance { min, max, spring } => {
+                acc.ang = Vec3::ZERO;
+                acc.perp = [0.0; 2];
+                acc.motor = 0.0;
+                acc.cone = 0.0;
+                acc.point.y = 0.0;
+                acc.point.z = 0.0;
+                if min < max {
+                    acc.point.x = 0.0;
+                    if !spring_on(spring) {
+                        acc.spring = 0.0;
+                    }
+                    if !(min > 0.0) {
+                        acc.lower = 0.0;
+                    }
+                    if !(max < f64::INFINITY) {
+                        acc.upper = 0.0;
+                    }
+                } else {
+                    acc.lower = 0.0;
+                    acc.upper = 0.0;
+                    acc.spring = 0.0;
+                }
+            }
+        }
     }
 
     fn geo(&self, a: &SBody, b: &SBody) -> Geo {
@@ -339,7 +430,9 @@ impl JointRt {
         if !(self.h > 0.0) {
             return (Vec3::ZERO, Vec3::ZERO);
         }
-        let g = self.geo(&SBody::STATIC, &SBody::STATIC);
+        let ea = SBody { dp: self.end[0].0, dq: self.end[0].1, ..SBody::STATIC };
+        let eb = SBody { dp: self.end[1].0, dq: self.end[1].1, ..SBody::STATIC };
+        let g = self.geo(&ea, &eb);
         let acc = &self.acc;
         let (lin, ang) = match self.joint.kind {
             JointKind::Ball { .. } => {
@@ -354,7 +447,7 @@ impl JointRt {
             JointKind::Slider { .. } => {
                 (g.ya * acc.perp[0] + g.za * acc.perp[1] + g.xa * (acc.spring + acc.motor + acc.lower - acc.upper), acc.ang)
             }
-            JointKind::Distance { .. } => (g.d.normalize_or_zero() * (acc.spring + acc.lower - acc.upper + acc.point.x), Vec3::ZERO),
+            JointKind::Distance { .. } => (self.distance_axis(&g, &ea, &eb) * (acc.spring + acc.lower - acc.upper + acc.point.x), Vec3::ZERO),
         };
         (lin / self.h, ang / self.h)
     }
@@ -389,7 +482,7 @@ impl JointRt {
                 apply(a, b, ra, g.rb, g.ya * acc.perp[0] + g.za * acc.perp[1]);
             }
             JointKind::Distance { .. } => {
-                let u = g.d.normalize_or_zero();
+                let u = self.distance_axis(&g, a, b);
                 apply(a, b, g.ra, g.rb, u * (acc.spring + acc.lower - acc.upper + acc.point.x));
             }
         }
@@ -410,6 +503,10 @@ impl JointRt {
                     if sn > 1e-12 {
                         let phi = atan2(sn, g.xa.dot(g.xb));
                         angular_limit(a, b, -(c / sn), cmax - phi, &mut self.acc.cone, &bias, inv_h);
+                    } else if g.xa.dot(g.xb) < 0.0 {
+                        // the axes point against each other: any axis across a's turns b back
+                        let n = g.xa.any_perpendicular();
+                        angular_limit(a, b, -n, cmax - core::f64::consts::PI, &mut self.acc.cone, &bias, inv_h);
                     }
                 }
                 if let Some((lo, hi)) = twist {
@@ -470,8 +567,10 @@ impl JointRt {
             JointKind::Distance { min: lo, max: hi, spring } => {
                 let g = self.geo(a, b);
                 let len = g.d.length();
-                if len > 1e-9 {
-                    let u = g.d / len;
+                // anchors together: a rope (min 0) pulls nothing, a rod or a minimum pushes apart along a fixed
+                // axis (from a's centre to b's, else the frame's X)
+                if len > 1e-9 || lo > 0.0 {
+                    let u = self.distance_axis(&g, a, b);
                     if lo < hi {
                         if let Some(s) = spring {
                             if s.hertz > 0.0 {

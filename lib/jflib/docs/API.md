@@ -67661,14 +67661,16 @@ parallel axis theorem.  A mesh has none: it is static.
 - **`fn scaled(&self, factor: f64) -> MassProps`**
   the mass and tensor scaled by `factor` (another density)
 - **`fn is_valid(&self) -> bool`**
-  mass, centre and tensor finite, the mass positive, the tensor symmetric with non-negative principal
-  moments that keep the triangle inequality (what a solid body can have; within a relative 1e-9)
+  mass, centre and tensor finite, the mass positive, the tensor symmetric with principal moments that are
+  non-negative and keep the triangle inequality, in its own axes (what a solid body can have; within a
+  relative 1e-9; the zero tensor of [`MassProps::point`] is one)
 
 **`impl Shape`**
 
 - **`fn mass_properties(&self, density: f64) -> Option<MassProps>`**
-  the mass properties of the shape filled with `density` (kg/m³), None for a mesh (static only) and for
-  a density that is not positive and finite
+  the mass properties of the shape filled with `density` (kg/m³), None for a mesh (never dynamic), for a
+  density that is not positive and finite and for sizes that are not (a radius, a box's half sizes; a
+  capsule's half height may be 0)
 
 ### `physics/src/math.rs`
 
@@ -67807,8 +67809,9 @@ the same code on every target.
   the rotation by |v| radians about the direction of `v` (a rotation vector; zero gives the identity):
   exact, so a body spinning at a constant rate turns by its rate times the time
 - **`fn to_scaled_axis(self) -> Vec3`**
-  the rotation vector of a unit quaternion: its axis times its angle in [0, pi] (the inverse of
-  [`Quat::from_scaled_axis`])
+  the rotation vector of a unit quaternion: its axis times its angle in [0, pi].  The inverse of
+  [`Quat::from_scaled_axis`] for vectors up to pi long; a longer one gives the same rotation by its angle
+  in [0, pi]
 - **`fn dot(self, o: Quat) -> f64`**
   the 4D dot product (the cosine of half the angle between two unit quaternions, up to the sign)
 - **`fn is_finite(self) -> bool`**
@@ -68116,7 +68119,7 @@ mesh (two-sided triangles)
     total height 2 (half_height + radius)
   - `Box { half: Vec3 }` -- a box around the origin with half sizes `half`
   - `Hull(Arc<ConvexHull>)` -- a convex hull (shared)
-  - `Mesh(Arc<TriMesh>)` -- a static triangle mesh (only as a body, not as a query shape)
+  - `Mesh(Arc<TriMesh>)` -- a triangle mesh: a static or kinematic body (never dynamic), not a query shape
 
 **`impl Shape`**
 
@@ -68131,7 +68134,7 @@ mesh (two-sided triangles)
 - **`fn hull_from_points(points: &[Vec3]) -> Result<Shape, HullError>`**
   the convex hull of `points`
 - **`fn mesh(mesh: TriMesh) -> Shape`**
-  a static triangle mesh, shared
+  a triangle mesh (for a static or kinematic body), shared
 - **`fn is_convex(&self) -> bool`**
   everything but a mesh
 - **`fn margin(&self) -> f64`**
@@ -68152,8 +68155,10 @@ the collision World (its box grown by how far it can move in this step), each pa
 (manifold.rs) and the impulses of the last step's points that lie within 2 cm of the new ones; a sleeping
 body that an awake one would touch wakes with its island.  Then the substeps of the soft solver
 (solver.rs, joint.rs), restitution, the new poses (into the World, so queries and the character controller
-see them), a sweep of fast bodies against what does not move (they stop where they first touch it, so they
-do not pass through a wall between two steps), sleep: an island (bodies linked by contacts and joints) whose
+see them), a sweep of fast bodies by their translation against what does not move (they stop where they first
+touch it, so they do not pass through a wall between two steps; a bullet also against moving bodies, with the
+motion relative to them) and a ray of each centre of mass; the turning is covered only by the speculative
+contacts, up to about a radian a step for a long body), sleep: an island (bodies linked by contacts and joints) whose
 bodies all moved slower than `sleep_speed` for `time_to_sleep` sleeps until something touches it.
 
 Determinism: everything in slot order, pairs sorted, no hash containers, no threads; the same bits on every
@@ -68187,12 +68192,13 @@ target as the queries (checked by physicstest's checksums).
   - `layers: u32` -- the layers the body is in (also what queries filter by)
   - `mask: u32` -- the layers it collides with: two bodies collide when each one's mask has a layer of the other
   - `sensor: bool` -- it reports overlaps ([`ContactEvent::SensorBegin`]) and pushes nothing
-  - `bullet: bool` -- it is swept against every body that is not a bullet, not only against what does not move (for small
-    fast projectiles)
+  - `bullet: bool` -- it is swept also against moving bodies that are not bullets themselves, not only against what does
+    not move (for small fast projectiles)
   - `can_sleep: bool` -- it may fall asleep (default true)
   - `gyroscopic: bool` -- gyroscopic forces: a body tumbling about an unstable axis flips as it does in space (Bullet's implicit
     step; costs a little, default off)
-  - `fixed_rotation: bool` -- it never turns (a figure's capsule pushed around as a dynamic body)
+  - `fixed_rotation: bool` -- it never turns (a figure's capsule pushed around as a dynamic body; a kinematic body keeps its
+    rotation in `set_velocity` and `move_kinematic`)
   - `awake: bool` -- it starts awake (default true)
   - `user: u64` -- free for the caller (the World's body has it too)
 
@@ -68231,7 +68237,7 @@ target as the queries (checked by physicstest's checksums).
 - **`fn sensor(mut self) -> RigidBody`**
   reports overlaps, pushes nothing
 - **`fn bullet(mut self) -> RigidBody`**
-  swept against every body, not only the static ones
+  swept also against moving bodies that are not bullets, not only against what does not move
 - **`fn sleepless(mut self) -> RigidBody`**
   never falls asleep
 - **`fn gyroscopic(mut self) -> RigidBody`**
@@ -68258,10 +68264,12 @@ target as the queries (checked by physicstest's checksums).
   - `joint_damping_ratio: f64` -- their damping ratio (default 2)
   - `max_push_speed: f64` -- the fastest an overlap is pushed apart (m/s; default 3)
   - `restitution_threshold: f64` -- slower approaches do not bounce (m/s; default 1)
-  - `linear_slop: f64` -- this much overlap is left alone, so resting contacts stay (m; default 0.005)
+  - `linear_slop: f64` -- a contact touches when its gap is at most this (events, restitution), a sweep stops this far before a
+    surface, and contact points within four times this of the last step's keep their impulses (m; default
+    0.005).  Overlaps are pushed apart down to 0, as in Box2D v3: a slop there let stacks sink further.
   - `speculative_distance: f64` -- contact points are made this far before touching, plus how far the bodies can move in the step
     (m; default 0.02)
-  - `max_speed: f64` -- no body moves faster (m/s; default 1000)
+  - `max_speed: f64` -- no dynamic body moves faster (m/s; default 1000); kinematic bodies move as they are told
   - `sleep: bool` -- may islands fall asleep (default true)
   - `time_to_sleep: f64` -- how long an island must be slow to fall asleep (s; default 0.5)
   - `sleep_speed: f64` -- slow: every point of every body of the island slower than this (m/s; default 0.05)
@@ -68366,8 +68374,9 @@ target as the queries (checked by physicstest's checksums).
 - **`fn apply_torque(&mut self, id: BodyId, torque: Vec3) -> bool`**
   a torque (N m) on a dynamic body during the next step
 - **`fn move_kinematic(&mut self, id: BodyId, target: Iso, dt: f64) -> bool`**
-  move a kinematic body to `target` over the next step of `dt` seconds: its velocities are set so it
-  gets there (what it touches on the way is pushed), and it ends exactly there.  After that step it keeps
+  move a kinematic body to `target` over the next step of `dt` seconds (positive and finite): its
+  velocities are set so it gets there (what it touches on the way is pushed), and it ends exactly there
+  (one with `fixed_rotation` keeps its rotation).  After that step it keeps
   those velocities until they are set again.
 - **`fn wake(&mut self, id: BodyId) -> bool`**
   wake a body and its island

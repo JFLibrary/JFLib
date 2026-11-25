@@ -96,9 +96,10 @@ for e in sim.events() {
 
 Joints: ball (with a swing cone and a twist range, for shoulders and hips), hinge (limits, a motor, a
 spring), fixed, slider (limits, motor, spring) and distance (rope, rod, spring); a ragdoll is a set of
-them. Islands of bodies at rest fall asleep and cost nothing until something touches them. Fast bodies
-are swept against what does not move (a `bullet` also against what does), so they do not pass through a
-wall between two steps. A `Simulation` is `Clone`: a copy is a snapshot that steps on to the same bits,
+them. Islands of bodies at rest fall asleep and cost nothing until something touches them. The
+translation of fast bodies is swept against what does not move (a `bullet`'s also against what does), so
+they do not pass through a wall between two steps; their turning is covered by the speculative contacts up
+to about a radian a step. A `Simulation` is `Clone`: a copy is a snapshot that steps on to the same bits,
 for a client that rolls back and predicts again.
 
 ## The same bits everywhere
@@ -129,7 +130,8 @@ The rigid bodies use the soft step of Box2D v3, in 3D: each step is cut into sub
 joints are damped springs that push overlaps apart without overshooting, and a relax pass takes the push
 out of the velocities again. Contact points come from GJK and EPA and the faces of both shapes along
 their normal, clipped against each other (up to four points, as in Jolt); speculative contacts reach as
-far as a body can move in the step, so a falling box stops exactly on the ground. Inertia tensors come
+far as a body can move in the step, so a falling box stops at the ground instead of sinking in first (under a
+load the soft contacts give a little, PHYSICS.md "Grenzen der Starrkörper"). Inertia tensors come
 from the shapes in closed form and, for hulls, from their tetrahedra.
 
 ## How to get it

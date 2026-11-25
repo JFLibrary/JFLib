@@ -6,8 +6,10 @@
 // (manifold.rs) and the impulses of the last step's points that lie within 2 cm of the new ones; a sleeping
 // body that an awake one would touch wakes with its island.  Then the substeps of the soft solver
 // (solver.rs, joint.rs), restitution, the new poses (into the World, so queries and the character controller
-// see them), a sweep of fast bodies against what does not move (they stop where they first touch it, so they
-// do not pass through a wall between two steps), sleep: an island (bodies linked by contacts and joints) whose
+// see them), a sweep of fast bodies by their translation against what does not move (they stop where they first
+// touch it, so they do not pass through a wall between two steps; a bullet also against moving bodies, with the
+// motion relative to them) and a ray of each centre of mass; the turning is covered only by the speculative
+// contacts, up to about a radian a step for a long body), sleep: an island (bodies linked by contacts and joints) whose
 // bodies all moved slower than `sleep_speed` for `time_to_sleep` sleeps until something touches it.
 //
 // Determinism: everything in slot order, pairs sorted, no hash containers, no threads; the same bits on every
@@ -74,15 +76,16 @@ pub struct RigidBody {
     pub mask: u32,
     /// it reports overlaps ([`ContactEvent::SensorBegin`]) and pushes nothing
     pub sensor: bool,
-    /// it is swept against every body that is not a bullet, not only against what does not move (for small
-    /// fast projectiles)
+    /// it is swept also against moving bodies that are not bullets themselves, not only against what does
+    /// not move (for small fast projectiles)
     pub bullet: bool,
     /// it may fall asleep (default true)
     pub can_sleep: bool,
     /// gyroscopic forces: a body tumbling about an unstable axis flips as it does in space (Bullet's implicit
     /// step; costs a little, default off)
     pub gyroscopic: bool,
-    /// it never turns (a figure's capsule pushed around as a dynamic body)
+    /// it never turns (a figure's capsule pushed around as a dynamic body; a kinematic body keeps its
+    /// rotation in `set_velocity` and `move_kinematic`)
     pub fixed_rotation: bool,
     /// it starts awake (default true)
     pub awake: bool,
@@ -208,7 +211,7 @@ impl RigidBody {
         self
     }
 
-    /// swept against every body, not only the static ones
+    /// swept also against moving bodies that are not bullets, not only against what does not move
     pub fn bullet(mut self) -> RigidBody {
         self.bullet = true;
         self
@@ -270,12 +273,14 @@ pub struct SimParams {
     pub max_push_speed: f64,
     /// slower approaches do not bounce (m/s; default 1)
     pub restitution_threshold: f64,
-    /// this much overlap is left alone, so resting contacts stay (m; default 0.005)
+    /// a contact touches when its gap is at most this (events, restitution), a sweep stops this far before a
+    /// surface, and contact points within four times this of the last step's keep their impulses (m; default
+    /// 0.005).  Overlaps are pushed apart down to 0, as in Box2D v3: a slop there let stacks sink further.
     pub linear_slop: f64,
     /// contact points are made this far before touching, plus how far the bodies can move in the step
     /// (m; default 0.02)
     pub speculative_distance: f64,
-    /// no body moves faster (m/s; default 1000)
+    /// no dynamic body moves faster (m/s; default 1000); kinematic bodies move as they are told
     pub max_speed: f64,
     /// may islands fall asleep (default true)
     pub sleep: bool,
@@ -414,6 +419,7 @@ struct Rb {
     bullet: bool,
     can_sleep: bool,
     gyroscopic: bool,
+    fixed_rotation: bool,
     awake: bool,
     sleep_time: f64,
     group: u32,
@@ -483,6 +489,9 @@ pub struct Simulation {
     constraints: Vec<Constraint>,
     /// their indices sorted by (a, b, key): a constraint is a kilobyte, so it is not moved into order
     order: Vec<u32>,
+    /// slots teleported or given other layers since the last step: their pairs are looked at again even when
+    /// nothing of them is awake (a static sensor moved off a sleeping body, a floor a body no longer meets)
+    dirty: Vec<u32>,
     /// overlapping (sensor, other) slots, sorted
     sensors: Vec<(u32, u32)>,
     /// touching pairs (as oriented in the constraints), sorted
@@ -566,6 +575,7 @@ impl Simulation {
             free_groups: Vec::new(),
             constraints: Vec::new(),
             order: Vec::new(),
+            dirty: Vec::new(),
             sensors: Vec::new(),
             touching: Vec::new(),
             events: Vec::new(),
@@ -671,6 +681,7 @@ impl Simulation {
             bullet: b.bullet,
             can_sleep: b.can_sleep,
             gyroscopic: b.gyroscopic,
+            fixed_rotation: b.fixed_rotation,
             awake: moves && (b.awake || b.kind == BodyKind::Kinematic),
             sleep_time: 0.0,
             group: NONE,
@@ -789,6 +800,7 @@ impl Simulation {
         r.target = None;
         let now = r.iso();
         self.world.set_iso(id, now);
+        self.dirty.push(id.index());
         self.wake_touching(id.index());
         self.wake_slot(id.index());
         true
@@ -806,7 +818,7 @@ impl Simulation {
             return true;
         }
         r.v = linear;
-        r.w = if r.inv_inertia == Mat3::ZERO && r.dynamic() { Vec3::ZERO } else { angular };
+        r.w = if r.fixed_rotation || (r.inv_inertia == Mat3::ZERO && r.dynamic()) { Vec3::ZERO } else { angular };
         self.wake_slot(id.index());
         true
     }
@@ -874,11 +886,12 @@ impl Simulation {
         true
     }
 
-    /// move a kinematic body to `target` over the next step of `dt` seconds: its velocities are set so it
-    /// gets there (what it touches on the way is pushed), and it ends exactly there.  After that step it keeps
+    /// move a kinematic body to `target` over the next step of `dt` seconds (positive and finite): its
+    /// velocities are set so it gets there (what it touches on the way is pushed), and it ends exactly there
+    /// (one with `fixed_rotation` keeps its rotation).  After that step it keeps
     /// those velocities until they are set again.
     pub fn move_kinematic(&mut self, id: BodyId, target: Iso, dt: f64) -> bool {
-        if !target.pos.is_finite() || !target.rot.is_finite() || !(dt > 0.0) {
+        if !target.pos.is_finite() || !target.rot.is_finite() || !(dt > 0.0 && dt.is_finite()) {
             return false;
         }
         let Some(r) = self.rb_mut(id) else {
@@ -887,7 +900,9 @@ impl Simulation {
         if r.kind != BodyKind::Kinematic {
             return false;
         }
-        let t = Iso::new(target.pos, target.rot.normalize());
+        // a body that never turns goes to the target's place with its own rotation
+        let rot = if r.fixed_rotation { r.rot } else { target.rot.normalize() };
+        let t = Iso::new(target.pos, rot);
         r.v = (t.transform_point(r.mass.center) - r.center) / dt;
         r.w = t.rot.mul(r.rot.conjugate()).to_scaled_axis() / dt;
         r.target = Some(t);
@@ -925,6 +940,8 @@ impl Simulation {
         };
         r.mask = mask;
         self.world.set_layers(id, layers);
+        self.dirty.push(id.index());
+        self.wake_touching(id.index());
         self.wake_slot(id.index());
         true
     }
@@ -949,6 +966,9 @@ impl Simulation {
         let (Some(ia), Some(ib)) = (self.iso(a), self.iso(b)) else {
             return Err(JointError::DeadBody);
         };
+        if !frame.pos.is_finite() || !frame.rot.is_finite() {
+            return Err(JointError::NotFinite);
+        }
         let frame = Iso::new(frame.pos, frame.rot.normalize());
         let joint = Joint { a, b, frame_a: ia.inv_mul(&frame), frame_b: ib.inv_mul(&frame), kind, collide_connected: false, user: 0 };
         self.add_joint_local(joint)
@@ -1051,7 +1071,9 @@ impl Simulation {
         };
         let same_kind = core::mem::discriminant(&rt.joint.kind) == core::mem::discriminant(&j.kind);
         rt.joint = j;
-        if !same_kind {
+        if same_kind {
+            rt.drop_unused();
+        } else {
             rt.acc = Default::default();
         }
         let (ia, ib) = (rt.ia, rt.ib);
@@ -1236,7 +1258,8 @@ impl Simulation {
         for mp in &g.points[..g.count] {
             let ra_w = mp.point - ra.center;
             let local_a = ra.rot.inverse_rotate(ra_w);
-            // the cores' points under the contact: the point lies midway between the two surfaces
+            // the cores' points under the contact, on the line through the point along the normal (so the gap
+            // moves with the levers the impulses act on): the point lies midway between the two surfaces
             let half = mp.separation * 0.5;
             let ta = mp.point - n * (half + margins.0) - ra.center;
             let tb = mp.point + n * (half + margins.1) - rb.center;
@@ -1282,11 +1305,32 @@ impl Simulation {
         let mut done: BTreeSet<(u32, u32)> = BTreeSet::new();
         let mut geoms: Vec<Geom> = Vec::new();
         let mut scratch = manifold::Scratch::new();
-        let mut start = 0usize;
         let mut pairs = 0usize;
+        // the boxes of the moving bodies in the trees hold where they can get in the step: a body's search with
+        // its own reach then finds another that comes towards it with its reach
+        for &i in active.iter() {
+            let Some((id, body)) = self.world.at(i) else {
+                continue;
+            };
+            let Some(Some(r)) = self.rbs.get(i as usize) else {
+                continue;
+            };
+            let reach = min(r.reach(dt), max(r.extent_max, spec0));
+            let bx = body.shape.aabb(&body.iso).expanded(spec0 + reach);
+            self.world.cover(id, &bx);
+        }
+        // who looks for pairs: the awake bodies, the slots moved or relayered since the last step, the islands
+        // that wake on the way
+        let mut dirty = core::mem::take(&mut self.dirty);
+        dirty.retain(|&s| self.world.at(s).is_some());
+        dirty.sort_unstable();
+        dirty.dedup();
+        let mut seekers: Vec<u32> = active.clone();
+        seekers.extend(dirty.iter().copied().filter(|s| active.binary_search(s).is_err()));
+        let mut start = 0usize;
         loop {
             let mut cand: Vec<(u32, u32)> = Vec::new();
-            for &i in &active[start..] {
+            for &i in &seekers[start..] {
                 let Some((_, body)) = self.world.at(i) else {
                     continue;
                 };
@@ -1301,7 +1345,7 @@ impl Simulation {
                     }
                 });
             }
-            start = active.len();
+            start = seekers.len();
             cand.sort_unstable();
             cand.dedup();
             for (x, y) in cand {
@@ -1351,17 +1395,18 @@ impl Simulation {
                     if self.rbs[s as usize].is_some_and(|r| r.dynamic() && !r.awake) {
                         let woke = self.wake_slot(s);
                         active.extend_from_slice(&woke);
+                        seekers.extend_from_slice(&woke);
                     }
                 }
             }
-            if active.len() == start {
+            if seekers.len() == start {
                 break;
             }
         }
         active.sort_unstable();
         active.dedup();
         // the manifolds of pairs that were not looked at (asleep, or against what does not move) stay
-        let is_active = |s: u32, rbs: &Vec<Option<Rb>>| rbs.get(s as usize).and_then(|r| r.as_ref()).is_some_and(|r| r.awake && r.moves());
+        let is_active = |s: u32, rbs: &Vec<Option<Rb>>| dirty.binary_search(&s).is_ok() || rbs.get(s as usize).and_then(|r| r.as_ref()).is_some_and(|r| r.awake && r.moves());
         for c in prev {
             if !is_active(c.a, &self.rbs) && !is_active(c.b, &self.rbs) && self.rbs.get(c.a as usize).is_some_and(|r| r.is_some()) && self.rbs.get(c.b as usize).is_some_and(|r| r.is_some()) {
                 out.push(c);
@@ -1482,7 +1527,7 @@ impl Simulation {
         let soft_rigid = Soft::new(2.0 * contact_hz, p.contact_damping_ratio, h);
         let joint_soft = Soft::new(min(p.joint_hertz, 0.5 * inv_h), p.joint_damping_ratio, h);
         let max_push = max(p.max_push_speed, 0.0);
-        let slop = 0.0 * max(p.linear_slop, 0.0);
+        let slop = max(p.linear_slop, 0.0);
         let max_w = 0.25 * core::f64::consts::PI * inv_h;
 
         for _ in 0..substeps {
@@ -1524,7 +1569,7 @@ impl Simulation {
             for &k in &solve_idx {
                 let c = &mut cons[k];
                 let s = if c.rigid_other { &soft_rigid } else { &soft };
-                solver::solve(c, &mut sb, s, inv_h, max_push, slop, true);
+                solver::solve(c, &mut sb, s, inv_h, max_push, true);
             }
             // positions: no body moves faster than max_speed or turns more than an eighth of a turn in a substep,
             // also when the constraints asked for more (conflicting joints on a light body with long levers)
@@ -1550,23 +1595,27 @@ impl Simulation {
             for &k in &solve_idx {
                 let c = &mut cons[k];
                 let s = if c.rigid_other { &soft_rigid } else { &soft };
-                solver::solve(c, &mut sb, s, inv_h, max_push, slop, false);
+                solver::solve(c, &mut sb, s, inv_h, max_push, false);
             }
         }
         for &k in &solve_idx {
-            solver::restitution(&mut cons[k], &mut sb, max(p.restitution_threshold, 0.0));
+            solver::restitution(&mut cons[k], &mut sb, max(p.restitution_threshold, 0.0), slop);
+        }
+        for &k in &jidx {
+            if let Some(rt) = self.joints[k].rt.as_mut() {
+                rt.finish(&sb);
+            }
         }
 
-        // the new poses
-        let mut swept = 0usize;
+        // the new poses, first without the World: it keeps every pose of the step's start for the sweeps, so
+        // a sweep sees every other body where it began, whatever the order of the slots
+        let mut ends: Vec<Option<(Vec3, Rb)>> = Vec::with_capacity(active.len());
         for (k, &i) in active.iter().enumerate() {
             let Some(mut r) = self.rbs[i as usize] else {
+                ends.push(None);
                 continue;
             };
-            let Some((id, body)) = self.world.at(i) else {
-                continue;
-            };
-            let s = sb[k];
+            let s = &sb[k];
             let c0 = r.center;
             r.v = s.v;
             r.w = s.w;
@@ -1576,35 +1625,72 @@ impl Simulation {
                 r.center = t.transform_point(r.mass.center);
                 r.rot = t.rot;
             }
+            r.force = Vec3::ZERO;
+            r.torque = Vec3::ZERO;
+            ends.push(Some((c0, r)));
+        }
+        let slop = max(p.linear_slop, 0.0);
+        let mut swept = 0usize;
+        for k in 0..active.len() {
+            let i = active[k];
+            let Some((c0, mut r)) = ends[k] else {
+                continue;
+            };
+            let Some((_, body)) = self.world.at(i) else {
+                continue;
+            };
             let motion = r.center - c0;
             let ml = motion.length();
             if r.dynamic() && p.continuous && !r.sensor && ml > 0.0 {
                 let rbs = &self.rbs;
                 let nc = &self.no_collide;
                 let (mask, layers, bullet) = (r.mask, body.layers, r.bullet);
-                let pred = |j: u32, other: &crate::world::Body, bullets: bool| {
-                    if j == i || other.layers & mask == 0 {
-                        return false;
+                // what this body may be swept against at all
+                let may = |j: u32, other_layers: u32| -> Option<&Rb> {
+                    if j == i || other_layers & mask == 0 {
+                        return None;
                     }
-                    let Some(Some(o)) = rbs.get(j as usize) else {
-                        return false;
-                    };
+                    let o = rbs.get(j as usize)?.as_ref()?;
                     if o.sensor || layers & o.mask == 0 || nc.binary_search(&(min_u(i, j), max_u(i, j))).is_ok() {
-                        return false;
+                        return None;
                     }
-                    !o.dynamic() || (bullets && bullet && !o.bullet)
+                    Some(o)
                 };
-                // the sweep of a fast body against what does not move (a bullet: also against what does):
-                // when it moved farther than its speculative contacts reached
+                // what did not move in the step (static bodies, kinematic ones at rest): the World has it
+                let still = |j: u32, other: &crate::world::Body| may(j, other.layers).is_some_and(|o| !o.dynamic() && sidx[j as usize] == NONE);
+                // the sweep of a fast body: when it moved farther than its speculative contacts reached
                 if r.bullet || ml > max(r.extent_max, max(p.speculative_distance, 0.0)) {
                     let iso0 = Iso::new(c0 - r.rot.rotate(r.mass.center), r.rot);
-                    let hit = self.world.cast_where(&body.shape, &iso0, motion, |j, o| pred(j, o, true));
-                    if let Some((_, h)) = hit {
-                        if h.fraction > 0.0 && h.fraction < 1.0 {
+                    let mut best: Option<(f64, Vec3)> = self.world.cast_where(&body.shape, &iso0, motion, still).map(|(_, h)| (h.fraction, h.normal));
+                    // what moved in the step, with the motion relative to it from its start: a kinematic body
+                    // for every fast body, a dynamic one (not a bullet) for a bullet
+                    let reach = body.shape.aabb(&iso0).union(&body.shape.aabb(&r.iso()));
+                    for (q, &j) in active.iter().enumerate() {
+                        let Some((cj0, rj)) = &ends[q] else {
+                            continue;
+                        };
+                        let Some((_, bj)) = self.world.at(j) else {
+                            continue;
+                        };
+                        if may(j, bj.layers).is_none() || !(rj.kind == BodyKind::Kinematic || (bullet && rj.dynamic() && !rj.bullet)) {
+                            continue;
+                        }
+                        if !reach.intersects(&bj.shape.aabb(&bj.iso).union(&bj.shape.aabb(&rj.iso()))) {
+                            continue;
+                        }
+                        let rel = motion - (rj.center - *cj0);
+                        if let Some(h) = query::cast(&body.shape, &iso0, rel, &bj.shape, &bj.iso) {
+                            if best.is_none_or(|b| h.fraction < b.0) {
+                                best = Some((h.fraction, h.normal));
+                            }
+                        }
+                    }
+                    if let Some((f, n)) = best {
+                        if f > 0.0 && f < 1.0 {
                             // a slop off the surface (along its normal, so a body that grazes it keeps its
                             // way): the next step meets it with a gap, which its speculative contact
                             // closes exactly
-                            r.center = c0 + motion * h.fraction + h.normal * max(p.linear_slop, 0.0);
+                            r.center = c0 + motion * f + n * slop;
                             swept += 1;
                         }
                     }
@@ -1615,16 +1701,24 @@ impl Simulation {
                 let motion = r.center - c0;
                 let ml = motion.length();
                 if ml > 0.0 {
-                    if let Some((_, h)) = self.world.ray_cast_where(c0, motion, 1.0, |j, o| pred(j, o, false)) {
+                    if let Some((_, h)) = self.world.ray_cast_where(c0, motion, 1.0, still) {
                         if h.t > 0.0 && h.t < 1.0 {
-                            r.center = c0 + motion * max(h.t - max(p.linear_slop, 0.0) / ml, 0.0);
+                            r.center = c0 + motion * max(h.t - slop / ml, 0.0);
                             swept += 1;
                         }
                     }
                 }
             }
-            r.force = Vec3::ZERO;
-            r.torque = Vec3::ZERO;
+            ends[k] = Some((c0, r));
+        }
+        // now into the World
+        for (k, &i) in active.iter().enumerate() {
+            let Some((_, r)) = ends[k] else {
+                continue;
+            };
+            let Some((id, _)) = self.world.at(i) else {
+                continue;
+            };
             let iso = r.iso();
             self.rbs[i as usize] = Some(r);
             self.world.set_iso(id, iso);
@@ -1711,6 +1805,14 @@ impl Simulation {
         for s in &self.joints {
             if let Some(rt) = &s.rt {
                 let (sa, sb) = (sidx.get(rt.ia as usize).copied().unwrap_or(NONE), sidx.get(rt.ib as usize).copied().unwrap_or(NONE));
+                // a body jointed to a moving kinematic one stays awake (it would be left behind as static)
+                for (x, y) in [(sa, sb), (sb, sa)] {
+                    if x != NONE && y != NONE && kin_moving[y as usize] {
+                        if let Some(r) = self.rbs[active[x as usize] as usize].as_mut() {
+                            r.sleep_time = 0.0;
+                        }
+                    }
+                }
                 if dyn_s(sa, &self.rbs) && dyn_s(sb, &self.rbs) {
                     unite(&mut parent, sa, sb);
                 }
