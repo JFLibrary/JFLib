@@ -2,15 +2,18 @@
 // a VM with limits, finish the parts (box UV in metres), measure them (geom's checks per part and for the whole
 // model, the script's expectations, the budget) and write the report.  Errors carry the file, line and
 // column, the source line with a caret and the calls, because an AI reads them and has to find the place;
-// the warnings of the host (cx.warn: the script went on) carry the same, and a failed rule of the script
-// (model.expect_size, model.budget) names the line that states it.
+// the warnings carry the same, and a failed rule of the script (model.expect_size, model.budget) names the line
+// that states it.  The warnings are first those of JFScript's language services on the script and each module it
+// imported (ls::check with the host's description, host::api(): a member a mesh or a vec does not have, a name
+// of a namespace that is not there, a division of two ints), then the host's in the order they came (cx.warn:
+// the script went on).
 
 use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use geom::{Fnv, Mesh, Report, Vec3};
-use script::{Limits, Status, Value, Vm, Warning};
+use script::{Api, Limits, Status, Value, Vm, Warning};
 
 use crate::host::{self, Model, ModelHost};
 use crate::json::J;
@@ -34,7 +37,8 @@ pub struct Run {
     pub file: String,
     pub model: Model,
     pub problems: Vec<Problem>,
-    /// the host's warnings (cx.warn) in the order they came, at most script::MAX_WARNINGS
+    /// the language services' warnings on the script and its modules, then the host's (cx.warn) in the order they
+    /// came; at most script::MAX_WARNINGS
     pub warnings: Vec<Warning>,
     /// how many more there were (not kept)
     pub warnings_dropped: u64,
@@ -48,6 +52,9 @@ pub struct Run {
     pub fuel: u64,
     pub script_us: u64,
     pub host_us: u64,
+    /// how many meshes the run made, and the most the script held at once (the others were freed)
+    pub meshes: u64,
+    pub meshes_peak: usize,
 }
 
 impl Run {
@@ -81,8 +88,9 @@ pub fn lf(s: &str) -> String {
 /// the cache key of a script, its parameters and its modules
 pub fn cache_key(src: &str, params: &[(String, String)], imports: &[(String, String)]) -> String {
     let mut text = String::new();
-    // (2: the report has warnings and the rules' places since JFScript S1; a report of 1 is built again)
-    text.push_str("modeltool-key-2\n");
+    // (2: the report has warnings and the rules' places since JFScript S1; 3: meshes and vectors are host objects
+    // since S2, and the language services' warnings are in the report; a report of before is built again)
+    text.push_str("modeltool-key-3\n");
     text.push_str(crate::APP_VERSION);
     text.push('\n');
     text.push_str(rt::VERSION);
@@ -185,6 +193,18 @@ pub fn file_loader(dir: &str, path: &str) -> Result<String, String> {
     }
 }
 
+/// The warnings of JFScript's language services on a script or module (ls::check with the host's description):
+/// a member a mesh or a vec does not have, a name of a namespace that is not there (with the closest one), a
+/// division of two ints, a top-level let read before it ran.  Its errors are compile_with's and stop the run
+/// before.
+pub fn ls_warnings(api: &Api, file: &str, src: &str) -> Vec<Warning> {
+    script::ls::check(src, api)
+        .into_iter()
+        .filter(|d| !d.error)
+        .map(|d| Warning { file: String::from(file), line: d.line, col: d.col, msg: d.msg })
+        .collect()
+}
+
 /// Compile and run the script `src` (named `file` in messages) with its parameters; `loader` reads a module
 /// for import(path) (the path relative to the script).  A module outside the script's folder is refused
 /// before the loader sees it (import_allowed).
@@ -203,8 +223,11 @@ pub fn run_script(file: &str, src: &str, params: &[(String, String)], loader: &m
         fuel: 0,
         script_us: 0,
         host_us: 0,
+        meshes: 0,
+        meshes_peak: 0,
     };
-    let prog = match script::compile_with(file, src, host::GLOBALS) {
+    let api = host::api();
+    let prog = match script::compile_with(file, src, &api.names()) {
         Ok(p) => p,
         Err(diags) => {
             for d in diags {
@@ -230,7 +253,7 @@ pub fn run_script(file: &str, src: &str, params: &[(String, String)], loader: &m
         import_allowed(&dir, path)?;
         loader(path)
     };
-    let mut host = ModelHost::new(&mut guarded);
+    let mut host = ModelHost::new(&api, &mut guarded);
     loop {
         match vm.run(&mut host, 10_000_000) {
             Status::Done(_) => break,
@@ -256,10 +279,21 @@ pub fn run_script(file: &str, src: &str, params: &[(String, String)], loader: &m
     run.host_us = host.host_us;
     run.imports = core::mem::take(&mut host.imports);
     run.model = core::mem::take(&mut host.model);
+    (run.meshes, run.meshes_peak) = (host.made, host.peak);
     drop(host);
-    // the warnings up to the end or the error, and the places of the rules, with the file named as errors name it
-    run.warnings = vm.take_warnings();
+    // the language services' warnings on the script and its modules, then the host's up to the end or the error,
+    // at most script::MAX_WARNINGS together; the places of the rules; each with the file named as errors name it
+    let mut warnings = ls_warnings(&api, file, src);
+    for (path, s) in &run.imports {
+        warnings.extend(ls_warnings(&api, path, s));
+    }
+    warnings.extend(vm.take_warnings());
     run.warnings_dropped = vm.warnings_dropped();
+    if warnings.len() > script::MAX_WARNINGS {
+        run.warnings_dropped += (warnings.len() - script::MAX_WARNINGS) as u64;
+        warnings.truncate(script::MAX_WARNINGS);
+    }
+    run.warnings = warnings;
     for w in run.warnings.iter_mut().filter(|w| w.file.is_empty()) {
         w.file = String::from(file);
     }

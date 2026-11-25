@@ -1,7 +1,7 @@
 {
   "tool": "modeltool 0.1.0",
   "script": "treppe.jfs",
-  "key": "5489483686ed4c619ee05da8a3d6df6c",
+  "key": "ff975329320598956cb5b96cdb3bfd32",
   "ok": true,
   "errors": [],
   "warnings": [],
@@ -65,5 +65,5 @@
   "imports": [],
   "files": {"report": "report.json", "glb": "model.glb", "sheet": "sheet.png", "front": "front.png", "side": "side.png", "top": "top.png", "iso": "iso.png"},
   "views": {"images": true, "size": 512, "grid_on": true, "grid": 0.5, "sheet": "front | side over top | iso", "cameras": "front: from +Z; side: from +X; top: from +Y, front at the bottom; the three at one scale; iso: from front right above", "adapter": "NVIDIA GeForce RTX 2070 SUPER"},
-  "timing": {"script_ms": 0.543, "geometry_ms": 0.615, "checks_ms": 0.877, "render_ms": 8018.781, "export_ms": 0.289, "total_ms": 8052.025, "fuel": 275}
+  "timing": {"script_ms": 0.624, "geometry_ms": 0.562, "checks_ms": 0.677, "render_ms": 186.963, "export_ms": 0.203, "total_ms": 205.658, "fuel": 265, "meshes": 11, "meshes_peak": 11}
 }

@@ -451,6 +451,13 @@ anfassen:
   `list.linspace` kommen aus JFScript ([GEOM.md](GEOM.md)). Die Prüfsumme blieb `0fae175a31a0f15e`. Die übrigen
   Wünsche folgen dem Richtungspapier (Vektoren und Host-Objekte mit S2, benannte Argumente und der bedingte
   Ausdruck mit S3).
+- **Stand 2026-11-25:** `modeltool` nimmt Stufe S2 von JFScript (a21a0c3): Meshes sind Objekte des Hosts (`type(m)`
+  ist `"mesh"`, `m.tris` eine Eigenschaft), die der Host freigibt, sobald das Skript sie nicht mehr hält; Vektoren
+  sind der Werttyp `vec` mit `+ − × ÷` (`treppe.jfs`: `b + richtung * 0.1`); eine Beschreibung (`host::api()`,
+  `script::Api`) liefert `--api` und den Sprachdiensten ihren Blick auf den Host, deren Warnungen (eine Methode, die
+  ein Mesh nicht hat, `int / int`) `modeltool` jetzt mit ausgibt ([GEOM.md](GEOM.md)). Die Prüfsumme ist
+  `ff9e060c8233c600`: nur der Brennstoff der Treppe ist anders, die Bits aller Meshes sind gleich. Offen für S3:
+  benannte Argumente, der bedingte Ausdruck, Zerlegen.
 
 **G7h Spiel 1**
 

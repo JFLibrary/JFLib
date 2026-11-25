@@ -1,97 +1,134 @@
 // host -- the script's view of lib/geom: the JFScript host functions geom.*, profile.*, vec.*, model.* and the
-// methods of a mesh.  The script only describes; every vertex is computed here in Rust.  A mesh is a map
-// {mesh: id, tris: n} (JFScript has no host objects yet: docs/GEOM.md, "Was JFScript braucht"), whose
-// methods reach the host as "map.move" and so on; meshes never change, every operation makes a new one.
-// Names are English, parameters included (decision G9.3 of JFScript's docs/RICHTUNG.md: with named arguments
-// they become part of the interface); the descriptions and messages are German.  Wrong arguments throw a
-// message that names the function and the parameter; the VM adds the line and column of the call.  What the
-// host accepts but is very likely a mistake (arguments beyond the last parameter, a value for `closed` that is
-// no bool, a second model.name / budget / uv_scale or material definition that replaces the first) is a
-// warning at the call (cx.warn); the script goes on.  A mesh made by a Boolean operation keeps its convex cells
-// (geom::Solid) beside it, moved, turned, scaled and mirrored with it, so it can go into the next Boolean
-// operation; any other mesh goes in as one convex solid.
+// host objects of JFScript S2 (docs/HOST.md there).  The script only describes; every vertex is computed here in
+// Rust.  A mesh is a host object of type "mesh" (Cx::new_object: identity, the script cannot open or change it,
+// type(m) is "mesh", print shows "mesh(12 Dreiecke)"); its methods reach Host::method, m.tris Host::get.  Meshes
+// never change, every operation makes a new one.  When the collector frees a mesh the script no longer holds,
+// Host::drop frees its vertices and its convex cells and the id is used again; a part of the model has its own
+// copy (model.add), so a drop never touches it.  The triangle limit of a run (ARENA_TRIANGLES) still counts every
+// mesh made, intermediate ones included: it bounds the work of a run, and it does not depend on when the
+// collector runs.  A vector is a value type "vec" (Cx::new_value: == compares the numbers exactly) with x, y, z,
+// + and - between vectors, * and / with a number, the unary minus and methods; every function that takes a point
+// or a vector takes a vec as well as a list [x, y, z] (or three numbers where it did), and the functions that
+// give a point or a vector in 3D give a vec (vec.* with lists of two numbers still gives a list).
+//
+// One description, api(): the functions, the two types with their members and operators, as script::Api with
+// TypeScript-like signatures (English names, parameters included: decision G9.3 of JFScript's docs/RICHTUNG.md;
+// German texts).  From it come `modeltool --api`, the names compile_with knows, the language services' check of
+// the script (run.rs: unknown members of a mesh or a vec as warnings), the most arguments of each function for
+// the warning about extra ones, and the messages about members a type does not have.  A signature names the
+// longest form (m.move(x, y, z)); the shorter ones (m.move(v)) are in its text.
+//
+// Wrong arguments throw a message that names the function and the parameter; the VM adds the line and column of
+// the call.  What the host accepts but is very likely a mistake (arguments beyond the last parameter, a value for
+// `closed` that is no bool, a second model.name / budget / uv_scale or material definition that replaces the
+// first) is a warning at the call (cx.warn); the script goes on.  A mesh made by a Boolean operation keeps its
+// convex cells (geom::Solid) beside it, moved, turned, scaled and mirrored with it, so it can go into the next
+// Boolean operation; any other mesh goes in as one convex solid.
 
 use alloc::format;
 use alloc::rc::Rc;
 use alloc::string::{String, ToString};
-use alloc::vec;
 use alloc::vec::Vec;
 
 use geom::{Affine, Axis, Mesh, Solid, Vec3};
-use script::{Cx, Fail, Host, Position, Value};
+use script::api::{Api, GlobalKind, Sig, Type};
+use script::{Cx, Fail, Host, Object, Operator, Position, Value, Vm};
 
-/// the names the host answers (compile_with: any other unknown name is an error before the run)
-pub const GLOBALS: &[&str] = &["geom", "model", "profile", "vec", "params"];
-
-/// the most triangles of all meshes a run makes, intermediate ones included
+/// the most triangles of all meshes a run makes, intermediate ones included (also those freed since)
 pub const ARENA_TRIANGLES: usize = 4_000_000;
 
-/// one host function for the reference (`modeltool --api`) and the messages
-pub struct ApiEntry {
-    pub name: &'static str,
-    pub params: &'static str,
-    pub doc: &'static str,
+/// The script's interface: every function, value and type with its members, signatures in TypeScript's form and
+/// what each does (German).  See the module comment for what is made from it.
+pub fn api() -> Api {
+    Api::new("modeltool")
+        .doc("Modelle aus Regeln und Bausteinen: das Skript beschreibt, lib/geom rechnet. Längen in Metern, Winkel in Grad, Y oben, vorn ist +Z; jeder Grundkörper steht auf y = 0, mittig über dem Ursprung. Ein Mesh ändert sich nie: jede Operation gibt ein neues. Punkte und Vektoren: ein vec oder eine Liste [x, y, z]; Profile: Listen von Punkten [x, y].")
+        .namespace("geom", "Grundkörper, Körper aus Profilen, Zusammenfügen und Boolesche Operationen")
+        .func("geom.box(w: float, h: float, d: float): mesh", "Quader w x h x d (x, y, z) in Metern; steht auf y = 0, mittig über dem Ursprung")
+        .func("geom.cylinder(r: float, h: float, segments: int = 32): mesh", "Zylinder um die Y-Achse auf y = 0; glatte Seiten, flache Deckel")
+        .func("geom.cone(r: float, h: float, segments: int = 32, r_top: float = 0): mesh", "Kegel (mit r_top > 0 ein Kegelstumpf) um die Y-Achse auf y = 0")
+        .func("geom.sphere(r: float, segments: int = 32, rings: int = segments / 2): mesh", "Kugel, liegt auf y = 0 (Mitte bei y = r)")
+        .func("geom.torus(R: float, r: float, segments: int = 32, sides: int = 16): mesh", "Torus, liegt flach auf y = 0; R zur Mitte des Rings, r der Ring")
+        .func("geom.stairs(w: float, h: float, d: float, steps: int): mesh", "Treppe w breit (x), h hoch, d tief (z); erste Stufe vorn (z = d/2), steigt nach hinten")
+        .func("geom.arch(w: float, h: float, d: float, thickness: float, segments: int = 16): mesh", "Torbogen: zwei Pfeiler der Stärke thickness, Öffnung mit Halbkreis, darüber die Stärke")
+        .func("geom.extrude(profile: list, depth: float): mesh", "Profil [[x, y], ...] (Ansicht von vorn) entlang Z, mittig um z = 0")
+        .func("geom.prism(footprint: list, h: float): mesh", "Grundriss [[x, z], ...] (Ansicht von oben) von y = 0 um h nach oben")
+        .func("geom.sweep(profile: list, path: list, closed: bool = false, smooth: float = 30): mesh", "Profil [[x, y], ...] entlang eines Pfads aus Punkten (vec oder [x, y, z]); Ecken auf Gehrung")
+        .func("geom.lathe(profile: list, segments: int = 32, smooth: float = 30): mesh", "Drehkörper: Profil [[radius, y], ...] um die Y-Achse")
+        .func("geom.merge(...meshes: mesh): mesh", "Meshes zu einem zusammenfügen (Teile bleiben getrennt, auch wenn sie sich durchdringen); auch geom.merge([m1, m2, ...])")
+        .func("geom.union(...meshes: mesh): mesh", "Vereinigung zu einem geschlossenen Körper (konvexe Körper oder Ergebnisse Boolescher Operationen); auch mit einer Liste")
+        .func("geom.difference(m: mesh, ...cuts: mesh): mesh", "m ohne die Abzüge (ein Fenster aus einer Wand, ein Loch durch eine Platte); auch geom.difference([m, cut1, ...])")
+        .func("geom.intersection(...meshes: mesh): mesh", "was in allen liegt; auch mit einer Liste")
+        .namespace("profile", "Profile: Listen von Punkten [x, y]")
+        .func("profile.rect(w: float, h: float): list", "Rechteck um den Ursprung")
+        .func("profile.circle(r: float, n: int = 32): list", "Vieleck mit n Ecken auf einem Kreis um den Ursprung")
+        .func("profile.rounded(w: float, h: float, r: float, n: int = 4): list", "Rechteck mit abgerundeten Ecken (n Segmente je Ecke)")
+        .func("profile.arc(r: float, start: float, end: float, n: int = 16): list", "Punkte eines Kreisbogens von start bis end (Grad), beide Enden dabei: ein offener Linienzug")
+        .func("profile.move(p: list, dx: float, dy: float): list", "verschoben")
+        .func("profile.scale(p: list, sx: float, sy: float = sx): list", "skaliert um den Ursprung")
+        .func("profile.rotate(p: list, deg: float): list", "gedreht um den Ursprung")
+        .func("profile.area(p: list): float", "Fläche (positiv gegen den Uhrzeigersinn)")
+        .func("vec(x: float, y: float, z: float): vec", "ein Vektor oder Punkt (x, y, z); auch vec([x, y, z]); rechnet mit + - * /, liest v.x, v.y, v.z")
+        .func("vec.add(a: vec, b: vec): vec", "a + b; nimmt auch Listen [x, y, z] (mit Listen aus 2 Zahlen gibt es eine Liste)")
+        .func("vec.sub(a: vec, b: vec): vec", "a - b (wie vec.add)")
+        .func("vec.mul(a: vec, s: float): vec", "a * s")
+        .func("vec.dot(a: vec, b: vec): float", "Skalarprodukt")
+        .func("vec.cross(a: vec, b: vec): vec", "Kreuzprodukt (3D)")
+        .func("vec.len(a: vec): float", "Länge")
+        .func("vec.dist(a: vec, b: vec): float", "Abstand")
+        .func("vec.norm(a: vec): vec", "Einheitsvektor")
+        .func("vec.lerp(a: vec, b: vec, t: float): vec", "a + (b - a) * t")
+        .namespace("model", "das Modell: Teile, Materialien und die Regeln, die der Bericht prüft")
+        .func("model.add(m: mesh, material = \"grau\", name: str = nil): int", "Teil des Modells; material: Name oder {color, roughness, metallic}; ohne name teil1, teil2, ...")
+        .func("model.material(name: str, props: map): str", "Material festlegen: props {color: \"#rrggbb\" oder [r, g, b], roughness = 0.8, metallic = 0} (Farben in sRGB, 0 bis 1)")
+        .func("model.name(text: str): nil", "Name des Modells")
+        .func("model.budget(triangles: int): nil", "höchstens so viele Dreiecke (Prüfung im Bericht, mit der Zeile der Regel)")
+        .func("model.expect_size(x: float, y: float, z: float, tolerance: float = 0.001): nil", "erwartete Maße der Box in Metern (Prüfung im Bericht, mit der Zeile der Regel); nil: diese Achse nicht prüfen; auch expect_size([x, y, z], tolerance) oder mit einem vec")
+        .func("model.uv_scale(meters: float): nil", "Meter je UV-Einheit der Box-Projektion (ohne Aufruf 1)")
+        .value("params: map", "die Parameter von --param NAME=WERT (Zahlen, true und false, sonst Text): params.get(\"b\", 0.8)")
+        .typ(
+            Type::new("mesh", "Ein Mesh: das Skript kann es nicht öffnen und nicht ändern, jede Methode gibt ein neues; == ist dasselbe Mesh; print zeigt mesh(12 Dreiecke).")
+                .prop("readonly tris: int", "die Zahl der Dreiecke")
+                .method("move(x: float, y: float, z: float): mesh", "verschoben; auch move(v) mit einem vec oder [x, y, z]")
+                .method("place(x: float, y: float, z: float): mesh", "so verschoben, dass die Mitte der Unterseite der Box bei (x, y, z) liegt; auch place(v)")
+                .method("center(): mesh", "so verschoben, dass die Mitte der Box im Ursprung liegt")
+                .method("rotate_x(deg: float): mesh", "um die X-Achse gedreht (rechtshändig; Vielfache von 90 exakt)")
+                .method("rotate_y(deg: float): mesh", "um die Y-Achse gedreht (rechtshändig; Vielfache von 90 exakt)")
+                .method("rotate_z(deg: float): mesh", "um die Z-Achse gedreht (rechtshändig; Vielfache von 90 exakt)")
+                .method("rotate(deg: float, ax: float, ay: float, az: float): mesh", "um die Achse (ax, ay, az) durch den Ursprung gedreht; auch rotate(deg, axis) mit einem vec oder [ax, ay, az]")
+                .method("scale(sx: float, sy: float, sz: float): mesh", "skaliert um den Ursprung; scale(s) in allen Achsen gleich, auch scale(v) mit einem vec oder [sx, sy, sz]")
+                .method("mirror(axis: str): mesh", "gespiegelt an der Ebene durch den Ursprung (\"x\": x -> -x; \"y\", \"z\"), Flächen bleiben außen")
+                .method("flip(): mesh", "Flächen umgedreht (innen nach außen)")
+                .method("weld(tolerance: float = 0): mesh", "Ecken an derselben Stelle zu einem Punkt verbunden (eine Hälfte und ihr Spiegelbild zu einer Fläche)")
+                .method("array(count: int, dx: float, dy: float, dz: float): mesh", "count Kopien, Kopie i um i * (dx, dy, dz) verschoben; auch array(count, v)")
+                .method("radial(count: int, step: float = 360 / count): mesh", "count Kopien um die Y-Achse, Kopie i um i * step Grad gedreht")
+                .method("flat(): mesh", "flache Normalen (harte Kanten)")
+                .method("smooth(deg: float = 30): mesh", "glatte Normalen über Kanten flacher als deg Grad")
+                .method("bevel(width: float, segments: int = 1, axis: str = nil): mesh", "Kanten und Ecken abgeschrägt (segments 1) oder gerundet (Flächen je Viertelkreis), width = Radius; axis \"x\", \"y\" oder \"z\": nur die Kanten entlang dieser Achse; nur konvexe Körper")
+                .method("bounds(): map", "{min, max, size, center} in Metern, jedes ein vec (nil bei einem leeren Mesh)")
+                .method("area(): float", "Oberfläche in m²")
+                .method("volume(): float", "Volumen in m³ (bei geschlossenen Meshes)")
+                .method("check(): map", "{ok, closed, outward, open_edges, flipped_edges, degenerate, triangles}"),
+        )
+        .typ(
+            Type::new("vec", "Ein Vektor oder Punkt (x, y, z) in Metern, unveränderlich: + und - zwischen Vektoren, * und / mit einer Zahl, -v; == vergleicht die Zahlen genau. Statt v[0] heißt es v.x. Wo ein Punkt oder Vektor verlangt ist, geht ein vec wie eine Liste [x, y, z].")
+                .value()
+                .prop("readonly x: float", "die x-Komponente (nach rechts)")
+                .prop("readonly y: float", "die y-Komponente (nach oben)")
+                .prop("readonly z: float", "die z-Komponente (nach vorn)")
+                .method("length(): float", "die Länge")
+                .method("dot(other: vec): float", "das Skalarprodukt")
+                .method("cross(other: vec): vec", "das Kreuzprodukt")
+                .method("normalized(): vec", "der Einheitsvektor in derselben Richtung (nicht für den Nullvektor)")
+                .method("distance(other: vec): float", "der Abstand der beiden Punkte")
+                .method("lerp(other: vec, t: float): vec", "v + (other - v) * t")
+                .op("vec + vec: vec", "die Summe")
+                .op("vec - vec: vec", "die Differenz")
+                .op("vec * float: vec", "gestreckt")
+                .op("float * vec: vec", "gestreckt")
+                .op("vec / float: vec", "geteilt")
+                .op("-vec: vec", "umgekehrt"),
+        )
 }
-
-/// every host function and method with its parameters (optional ones with their default) and what it does
-pub const API: &[ApiEntry] = &[
-    ApiEntry { name: "geom.box", params: "w, h, d", doc: "Quader w x h x d (x, y, z) in Metern; steht auf y = 0, mittig über dem Ursprung" },
-    ApiEntry { name: "geom.cylinder", params: "r, h, segments = 32", doc: "Zylinder um die Y-Achse auf y = 0; glatte Seiten, flache Deckel" },
-    ApiEntry { name: "geom.cone", params: "r, h, segments = 32, r_top = 0", doc: "Kegel (mit r_top > 0 ein Kegelstumpf) um die Y-Achse auf y = 0" },
-    ApiEntry { name: "geom.sphere", params: "r, segments = 32, rings = segments / 2", doc: "Kugel, liegt auf y = 0 (Mitte bei y = r)" },
-    ApiEntry { name: "geom.torus", params: "R, r, segments = 32, sides = 16", doc: "Torus, liegt flach auf y = 0; R zur Mitte des Rings, r der Ring" },
-    ApiEntry { name: "geom.stairs", params: "w, h, d, steps", doc: "Treppe w breit (x), h hoch, d tief (z); erste Stufe vorn (z = d/2), steigt nach hinten" },
-    ApiEntry { name: "geom.arch", params: "w, h, d, thickness, segments = 16", doc: "Torbogen: zwei Pfeiler der Stärke thickness, Öffnung mit Halbkreis, darüber die Stärke" },
-    ApiEntry { name: "geom.extrude", params: "profile, depth", doc: "Profil [[x, y], ...] (Ansicht von vorn) entlang Z, mittig um z = 0" },
-    ApiEntry { name: "geom.prism", params: "footprint, h", doc: "Grundriss [[x, z], ...] (Ansicht von oben) von y = 0 um h nach oben" },
-    ApiEntry { name: "geom.sweep", params: "profile, path, closed = false, smooth = 30", doc: "Profil [[x, y], ...] entlang eines Pfads [[x, y, z], ...]; Ecken auf Gehrung" },
-    ApiEntry { name: "geom.lathe", params: "profile, segments = 32, smooth = 30", doc: "Drehkörper: Profil [[radius, y], ...] um die Y-Achse" },
-    ApiEntry { name: "geom.merge", params: "m1, m2, ... | [m1, m2, ...]", doc: "Meshes zu einem zusammenfügen (Teile bleiben getrennt, auch wenn sie sich durchdringen)" },
-    ApiEntry { name: "geom.union", params: "m1, m2, ... | [m1, m2, ...]", doc: "Vereinigung zu einem geschlossenen Körper (konvexe Körper oder Ergebnisse Boolescher Operationen)" },
-    ApiEntry { name: "geom.difference", params: "m, cut1, cut2, ... | [m, cut1, ...]", doc: "m ohne die Abzüge (ein Fenster aus einer Wand, ein Loch durch eine Platte)" },
-    ApiEntry { name: "geom.intersection", params: "m1, m2, ... | [m1, m2, ...]", doc: "was in allen liegt" },
-    ApiEntry { name: "m.move", params: "x, y, z | [x, y, z]", doc: "verschoben" },
-    ApiEntry { name: "m.place", params: "x, y, z | [x, y, z]", doc: "so verschoben, dass die Mitte der Unterseite der Box bei (x, y, z) liegt" },
-    ApiEntry { name: "m.center", params: "", doc: "so verschoben, dass die Mitte der Box im Ursprung liegt" },
-    ApiEntry { name: "m.rotate_x", params: "deg", doc: "um die X-Achse gedreht (rechtshändig; Vielfache von 90 exakt); ebenso rotate_y, rotate_z" },
-    ApiEntry { name: "m.rotate", params: "deg, [ax, ay, az]", doc: "um eine Achse durch den Ursprung gedreht" },
-    ApiEntry { name: "m.scale", params: "s | sx, sy, sz | [sx, sy, sz]", doc: "skaliert um den Ursprung" },
-    ApiEntry { name: "m.mirror", params: "\"x\" | \"y\" | \"z\"", doc: "gespiegelt an der Ebene durch den Ursprung (x -> -x für \"x\"), Flächen bleiben außen" },
-    ApiEntry { name: "m.flip", params: "", doc: "Flächen umgedreht (innen nach außen)" },
-    ApiEntry { name: "m.weld", params: "tolerance = 0", doc: "Ecken an derselben Stelle zu einem Punkt verbunden (eine Hälfte und ihr Spiegelbild zu einer Fläche)" },
-    ApiEntry { name: "m.array", params: "count, dx, dy, dz | count, [dx, dy, dz]", doc: "count Kopien, Kopie i um i * (dx, dy, dz) verschoben" },
-    ApiEntry { name: "m.radial", params: "count, step = 360 / count", doc: "count Kopien um die Y-Achse, Kopie i um i * step Grad gedreht" },
-    ApiEntry { name: "m.flat", params: "", doc: "flache Normalen (harte Kanten)" },
-    ApiEntry { name: "m.smooth", params: "deg = 30", doc: "glatte Normalen über Kanten flacher als deg Grad" },
-    ApiEntry { name: "m.bevel", params: "width, segments = 1, axis = nil", doc: "Kanten und Ecken abgeschrägt (segments 1) oder gerundet (Flächen je Viertelkreis), width = Radius; axis \"x\" | \"y\" | \"z\": nur die Kanten entlang dieser Achse; nur konvexe Körper" },
-    ApiEntry { name: "m.bounds", params: "", doc: "{min, max, size, center} in Metern" },
-    ApiEntry { name: "m.area", params: "", doc: "Oberfläche in m²" },
-    ApiEntry { name: "m.volume", params: "", doc: "Volumen in m³ (bei geschlossenen Meshes)" },
-    ApiEntry { name: "m.check", params: "", doc: "{ok, closed, outward, open_edges, flipped_edges, degenerate, triangles}" },
-    ApiEntry { name: "m.tris", params: "", doc: "(Feld) die Zahl der Dreiecke" },
-    ApiEntry { name: "profile.rect", params: "w, h", doc: "Rechteck um den Ursprung" },
-    ApiEntry { name: "profile.circle", params: "r, n = 32", doc: "Vieleck mit n Ecken auf einem Kreis um den Ursprung" },
-    ApiEntry { name: "profile.rounded", params: "w, h, r, n = 4", doc: "Rechteck mit abgerundeten Ecken (n Segmente je Ecke)" },
-    ApiEntry { name: "profile.arc", params: "r, start, end, n = 16", doc: "Punkte eines Kreisbogens von start bis end (Grad), beide Enden dabei: ein offener Linienzug" },
-    ApiEntry { name: "profile.move", params: "p, dx, dy", doc: "verschoben" },
-    ApiEntry { name: "profile.scale", params: "p, sx, sy = sx", doc: "skaliert um den Ursprung" },
-    ApiEntry { name: "profile.rotate", params: "p, deg", doc: "gedreht um den Ursprung" },
-    ApiEntry { name: "profile.area", params: "p", doc: "Fläche (positiv gegen den Uhrzeigersinn)" },
-    ApiEntry { name: "vec.add", params: "a, b", doc: "a + b (Listen aus 2 oder 3 Zahlen); ebenso vec.sub" },
-    ApiEntry { name: "vec.mul", params: "a, s", doc: "a * s" },
-    ApiEntry { name: "vec.dot", params: "a, b", doc: "Skalarprodukt" },
-    ApiEntry { name: "vec.cross", params: "a, b", doc: "Kreuzprodukt (3D)" },
-    ApiEntry { name: "vec.len", params: "a", doc: "Länge; vec.dist(a, b) der Abstand" },
-    ApiEntry { name: "vec.norm", params: "a", doc: "Einheitsvektor" },
-    ApiEntry { name: "vec.lerp", params: "a, b, t", doc: "a + (b - a) * t" },
-    ApiEntry { name: "model.add", params: "m, material = \"grau\", name", doc: "Teil des Modells; material: Name oder {color, roughness, metallic}" },
-    ApiEntry { name: "model.material", params: "name, {color: \"#rrggbb\" | [r, g, b], roughness = 0.8, metallic = 0}", doc: "Material festlegen (Farben in sRGB, 0 bis 1)" },
-    ApiEntry { name: "model.name", params: "text", doc: "Name des Modells" },
-    ApiEntry { name: "model.budget", params: "triangles", doc: "höchstens so viele Dreiecke (Prüfung im Bericht, mit der Zeile der Regel)" },
-    ApiEntry { name: "model.expect_size", params: "x, y, z, tolerance = 0.001 | [x, y, z], tolerance", doc: "erwartete Maße der Box in Metern (Prüfung im Bericht, mit der Zeile der Regel); nil: diese Achse nicht prüfen" },
-    ApiEntry { name: "model.uv_scale", params: "meters = 1", doc: "Meter je UV-Einheit der Box-Projektion" },
-    ApiEntry { name: "params", params: "", doc: "Map der Parameter von --param NAME=WERT; params.get(\"b\", 0.8)" },
-];
 
 /// the built-in materials: name, sRGB colour, roughness, metallic
 pub const PALETTE: &[(&str, [f64; 3], f64, f64)] = &[
@@ -155,10 +192,20 @@ pub struct Model {
 
 /// the host of one run
 pub struct ModelHost<'a> {
+    api: &'a Api,
+    /// the meshes by id (a freed one is empty); live[id]: the script holds the mesh of that id
     meshes: Vec<Mesh>,
+    live: Vec<bool>,
     /// the convex cells of a mesh made by a Boolean operation (moved with it), by mesh id
     solids: Vec<Option<Rc<Solid>>>,
+    /// the ids Host::drop gave back, used again last in, first out
+    free: Vec<usize>,
+    /// the triangles of every mesh made so far (ARENA_TRIANGLES)
     arena: usize,
+    /// how many meshes the run made, and the most that lived at once
+    pub made: u64,
+    pub peak: usize,
+    alive: usize,
     /// the materials of model.material with where they were set
     defined: Vec<(MaterialDef, Position)>,
     /// where model.name and model.uv_scale were called last (for the warning when a second call replaces them)
@@ -168,16 +215,22 @@ pub struct ModelHost<'a> {
     loader: &'a mut dyn FnMut(&str) -> Result<String, String>,
     /// (path, source) of every module the script imported, in order
     pub imports: Vec<(String, String)>,
-    /// microseconds spent in host functions (the geometry)
+    /// microseconds spent in host functions and the methods of a mesh or a vec (the geometry)
     pub host_us: u64,
 }
 
 impl<'a> ModelHost<'a> {
-    pub fn new(loader: &'a mut dyn FnMut(&str) -> Result<String, String>) -> ModelHost<'a> {
+    pub fn new(api: &'a Api, loader: &'a mut dyn FnMut(&str) -> Result<String, String>) -> ModelHost<'a> {
         ModelHost {
+            api,
             meshes: Vec::new(),
+            live: Vec::new(),
             solids: Vec::new(),
+            free: Vec::new(),
             arena: 0,
+            made: 0,
+            peak: 0,
+            alive: 0,
             defined: Vec::new(),
             name_at: None,
             uv_at: None,
@@ -187,17 +240,29 @@ impl<'a> ModelHost<'a> {
             host_us: 0,
         }
     }
+
+    /// f with the time it takes counted as geometry
+    fn timed<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        let t0 = plat::time_us();
+        let r = f(self);
+        self.host_us += plat::time_us().saturating_sub(t0);
+        r
+    }
 }
 
 impl Host for ModelHost<'_> {
     fn call(&mut self, cx: &mut Cx, name: &str, args: &[Value]) -> Result<Value, Fail> {
-        let t0 = plat::time_us();
-        let r = self.dispatch(cx, name, args);
-        if r.is_ok() {
-            extra_arguments(cx, name, args);
-        }
-        self.host_us += plat::time_us().saturating_sub(t0);
-        r
+        self.timed(|h| {
+            let r = h.dispatch(cx, name, args);
+            if r.is_ok() {
+                let sig = match h.api.global(name).map(|g| &g.kind) {
+                    Some(GlobalKind::Func(s)) => Some(s),
+                    _ => None,
+                };
+                extra_arguments(cx, sig, name, args.len());
+            }
+            r
+        })
     }
 
     fn load(&mut self, cx: &mut Cx, path: &str) -> Result<String, String> {
@@ -206,15 +271,132 @@ impl Host for ModelHost<'_> {
         self.imports.push((String::from(path), src.clone()));
         Ok(src)
     }
+
+    // m.tris, v.x (not timed, as the operators)
+    fn get(&mut self, cx: &mut Cx, obj: Object, name: &str) -> Result<Value, Fail> {
+        match (obj.ty, name) {
+            ("mesh", "tris") => Ok(Value::Int(self.meshes.get(obj.id as usize).map_or(0, |m| m.triangle_count()) as i64)),
+            ("vec", "x" | "y" | "z") => {
+                let i = match name {
+                    "x" => 0,
+                    "y" => 1,
+                    _ => 2,
+                };
+                Ok(cx.data(obj.value).and_then(|d| d.get(i).copied()).unwrap_or(Value::Nil))
+            }
+            ("mesh" | "vec", _) => Err(self.no_member(cx, obj.ty, name, false)),
+            _ => Err(Fail::Unknown),
+        }
+    }
+
+    // nothing of a mesh or a vec changes
+    fn set(&mut self, cx: &mut Cx, obj: Object, name: &str, _value: Value) -> Result<(), Fail> {
+        let Some(t) = self.api.get_type(obj.ty) else { return Err(Fail::Unknown) };
+        if t.find_prop(name).is_none() {
+            return Err(self.no_member(cx, obj.ty, name, false));
+        }
+        let new = if obj.ty == "vec" { "; einen neuen macht vec(x, y, z)" } else { "; jede Methode gibt ein neues" };
+        Err(cx.error(&format!("{}.{} ist nur lesbar: ein {} ändert sich nie{}", obj.ty, name, obj.ty, new)))
+    }
+
+    fn method(&mut self, cx: &mut Cx, obj: Object, name: &str, args: &[Value]) -> Result<Value, Fail> {
+        self.timed(|h| {
+            let r = match obj.ty {
+                "mesh" => h.mesh_method(cx, obj.id as usize, name, args),
+                "vec" => h.vec_method(cx, obj.value, name, args),
+                _ => Err(Fail::Unknown),
+            };
+            if r.is_ok() {
+                let sig = h.api.get_type(obj.ty).and_then(|t| t.find_method(name)).map(|m| &m.sig);
+                extra_arguments(cx, sig, &format!("{}()", name), args.len());
+            }
+            r
+        })
+    }
+
+    // the operators of vec: + - between vectors, * / with a number (also 2 * v), the minus (not timed as geometry:
+    // the clock would cost more than the sum)
+    fn op(&mut self, cx: &mut Cx, op: Operator, a: Value, b: Value) -> Result<Value, Fail> {
+        let (va, vb) = (vec_data(cx, a), vec_data(cx, b));
+        let (sa, sb) = (number_of(a), number_of(b));
+        let r: [f64; 3] = match (op, va, vb) {
+            (Operator::Add, Some(p), Some(q)) => add3(&p, &q),
+            (Operator::Sub, Some(p), Some(q)) => sub3(&p, &q),
+            (Operator::Mul, Some(p), None) => match sb {
+                Some(s) => mul3(&p, s),
+                None => return Err(Fail::Unknown),
+            },
+            // (s * x is x * s, bit for bit)
+            (Operator::Mul, None, Some(q)) => match sa {
+                Some(s) => mul3(&q, s),
+                None => return Err(Fail::Unknown),
+            },
+            (Operator::Div, Some(p), None) => match sb {
+                Some(s) => [p[0] / s, p[1] / s, p[2] / s],
+                None => return Err(Fail::Unknown),
+            },
+            (Operator::Neg, Some(p), None) => [-p[0], -p[1], -p[2]],
+            _ => return Err(Fail::Unknown),
+        };
+        if !r.iter().all(|x| x.is_finite()) {
+            let what = if op == Operator::Neg { String::from("-vec") } else { format!("{} {} {}", cx.type_of(a), op.text(), cx.type_of(b)) };
+            return Err(cx.error(&format!("{}: das Ergebnis ist keine endliche Zahl (geteilt durch 0 oder zu groß)", what)));
+        }
+        new_vec(cx, &r)
+    }
+
+    fn to_str(&self, _vm: &Vm, obj: Object) -> Option<String> {
+        (obj.ty == "mesh").then(|| format!("mesh({} Dreiecke)", self.meshes.get(obj.id as usize).map_or(0, |m| m.triangle_count())))
+    }
+
+    // the script holds this mesh no more: its vertices and cells go, the id is used again (a part of the model has
+    // its own copy)
+    fn drop(&mut self, obj: Object) {
+        let id = obj.id as usize;
+        if obj.ty == "mesh" && self.live.get(id) == Some(&true) {
+            self.meshes[id] = Mesh::default();
+            self.solids[id] = None;
+            self.live[id] = false;
+            self.alive -= 1;
+            self.free.push(id);
+        }
+    }
 }
 
-/// `modeltool --api`: every function with its parameters and what it does, then the built-in materials
+/// `modeltool --api`: the description as text, the functions in their order (a blank line between namespaces),
+/// then each type with its members (a mesh's as m.NAME, a vec's as v.NAME) and operators; then the materials
 pub fn api_text() -> String {
-    let mut s = String::new();
-    for e in API {
-        s.push_str(&format!("{}({})\n    {}\n", e.name, e.params, e.doc));
+    let api = api();
+    let mut s = format!("{}\n", api.doc);
+    let mut root = "";
+    for g in &api.globals {
+        let r = g.name.split('.').next().unwrap_or(&g.name);
+        if r != root {
+            s.push('\n');
+            root = r;
+        }
+        match &g.kind {
+            GlobalKind::Func(sig) => s.push_str(&format!("{}\n    {}\n", sig.label(&g.name), g.doc)),
+            GlobalKind::Value(t) => s.push_str(&format!("{}: {}\n    {}\n", g.name, t, g.doc)),
+            GlobalKind::Namespace => s.push_str(&format!("{}.*: {}\n", g.name, g.doc)),
+        }
     }
-    s.push_str("Materialien: ");
+    for t in &api.types {
+        let kind = if t.value { "Werttyp: == vergleicht die Werte" } else { "Objekt: == ist dasselbe" };
+        s.push_str(&format!("\n{} ({})\n    {}\n", t.name, kind, t.doc));
+        let me = &t.name[..1];
+        for p in &t.props {
+            let ro = if p.readonly { ", nur lesbar" } else { "" };
+            s.push_str(&format!("{}.{}: {}{}\n    {}\n", me, p.name, p.ty, ro, p.doc));
+        }
+        for m in &t.methods {
+            s.push_str(&format!("{}.{}\n    {}\n", me, m.sig.label(&m.name), m.doc));
+        }
+        for o in &t.ops {
+            s.push_str(&format!("{}\n    {}\n", o.label(), o.doc));
+        }
+    }
+    s.push_str("\nMaterialien: ");
     s.push_str(&PALETTE.iter().map(|p| p.0).collect::<Vec<_>>().join(", "));
     s.push('\n');
     s
@@ -225,47 +407,22 @@ pub fn place(at: &Position) -> String {
     if at.file.is_empty() { format!("Zeile {}", at.line) } else { format!("{}:{}", at.file, at.line) }
 }
 
-/// The most arguments a host function reads (a method of a mesh: besides the mesh, under its API name "m.NAME"),
-/// over all its forms; None for the ones that take any number (merge and the Boolean operations).
-pub fn max_args(api: &str) -> Option<usize> {
-    Some(match api {
-        "geom.extrude" | "geom.prism" => 2,
-        "geom.box" | "geom.cylinder" | "geom.sphere" | "geom.lathe" => 3,
-        "geom.cone" | "geom.torus" | "geom.stairs" | "geom.sweep" => 4,
-        "geom.arch" => 5,
-        "m.center" | "m.flip" | "m.flat" | "m.bounds" | "m.area" | "m.volume" | "m.check" => 0,
-        "m.rotate_x" | "m.rotate_y" | "m.rotate_z" | "m.mirror" | "m.weld" | "m.smooth" => 1,
-        "m.radial" => 2,
-        "m.move" | "m.place" | "m.scale" | "m.bevel" => 3,
-        "m.rotate" | "m.array" => 4,
-        "profile.area" => 1,
-        "profile.rect" | "profile.circle" | "profile.rotate" => 2,
-        "profile.move" | "profile.scale" => 3,
-        "profile.rounded" | "profile.arc" => 4,
-        "vec.len" | "vec.norm" => 1,
-        "vec.add" | "vec.sub" | "vec.mul" | "vec.dot" | "vec.cross" | "vec.dist" => 2,
-        "vec.lerp" => 3,
-        "model.name" | "model.budget" | "model.uv_scale" => 1,
-        "model.material" => 2,
-        "model.add" => 3,
-        "model.expect_size" => 4,
-        _ => return None,
-    })
+/// The most arguments a function or method of this signature reads (its parameters); None for one that takes any
+/// number (a rest parameter: merge and the Boolean operations).
+pub fn max_args(sig: &Sig) -> Option<usize> {
+    if sig.params.iter().any(|p| p.rest) { None } else { Some(sig.params.len()) }
 }
 
 /// A warning when a call that worked got more arguments than the function reads: the others were never looked at
-/// (`geom.cylinder(0.3, 1.2, 32, 0.1)` with a radius for the top meant for geom.cone).
-fn extra_arguments(cx: &mut Cx, name: &str, args: &[Value]) {
-    let (ns, f) = name.split_once('.').unwrap_or(("", name));
-    let functions = ["box", "cylinder", "cone", "sphere", "torus", "stairs", "arch", "extrude", "prism", "sweep", "lathe", "merge", "union", "difference", "intersection"];
-    // a method: map.move(m, ..), also geom.move(m, ..); its messages name it "move()"
-    let method = ns == "map" || (ns == "geom" && !functions.contains(&f));
-    let (api, shown_as, given) = if method { (format!("m.{f}"), format!("{f}()"), args.len().saturating_sub(1)) } else { (String::from(name), String::from(name), args.len()) };
-    let Some(max) = max_args(&api) else { return };
+/// (`geom.cylinder(0.3, 1.2, 32, 0.1)` with a radius for the top meant for geom.cone).  `shown_as` is how messages
+/// name it ("geom.box", "move()").
+fn extra_arguments(cx: &mut Cx, sig: Option<&Sig>, shown_as: &str, given: usize) {
+    let Some(sig) = sig else { return };
+    let Some(max) = max_args(sig) else { return };
     if given <= max {
         return;
     }
-    let params = API.iter().find(|e| e.name == api).map_or("", |e| e.params);
+    let params = sig.params.iter().map(|p| p.name.as_str()).collect::<Vec<_>>().join(", ");
     let count = if given == 1 { String::from("1 Argument") } else { format!("{} Argumente", given) };
     let takes = if max == 0 { String::from("nimmt aber keine") } else { format!("nimmt aber höchstens {} ({})", max, params) };
     let rest = match given - max {
@@ -278,8 +435,14 @@ fn extra_arguments(cx: &mut Cx, name: &str, args: &[Value]) {
 
 // ---------------------------------------------------------------- arguments
 
-/// a value for a message: as print shows it, at most 40 characters, with its type
+/// a value for a message: as print shows it, at most 40 characters, with its type (a mesh as "mesh": its id says
+/// nothing)
 fn shown(cx: &Cx, v: Value) -> String {
+    if let Some(o) = cx.object(v) {
+        if o.ty == "mesh" {
+            return String::from("mesh");
+        }
+    }
     let mut s = cx.display(v);
     if s.chars().count() > 40 {
         s = s.chars().take(37).collect::<String>() + "...";
@@ -287,6 +450,8 @@ fn shown(cx: &Cx, v: Value) -> String {
     match v {
         Value::Str(_) => format!("str \"{}\"", s),
         Value::Nil => String::from("nil"),
+        // (a value type's text starts with its name: vec(1.0, 2.0, 3.0))
+        Value::Host(_) => s,
         _ => format!("{} {}", v.type_name(), s),
     }
 }
@@ -355,14 +520,39 @@ fn numbers_of(cx: &Cx, v: Value, n: usize) -> Option<Vec<f64>> {
     if out.len() == n { Some(out) } else { None }
 }
 
-/// a vector from argument i: a list [x, y, z] there, or three numbers at i, i + 1, i + 2
+/// the three numbers of a vec (None for any other value)
+fn vec_data(cx: &Cx, v: Value) -> Option<[f64; 3]> {
+    if cx.object(v)?.ty != "vec" {
+        return None;
+    }
+    let d = cx.data(v)?;
+    Some([number_of(*d.first()?)?, number_of(*d.get(1)?)?, number_of(*d.get(2)?)?])
+}
+
+/// a new vec; its numbers are finite (so it can go wherever a point goes, as a list of numbers could)
+fn new_vec(cx: &mut Cx, v: &[f64; 3]) -> Result<Value, Fail> {
+    if !v.iter().all(|x| x.is_finite()) {
+        return Err(cx.error("vec: das Ergebnis ist keine endliche Zahl (zu groß)"));
+    }
+    cx.new_value("vec", &[Value::Float(v[0]), Value::Float(v[1]), Value::Float(v[2])])
+}
+
+/// a point or vector in one value: a vec or a list of three numbers
+fn point_of(cx: &Cx, v: Value) -> Option<Vec3> {
+    if let Some(p) = vec_data(cx, v) {
+        return Some(Vec3::new(p[0], p[1], p[2]));
+    }
+    numbers_of(cx, v, 3).map(|q| Vec3::new(q[0], q[1], q[2]))
+}
+
+/// a vector from argument i: a vec or a list [x, y, z] there, or three numbers at i, i + 1, i + 2
 fn vec3(cx: &mut Cx, f: &str, args: &[Value], i: usize, what: &str) -> Result<Vec3, Fail> {
-    if let Some(v) = numbers_of(cx, arg(args, i), 3) {
-        return Ok(Vec3::new(v[0], v[1], v[2]));
+    if let Some(p) = point_of(cx, arg(args, i)) {
+        return Ok(p);
     }
     if matches!(arg(args, i), Value::List(_)) {
         let s = shown(cx, arg(args, i));
-        return Err(throw(cx, f, &format!("{} muss eine Liste aus 3 Zahlen sein, nicht {}", what, s)));
+        return Err(throw(cx, f, &format!("{} muss ein vec oder eine Liste aus 3 Zahlen sein, nicht {}", what, s)));
     }
     Ok(Vec3::new(num(cx, f, args, i, what)?, num(cx, f, args, i + 1, what)?, num(cx, f, args, i + 2, what)?))
 }
@@ -388,21 +578,21 @@ fn points2(cx: &mut Cx, f: &str, v: Value, what: &str) -> Result<Vec<[f64; 2]>, 
     Ok(out)
 }
 
-/// a list of 3D points [[x, y, z], ...]
+/// a list of 3D points, each a vec or [x, y, z]
 fn points3(cx: &mut Cx, f: &str, v: Value, what: &str) -> Result<Vec<Vec3>, Fail> {
     let items: Option<Vec<Value>> = cx.list(v).map(|l| l.to_vec());
     let Some(items) = items else {
         let s = shown(cx, v);
-        return Err(throw(cx, f, &format!("{} muss eine Liste von Punkten [[x, y, z], ...] sein, nicht {}", what, s)));
+        return Err(throw(cx, f, &format!("{} muss eine Liste von Punkten (vec oder [x, y, z]) sein, nicht {}", what, s)));
     };
     cx.spend(1 + items.len() as u64 / 8)?;
     let mut out = Vec::with_capacity(items.len());
     for (k, &p) in items.iter().enumerate() {
-        match numbers_of(cx, p, 3) {
-            Some(q) => out.push(Vec3::new(q[0], q[1], q[2])),
+        match point_of(cx, p) {
+            Some(q) => out.push(q),
             None => {
                 let s = shown(cx, p);
-                return Err(throw(cx, f, &format!("{}[{}] muss ein Punkt [x, y, z] aus drei Zahlen sein, nicht {}", what, k, s)));
+                return Err(throw(cx, f, &format!("{}[{}] muss ein Punkt sein (ein vec oder [x, y, z] aus drei Zahlen), nicht {}", what, k, s)));
             }
         }
     }
@@ -434,8 +624,47 @@ fn map_of(cx: &mut Cx, fields: &[(&str, Value)]) -> Result<Value, Fail> {
     Ok(m)
 }
 
-fn vec_value(cx: &mut Cx, v: Vec3) -> Result<Value, Fail> {
-    float_list(cx, &[v.x, v.y, v.z])
+// ---------------------------------------------------------------- vector arithmetic
+// (vec.*, the methods and the operators share these: the same numbers, bit for bit, as vec.* gave on lists)
+
+fn add3(a: &[f64], b: &[f64]) -> [f64; 3] {
+    [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
+}
+
+fn sub3(a: &[f64], b: &[f64]) -> [f64; 3] {
+    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+}
+
+fn mul3(a: &[f64], s: f64) -> [f64; 3] {
+    [a[0] * s, a[1] * s, a[2] * s]
+}
+
+/// the sum of a[i] * b[i] from 0.0
+fn dot_n(a: &[f64], b: &[f64]) -> f64 {
+    a.iter().zip(b).fold(0.0, |s, (x, y)| s + x * y)
+}
+
+fn len_n(a: &[f64]) -> f64 {
+    geom::math::sqrt(a.iter().fold(0.0, |s, x| s + x * x))
+}
+
+fn dist_n(a: &[f64], b: &[f64]) -> f64 {
+    geom::math::sqrt(a.iter().zip(b).fold(0.0, |s, (x, y)| s + (x - y) * (x - y)))
+}
+
+fn lerp_n(a: &[f64], b: &[f64], t: f64) -> Vec<f64> {
+    a.iter().zip(b).map(|(x, y)| x + (y - x) * t).collect()
+}
+
+fn cross3(a: &[f64], b: &[f64]) -> [f64; 3] {
+    let c = Vec3::new(a[0], a[1], a[2]).cross(Vec3::new(b[0], b[1], b[2]));
+    [c.x, c.y, c.z]
+}
+
+/// a / |a|; None for a vector without a direction
+fn norm_n(a: &[f64]) -> Option<Vec<f64>> {
+    let l = len_n(a);
+    if l > 0.0 { Some(a.iter().map(|x| x / l).collect()) } else { None }
 }
 
 // ---------------------------------------------------------------- dispatch
@@ -450,32 +679,50 @@ impl ModelHost<'_> {
                 }
                 "merge" => self.merge(cx, name, args),
                 "union" | "difference" | "intersection" => self.boolean(cx, name, f, args),
-                _ => {
-                    // geom.move(m, ...) and the other methods as functions
-                    if self.mesh_id(cx, arg(args, 0)).is_some() {
-                        self.method(cx, f, args)
-                    } else {
-                        Err(Fail::Unknown)
-                    }
-                }
+                _ => Err(Fail::Unknown),
             },
-            "map" if self.mesh_id(cx, arg(args, 0)).is_some() => self.method(cx, f, args),
             "profile" => self.profile(cx, name, f, args),
             "vec" => vector(cx, name, f, args),
             "model" => self.model_fn(cx, name, f, args),
+            "" if f == "vec" => {
+                // vec(x, y, z) or vec(p) of a vec or a list [x, y, z]
+                let v = if args.len() == 1 {
+                    match point_of(cx, args[0]) {
+                        Some(p) => p,
+                        None => {
+                            let s = shown(cx, args[0]);
+                            return Err(throw(cx, name, &format!("der Punkt muss eine Liste aus 3 Zahlen oder ein vec sein, nicht {}", s)));
+                        }
+                    }
+                } else {
+                    Vec3::new(num(cx, name, args, 0, "x")?, num(cx, name, args, 1, "y")?, num(cx, name, args, 2, "z")?)
+                };
+                new_vec(cx, &[v.x, v.y, v.z])
+            }
             _ => Err(Fail::Unknown),
         }
     }
 
-    /// the id of a mesh handle
+    /// "mesh hat keine Methode spin (es gibt: ...)", or the hint that it is a property (a method) of the type
+    fn no_member(&self, cx: &mut Cx, ty: &str, name: &str, call: bool) -> Fail {
+        let Some(t) = self.api.get_type(ty) else { return Fail::Unknown };
+        let msg = if call && t.find_prop(name).is_some() {
+            format!("{} ist eine Eigenschaft von {}, keine Methode – ohne Klammern: .{}", name, ty, name)
+        } else if !call && t.find_method(name).is_some() {
+            format!("{} ist eine Methode von {}, keine Eigenschaft – mit Klammern: {}(..)", name, ty, name)
+        } else if call {
+            format!("{} hat keine Methode {} (es gibt: {})", ty, name, t.methods.iter().map(|m| m.name.as_str()).collect::<Vec<_>>().join(", "))
+        } else {
+            format!("{} hat keine Eigenschaft {} (es gibt: {})", ty, name, t.props.iter().map(|p| p.name.as_str()).collect::<Vec<_>>().join(", "))
+        };
+        cx.error(&msg)
+    }
+
+    /// the id of a mesh the script holds
     fn mesh_id(&self, cx: &Cx, v: Value) -> Option<usize> {
-        if !matches!(v, Value::Map(_)) {
-            return None;
-        }
-        match cx.map_get_str(v, "mesh") {
-            Some(Value::Int(i)) if i >= 0 && (i as usize) < self.meshes.len() => Some(i as usize),
-            _ => None,
-        }
+        let o = cx.object(v)?;
+        let id = o.id as usize;
+        (o.ty == "mesh" && self.live.get(id) == Some(&true)).then_some(id)
     }
 
     /// argument i as a mesh
@@ -489,7 +736,7 @@ impl ModelHost<'_> {
         }
     }
 
-    /// keep a mesh and give the script its handle
+    /// keep a mesh and give the script its object
     fn handle(&mut self, cx: &mut Cx, f: &str, m: Mesh) -> Result<Value, Fail> {
         self.handle_with(cx, f, m, None)
     }
@@ -505,10 +752,24 @@ impl ModelHost<'_> {
         }
         cx.spend(1 + tris as u64 / 64)?;
         self.arena += tris;
-        self.meshes.push(m);
-        self.solids.push(solid);
-        let id = Value::Int(self.meshes.len() as i64 - 1);
-        map_of(cx, &[("mesh", id), ("tris", Value::Int(tris as i64))])
+        let id = match self.free.pop() {
+            Some(i) => {
+                self.meshes[i] = m;
+                self.solids[i] = solid;
+                self.live[i] = true;
+                i
+            }
+            None => {
+                self.meshes.push(m);
+                self.solids.push(solid);
+                self.live.push(true);
+                self.meshes.len() - 1
+            }
+        };
+        self.made += 1;
+        self.alive += 1;
+        self.peak = self.peak.max(self.alive);
+        cx.new_object("mesh", id as u64)
     }
 
     fn construct(&mut self, cx: &mut Cx, name: &str, f: &str, args: &[Value]) -> Result<Value, Fail> {
@@ -588,15 +849,12 @@ impl ModelHost<'_> {
         }
     }
 
-    fn merge(&mut self, cx: &mut Cx, name: &str, args: &[Value]) -> Result<Value, Fail> {
-        // geom.merge(a, b, ...) or geom.merge([a, b, ...])
+    /// the meshes of merge and the Boolean operations: the arguments, or one list of them
+    fn mesh_items(&self, cx: &mut Cx, name: &str, args: &[Value]) -> Result<Vec<usize>, Fail> {
         let items: Vec<Value> = match (args.len(), cx.list(arg(args, 0)).map(|l| l.to_vec())) {
             (1, Some(l)) => l,
             _ => args.to_vec(),
         };
-        if items.is_empty() {
-            return Err(throw(cx, name, "braucht mindestens ein Mesh"));
-        }
         let mut ids = Vec::with_capacity(items.len());
         for (k, &v) in items.iter().enumerate() {
             match self.mesh_id(cx, v) {
@@ -606,6 +864,15 @@ impl ModelHost<'_> {
                     return Err(throw(cx, name, &format!("Teil {} muss ein Mesh sein, nicht {}", k + 1, s)));
                 }
             }
+        }
+        Ok(ids)
+    }
+
+    fn merge(&mut self, cx: &mut Cx, name: &str, args: &[Value]) -> Result<Value, Fail> {
+        // geom.merge(a, b, ...) or geom.merge([a, b, ...])
+        let ids = self.mesh_items(cx, name, args)?;
+        if ids.is_empty() {
+            return Err(throw(cx, name, "braucht mindestens ein Mesh"));
         }
         let refs: Vec<&Mesh> = ids.iter().map(|&i| &self.meshes[i]).collect();
         match Mesh::merge(&refs) {
@@ -628,24 +895,15 @@ impl ModelHost<'_> {
 
     /// geom.union / difference / intersection of meshes (or one list of them)
     fn boolean(&mut self, cx: &mut Cx, name: &str, f: &str, args: &[Value]) -> Result<Value, Fail> {
-        let items: Vec<Value> = match (args.len(), cx.list(arg(args, 0)).map(|l| l.to_vec())) {
-            (1, Some(l)) => l,
-            _ => args.to_vec(),
+        let items = match (args.len(), cx.list(arg(args, 0))) {
+            (1, Some(l)) => l.len(),
+            _ => args.len(),
         };
         let least = if f == "difference" { 2 } else { 1 };
-        if items.len() < least {
+        if items < least {
             return Err(throw(cx, name, &format!("braucht mindestens {} Meshes", least)));
         }
-        let mut ids = Vec::with_capacity(items.len());
-        for (k, &v) in items.iter().enumerate() {
-            match self.mesh_id(cx, v) {
-                Some(id) => ids.push(id),
-                None => {
-                    let s = shown(cx, v);
-                    return Err(throw(cx, name, &format!("Teil {} muss ein Mesh sein, nicht {}", k + 1, s)));
-                }
-            }
-        }
+        let ids = self.mesh_items(cx, name, args)?;
         let mut acc = (*self.solid_of(cx, name, ids[0], "Teil 1")?).clone();
         for (k, &id) in ids.iter().enumerate().skip(1) {
             let o = self.solid_of(cx, name, id, &format!("Teil {}", k + 1))?;
@@ -669,12 +927,13 @@ impl ModelHost<'_> {
         }
     }
 
-    /// a method of a mesh (args[0] is the mesh)
-    fn method(&mut self, cx: &mut Cx, f: &str, args: &[Value]) -> Result<Value, Fail> {
+    /// m.NAME(rest): a method of the mesh `id`
+    fn mesh_method(&mut self, cx: &mut Cx, id: usize, f: &str, rest: &[Value]) -> Result<Value, Fail> {
+        if self.live.get(id) != Some(&true) {
+            return Err(Fail::Unknown);
+        }
         let name = format!("{}()", f);
         let name = name.as_str();
-        let id = self.mesh_arg(cx, name, args, 0, "das Objekt")?;
-        let rest = &args[1..];
         let m = &self.meshes[id];
         // the maps of move, place, center, rotations, scale and mirror (the solid goes along)
         let map: Option<Affine> = match f {
@@ -794,7 +1053,11 @@ impl ModelHost<'_> {
             }
             "bounds" => {
                 let Some(b) = m.bounds() else { return Ok(Value::Nil) };
-                let (lo, hi, size, c) = (vec_value(cx, b.min)?, vec_value(cx, b.max)?, vec_value(cx, b.size())?, vec_value(cx, b.center())?);
+                let (size, c) = (b.size(), b.center());
+                let lo = new_vec(cx, &[b.min.x, b.min.y, b.min.z])?;
+                let hi = new_vec(cx, &[b.max.x, b.max.y, b.max.z])?;
+                let size = new_vec(cx, &[size.x, size.y, size.z])?;
+                let c = new_vec(cx, &[c.x, c.y, c.z])?;
                 return map_of(cx, &[("min", lo), ("max", hi), ("size", size), ("center", c)]);
             }
             "area" => return Ok(Value::Float(m.area())),
@@ -812,13 +1075,51 @@ impl ModelHost<'_> {
                     ("triangles", Value::Int(r.triangles as i64)),
                 ]);
             }
-            _ => {
-                let known: Vec<&str> = API.iter().filter_map(|e| e.name.strip_prefix("m.")).collect();
-                return Err(cx.error(&format!("Ein Mesh hat keine Methode {} (es gibt: {})", f, known.join(", "))));
-            }
+            _ => return Err(self.no_member(cx, "mesh", f, true)),
         };
         let solid = if keep { self.solids[id].clone() } else { None };
         self.handle_with(cx, name, out, solid)
+    }
+
+    /// v.NAME(args): a method of a vec
+    fn vec_method(&mut self, cx: &mut Cx, v: Value, f: &str, args: &[Value]) -> Result<Value, Fail> {
+        let Some(a) = vec_data(cx, v) else { return Err(Fail::Unknown) };
+        let name = format!("{}()", f);
+        let other = |cx: &mut Cx| -> Result<[f64; 3], Fail> {
+            match point_of(cx, arg(args, 0)) {
+                Some(p) => Ok([p.x, p.y, p.z]),
+                None => {
+                    let s = shown(cx, arg(args, 0));
+                    Err(throw(cx, &name, &format!("other muss ein vec oder eine Liste aus 3 Zahlen sein, nicht {}", s)))
+                }
+            }
+        };
+        match f {
+            "length" => Ok(Value::Float(len_n(&a))),
+            "dot" => {
+                let b = other(cx)?;
+                Ok(Value::Float(dot_n(&a, &b)))
+            }
+            "cross" => {
+                let b = other(cx)?;
+                new_vec(cx, &cross3(&a, &b))
+            }
+            "normalized" => match norm_n(&a) {
+                Some(n) => new_vec(cx, &[n[0], n[1], n[2]]),
+                None => Err(throw(cx, &name, "ein Nullvektor hat keine Richtung")),
+            },
+            "distance" => {
+                let b = other(cx)?;
+                Ok(Value::Float(dist_n(&a, &b)))
+            }
+            "lerp" => {
+                let b = other(cx)?;
+                let t = num(cx, &name, args, 1, "t")?;
+                let r = lerp_n(&a, &b, t);
+                new_vec(cx, &[r[0], r[1], r[2]])
+            }
+            _ => Err(self.no_member(cx, "vec", f, true)),
+        }
     }
 
     fn profile(&mut self, cx: &mut Cx, name: &str, f: &str, args: &[Value]) -> Result<Value, Fail> {
@@ -919,11 +1220,12 @@ impl ModelHost<'_> {
                 let material = self.material_by(cx, name, arg(args, 1))?;
                 let part_name = match arg(args, 2) {
                     Value::Nil => format!("teil{}", self.model.parts.len() + 1),
-                    v => cx.display(v),
+                    v => cx.display_with(v, &*self),
                 };
                 if self.meshes[id].triangle_count() == 0 {
                     return Err(throw(cx, name, "das Mesh hat keine Dreiecke"));
                 }
+                // (a copy: the part stays when the script drops the mesh)
                 self.model.parts.push(Part { name: part_name, mesh: self.meshes[id].clone(), material });
                 Ok(Value::Int(self.model.parts.len() as i64))
             }
@@ -949,7 +1251,7 @@ impl ModelHost<'_> {
                 cx.new_str(&n)
             }
             "name" => {
-                let n = cx.display(arg(args, 0));
+                let n = cx.display_with(arg(args, 0), &*self);
                 if let Some(at) = &self.name_at {
                     if self.model.name != n {
                         let msg = format!("{}: \"{}\" ersetzt den Namen \"{}\" aus {}", name, n, self.model.name, place(at));
@@ -971,11 +1273,15 @@ impl ModelHost<'_> {
                 Ok(Value::Nil)
             }
             "expect_size" => {
-                // x, y, z or [x, y, z]; nil for an axis that is not checked
-                let (dims, ti): (Vec<Value>, usize) = match cx.list(arg(args, 0)).map(|l| l.to_vec()) {
-                    Some(l) if l.len() == 3 => (l, 1),
-                    Some(_) => return Err(throw(cx, name, "die Maße müssen eine Liste [x, y, z] sein")),
-                    None => ((0..3).map(|i| arg(args, i)).collect(), 3),
+                // x, y, z or [x, y, z] or a vec; nil for an axis that is not checked
+                let (dims, ti): (Vec<Value>, usize) = if let Some(p) = vec_data(cx, arg(args, 0)) {
+                    (p.iter().map(|&x| Value::Float(x)).collect(), 1)
+                } else {
+                    match cx.list(arg(args, 0)).map(|l| l.to_vec()) {
+                        Some(l) if l.len() == 3 => (l, 1),
+                        Some(_) => return Err(throw(cx, name, "die Maße müssen eine Liste [x, y, z] sein")),
+                        None => ((0..3).map(|i| arg(args, i)).collect(), 3),
+                    }
                 };
                 let mut size = [f64::NAN; 3];
                 for (k, &v) in dims.iter().enumerate() {
@@ -1061,16 +1367,19 @@ pub fn parse_hex(s: &str) -> Option<[f64; 3]> {
     Some([c(0)?, c(2)?, c(4)?])
 }
 
-/// vec.*: small vector helpers on lists of 2 or 3 numbers
+/// vec.*: vector helpers on vec values and on lists of 2 or 3 numbers; a result in 3D is a vec, in 2D a list
 fn vector(cx: &mut Cx, name: &str, f: &str, args: &[Value]) -> Result<Value, Fail> {
     let get = |cx: &mut Cx, i: usize, what: &str| -> Result<Vec<f64>, Fail> {
         let v = arg(args, i);
+        if let Some(p) = vec_data(cx, v) {
+            return Ok(p.to_vec());
+        }
         let n = cx.list(v).map_or(0, |l| l.len());
         match numbers_of(cx, v, n).filter(|_| n == 2 || n == 3) {
             Some(x) => Ok(x),
             None => {
                 let s = shown(cx, v);
-                Err(throw(cx, name, &format!("{} muss eine Liste aus 2 oder 3 Zahlen sein, nicht {}", what, s)))
+                Err(throw(cx, name, &format!("{} muss ein vec oder eine Liste aus 2 oder 3 Zahlen sein, nicht {}", what, s)))
             }
         }
     };
@@ -1091,40 +1400,45 @@ fn vector(cx: &mut Cx, name: &str, f: &str, args: &[Value]) -> Result<Value, Fai
         "dot" => {
             let (a, b) = (get(cx, 0, "a")?, get(cx, 1, "b")?);
             same(cx, &a, &b)?;
-            return Ok(Value::Float(a.iter().zip(&b).fold(0.0, |s, (x, y)| s + x * y)));
+            return Ok(Value::Float(dot_n(&a, &b)));
         }
         "cross" => {
             let (a, b) = (get(cx, 0, "a")?, get(cx, 1, "b")?);
             if a.len() != 3 || b.len() != 3 {
                 return Err(throw(cx, name, "das Kreuzprodukt braucht zwei Vektoren aus 3 Zahlen"));
             }
-            let c = Vec3::new(a[0], a[1], a[2]).cross(Vec3::new(b[0], b[1], b[2]));
-            vec![c.x, c.y, c.z]
+            cross3(&a, &b).to_vec()
         }
         "len" => {
             let a = get(cx, 0, "a")?;
-            return Ok(Value::Float(geom::math::sqrt(a.iter().fold(0.0, |s, x| s + x * x))));
+            return Ok(Value::Float(len_n(&a)));
         }
         "dist" => {
             let (a, b) = (get(cx, 0, "a")?, get(cx, 1, "b")?);
             same(cx, &a, &b)?;
-            return Ok(Value::Float(geom::math::sqrt(a.iter().zip(&b).fold(0.0, |s, (x, y)| s + (x - y) * (x - y)))));
+            return Ok(Value::Float(dist_n(&a, &b)));
         }
         "norm" => {
             let a = get(cx, 0, "a")?;
-            let l = geom::math::sqrt(a.iter().fold(0.0, |s, x| s + x * x));
-            if !(l > 0.0) {
-                return Err(throw(cx, name, "ein Nullvektor hat keine Richtung"));
+            match norm_n(&a) {
+                Some(n) => n,
+                None => return Err(throw(cx, name, "ein Nullvektor hat keine Richtung")),
             }
-            a.iter().map(|x| x / l).collect()
         }
         "lerp" => {
             let (a, b) = (get(cx, 0, "a")?, get(cx, 1, "b")?);
             same(cx, &a, &b)?;
             let t = num(cx, name, args, 2, "t")?;
-            a.iter().zip(&b).map(|(x, y)| x + (y - x) * t).collect()
+            lerp_n(&a, &b, t)
         }
         _ => return Err(Fail::Unknown),
     };
+    if out.len() == 3 {
+        if !out.iter().all(|x| x.is_finite()) {
+            return Err(throw(cx, name, "das Ergebnis ist keine endliche Zahl (zu groß)"));
+        }
+        // (a vec: v.x and the operators; a list of 2 stays a list)
+        return new_vec(cx, &[out[0], out[1], out[2]]);
+    }
     float_list(cx, &out)
 }

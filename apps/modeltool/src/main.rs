@@ -145,6 +145,9 @@ fn timing(r: &run::Run, a: Option<&run::Analysis>, render_us: u64, export_us: u6
         ("export_ms", ms(export_us)),
         ("total_ms", ms(total_us)),
         ("fuel", J::Int(r.fuel as i64)),
+        // (the meshes the script made, and the most it held at once: the others were freed during the run)
+        ("meshes", J::Int(r.meshes as i64)),
+        ("meshes_peak", J::Int(r.meshes_peak as i64)),
     ])
 }
 
