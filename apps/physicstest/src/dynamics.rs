@@ -203,10 +203,40 @@ pub fn mass_tests(c: &mut Ctx) {
     // a turned box's tensor is valid in any frame
     let turned = Shape::cuboid(Vec3::new(0.1, 0.5, 2.0)).mass_properties(rho).expect("box").transformed(&Iso::new(Vec3::ZERO, Quat::from_axis_angle(Vec3::new(1.0, 2.0, 3.0).normalize_or_zero(), 0.9)));
     c.check(turned.is_valid(), || format!("a turned box is not valid: {:?}", turned));
+    // of any size: one near the top of the range is valid (its products would overflow), the bad one near the
+    // bottom is not (they would underflow)
+    let p2 = |k: i64| f64::from_bits(((k + 1023) as u64) << 52);
+    let huge = Mat3::from_cols(Vec3::new(2.0, 1.0, 0.0), Vec3::new(1.0, 2.0, 0.0), Vec3::new(0.0, 0.0, 2.0)).scale(p2(600));
+    c.check(MassProps::new(1.0, Vec3::ZERO, huge).is_valid(), || "a valid tensor of 2^600 is not valid".into());
+    c.check(!MassProps::new(1.0, Vec3::ZERO, bad.scale(p2(-600))).is_valid(), || "the tensor with a negative principal moment is valid at 2^-600".into());
+    // the moments 1 + 1e-5, 1 - 1e-5 and 0 break the triangle inequality by 1e-5 of their sum, beyond the 1e-9
+    // allowed, in any frame
+    let near = Mat3::from_cols(Vec3::new(1.0, 1e-5, 0.0), Vec3::new(1e-5, 1.0, 0.0), Vec3::ZERO);
+    c.check(!MassProps::new(1.0, Vec3::ZERO, near).is_valid(), || "a tensor 1e-5 off the triangle inequality is valid".into());
+    // a rod's and a plate's tensor (tr(I)/2 - I has an eigenvalue 0) turned anyhow stay valid, of any size;
+    // the plate's moment over the sum of the others by 1e-7 does not
+    let mut rng = Rng::new(43);
+    let (mut lost, mut kept) = (0usize, 0usize);
+    for _ in 0..100 {
+        let q = rng.quat();
+        for (s, diag) in [(1.0, Vec3::new(1.0, 0.0, 1.0)), (1.0, Vec3::new(1.0, 2.0, 3.0)), (p2(-900), Vec3::new(0.0, 3.0, 3.0)), (p2(900), Vec3::new(2.0, 1.0, 3.0))] {
+            lost += usize::from(!MassProps::new(1.0, Vec3::ZERO, Mat3::diagonal(diag * s).rotated(q)).is_valid());
+        }
+        kept += usize::from(MassProps::new(1.0, Vec3::ZERO, Mat3::diagonal(Vec3::new(1.0, 2.0, 3.0 * (1.0 + 1e-7))).rotated(q)).is_valid());
+    }
+    c.check(lost == 0 && kept == 0, || format!("turned rods and plates: {} of 400 not valid, {} of 100 just off valid", lost, kept));
     c.check(Shape::cuboid(Vec3::new(-1.0, -1.0, 1.0)).mass_properties(rho).is_none() && Shape::sphere(-0.5).mass_properties(rho).is_none() && Shape::capsule(0.5, -0.1).mass_properties(rho).is_none(), || "negative sizes gave a mass".into());
     c.check(Shape::capsule(0.0, 0.3).mass_properties(rho).is_some(), || "a capsule of half height 0 (a ball) gave no mass".into());
     let tiny = Mat3::diagonal(Vec3::splat(1e-105)).inverse();
     c.check(tiny.is_some_and(|m| rel(m.at(0, 0), 1e105) < 1e-12 && m.is_finite()), || format!("the inverse of a tiny diagonal: {:?}", tiny));
+    // entries of very different sizes: diag(2^-300, 2^-300, 2^300), and an ordinary matrix with its first
+    // two rows times 2^-600 (a determinant of 2^-1200 with one scale for all)
+    let skew = Mat3::diagonal(Vec3::new(p2(-300), p2(-300), p2(300))).inverse();
+    c.check(skew.is_some_and(|m| m.at(0, 0) == p2(300) && m.at(1, 1) == p2(300) && m.at(2, 2) == p2(-300) && m.at(0, 1) == 0.0), || format!("the inverse of diag(2^-300, 2^-300, 2^300): {:?}", skew));
+    let plain = Mat3::from_cols(Vec3::new(2.0, 1.0, 0.5), Vec3::new(1.0, 3.0, 1.0), Vec3::new(0.5, 1.0, 4.0));
+    let want = plain.inverse().expect("plain").mul(&Mat3::diagonal(Vec3::new(p2(600), p2(600), 1.0)));
+    let got = Mat3::diagonal(Vec3::new(p2(-600), p2(-600), 1.0)).mul(&plain).inverse();
+    c.check(got.is_some_and(|m| (0..3).all(|r| (0..3).all(|k| rel(m.at(r, k), want.at(r, k)) < 1e-12))), || format!("the inverse of rows 2^-600 apart: {:?}", got));
 }
 
 // ---------------------------------------------------------------- motion
@@ -992,19 +1022,35 @@ pub fn joint_tests(c: &mut Ctx) {
         let len = sim.joint_position(j).expect("length");
         c.check((len - 1.0).abs() < 0.01, || format!("a rod from one point: length {} want 1", len));
     }
-    // a slider whose motor is taken away coasts instead of being driven on by the motor's old impulse
+    // a rope that held a load and then has its anchors put together pulls nothing: the load falls freely
+    {
+        let mut sim = Simulation::new();
+        let hub = anchor(&mut sim, Vec3::ZERO);
+        let at = Vec3::new(0.0, -1.0, 0.0);
+        let load = sim.add(RigidBody::dynamic(Shape::sphere(0.1), Iso::at(at)).with_damping(0.0, 0.0).sleepless()).expect("load");
+        sim.add_joint(hub, load, Iso::at(at), JointKind::Distance { min: 0.0, max: 1.0, spring: None }).expect("rope");
+        run(&mut sim, 120);
+        let hung = sim.state(load).expect("load").center.y;
+        sim.set_iso(load, Iso::at(at));
+        sim.set_velocity(load, Vec3::ZERO, Vec3::ZERO);
+        sim.step(DT);
+        let (v, fall) = (sim.velocity(load).expect("v").0, SimParams::default().gravity * DT);
+        c.check((hung + 2.0).abs() < 0.01 && (v - fall).length() < 1e-9, || format!("a slack rope with its anchors together: hung at {}, then {:?} after a step, free fall {:?}", hung, v, fall));
+    }
+    // a slider whose motor is taken away while it still drives the car coasts instead of being driven on by the
+    // motor's old impulse
     {
         let mut sim = Simulation::with_params(no_gravity());
         let rail = anchor(&mut sim, Vec3::ZERO);
         let car = sim.add(RigidBody::dynamic(Shape::cuboid(Vec3::splat(0.2)), Iso::IDENTITY).with_damping(0.0, 0.0).sleepless()).expect("car");
         let kind = |m: Option<Motor>| JointKind::Slider { limits: None, motor: m, spring: None };
-        let j = sim.add_joint(rail, car, Iso::IDENTITY, kind(Some(Motor { speed: 2.0, max_force: 1000.0 }))).expect("slider");
-        run(&mut sim, 60);
+        let j = sim.add_joint(rail, car, Iso::IDENTITY, kind(Some(Motor { speed: 2.0, max_force: 100.0 }))).expect("slider");
+        sim.step(DT);
         let v0 = sim.velocity(car).expect("v").0.x;
         sim.set_joint(j, kind(None), false);
         run(&mut sim, 60);
         let v1 = sim.velocity(car).expect("v").0.x;
-        c.check((v0 - 2.0).abs() < 0.02 && (v1 - v0).abs() < 1e-6, || format!("a slider without its motor: {} m/s then {} m/s", v0, v1));
+        c.check(v0 > 0.0 && v0 < 2.0 && (v1 - v0).abs() < 1e-6, || format!("a slider without its motor: {} m/s (still below 2) then {} m/s", v0, v1));
     }
     // a body welded to a slow kinematic carrier stays awake and goes along
     {
@@ -1076,6 +1122,32 @@ pub fn ccd_tests(c: &mut Ctx) {
         sim.step(DT);
         let x = sim.state(shot).expect("shot").center.x;
         c.check(x < 0.0 && x > -1.0, || format!("the bullet across a moving body ended at x {} (they meet at about -0.42)", x));
+    }
+    // a bullet at a sleeping box beyond the reach of its contacts stops at it, and the box wakes and moves
+    {
+        let mut sim = Simulation::new();
+        floor(&mut sim, 20.0);
+        let target = sim.add(RigidBody::dynamic(Shape::cuboid(Vec3::splat(0.3)), Iso::at(Vec3::new(0.0, 0.3, 0.0)))).expect("box");
+        run(&mut sim, 120);
+        let asleep = !sim.is_awake(target);
+        let shot = sim.add(RigidBody::dynamic(Shape::sphere(0.1), Iso::at(Vec3::new(-10.0, 0.3, 0.0))).with_velocity(Vec3::new(1200.0, 0.0, 0.0)).bullet()).expect("shot");
+        sim.step(DT);
+        let x = sim.state(shot).expect("shot").center.x;
+        run(&mut sim, 10);
+        let moved = sim.state(target).expect("box").center.x;
+        c.check(asleep && x < -0.39 && x > -1.0 && moved > 0.01, || format!("a bullet at a sleeping box: asleep {}, the shot at x {} (the box from -0.3), the box then at {}", asleep, x, moved));
+    }
+    // a bullet and a kinematic box racing at each other: the box carries it on, the two do not pass
+    {
+        let mut sim = Simulation::with_params(no_gravity());
+        let shot = sim.add(RigidBody::dynamic(Shape::sphere(0.1), Iso::at(Vec3::new(-5.0, 0.0, 0.0))).with_velocity(Vec3::new(600.0, 0.0, 0.0)).bullet()).expect("shot");
+        let wall = sim.add(RigidBody::kinematic(Shape::cuboid(Vec3::splat(0.5)), Iso::at(Vec3::new(5.0, 0.0, 0.0))).with_velocity(Vec3::new(-600.0, 0.0, 0.0))).expect("wall");
+        let mut ahead = f64::INFINITY;
+        for _ in 0..3 {
+            sim.step(DT);
+            ahead = ahead.min(sim.state(wall).expect("wall").center.x - sim.state(shot).expect("shot").center.x);
+        }
+        c.check(ahead > 0.6 - 0.01, || format!("a bullet and a kinematic box racing at each other: the box {} m ahead of it (0.6 touching)", ahead));
     }
     // a pellet at 500 m/s does not pass a 1 mm wall, a box or a mesh; without the sweep it does
     for (mesh, continuous) in [(false, true), (true, true), (false, false)] {

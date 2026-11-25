@@ -67662,8 +67662,8 @@ parallel axis theorem.  A mesh has none: it is static.
   the mass and tensor scaled by `factor` (another density)
 - **`fn is_valid(&self) -> bool`**
   mass, centre and tensor finite, the mass positive, the tensor symmetric with principal moments that are
-  non-negative and keep the triangle inequality, in its own axes (what a solid body can have; within a
-  relative 1e-9; the zero tensor of [`MassProps::point`] is one)
+  non-negative and keep the triangle inequality, in its own axes (what a solid body can have; each within
+  1e-9 of the moments' sum, of any size; the zero tensor of [`MassProps::point`] is one)
 
 **`impl Shape`**
 
@@ -67850,7 +67850,9 @@ the same code on every target.
 - **`fn determinant(&self) -> f64`**
   the determinant
 - **`fn inverse(&self) -> Option<Mat3>`**
-  the inverse, None when the matrix is singular (or not finite)
+  the inverse, None when the matrix is singular, not finite, or its inverse is not (and when even its
+  rows and columns brought to one size leave a determinant that under- or overflows: a condition number
+  beyond about 10^300)
 - **`fn rotated(&self, q: Quat) -> Mat3`**
   R M R^T: a tensor of a body's frame (its inertia) in the frame rotated by `q`
 - **`fn outer(a: Vec3, b: Vec3) -> Mat3`**

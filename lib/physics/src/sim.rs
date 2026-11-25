@@ -1631,85 +1631,99 @@ impl Simulation {
         }
         let slop = max(p.linear_slop, 0.0);
         let mut swept = 0usize;
-        for k in 0..active.len() {
-            let i = active[k];
-            let Some((c0, mut r)) = ends[k] else {
-                continue;
-            };
-            let Some((_, body)) = self.world.at(i) else {
-                continue;
-            };
-            let motion = r.center - c0;
-            let ml = motion.length();
-            if r.dynamic() && p.continuous && !r.sensor && ml > 0.0 {
-                let rbs = &self.rbs;
-                let nc = &self.no_collide;
-                let (mask, layers, bullet) = (r.mask, body.layers, r.bullet);
-                // what this body may be swept against at all
-                let may = |j: u32, other_layers: u32| -> Option<&Rb> {
-                    if j == i || other_layers & mask == 0 {
-                        return None;
-                    }
-                    let o = rbs.get(j as usize)?.as_ref()?;
-                    if o.sensor || layers & o.mask == 0 || nc.binary_search(&(min_u(i, j), max_u(i, j))).is_ok() {
-                        return None;
-                    }
-                    Some(o)
+        // the bodies that are not bullets first, then the bullets: a bullet is swept against the dynamic bodies
+        // with the motion they end with (their own sweep done), whatever the order of the slots
+        for bullets in [false, true] {
+            for k in 0..active.len() {
+                let i = active[k];
+                let Some((c0, mut r)) = ends[k] else {
+                    continue;
                 };
-                // what did not move in the step (static bodies, kinematic ones at rest): the World has it
-                let still = |j: u32, other: &crate::world::Body| may(j, other.layers).is_some_and(|o| !o.dynamic() && sidx[j as usize] == NONE);
-                // the sweep of a fast body: when it moved farther than its speculative contacts reached
-                if r.bullet || ml > max(r.extent_max, max(p.speculative_distance, 0.0)) {
-                    let iso0 = Iso::new(c0 - r.rot.rotate(r.mass.center), r.rot);
-                    let mut best: Option<(f64, Vec3)> = self.world.cast_where(&body.shape, &iso0, motion, still).map(|(_, h)| (h.fraction, h.normal));
-                    // what moved in the step, with the motion relative to it from its start: a kinematic body
-                    // for every fast body, a dynamic one (not a bullet) for a bullet
-                    let reach = body.shape.aabb(&iso0).union(&body.shape.aabb(&r.iso()));
-                    for (q, &j) in active.iter().enumerate() {
-                        let Some((cj0, rj)) = &ends[q] else {
-                            continue;
-                        };
-                        let Some((_, bj)) = self.world.at(j) else {
-                            continue;
-                        };
-                        if may(j, bj.layers).is_none() || !(rj.kind == BodyKind::Kinematic || (bullet && rj.dynamic() && !rj.bullet)) {
-                            continue;
+                if r.bullet != bullets {
+                    continue;
+                }
+                let Some((_, body)) = self.world.at(i) else {
+                    continue;
+                };
+                let motion = r.center - c0;
+                let ml = motion.length();
+                if r.dynamic() && p.continuous && !r.sensor && ml > 0.0 {
+                    let rbs = &self.rbs;
+                    let nc = &self.no_collide;
+                    let (mask, layers, bullet) = (r.mask, body.layers, r.bullet);
+                    // what this body may be swept against at all
+                    let may = |j: u32, other_layers: u32| -> Option<&Rb> {
+                        if j == i || other_layers & mask == 0 {
+                            return None;
                         }
-                        if !reach.intersects(&bj.shape.aabb(&bj.iso).union(&bj.shape.aabb(&rj.iso()))) {
-                            continue;
+                        let o = rbs.get(j as usize)?.as_ref()?;
+                        if o.sensor || layers & o.mask == 0 || nc.binary_search(&(min_u(i, j), max_u(i, j))).is_ok() {
+                            return None;
                         }
-                        let rel = motion - (rj.center - *cj0);
-                        if let Some(h) = query::cast(&body.shape, &iso0, rel, &bj.shape, &bj.iso) {
-                            if best.is_none_or(|b| h.fraction < b.0) {
-                                best = Some((h.fraction, h.normal));
+                        Some(o)
+                    };
+                    // what did not move in the step: static bodies, kinematic ones at rest and, for a bullet,
+                    // sleeping dynamic ones that are not bullets (the World has them where they are)
+                    let still = |j: u32, other: &crate::world::Body| {
+                        sidx[j as usize] == NONE && may(j, other.layers).is_some_and(|o| !o.dynamic() || (bullet && !o.bullet))
+                    };
+                    // the sweep of a fast body: when it moved farther than its speculative contacts reached
+                    if r.bullet || ml > max(r.extent_max, max(p.speculative_distance, 0.0)) {
+                        let iso0 = Iso::new(c0 - r.rot.rotate(r.mass.center), r.rot);
+                        // the first hit: where along the motion, the normal, how far what it hit moved in the step
+                        let mut best: Option<(f64, Vec3, Vec3)> = self.world.cast_where(&body.shape, &iso0, motion, still).map(|(_, h)| (h.fraction, h.normal, Vec3::ZERO));
+                        // what moved in the step, with the motion relative to it from its start: a kinematic body
+                        // for every fast body, a dynamic one (not a bullet, already swept itself) for a bullet
+                        let reach = body.shape.aabb(&iso0).union(&body.shape.aabb(&r.iso()));
+                        for (q, &j) in active.iter().enumerate() {
+                            let Some((cj0, rj)) = &ends[q] else {
+                                continue;
+                            };
+                            let Some((_, bj)) = self.world.at(j) else {
+                                continue;
+                            };
+                            if may(j, bj.layers).is_none() || !(rj.kind == BodyKind::Kinematic || (bullet && rj.dynamic() && !rj.bullet)) {
+                                continue;
+                            }
+                            if !reach.intersects(&bj.shape.aabb(&bj.iso).union(&bj.shape.aabb(&rj.iso()))) {
+                                continue;
+                            }
+                            let dj = rj.center - *cj0;
+                            if let Some(h) = query::cast(&body.shape, &iso0, motion - dj, &bj.shape, &bj.iso) {
+                                if best.is_none_or(|b| h.fraction < b.0) {
+                                    best = Some((h.fraction, h.normal, dj));
+                                }
+                            }
+                        }
+                        if let Some((f, n, dj)) = best {
+                            if f > 0.0 && f < 1.0 {
+                                // where they meet, and against a body that moved carried on with it for the rest of
+                                // the step (so the two do not pass each other: the body stays where the hit left
+                                // it relative to the other); a slop off the surface (along its normal, so a body
+                                // that grazes it keeps its way): the next step meets it with a gap, which its
+                                // speculative contact closes exactly
+                                let at = if dj == Vec3::ZERO { c0 + motion * f } else { c0 + (motion - dj) * f + dj };
+                                r.center = at + n * slop;
+                                swept += 1;
                             }
                         }
                     }
-                    if let Some((f, n)) = best {
-                        if f > 0.0 && f < 1.0 {
-                            // a slop off the surface (along its normal, so a body that grazes it keeps its
-                            // way): the next step meets it with a gap, which its speculative contact
-                            // closes exactly
-                            r.center = c0 + motion * f + n * slop;
-                            swept += 1;
+                    // the centre of mass never passes through what does not move: a body that turned into the
+                    // ground faster than its contacts could follow still has its centre on the right side, so
+                    // its contacts push it out (a two-sided triangle would otherwise push it on through)
+                    let motion = r.center - c0;
+                    let ml = motion.length();
+                    if ml > 0.0 {
+                        if let Some((_, h)) = self.world.ray_cast_where(c0, motion, 1.0, still) {
+                            if h.t > 0.0 && h.t < 1.0 {
+                                r.center = c0 + motion * max(h.t - slop / ml, 0.0);
+                                swept += 1;
+                            }
                         }
                     }
                 }
-                // the centre of mass never passes through what does not move: a body that turned into the
-                // ground faster than its contacts could follow still has its centre on the right side, so
-                // its contacts push it out (a two-sided triangle would otherwise push it on through)
-                let motion = r.center - c0;
-                let ml = motion.length();
-                if ml > 0.0 {
-                    if let Some((_, h)) = self.world.ray_cast_where(c0, motion, 1.0, still) {
-                        if h.t > 0.0 && h.t < 1.0 {
-                            r.center = c0 + motion * max(h.t - slop / ml, 0.0);
-                            swept += 1;
-                        }
-                    }
-                }
+                ends[k] = Some((c0, r));
             }
-            ends[k] = Some((c0, r));
         }
         // now into the World
         for (k, &i) in active.iter().enumerate() {

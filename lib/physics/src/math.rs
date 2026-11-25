@@ -87,6 +87,35 @@ pub(crate) fn abs(x: f64) -> f64 {
     f64::from_bits(x.to_bits() & !(1u64 << 63))
 }
 
+/// the exponent k (-1022..=1022) of the power of two that brings a positive x into [1, 2) (a subnormal one as
+/// close as that goes), None for 0 and what is not a positive number
+#[inline]
+pub(crate) fn unit_exp(x: f64) -> Option<i64> {
+    if !(x > 0.0) {
+        return None;
+    }
+    let e = ((x.to_bits() >> 52) & 0x7ff) as i64;
+    Some((1023 - e).clamp(-1022, 1022))
+}
+
+/// 2^k for k in -1022..=1023
+#[inline]
+pub(crate) fn pow2(k: i64) -> f64 {
+    f64::from_bits(((k + 1023) as u64) << 52)
+}
+
+/// x 2^k for k in -2044..=2044: exact, unless the result is subnormal or out of range
+#[inline]
+pub(crate) fn scale2(x: f64, k: i64) -> f64 {
+    if (-1022..=1023).contains(&k) {
+        x * pow2(k)
+    } else {
+        // in two halves: the value between x and the result stays in range when the result is
+        let h = k / 2;
+        x * pow2(h) * pow2(k - h)
+    }
+}
+
 // ---------------------------------------------------------------- Vec3
 
 /// A point or a direction in metres, `f64` (docs/PHYSICS.md, "f64").  Converts from and to `[f64; 3]`,
@@ -566,30 +595,44 @@ impl Mat3 {
         self.cols[0].dot(self.cols[1].cross(self.cols[2]))
     }
 
-    /// the inverse, None when the matrix is singular (or not finite)
+    /// the inverse, None when the matrix is singular, not finite, or its inverse is not (and when even its
+    /// rows and columns brought to one size leave a determinant that under- or overflows: a condition number
+    /// beyond about 10^300)
     pub fn inverse(&self) -> Option<Mat3> {
         if !self.is_finite() {
             return None;
         }
-        // scaled first by the power of two that brings the largest entry into [1, 2): exact, so a matrix of
-        // ordinary size gives the same bits as without, and the determinant of a tiny or a huge one neither
-        // under- nor overflows
-        let big = self.cols.iter().fold(0.0, |m, v| max(m, max(abs(v.x), max(abs(v.y), abs(v.z)))));
-        if !(big > 0.0) {
-            return None;
+        // the rows, then the columns, scaled by the powers of two that bring their largest entry into [1, 2):
+        // exact, so a matrix of ordinary size gives the same bits as without (each term of a cofactor and of
+        // the determinant carries the same factors), and the determinant of a tiny, a huge or a badly scaled
+        // one (diag(2^-300, 2^-300, 2^300)) neither under- nor overflows.  With M' = R M C:
+        // inv(M) = C inv(M') R.
+        let mut rows = self.transpose().cols;
+        let mut kr = [0i64; 3];
+        for (k, r) in kr.iter_mut().zip(rows.iter_mut()) {
+            *k = unit_exp(r.abs().max_elem())?;
+            *r = *r * pow2(*k);
         }
-        let e = ((big.to_bits() >> 52) & 0x7ff) as i64;
-        let k = (1023 - e).clamp(-1022, 1022);
-        let s = f64::from_bits(((k + 1023) as u64) << 52);
-        let [a, b, c] = self.cols.map(|v| v * s);
+        let mut cols = Mat3 { cols: rows }.transpose().cols;
+        let mut kc = [0i64; 3];
+        for (k, c) in kc.iter_mut().zip(cols.iter_mut()) {
+            *k = unit_exp(c.abs().max_elem())?;
+            *c = *c * pow2(*k);
+        }
+        let [a, b, c] = cols;
         let (bc, ca, ab) = (b.cross(c), c.cross(a), a.cross(b));
         let det = a.dot(bc);
         if !(det != 0.0 && det.is_finite()) {
             return None;
         }
-        // the rows of the inverse are the cross products of the columns divided by the determinant, and the
-        // scale undone: inv(M) = s inv(s M)
-        let m = Mat3 { cols: [bc * (s / det), ca * (s / det), ab * (s / det)] }.transpose();
+        // the rows of inv(M') are the cross products of its columns divided by the determinant; row i of
+        // inv(M) is row i of inv(M') times 2^kc[i], entry j times 2^kr[j]
+        let f = 1.0 / det;
+        let row = |v: Vec3, i: usize| {
+            let v = v * f;
+            Vec3::new(scale2(v.x, kc[i] + kr[0]), scale2(v.y, kc[i] + kr[1]), scale2(v.z, kc[i] + kr[2]))
+        };
+        let m = Mat3 { cols: [row(bc, 0), row(ca, 1), row(ab, 2)] }.transpose();
         if m.is_finite() { Some(m) } else { None }
     }
 
