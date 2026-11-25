@@ -477,6 +477,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **crypto:** `rsa::PrivateKey::iqmp` of a key whose q has more 64-bit words than p: q is reduced mod p first; the words above p's length were dropped, and the coefficient a key file keeps was wrong
 - **plat:** iOS: a change of dark mode, contrast, motion or text size while the app ran never reached it (no E_SETTINGS): the host now marks the app as started when UIKit takes over
 - **ui:** Scripts: `gpu expect screen` on Windows failed where something that takes no clicks lies over the script's window -- an overlay such as Discord's or the GPU driver's (topmost over the whole screen, hit tests pass through it) or a shadow: when the window as DWM composes it equals the framebuffer, that is a note now, as another window on top of ours already was; `plat::win_test_composed(w)` (test aid): the client area as the system composes it, PrintWindow with `PW_RENDERFULLCONTENT` (the GPU child's swapchain too, nothing of what lies on top; None on the other systems). docs/GPU.md
+- **ui:** Scripts: a `gpu on` after `gpu off` left its new windows at 320 x 240 (the size asked of the closed ones stayed), so every GPU check after it was only "the system keeps the window at another size (no result)": diagramtest's gpu_canvas.uis checked nothing of its switches (`jfgui_GPU_CANVAS_PAN`, `jfgui_GPU_CANVAS_CPU`, `jfgui_GPU_CANVAS`), Kritzel's nothing of `jfgui_GPU_CANVAS_ZOOM`; `gpu off` forgets that size with its windows
 
 ### Security
 

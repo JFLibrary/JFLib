@@ -4242,11 +4242,14 @@ impl Ui {
             s.tile_bytes = 0;
             s.dev = Dev::None;
             s.want = false;
-            for pw in s.script_pw.iter_mut() {
+            // (the size asked of a window goes with it: the next `gpu on` makes new ones at 320 x 240, and they
+            // must be asked again, else they stay so and every check after it is "kept at another size")
+            for (pw, asked) in s.script_pw.iter_mut().zip(s.script_asked.iter_mut()) {
                 if *pw >= 0 {
                     plat::win_destroy(*pw);
                     *pw = -1;
                 }
+                *asked = (0, 0);
             }
             script_pump();
             return;
