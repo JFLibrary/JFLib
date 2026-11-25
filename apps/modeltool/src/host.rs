@@ -215,7 +215,7 @@ pub struct ModelHost<'a> {
     loader: &'a mut dyn FnMut(&str) -> Result<String, String>,
     /// (path, source) of every module the script imported, in order
     pub imports: Vec<(String, String)>,
-    /// microseconds spent in host functions and hooks (the geometry)
+    /// microseconds spent in host functions and the methods of a mesh or a vec (the geometry)
     pub host_us: u64,
 }
 
@@ -272,7 +272,7 @@ impl Host for ModelHost<'_> {
         Ok(src)
     }
 
-    // m.tris, v.x
+    // m.tris, v.x (not timed, as the operators)
     fn get(&mut self, cx: &mut Cx, obj: Object, name: &str) -> Result<Value, Fail> {
         match (obj.ty, name) {
             ("mesh", "tris") => Ok(Value::Int(self.meshes.get(obj.id as usize).map_or(0, |m| m.triangle_count()) as i64)),
@@ -314,36 +314,35 @@ impl Host for ModelHost<'_> {
         })
     }
 
-    // the operators of vec: + - between vectors, * / with a number (also 2 * v), the minus
+    // the operators of vec: + - between vectors, * / with a number (also 2 * v), the minus (not timed as geometry:
+    // the clock would cost more than the sum)
     fn op(&mut self, cx: &mut Cx, op: Operator, a: Value, b: Value) -> Result<Value, Fail> {
-        self.timed(|_| {
-            let (va, vb) = (vec_data(cx, a), vec_data(cx, b));
-            let (sa, sb) = (number_of(a), number_of(b));
-            let r: [f64; 3] = match (op, va, vb) {
-                (Operator::Add, Some(p), Some(q)) => add3(&p, &q),
-                (Operator::Sub, Some(p), Some(q)) => sub3(&p, &q),
-                (Operator::Mul, Some(p), None) => match sb {
-                    Some(s) => mul3(&p, s),
-                    None => return Err(Fail::Unknown),
-                },
-                // (s * x is x * s, bit for bit)
-                (Operator::Mul, None, Some(q)) => match sa {
-                    Some(s) => mul3(&q, s),
-                    None => return Err(Fail::Unknown),
-                },
-                (Operator::Div, Some(p), None) => match sb {
-                    Some(s) => [p[0] / s, p[1] / s, p[2] / s],
-                    None => return Err(Fail::Unknown),
-                },
-                (Operator::Neg, Some(p), None) => [-p[0], -p[1], -p[2]],
-                _ => return Err(Fail::Unknown),
-            };
-            if !r.iter().all(|x| x.is_finite()) {
-                let what = if op == Operator::Neg { String::from("-vec") } else { format!("{} {} {}", cx.type_of(a), op.text(), cx.type_of(b)) };
-                return Err(cx.error(&format!("{}: das Ergebnis ist keine endliche Zahl (geteilt durch 0 oder zu groß)", what)));
-            }
-            new_vec(cx, &r)
-        })
+        let (va, vb) = (vec_data(cx, a), vec_data(cx, b));
+        let (sa, sb) = (number_of(a), number_of(b));
+        let r: [f64; 3] = match (op, va, vb) {
+            (Operator::Add, Some(p), Some(q)) => add3(&p, &q),
+            (Operator::Sub, Some(p), Some(q)) => sub3(&p, &q),
+            (Operator::Mul, Some(p), None) => match sb {
+                Some(s) => mul3(&p, s),
+                None => return Err(Fail::Unknown),
+            },
+            // (s * x is x * s, bit for bit)
+            (Operator::Mul, None, Some(q)) => match sa {
+                Some(s) => mul3(&q, s),
+                None => return Err(Fail::Unknown),
+            },
+            (Operator::Div, Some(p), None) => match sb {
+                Some(s) => [p[0] / s, p[1] / s, p[2] / s],
+                None => return Err(Fail::Unknown),
+            },
+            (Operator::Neg, Some(p), None) => [-p[0], -p[1], -p[2]],
+            _ => return Err(Fail::Unknown),
+        };
+        if !r.iter().all(|x| x.is_finite()) {
+            let what = if op == Operator::Neg { String::from("-vec") } else { format!("{} {} {}", cx.type_of(a), op.text(), cx.type_of(b)) };
+            return Err(cx.error(&format!("{}: das Ergebnis ist keine endliche Zahl (geteilt durch 0 oder zu groß)", what)));
+        }
+        new_vec(cx, &r)
     }
 
     fn to_str(&self, _vm: &Vm, obj: Object) -> Option<String> {
