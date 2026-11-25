@@ -189,8 +189,10 @@
 //                          back = the framebuffer byte for byte (x byte: 255), and no frame differed
 //                          since the last check (a canvas's scaled tiles count as GpuOutput::canvas_diff_*)
 //   gpu expect screen      the composed screen at the window = the framebuffer (another window on
-//                          top of ours is a note, not a failure); X11: what the server holds for the
-//                          window; Wayland: a note, no client can read it
+//                          top of ours is a note, not a failure; Windows: also what takes no clicks,
+//                          an overlay or a shadow, when the window as DWM composes it = the
+//                          framebuffer); X11: what the server holds for the window; Wayland: a
+//                          note, no client can read it
 //   gpu expect window      the window's DC = the framebuffer (the CPU path's pixels); Linux as `screen`
 //   gpu expect upload N    at most N bytes uploaded since the last check
 //   gpu expect base N      at most N bytes of them to the base texture since the last check
@@ -4576,8 +4578,32 @@ impl Ui {
         if bad != 0 {
             let total = w as u64 * h as u64;
             // (not only the first: it can lie in the shadow of a window above, where hit tests find ours)
-            if screen && some.iter().any(|&p| plat::win_test(plat::WT_FROM_POINT, pw, p) != 1) {
+            let covered = screen && some.iter().any(|&p| plat::win_test(plat::WT_FROM_POINT, pw, p) != 1);
+            // (Windows: hit tests pass through what takes no clicks -- an overlay such as Discord's or a GPU
+            // driver's lies topmost over the whole screen and draws where it likes -- and through shadows.  The
+            // window's own picture as DWM composes it, without what lies on top, says whether the rest is ours)
+            let own_ok = screen
+                && !covered
+                && cfg!(windows)
+                && plat::win_test_composed(pw).is_some_and(|(cw, ch, c)| {
+                    cw == w
+                        && ch == h
+                        && (0..h as usize).all(|y| {
+                            let b = &fb.px[y * fb.stride as usize..y * fb.stride as usize + row];
+                            c[y * row..y * row + row].chunks_exact(4).zip(b.chunks_exact(4)).all(|(p, q)| p[..3] == q[..3])
+                        })
+                });
+            if covered {
                 plat::write_stdout(format!("note: gpu expect screen: {bad} of {total} pixels differ: another window lies on top of ours\n").as_bytes());
+            } else if own_ok {
+                plat::write_stdout(
+                    format!(
+                        "note: gpu expect screen: {bad} of {total} pixels differ, first at {}, {}, but the window as the system composes it \
+                         equals the framebuffer: something that takes no clicks lies on top of ours (an overlay, a shadow)\n",
+                        first.0, first.1
+                    )
+                    .as_bytes(),
+                );
             } else {
                 self.fail(format!("{bad} pixels differ, first at {}, {}", first.0, first.1).as_bytes());
             }

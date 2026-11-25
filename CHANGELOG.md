@@ -476,6 +476,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **netio:** TLS: a handshake message longer than a record (a certificate chain of over 16 KiB) goes in several records (RFC 8446 5.1); it went in one record, which the peer refused (record_overflow)
 - **crypto:** `rsa::PrivateKey::iqmp` of a key whose q has more 64-bit words than p: q is reduced mod p first; the words above p's length were dropped, and the coefficient a key file keeps was wrong
 - **plat:** iOS: a change of dark mode, contrast, motion or text size while the app ran never reached it (no E_SETTINGS): the host now marks the app as started when UIKit takes over
+- **ui:** Scripts: `gpu expect screen` on Windows failed where something that takes no clicks lies over the script's window -- an overlay such as Discord's or the GPU driver's (topmost over the whole screen, hit tests pass through it) or a shadow: when the window as DWM composes it equals the framebuffer, that is a note now, as another window on top of ours already was; `plat::win_test_composed(w)` (test aid): the client area as the system composes it, PrintWindow with `PW_RENDERFULLCONTENT` (the GPU child's swapchain too, nothing of what lies on top; None on the other systems). docs/GPU.md
 
 ### Security
 
