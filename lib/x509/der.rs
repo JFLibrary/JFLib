@@ -12,6 +12,7 @@ pub const BIT_STRING: u8 = 0x03;
 pub const OCTET_STRING: u8 = 0x04;
 pub const NULL: u8 = 0x05;
 pub const OID: u8 = 0x06;
+pub const ENUMERATED: u8 = 0x0a;
 pub const UTF8: u8 = 0x0c;
 pub const PRINTABLE: u8 = 0x13;
 pub const IA5: u8 = 0x16;

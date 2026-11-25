@@ -83,13 +83,13 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [crypto](#crypto) -- hashes, MACs, KDFs, Argon2id, AEAD, X25519, Ed25519, sealed boxes (no randomness inside)
   <br>[lib.rs](#crypto-crate-root) · [aead.rs](#cryptoaeadrs) · [aes.rs](#cryptoaesrs) · [argon2.rs](#cryptoargon2rs) · [b64.rs](#cryptob64rs) · [blake2b.rs](#cryptoblake2brs) · [blake3.rs](#cryptoblake3rs) · [bn.rs](#cryptobnrs) · [chacha.rs](#cryptochachars) · [ecdsa.rs](#cryptoecdsars) · [ed25519.rs](#cryptoed25519rs) · [gcm.rs](#cryptogcmrs) · [hmac.rs](#cryptohmacrs) · [p256.rs](#cryptop256rs) · [p384.rs](#cryptop384rs) · [poly1305.rs](#cryptopoly1305rs) · [rsa.rs](#cryptorsars) · [sealbox.rs](#cryptosealboxrs) · [sha2.rs](#cryptosha2rs) · [sha3.rs](#cryptosha3rs) · [x25519.rs](#cryptox25519rs) · [sha1.rs](#cryptosha1rs) · [keywrap.rs](#cryptokeywraprs) · [cmac.rs](#cryptocmacrs) · [md5.rs](#cryptomd5rs) · [mlkem.rs](#cryptomlkemrs) · [eappwd.rs](#cryptoeappwdrs)
 - [x509](#x509) -- X.509 certificates: strict parsing, path validation with name constraints, a private Ed25519 CA's builder, the DER reader and writer (netio::x509 and netpkt::x509 are this crate)
-  <br>[lib.rs](#x509-crate-root) · [der.rs](#x509derrs) · [ip.rs](#x509iprs) · [key.rs](#x509keyrs)
+  <br>[lib.rs](#x509-crate-root) · [csr.rs](#x509csrrs) · [der.rs](#x509derrs) · [ip.rs](#x509iprs) · [key.rs](#x509keyrs) · [ocsp.rs](#x509ocsprs)
 - [compress](#compress) -- DEFLATE, zlib, gzip, Brotli, LZ4, Zstandard, CRC-32, Adler-32 and xxHash, codec ids
   <br>[lib.rs](#compress-crate-root) · [brotli/mod.rs](#compressbrotlimodrs) · [brotli/enc.rs](#compressbrotliencrs) · [brotli/sdec.rs](#compressbrotlisdecrs) · [brotli/senc.rs](#compressbrotlisencrs) · [checksum.rs](#compresschecksumrs) · [deflate/mod.rs](#compressdeflatemodrs) · [deflate/dec.rs](#compressdeflatedecrs) · [deflate/enc.rs](#compressdeflateencrs) · [deflate/sdec.rs](#compressdeflatesdecrs) · [gzip.rs](#compressgziprs) · [lz4.rs](#compresslz4rs) · [stream.rs](#compressstreamrs) · [xxh.rs](#compressxxhrs) · [zlib.rs](#compresszlibrs) · [zstd/mod.rs](#compresszstdmodrs) · [zstd/dec.rs](#compresszstddecrs) · [zstd/dict.rs](#compresszstddictrs) · [zstd/enc.rs](#compresszstdencrs) · [zstd/sdec.rs](#compresszstdsdecrs) · [zstd/senc.rs](#compresszstdsencrs)
 - [datastore](#datastore) -- an embedded journal database: JSON collections, transactions, snapshots, crash recovery, secondary indexes, encryption at rest
   <br>[lib.rs](#datastore-crate-root) · [index.rs](#datastoreindexrs) · [journal.rs](#datastorejournalrs)
 - [netio](#netio) -- HTTP/1.1 server and client, TLS 1.3 subset, X.509 of a private CA, SSH-2, DNS
-  <br>[lib.rs](#netio-crate-root) · [client.rs](#netioclientrs) · [dns.rs](#netiodnsrs) · [http.rs](#netiohttprs) · [pem.rs](#netiopemrs) · [roots.rs](#netiorootsrs) · [server.rs](#netioserverrs) · [smtp.rs](#netiosmtprs) · [ssh.rs](#netiosshrs) · [tls/mod.rs](#netiotlsmodrs) · [tls/conn.rs](#netiotlsconnrs) · [tls/keysched.rs](#netiotlskeyschedrs) · [tls/kx.rs](#netiotlskxrs) · [tls/record.rs](#netiotlsrecordrs) · [tls/session.rs](#netiotlssessionrs) · [trust.rs](#netiotrustrs) · [url.rs](#netiourlrs) · [ws.rs](#netiowsrs)
+  <br>[lib.rs](#netio-crate-root) · [acme.rs](#netioacmers) · [client.rs](#netioclientrs) · [dns.rs](#netiodnsrs) · [http.rs](#netiohttprs) · [ocsp.rs](#netioocsprs) · [pem.rs](#netiopemrs) · [roots.rs](#netiorootsrs) · [server.rs](#netioserverrs) · [smtp.rs](#netiosmtprs) · [ssh.rs](#netiosshrs) · [tls/mod.rs](#netiotlsmodrs) · [tls/conn.rs](#netiotlsconnrs) · [tls/keysched.rs](#netiotlskeyschedrs) · [tls/kx.rs](#netiotlskxrs) · [tls/record.rs](#netiotlsrecordrs) · [tls/session.rs](#netiotlssessionrs) · [tls/staple.rs](#netiotlsstaplers) · [trust.rs](#netiotrustrs) · [url.rs](#netiourlrs) · [ws.rs](#netiowsrs)
 - [netpkt](#netpkt) -- network packets byte for byte: addresses, checksums, Ethernet to TCP codecs, DHCP, DNS, NTP, syslog, SNMP, SSH, TLS 1.3, EAP and IMAP without I/O, X.509, cookies, URI references, a dissector, pcapng
   <br>[lib.rs](#netpkt-crate-root) · [addr.rs](#netpktaddrrs) · [arp.rs](#netpktarprs) · [checksum.rs](#netpktchecksumrs) · [decode.rs](#netpktdecoders) · [dhcp.rs](#netpktdhcprs) · [dns.rs](#netpktdnsrs) · [eth.rs](#netpktethrs) · [icmp.rs](#netpkticmprs) · [ipv4.rs](#netpktipv4rs) · [ipv6.rs](#netpktipv6rs) · [ntp.rs](#netpktntprs) · [pcapng.rs](#netpktpcapngrs) · [pkt.rs](#netpktpktrs) · [syslog.rs](#netpktsyslogrs) · [tcp.rs](#netpkttcprs) · [udp.rs](#netpktudprs) · [http.rs](#netpkthttprs) · [stp.rs](#netpktstprs) · [rip.rs](#netpktriprs) · [nat.rs](#netpktnatrs) · [icmpv6.rs](#netpkticmpv6rs) · [ospf.rs](#netpktospfrs) · [addrsel.rs](#netpktaddrselrs) · [eapol.rs](#netpkteapolrs) · [bgp.rs](#netpktbgprs) · [tftp.rs](#netpkttftprs) · [ftp.rs](#netpktftprs) · [smtp.rs](#netpktsmtprs) · [pop3.rs](#netpktpop3rs) · [imf.rs](#netpktimfrs) · [ber.rs](#netpktberrs) · [snmp.rs](#netpktsnmprs) · [mib.rs](#netpktmibrs) · [telnet.rs](#netpkttelnetrs) · [radius.rs](#netpktradiusrs) · [uri.rs](#netpkturirs) · [ssh.rs](#netpktsshrs) · [snmpv3.rs](#netpktsnmpv3rs) · [eap.rs](#netpkteaprs) · [imap.rs](#netpktimaprs) · [cookie.rs](#netpktcookiers) · [x509.rs](#netpktx509rs) · [tls.rs](#netpkttlsrs)
 - [eapm](#eapm) -- EAP-MD5 and EAP-PWD as peer and server state machines without I/O
@@ -43712,8 +43712,12 @@ SHA-256 / 384 / 512), parsed strictly; no I/O, no clock (the caller passes the t
   CertBuilder { .. }.sign(&issuer_cert_or_self, &issuer_key) -> DER     (Ed25519)
   CertBuilder { spki, .. }.sign_key(issuer, &PrivateKey, extra) -> DER   any key, signed by any
   PrivateKey: Ed25519, ECDSA (P-256 / P-384), RSA; PKCS #8 / SEC 1 / PKCS #1 (key.rs)
+  ocsp::check(der, &cert, &issuer, now)   an OCSP response (RFC 6960); request, CertId,
+                                          ResponseBuilder for a private CA's responder (ocsp.rs)
+  CsrBuilder { dns, .. }.sign(&key), Csr::parse   certificate requests (PKCS #10, csr.rs)
 
-Not checked: revocation (CRL / OCSP), certificate policies.  Name constraints are processed
+Not checked: CRLs, certificate policies (OCSP: the ocsp module; a certificate's responders,
+caIssuers and TLS features are read).  Name constraints are processed
 for DNS names, IP addresses, e-mail addresses (rfc822Name), URIs (their host) and directory
 names (a byte-wise prefix of the subject's RDNs); a CA that constrains another form refuses
 every certificate below it that has a name of that form (RFC 5280 4.2.1.10).  They apply to
@@ -43724,6 +43728,9 @@ the leaf and to the intermediates below the CA, self-issued ones excepted (6.1.3
 
 ```rust
 OID_ED25519: &[u64] = &[1, 3, 101, 112]
+/// the TLS feature of a certificate that must come with a stapled OCSP response (RFC 7633:
+/// status_request)
+TLS_FEATURE_STATUS_REQUEST: u16 = 5
 /// key usage bits as they appear in the first byte
 KU_DIGITAL_SIGNATURE: u8 = 0x80
 KU_KEY_CERT_SIGN: u8 = 0x04
@@ -43798,11 +43805,29 @@ KU_CRL_SIGN: u8 = 0x02
   - `other_names: Vec<u8>` -- the tags of subject alternative names of other forms (otherName 0xa0, x400Address 0xa3,
     ediPartyName 0xa5, registeredID 0x88)
   - `ski: Vec<u8>`
+  - `aki: Vec<u8>` -- the keyIdentifier of the authority key identifier (empty without one): which key of the
+    issuer signed it (ACME's renewal information names a certificate by it)
+  - `ocsp_urls: Vec<String>` -- the OCSP responders of the authority information access (URIs, RFC 5280 4.2.2.1)
+  - `ca_issuers: Vec<String>` -- where the issuer's certificate is (caIssuers URIs of the authority information access)
+  - `tls_features: Vec<u16>` -- the TLS features the certificate demands (RFC 7633): TLS_FEATURE_STATUS_REQUEST is
+    "must staple", a TLS client that asks for a stapled OCSP response refuses it without one
+    (netio: Revocation::Stapled or Required with Trust::Anchors, System or Custom; with
+    Revocation::Off, Trust::Pinned or Trust::Any it asks for none and does not look)
+  - `ocsp_nocheck: bool` -- id-pkix-ocsp-nocheck (RFC 6960 4.2.2.2.1): an OCSP responder's certificate that is not
+    checked for revocation itself
   - `unknown_critical: bool` -- a critical extension this code does not understand (such a certificate is rejected)
 
 **`impl Cert`**
 
 - **`fn parse(bytes: &[u8]) -> Option<Cert>`**
+- **`fn spki(&self) -> Vec<u8>`**
+  its SubjectPublicKeyInfo as it stands in the certificate (DER): what keys are pinned by
+  and a certificate request carries
+- **`fn ocsp_signer(&self) -> bool`**
+  whether its extended key usage allows signing OCSP responses (id-kp-OCSPSigning: a
+  responder its CA delegated to, RFC 6960 4.2.2.2)
+- **`fn must_staple(&self) -> bool`**
+  whether it must come with a stapled OCSP response (RFC 7633)
 - **`fn fingerprint_bytes(&self) -> [u8; 32]`**
   SHA-256 of the certificate
 - **`fn fingerprint_text(&self) -> String`**
@@ -43843,6 +43868,11 @@ KU_CRL_SIGN: u8 = 0x02
   - `client_auth: bool`
   - `spki: Vec<u8>` -- the subject's key as a SubjectPublicKeyInfo (PrivateKey::spki, spki_of); empty: the
     Ed25519 key `public_key`
+  - `ocsp_urls: Vec<String>` -- OCSP responders to name in the authority information access (http URIs)
+  - `must_staple: bool` -- a leaf that must come with a stapled OCSP response (the TLS feature status_request,
+    RFC 7633)
+  - `ocsp_signing: bool` -- a leaf that signs OCSP responses for its issuer (id-kp-OCSPSigning, with
+    id-pkix-ocsp-nocheck)
 
 - **`fn extension(oid: &[u64], critical: bool, value: &[u8]) -> Vec<u8>`**
   a DER Extension (oid, the critical flag, the DER value) for CertBuilder::sign_ext
@@ -43867,6 +43897,58 @@ KU_CRL_SIGN: u8 = 0x02
 - **`fn ed25519_from_pkcs8(b: &[u8]) -> Option<[u8; 32]>`**
   the seed of a PKCS#8 Ed25519 private key
 
+### `x509/csr.rs`
+
+Source: [`lib/x509/csr.rs`](../lib/x509/csr.rs)
+
+```text
+csr -- certificate requests (PKCS #10, RFC 2986): what ACME's finalize sends (RFC 8555 7.4)
+and what a private CA reads before it signs
+
+  CsrBuilder { dns, ips, cn, must_staple }.sign(&key) -> Option<DER>
+  Csr::parse(der) -> Option<Csr>     the subject, the key, the requested names; its signature
+                                     checked (the requester holds the key)
+
+The names go into an extensionRequest (PKCS #9) as a subject alternative name; the common
+name is optional (ACME's CAs take the names from the extension).
+```
+
+- **`struct CsrBuilder`**
+  a request to build
+  - `cn: String` -- the common name (empty: none; ACME takes at most 64 bytes, RFC 5280's ub-common-name)
+  - `dns: Vec<String>`
+  - `ips: Vec<IpAddr>`
+  - `must_staple: bool` -- ask for a certificate that must come with a stapled OCSP response (RFC 7633)
+
+**`impl CsrBuilder`**
+
+- **`fn for_names(names: &[&str]) -> CsrBuilder`**
+  a request for these DNS names (the first one also the common name when it fits)
+- **`fn sign(&self, key: &PrivateKey) -> Option<Vec<u8>>`**
+  the DER request, signed with `key` (ECDSA with its curve's hash, RSA PKCS #1 v1.5 with
+  SHA-256, Ed25519); None when a name is not a DNS name in the preferred syntax, or an RSA
+  key is shorter than 2048 bits or not a whole number of bytes (as Csr::parse and
+  certificates take them)
+
+- **`struct Csr`**
+  a request read and its signature checked
+  - `der: Vec<u8>`
+  - `subject: Vec<u8>` -- the subject (DER of the Name)
+  - `cn: String`
+  - `spki: Vec<u8>` -- the SubjectPublicKeyInfo (DER), for CertBuilder::spki
+  - `key: PubKey`
+  - `dns: Vec<String>` -- the names of the requested subject alternative name (DNS names lower case)
+  - `ips: Vec<IpAddr>`
+  - `tls_features: Vec<u16>` -- the requested TLS features (RFC 7633)
+  - `sig_alg: SigAlg`
+
+**`impl Csr`**
+
+- **`fn parse(b: &[u8]) -> Option<Csr>`**
+  a request: version 0, a key this crate reads, a signature by that key; the names of an
+  extensionRequest (other extensions are left to the CA, which decides what it signs).
+  None when it is malformed or the signature does not verify
+
 ### `x509/der.rs`
 
 Source: [`lib/x509/der.rs`](../lib/x509/der.rs)
@@ -43886,6 +43968,7 @@ BIT_STRING: u8 = 0x03
 OCTET_STRING: u8 = 0x04
 NULL: u8 = 0x05
 OID: u8 = 0x06
+ENUMERATED: u8 = 0x0a
 UTF8: u8 = 0x0c
 PRINTABLE: u8 = 0x13
 IA5: u8 = 0x16
@@ -44045,6 +44128,149 @@ each other in variable time, as a program does at start), then signs in constant
 
 - **`fn spki_of(key: &PubKey) -> Vec<u8>`**
   the SubjectPublicKeyInfo of a public key (empty for PubKey::Other)
+
+### `x509/ocsp.rs`
+
+Source: [`lib/x509/ocsp.rs`](../lib/x509/ocsp.rs)
+
+```text
+ocsp -- the Online Certificate Status Protocol (RFC 6960, the lightweight profile of RFC
+5019): what TLS staples (RFC 6066 8, RFC 8446 4.4.2.1) and what a private CA answers
+
+  CertId::new(&cert, &issuer)             the certificate's id (SHA-1, as RFC 5019 asks;
+                                          CertId::with_hash for SHA-256 and longer)
+  request(&[id], nonce) -> DER            an OCSPRequest (unsigned, RFC 6960 4.1)
+  Request::parse(der)                     the ids and the nonce of a request (a responder)
+  check(der, &cert, &issuer, now) -> Result<Response, String>
+                                          a response about `cert`: signed by its issuer or by
+                                          a responder the issuer delegated to, current at
+                                          `now`; Response { status, this_update, .. }
+  ResponseBuilder { status, .. }.sign(&cert, &issuer, responder, &key) -> DER
+  error_response(code) -> DER             an unsuccessful one (tryLater, unauthorized, ..)
+
+A response is current from thisUpdate (5 minutes of clock skew allowed) to nextUpdate (and
+5 minutes after it); one without nextUpdate for a day after thisUpdate, as browsers take it.
+Delegated responders (RFC 6960 4.2.2.2) must be issued directly by the issuer, carry
+id-kp-OCSPSigning (and digitalSignature, when they have a key usage) and be valid, and a
+response counts no longer than its responder's certificate; their own revocation is not
+checked (they carry id-pkix-ocsp-nocheck as a rule).  Unknown critical extensions refuse a
+response, and a request.
+```
+
+```rust
+/// the clock skew taken at either end of a response's time
+SKEW: i64 = 300
+/// how long a response without nextUpdate counts as current after its thisUpdate
+NO_NEXT_UPDATE: i64 = 86_400
+/// the response statuses of an unsuccessful OCSPResponse (RFC 6960 4.2.1)
+MALFORMED_REQUEST: u8 = 1
+INTERNAL_ERROR: u8 = 2
+TRY_LATER: u8 = 3
+SIG_REQUIRED: u8 = 5
+UNAUTHORIZED: u8 = 6
+```
+
+- **`enum IdHash`**
+  the hash of a CertID
+  - `Sha1`
+  - `Sha256`
+  - `Sha384`
+  - `Sha512`
+
+- **`struct CertId`**
+  which certificate a request or response is about (RFC 6960 4.1.1)
+  - `hash: IdHash`
+  - `name_hash: Vec<u8>` -- the hash of the issuer's name (its DER)
+  - `key_hash: Vec<u8>` -- the hash of the issuer's public key (the bytes of its subjectPublicKey)
+  - `serial: Vec<u8>` -- the certificate's serial number (the INTEGER's content)
+
+**`impl CertId`**
+
+- **`fn new(cert: &Cert, issuer: &Cert) -> Option<CertId>`**
+  the id of `cert` with SHA-1 (RFC 5019 2.1.1: what responders take); None when `issuer` is
+  not the one that names it or its key cannot be read
+- **`fn with_hash(cert: &Cert, issuer: &Cert, hash: IdHash) -> Option<CertId>`**
+- **`fn encode(&self) -> Vec<u8>`**
+  the DER CertID (a request's or a response's)
+
+- **`fn request(ids: &[CertId], nonce: Option<&[u8]>) -> Vec<u8>`**
+  an OCSPRequest for these certificates, unsigned; `nonce` (1 to 32 bytes) binds the answer
+  to it (responders of RFC 5019 answer from a cache and leave it out)
+
+- **`struct Request`**
+  what a request asks (for a responder)
+  - `ids: Vec<CertId>`
+  - `nonce: Option<Vec<u8>>`
+
+**`impl Request`**
+
+- **`fn parse(b: &[u8]) -> Option<Request>`**
+  an OCSPRequest: version 1, no requestor name, no signature (a signed one is not taken:
+  None), at most 64 certificates
+
+- **`enum Status`**
+  the status of a certificate
+  - `Good`
+  - `Revoked { time: i64, reason: Option<u8> }` -- since `time` (Unix seconds), for `reason` (CRLReason, RFC 5280 5.3.1) when given
+  - `Unknown` -- the responder does not know the certificate
+
+- **`struct Response`**
+  a checked response
+  - `status: Status`
+  - `this_update: i64` -- Unix seconds
+  - `next_update: Option<i64>`
+  - `produced_at: i64`
+  - `nonce: Option<Vec<u8>>` -- the nonce it carries (compare it with the request's)
+  - `responder_until: Option<i64>` -- the end of the delegated responder's certificate that signed it (None: the issuer
+    signed it); the response counts no longer
+
+**`impl Response`**
+
+- **`fn expires(&self) -> i64`**
+  until when it counts as current: nextUpdate (or a day after thisUpdate), at most to the
+  end of a delegated responder's certificate
+- **`fn refresh_at(&self) -> i64`**
+  when a server fetches the next one: halfway between thisUpdate and the end (as RFC 5019
+  6.2 and the CAs advise), an hour before the end where that comes earlier but not before
+  thisUpdate (a short response gets less than an hour); never after the end (a thisUpdate
+  ahead within the clock skew, a delegated responder about to expire)
+- **`fn next_fetch(&self, now: i64) -> i64`**
+  when a server that got it at `now` fetches the next one: refresh_at, a minute from now at
+  the earliest (no fetch loop), but 10 seconds before the response expires when that comes
+  first (10 seconds from now at the earliest: a response that ends sooner than that lapses
+  before the next fetch, the floor that keeps a loop away wins)
+
+- **`fn check(b: &[u8], cert: &Cert, issuer: &Cert, now: i64) -> Result<Response, String>`**
+  a response about `cert`, which `issuer` issued, at `now` (Unix seconds): its structure, its
+  signature (the issuer, or a responder certificate in it that the issuer issued for OCSP), the
+  entry for `cert`, its time.  Ok with the status (a revoked one too: the caller decides);
+  Err why it cannot be used (an unsuccessful response, tryLater among them).  That `issuer`
+  signed `cert` is the caller's to know (Cert::signed_by): the response is bound to the
+  issuer's name and key, so one for another CA's certificate does not count
+
+- **`struct ResponseBuilder`**
+  a response to build and sign (a private CA's responder, tests)
+  - `status: Status`
+  - `this_update: i64`
+  - `next_update: Option<i64>` -- None: newer information is always there (a response without nextUpdate)
+  - `produced_at: i64`
+  - `nonce: Option<Vec<u8>>` -- the request's nonce, to answer it
+  - `by_key: bool` -- the responder named by the SHA-1 of its key (byKey, RFC 5019 2.2.3) instead of its name
+  - `hash: IdHash`
+  - `extensions: Vec<Vec<u8>>` -- further responseExtensions (each from x509::extension)
+
+**`impl ResponseBuilder`**
+
+- **`fn good(now: i64) -> ResponseBuilder`**
+  good, current from `now` for four days, by key
+- **`fn sign(&self, cert: &Cert, issuer: &Cert, responder: Option<&Cert>, key: &PrivateKey) -> Option<Vec<u8>>`**
+  the DER response about `cert`, signed with `key`: the issuer's key (`responder` None), or
+  that of a responder certificate the issuer issued for OCSP (it goes into the response);
+  None when `key` is not that certificate's, or it signs nothing a certificate names
+
+- **`fn error_response(code: u8) -> Vec<u8>`**
+  an unsuccessful OCSPResponse (MALFORMED_REQUEST, INTERNAL_ERROR, TRY_LATER, SIG_REQUIRED,
+  UNAUTHORIZED): no responseBytes, nothing signed
 
 ## compress
 
@@ -45293,10 +45519,15 @@ netio -- network protocols on top of plat::net
   client     Client::request(...): blocking, timeouts, size limit
   tls        TLS 1.3 servers and clients (ChaCha20-Poly1305, AES-GCM; X25519MLKEM768,
              X25519, P-256, P-384; Ed25519, ECDSA, RSA keys; SNI, ALPN, mutual auth;
-             resumption with tickets, 0-RTT where the server allows it) and the TLS 1.2
+             resumption with tickets, 0-RTT where the server allows it, OCSP stapling) and the TLS 1.2
              fallback for public servers: connect / accept -> TlsStream (a Stream)
   x509 / der the crate jflib-x509 (re-exported): certificates (parse, build with any key,
-             verify chains) of a private CA and of the web PKI; PrivateKey (PKCS #8 ...)
+             verify chains) of a private CA and of the web PKI; PrivateKey (PKCS #8 ...);
+             OCSP responses and certificate requests
+  ocsp       a certificate's status from its CA's responder; the stapled responses of a TLS
+             server kept current (tls::Staples)
+  acme       certificates from an ACME CA (RFC 8555: Let's Encrypt, ...): accounts, orders,
+             http-01 / tls-alpn-01 / dns-01, renewal information, revocation
   pem        PEM blocks
   roots      the system's certificate authorities (Windows: CryptoAPI; Linux: the bundle)
   ssh        SSH-2 client (curve25519, ssh-ed25519, chacha20-poly1305): run commands with
@@ -45334,6 +45565,319 @@ Re-exports: `x509::der`
     after read gave Ok(0): whether the peer ended the stream in order.  TLS: only after its
     close_notify -- a TCP end without one may be an attacker cutting a body that runs to the
     end of the connection (HTTP without a length).  Plain streams: always
+
+### `netio/acme.rs`
+
+Source: [`lib/netio/acme.rs`](../lib/netio/acme.rs)
+
+```text
+acme -- certificates from a CA that speaks ACME (RFC 8555): Let's Encrypt, ZeroSSL, Google
+Trust Services, a company's step-ca.  http-01, tls-alpn-01 (RFC 8737) and dns-01 challenges,
+DNS names and IP addresses (RFC 8738), renewal information (ARI, RFC 9773), external
+account binding (RFC 8555 7.3.4), profiles, key change, revocation
+
+  Acme::new(client, directory_url) -> Result<Acme, AcmeError>     reads the CA's directory
+  acme.account(key, &NewAccount { contact, terms_agreed, eab, .. }) -> Account
+  account.issue(&ids, &cert_key, &mut solver, &OrderOptions) -> Issued { chain, pem, .. }
+      the whole issuance: an order, each authorization proved by `solver`, a certificate
+      request for `cert_key`, the chain once the CA has issued it
+  step by step: new_order, authorization, respond, wait_authorization, finalize,
+      wait_order, certificate
+  acme.renewal_info(&cert) (ARI: when to renew), account.revoke, change_key, update_contact,
+      deactivate; revoke_with_key (by the certificate's own key)
+  Solver: what proves control of a name -- Http01 (a netio Server's handler answers
+      /.well-known/acme-challenge/), TlsAlpn01 (a tls::ServerConfig that answers
+      "acme-tls/1"), a DNS provider's code of the program's own (dns01_name, dns01_value)
+
+Every request is a JWS (RFC 7515) signed with the account key: ES256 (P-256), ES384 (P-384),
+RS256 (RSA) or EdDSA (Ed25519; not every CA takes it).  The CA's URLs must be https; its
+answers are bounded (64 KiB, a certificate chain 1 MiB) and checked: the chain issued must be
+for the certificate key and every identifier ordered.  A wait for an authorization or the
+order follows Retry-After and ends after Acme::timeout_ms.
+```
+
+```rust
+/// Let's Encrypt's directory, and its staging one (for tests: higher rate limits, an untrusted
+/// root)
+LETS_ENCRYPT: &str = "https://acme-v02.api.letsencrypt.org/directory"
+LETS_ENCRYPT_STAGING: &str = "https://acme-staging-v02.api.letsencrypt.org/directory"
+/// the ALPN protocol of tls-alpn-01 (RFC 8737 6.2)
+ACME_TLS_ALPN: &str = "acme-tls/1"
+/// the longest answer of the CA (JSON), and of a certificate chain
+MAX_ANSWER: usize = 64 * 1024
+MAX_CHAIN: usize = 1 << 20
+```
+
+- **`struct Problem`**
+  a problem document of the CA (RFC 8555 6.7, RFC 7807)
+  - `status: u16` -- the HTTP status of the answer (0 inside an object: an authorization's error)
+  - `kind: String` -- "urn:ietf:params:acme:error:rateLimited", ...
+  - `detail: String`
+  - `identifier: Option<Identifier>` -- the identifier a subproblem is about (RFC 8555 6.7.1)
+  - `subproblems: Vec<Problem>`
+  - `retry_after: Option<u64>` -- seconds to wait before trying again (Retry-After), when the CA says
+
+**`impl Problem`**
+
+- **`fn is(&self, name: &str) -> bool`**
+  whether it is the ACME error `name` ("badNonce", "rateLimited", "unauthorized", ...)
+
+- **`enum AcmeError`**
+  - `Http(HttpError)` -- the request did not reach the CA, or no HTTP answer came
+  - `Problem(Problem)` -- the CA refused (its problem document)
+  - `Protocol(String)` -- an answer of the CA that does not follow RFC 8555
+  - `Invalid(String, Option<Problem>)` -- an authorization or the order ended invalid (the CA's reason, when it gave one)
+  - `Solver(String)` -- the solver could not set a challenge up
+  - `Timeout(String)` -- the CA did not decide within Acme::timeout_ms
+
+- **`enum Identifier`**
+  what a certificate is for
+  - `Dns(String)` -- a DNS name, lower case; "\*.example.com" for a wildcard (dns-01 only)
+  - `Ip(IpAddr)` -- an IP address (RFC 8738)
+
+**`impl Identifier`**
+
+- **`fn parse(s: &str) -> Identifier`**
+  a name or an address ("example.com", "\*.example.com", "192.0.2.1", "2001:db8::1")
+- **`fn value(&self) -> String`**
+  the text of the identifier (an address in its RFC 5952 form)
+- **`fn tls_name(&self) -> String`**
+  the name a validator puts in server_name for tls-alpn-01: the name, or for an address
+  its reverse DNS name (RFC 8738 6)
+
+- **`struct Directory`**
+  the CA's directory (RFC 8555 7.1.1)
+  - `new_nonce: String`
+  - `new_account: String`
+  - `new_order: String`
+  - `revoke_cert: String`
+  - `key_change: String`
+  - `new_authz: Option<String>` -- pre-authorization (most CAs have none)
+  - `renewal_info: Option<String>` -- renewal information (RFC 9773)
+  - `terms_of_service: Option<String>` -- what an account must agree to (NewAccount::terms_agreed)
+  - `website: Option<String>`
+  - `caa_identities: Vec<String>` -- the names a CAA record must name for this CA
+  - `external_account_required: bool` -- accounts need an external account binding (NewAccount::eab)
+  - `profiles: Vec<(String, String)>` -- the certificate profiles offered: (name, description)
+
+- **`fn rfc3339(s: &str) -> Option<i64>`**
+  an RFC 3339 time ("2026-11-24T08:00:00Z", fractions, an offset) -> Unix seconds
+
+- **`fn rfc3339_text(t: i64) -> String`**
+  Unix seconds -> "2026-11-24T08:00:00Z"
+
+- **`fn thumbprint(key: &PubKey) -> Option<String>`**
+  the JWK thumbprint (RFC 7638, SHA-256), base64url
+
+- **`struct Eab`**
+  an external account binding (RFC 8555 7.3.4): the key id and MAC key the CA handed out
+  - `kid: String`
+  - `hmac_key: Vec<u8>`
+
+**`impl Eab`**
+
+- **`fn new(kid: &str, hmac_key_b64: &str) -> Option<Eab>`**
+  the key id and the MAC key as the CA shows it (base64url)
+
+- **`struct NewAccount`**
+  a new (or existing) account
+  - `contact: Vec<String>` -- "mailto:admin@example.com" (some CAs need one; Let's Encrypt no longer writes to them)
+  - `terms_agreed: bool` -- the directory's terms of service agreed to
+  - `only_existing: bool` -- only find the account of the key, make none (RFC 8555 7.3.1)
+  - `eab: Option<Eab>`
+
+- **`struct OrderOptions`**
+  an order's options
+  - `not_before: Option<i64>` -- the validity asked for (Unix seconds; most CAs decide it themselves)
+  - `not_after: Option<i64>`
+  - `profile: Option<String>` -- a profile of the directory's (Directory::profiles)
+  - `replaces: Option<String>` -- the certificate this one replaces (its ARI id, ari_id): the CA can tell a renewal
+  - `must_staple: bool` -- a certificate that must come with a stapled OCSP response (RFC 7633; not every CA
+    issues them)
+
+- **`struct Order`**
+  - `url: String`
+  - `status: String` -- "pending", "ready", "processing", "valid", "invalid"
+  - `expires: Option<i64>`
+  - `identifiers: Vec<Identifier>`
+  - `authorizations: Vec<String>`
+  - `finalize: String`
+  - `certificate: Option<String>`
+  - `error: Option<Problem>`
+  - `profile: Option<String>`
+
+- **`struct Challenge`**
+  - `kind: String` -- "http-01", "tls-alpn-01", "dns-01", ...
+  - `url: String`
+  - `status: String` -- "pending", "processing", "valid", "invalid"
+  - `token: String` -- base64url (checked: only its alphabet, 16 to 256 characters)
+  - `error: Option<Problem>`
+
+- **`struct Authorization`**
+  - `url: String`
+  - `status: String` -- "pending", "valid", "invalid", "deactivated", "expired", "revoked"
+  - `identifier: Identifier`
+  - `wildcard: bool` -- for "\*." plus the identifier (dns-01 only)
+  - `expires: Option<i64>`
+  - `challenges: Vec<Challenge>`
+
+- **`struct Issued`**
+  a certificate issued
+  - `chain: Vec<Vec<u8>>` -- DER, leaf first
+  - `pem: String` -- the chain as the CA sent it (PEM): for the server's certificate file
+  - `alternates: Vec<String>` -- other chains the CA offers (Link rel="alternate"; Acme::certificate fetches them)
+  - `order: Order`
+
+**`impl Issued`**
+
+- **`fn identity(&self, key: &PrivateKey) -> Identity`**
+  the identity for a TLS server: the chain and the certificate key
+
+- **`struct RenewalInfo`**
+  when to renew a certificate (ARI, RFC 9773)
+  - `start: i64` -- the window the CA suggests (Unix seconds): renew at a random time in it
+  - `end: i64`
+  - `explanation: Option<String>`
+  - `retry_after: u64` -- when to ask again (seconds, Retry-After; 6 hours when the CA does not say)
+
+**`impl RenewalInfo`**
+
+- **`fn renew_at(&self, fraction: f64) -> i64`**
+  a time in the window to renew at: start + (end - start) \* fraction (a random fraction in
+  [0, 1) spreads the renewals out, as RFC 9773 4.2 asks)
+
+- **`fn ari_id(cert: &Cert) -> Option<String>`**
+  a certificate's id in renewal information and in an order's "replaces" (RFC 9773 4.1): the
+  key identifier of its authority key identifier and its serial number; None without the
+  former
+
+- **`struct Acme`**
+  the client of one CA (cheap to clone: the clones share the nonces)
+  - `directory: Arc<Directory>`
+  - `timeout_ms: u64` -- the longest wait for an authorization or the order to be decided (ms; 3 minutes)
+  - `poll_ms: u32` -- the pause between two looks at an authorization or the order when the CA sends no
+    Retry-After (ms; 2 seconds)
+  - `max_poll_ms: u32` -- the longest pause taken from a Retry-After (ms; 30 s); a shorter Retry-After counts as
+    at least half a second (or max_poll_ms, when that is less). No pause of either kind goes
+    past timeout_ms: the last one ends at it
+
+**`impl Acme`**
+
+- **`fn new(client: Client, directory: &str) -> Result<Acme, AcmeError>`**
+  the CA at `directory` (an https URL: LETS_ENCRYPT, ...) over `client` (with an https
+  connector: trust::system_connector for public CAs)
+- **`fn account(&self, key: PrivateKey, new: &NewAccount) -> Result<Account, AcmeError>`**
+  the account of `key` (made when there is none and new.only_existing is false)
+- **`fn renewal_info(&self, cert: &Cert) -> Result<RenewalInfo, AcmeError>`**
+  when the CA suggests renewing `cert` (ARI, RFC 9773); Err when the directory has no
+  renewalInfo or the certificate no authority key identifier
+
+- **`struct Account`**
+  an account of a CA
+  - `url: String` -- the account's URL (its key id, "kid")
+  - `status: String` -- "valid", "deactivated", "revoked"
+  - `contact: Vec<String>`
+  - `created: bool` -- the CA made it on this call (201)
+
+**`impl Account`**
+
+- **`fn acme(&self) -> &Acme`**
+- **`fn key(&self) -> &PrivateKey`**
+- **`fn key_authorization(&self, token: &str) -> String`**
+  what a challenge with this token must show (RFC 8555 8.1): token "." the thumbprint of
+  the account key
+- **`fn new_order(&self, ids: &[Identifier], opts: &OrderOptions) -> Result<Order, AcmeError>`**
+  a new order for these identifiers
+- **`fn order(&self, url: &str) -> Result<Order, AcmeError>`**
+  an order as it stands now
+- **`fn authorization(&self, url: &str) -> Result<Authorization, AcmeError>`**
+- **`fn respond(&self, ch: &Challenge) -> Result<(), AcmeError>`**
+  tell the CA a challenge is ready to be checked (RFC 8555 7.5.1)
+- **`fn wait_authorization(&self, url: &str) -> Result<Authorization, AcmeError>`**
+  wait until the authorization is decided: Ok when valid.  Acme::timeout_ms bounds the
+  waiting: no look starts after it (0: none); a request under way runs out under the
+  Client's timeouts, and what it brings counts (a valid authorization is the CA's
+  decision, however late it comes)
+- **`fn wait_order(&self, url: &str) -> Result<Order, AcmeError>`**
+  wait until the order is no longer pending or processing (Acme::timeout_ms as
+  wait_authorization)
+- **`fn finalize(&self, order: &Order, csr: &[u8]) -> Result<Order, AcmeError>`**
+  send the certificate request (DER) of a ready order
+- **`fn certificate(&self, url: &str) -> Result<(Vec<Vec<u8>>, String, Vec<String>), AcmeError>`**
+  the chain at a certificate URL (an order's, or an alternate one) -> (DER chain, PEM,
+  alternates)
+- **`fn issue(&self, ids: &[Identifier], cert_key: &PrivateKey, solver: &mut dyn Solver, opts: &OrderOptions) -> Result<Issued, AcmeError>`**
+  the whole issuance for `ids` and the key `cert_key` (not the account key): an order;
+  each pending authorization proved with the first challenge type of solver.kinds() it
+  offers (a wildcard only by dns-01), set up, answered, waited for and taken down; the
+  certificate request; the chain, checked to be for `cert_key` and every identifier
+- **`fn revoke(&self, cert_der: &[u8], reason: Option<u8>) -> Result<(), AcmeError>`**
+  revoke a certificate of this account (RFC 8555 7.6); `reason`: a CRLReason (RFC 5280
+  5.3.1: 1 keyCompromise, 4 superseded, 5 cessationOfOperation, ...)
+- **`fn change_key(&mut self, new_key: PrivateKey) -> Result<(), AcmeError>`**
+  change the account's key (RFC 8555 7.3.5)
+- **`fn update_contact(&mut self, contact: &[String]) -> Result<(), AcmeError>`**
+  replace the account's contact addresses
+- **`fn deactivate(&mut self) -> Result<(), AcmeError>`**
+  end the account (RFC 8555 7.3.6): it cannot be used again
+
+- **`fn revoke_with_key(acme: &Acme, cert_der: &[u8], cert_key: &PrivateKey, reason: Option<u8>) -> Result<(), AcmeError>`**
+  revoke a certificate by its own key (signed with it, no account: a lost account key, a
+  compromised certificate key)
+
+- **`trait Solver`**
+  what proves control of an identifier
+  - `fn kinds(&self) -> Vec<&'static str>`
+    the challenge types it sets up, the preferred first ("http-01", "tls-alpn-01",
+    "dns-01")
+  - `fn present(&mut self, id: &Identifier, ch: &Challenge, key_auth: &str) -> Result<(), String>`
+    set the challenge up for `id` ("\*.example.com" for a wildcard): `key_auth` is what it
+    must show (dns-01: dns01_value(key_auth) as TXT of dns01_name(id))
+  - `fn cleanup(&mut self, id: &Identifier, ch: &Challenge)`
+    take it down once the authorization is decided
+
+- **`fn dns01_name(id: &Identifier) -> String`**
+  the TXT record's name of dns-01 (RFC 8555 8.4): "\_acme-challenge." and the name (a
+  wildcard's without "\*.")
+
+- **`fn dns01_value(key_auth: &str) -> String`**
+  the TXT record's value of dns-01: base64url of SHA-256 of the key authorization
+
+- **`struct Http01`**
+  http-01 (RFC 8555 8.3): the key authorizations a netio HTTP server answers at
+  /.well-known/acme-challenge/&lt;token> on port 80.  Clones share the tokens: one goes to the
+  solver, one into the server (handler or answer)
+
+**`impl Http01`**
+
+- **`fn new() -> Http01`**
+- **`fn answer(&self, req: &Request) -> Option<Response>`**
+  the answer to a challenge request, None for every other request
+- **`fn handler(&self, next: Handler) -> Handler`**
+  a handler that answers challenges and hands every other request to `next`
+
+- **`struct TlsAlpn01`**
+  tls-alpn-01 (RFC 8737): a certificate for the challenge, shown on port 443 to a client that
+  offers only "acme-tls/1".  Clones share the certificates: one goes to the solver, one into
+  the server's config (setup).  A name has one challenge at a time: another one for it fails
+  to be set up until the first is cleaned up; the same challenge set up twice (two orders the
+  CA gave it to) keeps its first certificate and stays until both are cleaned up
+
+**`impl TlsAlpn01`**
+
+- **`fn new() -> TlsAlpn01`**
+- **`fn setup(&self, cfg: &mut ServerConfig)`**
+  let `cfg` answer the challenges: "acme-tls/1" among its protocols (last; to a client that
+  does not offer it alone the server's list is as if it were not there, so a server without
+  protocols of its own still answers without ALPN), and a select that shows the challenge
+  certificate for a ClientHello offering only it (before the config's own select)
+- **`fn certificate(id: &Identifier, key_auth: &str) -> Option<Identity>`**
+  the self-signed certificate of a challenge (RFC 8737 3): the identifier as its only
+  name, the critical acmeIdentifier with SHA-256 of the key authorization
+
+- **`struct Solvers(pub Vec<Box<dyn Solver + Send>>)`**
+  several solvers, each for the challenge types it sets up (a DNS provider for wildcards,
+  http-01 for the rest): the first that sets up a type the authorization offers takes it
 
 ### `netio/client.rs`
 
@@ -45639,6 +46183,46 @@ MAX_HEADERS: usize = 100
 
 - **`fn write_request(s: &dyn Stream, method: &str, target: &str, h: &Headers, body: &[u8]) -> bool`**
   send a request (the body as Content-Length)
+
+### `netio/ocsp.rs`
+
+Source: [`lib/netio/ocsp.rs`](../lib/netio/ocsp.rs)
+
+```text
+ocsp -- OCSP over HTTP (RFC 6960 A.1, RFC 5019): a certificate's status from its CA's
+responder, and the stapled responses a server keeps current
+
+  fetch(&client, &cert, &issuer) -> Result<(DER, Response), String>
+                                  a POST of the request to the certificate's responder (its
+                                  first http(s) OCSP URI), the answer checked
+  refresh(&staples, &client, &chain, issuer) -> Result<i64, String>
+                                  a server's staple for the leaf of `chain`: fetched when there
+                                  is none or it is due, kept in `staples` (tls::Staples) ->
+                                  when to call again (Unix seconds)
+
+A server calls refresh for each of its certificates at start and then at the times it
+returns; after an error again within the hour (the kept response serves until its
+nextUpdate).  Responders speak plain http as a rule: the response is signed, the request
+carries no secret (RFC 6960 A.1).
+```
+
+```rust
+/// the longest answer taken from a responder
+MAX_RESPONSE: usize = 64 * 1024
+/// how soon refresh asks again after a failed fetch
+RETRY_S: i64 = 3600
+```
+
+- **`fn fetch(client: &Client, cert: &Cert, issuer: &Cert) -> Result<(Vec<u8>, Response), String>`**
+  the status of `cert` from its CA's OCSP responder: the first http or https URI of its
+  authority information access gets the request by POST; the answer must be a response
+  that check takes now -> its DER (to staple) and what it says
+
+- **`fn refresh(staples: &Staples, client: &Client, chain: &[Vec<u8>], issuer: Option<&Cert>) -> Result<i64, String>`**
+  keep the staple of the leaf of `chain` (DER, leaf first) current: fetched when there is
+  none, it is due (Response::refresh_at) or out of date.  `issuer`: the leaf's issuer when the
+  chain does not hold it.  -> when to call again (Unix seconds); Err: why the fetch failed
+  (call again within RETRY_S: the kept response serves until it is out of date)
 
 ### `netio/pem.rs`
 
@@ -45959,9 +46543,10 @@ tls -- TLS 1.3 servers and clients, and TLS 1.2 towards public servers (RFC 8446
   (post-quantum hybrid), X25519, P-256, P-384 · certificates and keys of Ed25519, ECDSA
   (P-256 / P-384) and RSA (the web PKI or a CA of one's own) · mutual authentication ·
   HelloRetryRequest · KeyUpdate · resumption with session tickets (psk_dhe_ke) · 0-RTT with
-  replay protection (opt-in).
+  replay protection (opt-in) · OCSP stapling (status_request, RFC 6066 8 / RFC 8446 4.4.2.1).
   Public servers (client side, Trust::System / Custom): also TLS 1.2 with ECDHE and AEAD suites.
-  Not here: external PSKs, psk_ke, TLS 1.2 resumption, renegotiation, revocation checks.
+  Not here: external PSKs, psk_ke, TLS 1.2 resumption, renegotiation, OCSP or CRLs fetched by
+  the client itself.
 
   connect(stream, ClientConfig) -> TlsStream     accept(stream, ServerConfig) -> TlsStream
   TlsStream implements Stream (HTTP runs over it unchanged); peer_certs() after the handshake
@@ -45969,6 +46554,9 @@ tls -- TLS 1.3 servers and clients, and TLS 1.2 towards public servers (RFC 8446
   (Sessions: a client's tickets per server); TlsStream::resumed()
   0-RTT: ServerConfig::early_data (bytes; 0 = none), connect_early(stream, cfg, data) ->
   (TlsStream, bytes taken), TlsStream::read_early (a server: data that may be a replay)
+  OCSP: ServerConfig::ocsp (Staples: the responses to staple, netio::ocsp::refresh fetches
+  them); ClientConfig::revocation (Revocation::Stapled by default: a stapled response is
+  checked, a revoked certificate refused); TlsStream::ocsp_response
   Identity::new(chain, key) / Identity::from_pem(certs, key): a chain and its key (PrivateKey:
   Ed25519, ECDSA, RSA; PKCS #8, SEC 1, PKCS #1)
   Trust::Anchors(CAs) / Pinned(SHA-256 of the leaf) / Any (trust on first use: the caller
@@ -46019,11 +46607,24 @@ conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over 
   - `sessions: Option<Arc<Sessions>>` -- session tickets to resume with (TLS 1.3): the connection offers one of this server and
     keeps the ones it gets.  Several configs may share a cache: it keeps the tickets by
     server name, trust and client identity.  None: no resumption
+  - `revocation: Revocation` -- what a stapled OCSP response decides (with Trust::Anchors, System and Custom; a pinned
+    certificate or Trust::Any asks for none)
 
 **`impl ClientConfig`**
 
 - **`fn new(trust: Trust, server_name: &str) -> ClientConfig`**
-  this trust and server name; no client certificate, no ALPN, no resumption
+  this trust and server name; no client certificate, no ALPN, no resumption; stapled OCSP
+  responses checked (Revocation::Stapled)
+
+- **`enum Revocation`**
+  the OCSP response a client asks the server to staple (status_request): a usable one is
+  signed by the issuer of the server's certificate (in the chain or an anchor) or a responder
+  it named, about that certificate, and current (RFC 6960; x509::ocsp::check)
+  - `Off` -- none asked for
+  - `Stapled` -- asked for and checked: a certificate a usable response calls revoked is refused
+    (certificate_revoked); without a usable response the handshake goes on, unless the
+    certificate must be stapled (RFC 7633, Cert::must_staple)
+  - `Required` -- a usable response that says good is required (bad_certificate_status_response without one)
 
 - **`struct Hello`**
   what a ClientHello asks for: the program's ServerConfig::select picks the identity by it
@@ -46049,7 +46650,8 @@ conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over 
     check); for a port that consoles and agents share
   - `alpn: Vec<String>` -- the application protocols the server speaks (ALPN), in its order of preference; a
     client that offers protocols, none of them these, is refused (no_application_protocol,
-    RFC 7301 3.2).  Empty: ALPN is not answered
+    RFC 7301 3.2).  Empty: ALPN is not answered.  "acme-tls/1" (RFC 8737, acme::TlsAlpn01)
+    counts only for a client that offers it alone
   - `tickets: Option<Arc<Tickets>>` -- session tickets (TLS 1.3 resumption): sent after each handshake and taken back for a
     handshake without certificates.  A resumed connection keeps the client certificates of
     its first handshake (peer_certs) for up to 7 days, while the same client_auth trust asks
@@ -46061,6 +46663,8 @@ conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over 
     first time it comes (Tickets::replay_check), keeps it apart (TlsStream::read_early) and
     hands it to read() only once the handshake is done.  With 0-RTT taken, accept returns
     after the server's flight, before the client's Finished
+  - `ocsp: Option<Arc<Staples>>` -- the OCSP responses to staple for the certificates shown, to clients that ask for one
+    (netio::ocsp::refresh keeps them current).  None: no stapling
 
 **`impl ServerConfig`**
 
@@ -46095,6 +46699,9 @@ conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over 
   a server: the name the client asked for (SNI, lower case; empty: none)
 - **`fn resumed(&self) -> bool`**
   the handshake resumed a session (a ticket instead of certificates)
+- **`fn ocsp_response(&self) -> Option<Vec<u8>>`**
+  a client: the OCSP response the server stapled for its certificate (DER), when it sent
+  one; whether it was usable decided ClientConfig::revocation
 - **`fn read_early(&self, buf: &mut [u8]) -> NetResult<usize>`**
   a server that took 0-RTT: the client's early data as it comes, before the handshake is
   done; Ok(0) at its end (or when none was taken).  An attacker may have replayed it
@@ -46161,6 +46768,7 @@ AL_RECORD_OVERFLOW: u8 = 22
 AL_HANDSHAKE_FAILURE: u8 = 40
 AL_BAD_CERTIFICATE: u8 = 42
 AL_UNSUPPORTED_CERTIFICATE: u8 = 43
+AL_CERTIFICATE_REVOKED: u8 = 44
 AL_CERTIFICATE_EXPIRED: u8 = 45
 AL_ILLEGAL_PARAMETER: u8 = 47
 AL_UNKNOWN_CA: u8 = 48
@@ -46171,6 +46779,7 @@ AL_INTERNAL_ERROR: u8 = 80
 AL_NO_RENEGOTIATION: u8 = 100
 AL_MISSING_EXTENSION: u8 = 109
 AL_UNSUPPORTED_EXTENSION: u8 = 110
+AL_BAD_CERTIFICATE_STATUS_RESPONSE: u8 = 113
 AL_CERTIFICATE_REQUIRED: u8 = 116
 AL_NO_APPLICATION_PROTOCOL: u8 = 120
 ```
@@ -46213,6 +46822,10 @@ AL_NO_APPLICATION_PROTOCOL: u8 = 120
 - **`fn closed(&self) -> bool`**
 - **`fn peer_closed(&self) -> bool`**
   the peer sent close_notify (an orderly end, not a cut connection)
+- **`fn test_force_status(&mut self)`**
+  (tests) a server staples what it keeps even to a client that did not ask
+- **`fn ocsp_response(&self) -> Option<&[u8]>`**
+  a client: the OCSP response the server stapled for its certificate (DER)
 - **`fn peer_certs(&self) -> &[Cert]`**
   the peer's certificate chain (leaf first)
 - **`fn version(&self) -> &'static str`**
@@ -46464,8 +47077,12 @@ FRESH_WINDOW_MS: i64 = 10_000
   a client's tickets (ClientConfig::sessions): per server, a connection takes the newest and
   the server sends new ones.  The key of a server is its name, the trust of the connection and
   its client identity, so a ticket a connection with Trust::Any got is never offered by one that
-  checks certificates, nor one of a client certificate by a connection without it.  Shared by
-  threads; in memory only
+  checks certificates, nor one of a client certificate by a connection without it; and its
+  revocation check, so one of Revocation::Off is never offered by a connection that checks.
+  A ticket whose handshake checked a stapled OCSP response goes when that response does: 5
+  minutes (ocsp::SKEW) after its Response::expires, as a full handshake would still take it,
+  at the end of a delegated responder's certificate at the latest.
+  Shared by threads; in memory only
 
 **`impl Sessions`**
 
@@ -46517,6 +47134,56 @@ FRESH_WINDOW_MS: i64 = 10_000
   more lifetime, older ones no longer
 - **`fn test_shift(&self, ms: i64)`**
   (tests) move these tickets' clock by `ms`
+
+### `netio/tls/staple.rs`
+
+Source: [`lib/netio/tls/staple.rs`](../lib/netio/tls/staple.rs)
+
+```text
+staple -- the OCSP responses a server staples (RFC 6066 8, RFC 8446 4.4.2.1)
+
+  Staples::new()                    one store for all of a server's certificates
+  staples.set(&chain, issuer, der)  a response for the leaf of `chain`, checked against it and
+                                    its issuer (chain[1], or `issuer` when the chain has none)
+  staples.get(&leaf) / response(&leaf) / remove(&leaf)
+  netio::ocsp::refresh(&staples, &client, &chain, issuer)   fetches and sets when one is due
+
+A server with ServerConfig::ocsp sends a client that asks (status_request) the current
+response of the certificate it shows; one past its nextUpdate is not sent (and dropped).
+```
+
+```rust
+/// the longest response kept (responses are a few KiB; one with a responder certificate and
+/// an RSA signature under 4 KiB)
+MAX_STAPLE: usize = 32 * 1024
+```
+
+- **`struct Staples`**
+  OCSP responses by certificate (SHA-256 of the leaf's DER)
+
+**`impl Staples`**
+
+- **`fn new() -> Staples`**
+- **`fn now(&self) -> i64`**
+  Unix seconds (tests shift the clock: test_shift)
+- **`fn test_shift(&self, secs: i64)`**
+- **`fn test_insert(&self, leaf: &[u8], der: Vec<u8>)`**
+  (tests) keep any bytes for a leaf, unchecked, current for a day
+- **`fn set(&self, chain: &[Vec<u8>], issuer: Option<&Cert>, der: Vec<u8>) -> Result<Response, String>`**
+  keep `der` for the leaf of `chain` (DER, leaf first): checked against the leaf and its
+  issuer (`issuer`, which must have signed the leaf, else the certificate of the chain that
+  did) and current now.  A revoked or unknown status is kept too (the server shows what its
+  CA says).  It is stapled until it expires (Response::expires: also the end of a
+  delegated responder's certificate).  -> the response read
+- **`fn get(&self, leaf: &[u8]) -> Option<Arc<Vec<u8>>>`**
+  the response to staple for this leaf (DER): None when there is none or it is out of date
+  (it is dropped then)
+- **`fn response(&self, leaf: &[u8]) -> Option<Response>`**
+  what the kept response for this leaf says (also one out of date)
+- **`fn remove(&self, leaf: &[u8])`**
+- **`fn len(&self) -> usize`**
+- **`fn is_empty(&self) -> bool`**
+- **`fn clear(&self)`**
 
 ### `netio/trust.rs`
 

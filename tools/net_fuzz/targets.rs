@@ -173,6 +173,54 @@ fn server_flight() -> Vec<Vec<u8>> {
     vec![s.take_out()]
 }
 
+/// a CA, a leaf of it, and OCSP responses about the leaf (good, revoked with a reason, by a
+/// delegated responder, with a nonce, SHA-256 ids) and requests for it
+fn ocsp_seeds() -> (netio::x509::Cert, netio::x509::Cert, Vec<Vec<u8>>) {
+    use netio::x509::ocsp::{IdHash, ResponseBuilder, Status};
+    use netio::x509::{Cert, CertBuilder, PrivateKey};
+    let ck = crypto::ed25519::Keypair::from_seed(&[11; 32]);
+    let ca_der = CertBuilder { serial: [1; 16], cn: "OCSP CA".into(), not_before: 0, not_after: 4_000_000_000, public_key: ck.public, is_ca: true, ..Default::default() }.sign(None, &ck);
+    let ca = Cert::parse(&ca_der).unwrap_or_default();
+    let lk = crypto::ed25519::Keypair::from_seed(&[12; 32]);
+    let leaf_der = CertBuilder { serial: [2; 16], cn: "a.lab".into(), not_before: 0, not_after: 4_000_000_000, public_key: lk.public, dns: vec!["a.lab".into()], server_auth: true, ocsp_urls: vec!["http://ocsp.lab/".into()], ..Default::default() }.sign(Some(&ca), &ck);
+    let leaf = Cert::parse(&leaf_der).unwrap_or_default();
+    let rk = crypto::ed25519::Keypair::from_seed(&[13; 32]);
+    let resp_der = CertBuilder { serial: [3; 16], cn: "responder".into(), not_before: 0, not_after: 4_000_000_000, public_key: rk.public, ocsp_signing: true, ..Default::default() }.sign(Some(&ca), &ck);
+    let responder = Cert::parse(&resp_der).unwrap_or_default();
+    let (cak, rkk) = (PrivateKey::from(ck), PrivateKey::from(rk));
+    let t = 1_800_000_000 - 3600;
+    let good = ResponseBuilder::good(t);
+    let mut out: Vec<Vec<u8>> = Vec::new();
+    out.extend(good.sign(&leaf, &ca, None, &cak));
+    out.extend(ResponseBuilder { status: Status::Revoked { time: t - 60, reason: Some(1) }, by_key: false, ..good.clone() }.sign(&leaf, &ca, None, &cak));
+    out.extend(ResponseBuilder { nonce: Some(vec![7; 16]), hash: IdHash::Sha256, next_update: None, ..good.clone() }.sign(&leaf, &ca, None, &cak));
+    out.extend(good.sign(&leaf, &ca, Some(&responder), &rkk));
+    out.push(netio::x509::ocsp::error_response(netio::x509::ocsp::TRY_LATER));
+    if let Some(id) = netio::x509::ocsp::CertId::new(&leaf, &ca) {
+        out.push(netio::x509::ocsp::request(std::slice::from_ref(&id), Some(&[5; 20])));
+        out.push(netio::x509::ocsp::request(&[id.clone(), id], None));
+    }
+    (leaf, ca, out)
+}
+
+/// certificate requests of each key kind, with names, addresses and must-staple
+fn csr_seeds() -> Vec<Vec<u8>> {
+    use netio::x509::{CsrBuilder, IpAddr, PrivateKey};
+    let mut r = Rng(0x5eed);
+    let mut rand = |b: &mut [u8]| b.iter_mut().for_each(|x| *x = r.next() as u8);
+    let keys = vec![
+        PrivateKey::from(crypto::ed25519::Keypair::from_seed(&[14; 32])),
+        PrivateKey::generate_ecdsa(crypto::ecdsa::Curve::P256, &mut rand),
+        PrivateKey::generate_ecdsa(crypto::ecdsa::Curve::P384, &mut rand),
+    ];
+    let mut out = Vec::new();
+    for k in &keys {
+        out.extend(CsrBuilder::for_names(&["a.lab", "*.b.lab"]).sign(k));
+        out.extend(CsrBuilder { ips: vec![IpAddr::LOCALHOST_V4], must_staple: true, ..CsrBuilder::default() }.sign(k));
+    }
+    out
+}
+
 fn frame(eth_type: u16, l3: &[u8]) -> Vec<u8> {
     let mut f = vec![0x02, 0, 0, 0, 0, 1, 0x02, 0, 0, 0, 0, 2];
     f.extend_from_slice(&eth_type.to_be_bytes());
@@ -618,6 +666,7 @@ pub fn targets(seed_dir: &str) -> Vec<(&'static str, Vec<Vec<u8>>, Fun)> {
     let id = tls_ids();
     let tk = psk_tickets();
     let pcfg = psk_server(&tk);
+    let (ocsp_leaf, ocsp_ca, ocsp) = ocsp_seeds();
     vec![
         // a deliberate panic on inputs that start with 0xEE: the run must find it (net_fuzz.py)
         ("selftest_panic", vec![b"seed".to_vec()], Box::new(|d: &[u8]| {
@@ -647,6 +696,16 @@ pub fn targets(seed_dir: &str) -> Vec<(&'static str, Vec<Vec<u8>>, Fun)> {
             if let Some(c) = netpkt::x509::Cert::parse(d) {
                 let _ = netpkt::x509::check_chain(&[c.clone()], &[c.clone()], "a.lab", 1_800_000_000);
                 let _ = netpkt::x509::check_chain(&[c.clone(), c.clone()], &[], "www.example.org", 1_800_000_000);
+            }
+        })),
+        // OCSP responses checked against a certificate and its CA; requests read as a responder does
+        ("ocsp", ocsp, Box::new(move |d: &[u8]| {
+            let _ = netio::x509::ocsp::check(d, &ocsp_leaf, &ocsp_ca, 1_800_000_000);
+            let _ = netio::x509::ocsp::Request::parse(d);
+        })),
+        ("csr", csr_seeds(), Box::new(|d: &[u8]| {
+            if let Some(c) = netio::x509::Csr::parse(d) {
+                let _ = (c.dns.len(), c.ips.len(), c.tls_features.len());
             }
         })),
         ("dns", vec![dm.clone()], Box::new(move |d: &[u8]| {

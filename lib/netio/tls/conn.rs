@@ -39,8 +39,8 @@ use super::record::{self, Cipher, ALERT, APPLICATION_DATA, CHANGE_CIPHER_SPEC, H
 use super::record::{ECDHE_ECDSA_AES128_GCM, ECDHE_ECDSA_AES256_GCM, ECDHE_ECDSA_CHACHA20, ECDHE_RSA_AES128_GCM, ECDHE_RSA_AES256_GCM, ECDHE_RSA_CHACHA20};
 use super::record::{TLS_AES_128_GCM_SHA256, TLS_AES_256_GCM_SHA384, TLS_CHACHA20_POLY1305_SHA256};
 use super::session::{self, Session, TicketData, Tickets, FRESH_WINDOW_MS, MAX_LIFETIME};
-use super::{ClientConfig, Hello, Identity, ServerConfig, TlsError, Trust};
-use crate::x509::{verify_chain, Cert, PrivateKey, PubKey, SigAlg, Usage};
+use super::{ClientConfig, Hello, Identity, Revocation, ServerConfig, TlsError, Trust};
+use crate::x509::{ocsp, verify_chain, Cert, PrivateKey, PubKey, SigAlg, Usage};
 use crypto::ecdsa::Curve;
 use crypto::HashAlg;
 
@@ -59,6 +59,11 @@ const WEB_SIG_ALGS: [u16; 9] = [0x0403, 0x0503, 0x0804, 0x0805, 0x0806, ED25519,
 const DOWNGRADE: [u8; 7] = *b"DOWNGRD";
 
 const EXT_SERVER_NAME: u16 = 0;
+const EXT_STATUS_REQUEST: u16 = 5;
+/// the ALPN protocol of ACME's tls-alpn-01 (RFC 8737 6.2)
+const ACME_TLS_ALPN: &[u8] = b"acme-tls/1";
+/// CertificateStatusType ocsp (RFC 6066 8)
+const STATUS_OCSP: u8 = 1;
 const EXT_GROUPS: u16 = 10;
 const EXT_POINT_FORMATS: u16 = 11;
 const EXT_SIG_ALGS: u16 = 13;
@@ -100,6 +105,7 @@ const HS_SERVER_HELLO_DONE: u8 = 14;
 const HS_CERTIFICATE_VERIFY: u8 = 15;
 const HS_CLIENT_KEY_EXCHANGE: u8 = 16;
 const HS_FINISHED: u8 = 20;
+const HS_CERTIFICATE_STATUS: u8 = 22;
 const HS_KEY_UPDATE: u8 = 24;
 const HS_MESSAGE_HASH: u8 = 254;
 
@@ -110,6 +116,7 @@ pub const AL_RECORD_OVERFLOW: u8 = 22;
 pub const AL_HANDSHAKE_FAILURE: u8 = 40;
 pub const AL_BAD_CERTIFICATE: u8 = 42;
 pub const AL_UNSUPPORTED_CERTIFICATE: u8 = 43;
+pub const AL_CERTIFICATE_REVOKED: u8 = 44;
 pub const AL_CERTIFICATE_EXPIRED: u8 = 45;
 pub const AL_ILLEGAL_PARAMETER: u8 = 47;
 pub const AL_UNKNOWN_CA: u8 = 48;
@@ -120,6 +127,7 @@ pub const AL_INTERNAL_ERROR: u8 = 80;
 pub const AL_NO_RENEGOTIATION: u8 = 100;
 pub const AL_MISSING_EXTENSION: u8 = 109;
 pub const AL_UNSUPPORTED_EXTENSION: u8 = 110;
+pub const AL_BAD_CERTIFICATE_STATUS_RESPONSE: u8 = 113;
 pub const AL_CERTIFICATE_REQUIRED: u8 = 116;
 pub const AL_NO_APPLICATION_PROTOCOL: u8 = 120;
 
@@ -448,6 +456,15 @@ pub struct Conn {
     /// (tests) a server's suites in its order and the groups it has (empty: all of its own)
     test_suites: Vec<u16>,
     test_groups: Vec<u16>,
+    /// a client: the OCSP response stapled for the server's certificate; whether a TLS 1.2
+    /// server said it may send one (status_request in its ServerHello)
+    staple: Option<Vec<u8>>,
+    status_acked: bool,
+    /// a client: until when the good stapled response checked counts (this handshake's, or the
+    /// session's on a resumption); tickets carry it on
+    staple_until: Option<i64>,
+    /// a server: the client asked for a stapled OCSP response
+    status_wanted: bool,
 }
 
 // the secrets of the key schedule are wiped when the connection goes
@@ -530,6 +547,10 @@ impl Conn {
             modes_sent: false,
             test_suites: Vec::new(),
             test_groups: Vec::new(),
+            staple: None,
+            staple_until: None,
+            status_acked: false,
+            status_wanted: false,
         }
     }
 
@@ -569,7 +590,9 @@ impl Conn {
         c.web = matches!(cfg.trust, Trust::System(_) | Trust::Custom(_));
         if let Some(cache) = cfg.sessions.as_ref() {
             c.session_key = session::session_key(&cfg);
-            c.offer = cache.take(&c.session_key);
+            // Required takes no session whose handshake checked no good staple
+            let checks = cfg.revocation == Revocation::Required && matches!(cfg.trust, Trust::Anchors(_) | Trust::System(_) | Trust::Custom(_));
+            c.offer = cache.take(&c.session_key).filter(|s| !checks || s.status_until.is_some());
         }
         c.early_out = Vec::from(early);
         c.ccfg = Some(cfg);
@@ -639,6 +662,17 @@ impl Conn {
     /// the peer sent close_notify (an orderly end, not a cut connection)
     pub fn peer_closed(&self) -> bool {
         self.peer_closed
+    }
+
+    /// (tests) a server staples what it keeps even to a client that did not ask
+    #[doc(hidden)]
+    pub fn test_force_status(&mut self) {
+        self.status_wanted = true;
+    }
+
+    /// a client: the OCSP response the server stapled for its certificate (DER)
+    pub fn ocsp_response(&self) -> Option<&[u8]> {
+        self.staple.as_deref()
     }
 
     /// the peer's certificate chain (leaf first)
@@ -1014,11 +1048,14 @@ impl Conn {
                 Ok(())
             }
             (State::ClientCertOrCr | State::ClientCert, HS_CERTIFICATE) => {
-                self.peer = parse_certificates(body)?;
+                let (peer, staple) = parse_certificates(body, &self.sent_exts)?;
+                self.peer = peer;
+                self.staple = staple;
                 if self.peer.is_empty() {
                     return Err(fail(AL_DECODE_ERROR, "the server sent no certificate"));
                 }
                 self.check_server_chain()?;
+                self.check_staple()?;
                 self.add(msg);
                 self.state = State::ClientCv;
                 Ok(())
@@ -1033,7 +1070,8 @@ impl Conn {
             }
             (State::ClientFinished, HS_FINISHED) => self.client_server_finished(msg, body),
             (State::ServerClientCert, HS_CERTIFICATE) => {
-                let certs = parse_certificates(body)?;
+                // the CertificateRequest asked for no extensions in the entries
+                let (certs, _) = parse_certificates(body, &[])?;
                 self.add(msg);
                 if certs.is_empty() {
                     if self.scfg.as_ref().is_some_and(|c| c.client_auth_optional) {
@@ -1094,7 +1132,15 @@ impl Conn {
                 self.state = State::Client12Ske;
                 Ok(())
             }
+            // a stapled OCSP response, right after the Certificate when the ServerHello said so
+            // (RFC 6066 8)
+            (State::Client12Ske, HS_CERTIFICATE_STATUS) if self.status_acked && self.staple.is_none() => {
+                self.staple = Some(Vec::from(certificate_status(body)?));
+                self.add(msg);
+                Ok(())
+            }
             (State::Client12Ske, HS_SERVER_KEY_EXCHANGE) => {
+                self.check_staple()?;
                 self.server_key_exchange(body)?;
                 self.add(msg);
                 self.state = State::Client12Done;
@@ -1226,6 +1272,10 @@ impl Conn {
         let mut algs = Vec::new();
         put_v16(&mut algs, &u16s(&WEB_SIG_ALGS));
         put_ext(&mut e, EXT_SIG_ALGS, &algs);
+        // a stapled OCSP response (RFC 6066 8): ocsp, no responder ids, no request extensions
+        if self.asks_status() {
+            put_ext(&mut e, EXT_STATUS_REQUEST, &[STATUS_OCSP, 0, 0, 0, 0]);
+        }
         // shares for X25519MLKEM768 and X25519; after a HelloRetryRequest the one it asked for
         if self.shares.is_empty() {
             self.shares = [X25519_MLKEM768, X25519].iter().filter_map(|g| Share::new(*g)).collect();
@@ -1401,6 +1451,7 @@ impl Conn {
             alpn: self.alpn.clone(),
             peer: self.peer.clone(),
             auth_s: self.auth_s,
+            status_until: self.staple_until,
             _pin: pin,
         };
         cache.put(self.session_key, s);
@@ -1536,6 +1587,7 @@ impl Conn {
             if let Some(s) = self.offer.as_ref() {
                 self.peer = s.peer.clone();
                 self.auth_s = s.auth_s;
+                self.staple_until = s.status_until;
             }
         } else {
             if let Some(p) = self.psk.as_mut() {
@@ -1585,6 +1637,49 @@ impl Conn {
         check_trust(trust, &self.peer, None, Usage::Client)
     }
 
+    /// a client asks for a stapled OCSP response when it checks the certificate against a CA
+    /// (not a pinned one, not Trust::Any) and revocation is on
+    fn asks_status(&self) -> bool {
+        self.ccfg.as_ref().is_some_and(|c| c.revocation != Revocation::Off && matches!(c.trust, Trust::Anchors(_) | Trust::System(_) | Trust::Custom(_)))
+    }
+
+    /// the stapled OCSP response against ClientConfig::revocation, once the chain is trusted: a
+    /// usable one (x509::ocsp::check with the leaf's issuer from the chain or the anchors) that
+    /// says revoked ends the handshake; a missing, unusable or unknown one only when a response
+    /// is required (Revocation::Required, a must-staple certificate)
+    fn check_staple(&mut self) -> Result<(), TlsError> {
+        if !self.asks_status() {
+            return Ok(());
+        }
+        let cfg = self.ccfg.as_ref().ok_or(fail(AL_INTERNAL_ERROR, "config"))?;
+        let leaf = &self.peer[0];
+        let required = cfg.revocation == Revocation::Required || leaf.must_staple();
+        let Some(der) = self.staple.as_deref() else {
+            return if required { Err(fail(AL_BAD_CERTIFICATE_STATUS_RESPONSE, "no stapled OCSP response")) } else { Ok(()) };
+        };
+        // the issuer: in the chain, else among the anchors (a leaf right below a root)
+        let system = matches!(cfg.trust, Trust::System(_)).then(crate::roots::system_anchors);
+        let (a, b): (&[Cert], &[Cert]) = match &cfg.trust {
+            Trust::Anchors(a) => (a, &[]),
+            Trust::System(extra) => (extra, system.as_deref().map_or(&[][..], |v| v.as_slice())),
+            _ => (&[], &[]),
+        };
+        let issuer = self.peer[1..].iter().chain(a).chain(b).find(|c| leaf.signed_by(c));
+        let now = plat::unix_time_ns().div_euclid(1_000_000_000);
+        let r = issuer.ok_or(()).and_then(|i| ocsp::check(der, leaf, i, now).map_err(|_| ()));
+        match r.as_ref().map(|r| r.status) {
+            Ok(ocsp::Status::Revoked { .. }) => Err(fail(AL_CERTIFICATE_REVOKED, "the certificate is revoked (OCSP)")),
+            Ok(ocsp::Status::Good) => {
+                // as long as a full handshake would take it: the response's end and the clock
+                // skew, but not past a delegated responder's certificate
+                self.staple_until = r.ok().map(|r| r.responder_until.map_or(r.expires() + ocsp::SKEW, |u| u.min(r.expires() + ocsp::SKEW)));
+                Ok(())
+            }
+            _ if required => Err(fail(AL_BAD_CERTIFICATE_STATUS_RESPONSE, "no usable stapled OCSP response")),
+            _ => Ok(()),
+        }
+    }
+
     fn client_server_finished(&mut self, msg: &[u8], body: &[u8]) -> Result<(), TlsError> {
         let want = keysched::finished(self.hash_alg, &self.s_hs, &self.hash());
         finished_len(body, want.len())?;
@@ -1607,7 +1702,7 @@ impl Conn {
         if self.cert_requested {
             let id = self.ccfg.as_ref().and_then(|c| c.identity.clone()).filter(|i| our_scheme(&i.key, &self.cr_algs).is_some());
             let chain: Vec<Vec<u8>> = id.as_ref().map(|i| i.chain.clone()).unwrap_or_default();
-            let cm = hs_msg(HS_CERTIFICATE, &certificate_body(&chain));
+            let cm = hs_msg(HS_CERTIFICATE, &certificate_body(&chain, None));
             self.send_hs(&cm);
             if let Some(i) = id {
                 if !chain.is_empty() {
@@ -1642,8 +1737,14 @@ impl Conn {
         if !SUITES_12.contains(&suite) {
             return Err(fail(AL_ILLEGAL_PARAMETER, "cipher suite"));
         }
-        self.server_exts(exts, &[EXT_SERVER_NAME, EXT_POINT_FORMATS, EXT_EMS, EXT_RENEGOTIATION_INFO, EXT_ALPN])?;
+        self.server_exts(exts, &[EXT_SERVER_NAME, EXT_POINT_FORMATS, EXT_EMS, EXT_RENEGOTIATION_INFO, EXT_ALPN, EXT_STATUS_REQUEST])?;
         self.server_alpn(exts)?;
+        // status_request answered with an empty body: a CertificateStatus may follow
+        self.status_acked = match ext(exts, EXT_STATUS_REQUEST) {
+            Some([]) => true,
+            Some(_) => return Err(fail(AL_DECODE_ERROR, "status_request in the ServerHello is not empty")),
+            None => false,
+        };
         if ext(exts, EXT_RENEGOTIATION_INFO).is_some_and(|r| r != [0]) {
             return Err(fail(AL_HANDSHAKE_FAILURE, "renegotiation_info"));
         }
@@ -1822,12 +1923,33 @@ impl Conn {
             Some(b) => alpn_list(b)?,
             None => Vec::new(),
         };
+        // status_request (RFC 6066 8): ocsp with its responder ids and request extensions (each
+        // list read and left aside: the response is the one kept); another type is ignored
+        if let Some(b) = ext(&exts, EXT_STATUS_REQUEST) {
+            let mut r = R { b };
+            if r.u8()? == STATUS_OCSP {
+                let mut ids = R { b: r.v16()? };
+                while !ids.b.is_empty() {
+                    if ids.v16()?.is_empty() {
+                        return Err(fail(AL_DECODE_ERROR, "an empty responder id"));
+                    }
+                }
+                r.v16()?;
+                r.done()?;
+                self.status_wanted = true;
+            }
+        }
         let cfg = self.scfg.as_ref().ok_or(fail(AL_INTERNAL_ERROR, "config"))?;
-        // ALPN: the server's first protocol that the client offers (RFC 7301 3.2)
-        let alpn = if cfg.alpn.is_empty() || offered_alpn.is_empty() {
+        // ALPN: the server's first protocol that the client offers (RFC 7301 3.2).  "acme-tls/1"
+        // (RFC 8737) is for an ACME CA's validation, which offers it alone: for every other
+        // client the server's list is as if it were not in it (a server without protocols of
+        // its own answers them without ALPN, as before)
+        let acme_only = offered_alpn.len() == 1 && offered_alpn[0] == ACME_TLS_ALPN;
+        let ours: Vec<&String> = cfg.alpn.iter().filter(|p| acme_only || p.as_bytes() != ACME_TLS_ALPN).collect();
+        let alpn = if ours.is_empty() || offered_alpn.is_empty() {
             None
         } else {
-            let p = cfg.alpn.iter().find(|p| offered_alpn.iter().any(|o| o.as_slice() == p.as_bytes()));
+            let p = ours.iter().find(|p| offered_alpn.iter().any(|o| o.as_slice() == p.as_bytes()));
             Some(Vec::from(p.ok_or(fail(AL_NO_APPLICATION_PROTOCOL, "no application protocol in common"))?.as_bytes()))
         };
         let hello = Hello { server_name: sni.clone(), alpn: offered_alpn.clone(), sig_algs: algs.clone().unwrap_or_default() };
@@ -2049,6 +2171,7 @@ impl Conn {
         let cfg = self.scfg.as_ref().ok_or(fail(AL_INTERNAL_ERROR, "config"))?;
         // a resumption shows no certificate and asks for none (RFC 8446 4.3.2): Finished
         let want_client = cfg.client_auth.is_some() && !self.resumed;
+        let staples = cfg.ocsp.clone();
         if !self.resumed {
             let id = self.identity.clone().ok_or(fail(AL_INTERNAL_ERROR, "identity"))?;
             let (chain, key) = (id.chain, id.key);
@@ -2063,7 +2186,12 @@ impl Conn {
                 let m = hs_msg(HS_CERTIFICATE_REQUEST, &b);
                 self.send_hs(&m);
             }
-            let cm = hs_msg(HS_CERTIFICATE, &certificate_body(&chain));
+            // the OCSP response kept for this certificate, to a client that asked for one
+            let staple = match (&staples, chain.first()) {
+                (Some(st), Some(leaf)) if self.status_wanted => st.get(leaf),
+                _ => None,
+            };
+            let cm = hs_msg(HS_CERTIFICATE, &certificate_body(&chain, staple.as_ref().map(|s| s.as_slice())));
             self.send_hs(&cm);
             let m = certificate_verify(&key, algs.as_deref().unwrap_or(&[]), true, &self.hash())?;
             self.send_hs(&m);
@@ -2328,8 +2456,8 @@ fn cipher_of(suite: u16, secret: &[u8]) -> Result<Cipher, TlsError> {
 }
 
 /// the extensions this side knows (one of them where it does not belong is illegal_parameter)
-const KNOWN_EXTS: [u16; 14] = [
-    EXT_SERVER_NAME, EXT_GROUPS, EXT_POINT_FORMATS, EXT_SIG_ALGS, EXT_ALPN, EXT_EMS, EXT_COOKIE, EXT_EARLY_DATA, EXT_PSK, EXT_PSK_MODES, EXT_PADDING, EXT_VERSIONS,
+const KNOWN_EXTS: [u16; 15] = [
+    EXT_SERVER_NAME, EXT_STATUS_REQUEST, EXT_GROUPS, EXT_POINT_FORMATS, EXT_SIG_ALGS, EXT_ALPN, EXT_EMS, EXT_COOKIE, EXT_EARLY_DATA, EXT_PSK, EXT_PSK_MODES, EXT_PADDING, EXT_VERSIONS,
     EXT_KEY_SHARE, EXT_RENEGOTIATION_INFO,
 ];
 
@@ -2348,11 +2476,22 @@ fn finished_len(body: &[u8], want: usize) -> Result<(), TlsError> {
     if body.len() == want { Ok(()) } else { Err(fail(AL_DECODE_ERROR, "Finished of the wrong length")) }
 }
 
-fn certificate_body(chain: &[Vec<u8>]) -> Vec<u8> {
+/// a TLS 1.3 Certificate: the chain, the leaf's entry with a stapled OCSP response (the
+/// status_request extension, RFC 8446 4.4.2.1) when there is one
+fn certificate_body(chain: &[Vec<u8>], staple: Option<&[u8]>) -> Vec<u8> {
     let mut list = Vec::new();
-    for c in chain {
+    for (i, c) in chain.iter().enumerate() {
         put_v24(&mut list, c);
-        put16(&mut list, 0); // no entry extensions
+        match staple.filter(|_| i == 0) {
+            Some(der) => {
+                let mut cs = alloc::vec![STATUS_OCSP];
+                put_v24(&mut cs, der);
+                let mut e = Vec::new();
+                put_ext(&mut e, EXT_STATUS_REQUEST, &cs);
+                put_v16(&mut list, &e);
+            }
+            None => put16(&mut list, 0),
+        }
     }
     let mut b = Vec::new();
     b.push(0); // empty context
@@ -2360,7 +2499,26 @@ fn certificate_body(chain: &[Vec<u8>]) -> Vec<u8> {
     b
 }
 
-fn parse_certificates(body: &[u8]) -> Result<Vec<Cert>, TlsError> {
+/// CertificateStatus (RFC 6066 8): ocsp and the response, 1 to 2^24 - 1 bytes
+fn certificate_status(b: &[u8]) -> Result<&[u8], TlsError> {
+    let mut r = R { b };
+    if r.u8()? != STATUS_OCSP {
+        return Err(fail(AL_ILLEGAL_PARAMETER, "a certificate status of another type than ocsp"));
+    }
+    let der = r.v24()?;
+    r.done()?;
+    if der.is_empty() {
+        return Err(fail(AL_DECODE_ERROR, "an empty OCSP response"));
+    }
+    Ok(der)
+}
+
+/// a TLS 1.3 Certificate -> the certificates and the OCSP response stapled to the leaf.  The
+/// entries' extensions must be ones the other side asked for (`asked`: of the ClientHello; a
+/// CertificateRequest of ours asks for none), else unsupported_extension (RFC 8446 4.2, 4.4.2);
+/// of them only status_request belongs here, a response stapled to another certificate is read
+/// and left aside
+fn parse_certificates(body: &[u8], asked: &[u16]) -> Result<(Vec<Cert>, Option<Vec<u8>>), TlsError> {
     let mut r = R { b: body };
     if !r.v8()?.is_empty() {
         return Err(fail(AL_ILLEGAL_PARAMETER, "certificate context"));
@@ -2368,14 +2526,27 @@ fn parse_certificates(body: &[u8]) -> Result<Vec<Cert>, TlsError> {
     let mut list = R { b: r.v24()? };
     r.done()?;
     let mut out = Vec::new();
+    let mut staple = None;
     let mut n = 0;
     while !list.b.is_empty() {
         let der = list.v24()?;
-        list.v16()?;
+        let exts = extensions(list.v16()?)?;
+        for (t, d) in &exts {
+            if !asked.contains(t) {
+                return Err(fail(AL_UNSUPPORTED_EXTENSION, "an extension in a certificate entry that was not asked for"));
+            }
+            if *t != EXT_STATUS_REQUEST {
+                return Err(fail(AL_ILLEGAL_PARAMETER, "an extension in a message it does not belong in"));
+            }
+            let s = certificate_status(d)?;
+            if n == 0 {
+                staple = Some(Vec::from(s));
+            }
+        }
         push_cert(&mut out, der, n)?;
         n += 1;
     }
-    Ok(out)
+    Ok((out, staple))
 }
 
 /// the longest handshake message taken
