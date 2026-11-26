@@ -6,7 +6,7 @@
 // parallel axis theorem.  A mesh has none: it is static.
 
 use crate::hull::ConvexHull;
-use crate::math::{Iso, Mat3, Vec3};
+use crate::math::{abs, max, pow2, unit_exp, Iso, Mat3, Vec3};
 use crate::shape::Shape;
 
 const PI: f64 = core::f64::consts::PI;
@@ -52,27 +52,44 @@ impl MassProps {
     }
 
     /// mass, centre and tensor finite, the mass positive, the tensor symmetric with principal moments that are
-    /// non-negative and keep the triangle inequality, in its own axes (what a solid body can have; within a
-    /// relative 1e-9; the zero tensor of [`MassProps::point`] is one)
+    /// non-negative and keep the triangle inequality, in its own axes: what a solid body can have, of any size.
+    /// Each principal moment is below the sum of the other two plus 1e-9 times the sum of all three (so the
+    /// moments of a rod or a plate, which meet the inequality exactly, pass in any frame); the zero tensor of
+    /// [`MassProps::point`] is valid.
     pub fn is_valid(&self) -> bool {
         if !(self.mass > 0.0 && self.mass.is_finite() && self.center.is_finite() && self.inertia.is_finite()) {
             return false;
         }
-        let i = &self.inertia;
-        let t = i.trace().abs();
-        let tol = t * 1e-9 + f64::MIN_POSITIVE;
-        let sym = (i.at(0, 1) - i.at(1, 0)).abs() <= tol && (i.at(0, 2) - i.at(2, 0)).abs() <= tol && (i.at(1, 2) - i.at(2, 1)).abs() <= tol;
-        if !sym {
+        // brought to one size by a power of two (exact): the products below neither over- nor underflow
+        let big = self.inertia.cols.iter().fold(0.0, |m, v| max(m, v.abs().max_elem()));
+        let Some(k) = unit_exp(big) else {
+            return true; // the zero tensor of a point
+        };
+        let i = self.inertia.scale(pow2(k));
+        let t = i.trace();
+        let tol = abs(t) * 1e-9;
+        if !(abs(i.at(0, 1) - i.at(1, 0)) <= tol && abs(i.at(0, 2) - i.at(2, 0)) <= tol && abs(i.at(1, 2) - i.at(2, 1)) <= tol) {
             return false;
         }
-        // a solid body's tensor is tr(C) 1 - C for the second moment C of its mass, which is positive
-        // semidefinite; that holds the principal moments non-negative and in the triangle inequality, in any
-        // frame.  C is positive semidefinite when all its principal minors are (the zero tensor of a point too).
-        let c = Mat3::IDENTITY.scale(i.trace() * 0.5).sub(i);
-        let e = |r: usize, k: usize| c.at(r, k);
-        let minors_1 = [e(0, 0), e(1, 1), e(2, 2)];
-        let minors_2 = [e(0, 0) * e(1, 1) - e(0, 1) * e(1, 0), e(0, 0) * e(2, 2) - e(0, 2) * e(2, 0), e(1, 1) * e(2, 2) - e(1, 2) * e(2, 1)];
-        minors_1.iter().all(|&m| m >= -tol) && minors_2.iter().all(|&m| m >= -tol * (t + tol)) && c.determinant() >= -tol * (t + tol) * (t + tol)
+        // a solid body's tensor is tr(S) 1 - S for the second moment S of its mass, which is positive
+        // semidefinite: S = tr(I)/2 1 - I has the eigenvalues (I2 + I3 - I1) / 2 ... of the principal moments,
+        // in any frame.  I1 < I2 + I3 + tol is (I2 + I3 - I1) / 2 > -tol / 2: S + tol/2 1 positive definite,
+        // which the pivots of its LDL^T factors tell (each positive; their rounding is about 1e-16 of the sum,
+        // far below tol / 2, also for a rod or a plate, whose S has an eigenvalue 0).
+        let s = |r: usize, c: usize| -(i.at(r, c) + i.at(c, r)) * 0.5;
+        let dg = t * 0.5 + tol * 0.5;
+        let (s00, s11, s22) = (dg - i.at(0, 0), dg - i.at(1, 1), dg - i.at(2, 2));
+        let (s01, s02, s12) = (s(0, 1), s(0, 2), s(1, 2));
+        if !(s00 > 0.0) {
+            return false;
+        }
+        let (l10, l20) = (s01 / s00, s02 / s00);
+        let d1 = s11 - l10 * s01;
+        if !(d1 > 0.0) {
+            return false;
+        }
+        let e21 = s12 - l20 * s01;
+        s22 - l20 * s02 - e21 * e21 / d1 > 0.0
     }
 }
 

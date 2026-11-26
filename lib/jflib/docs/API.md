@@ -67662,8 +67662,10 @@ parallel axis theorem.  A mesh has none: it is static.
   the mass and tensor scaled by `factor` (another density)
 - **`fn is_valid(&self) -> bool`**
   mass, centre and tensor finite, the mass positive, the tensor symmetric with principal moments that are
-  non-negative and keep the triangle inequality, in its own axes (what a solid body can have; within a
-  relative 1e-9; the zero tensor of [`MassProps::point`] is one)
+  non-negative and keep the triangle inequality, in its own axes: what a solid body can have, of any size.
+  Each principal moment is below the sum of the other two plus 1e-9 times the sum of all three (so the
+  moments of a rod or a plate, which meet the inequality exactly, pass in any frame); the zero tensor of
+  [`MassProps::point`] is valid.
 
 **`impl Shape`**
 
@@ -67850,7 +67852,9 @@ the same code on every target.
 - **`fn determinant(&self) -> f64`**
   the determinant
 - **`fn inverse(&self) -> Option<Mat3>`**
-  the inverse, None when the matrix is singular (or not finite)
+  the inverse, None when the matrix is singular, not finite, or its inverse is not (and when even its
+  rows and columns brought to one size leave a determinant that under- or overflows: a condition number
+  beyond about 10^300)
 - **`fn rotated(&self, q: Quat) -> Mat3`**
   R M R^T: a tensor of a body's frame (its inertia) in the frame rotated by `q`
 - **`fn outer(a: Vec3, b: Vec3) -> Mat3`**
@@ -68156,9 +68160,10 @@ the collision World (its box grown by how far it can move in this step), each pa
 body that an awake one would touch wakes with its island.  Then the substeps of the soft solver
 (solver.rs, joint.rs), restitution, the new poses (into the World, so queries and the character controller
 see them), a sweep of fast bodies by their translation against what does not move (they stop where they first
-touch it, so they do not pass through a wall between two steps; a bullet also against moving bodies, with the
-motion relative to them) and a ray of each centre of mass; the turning is covered only by the speculative
-contacts, up to about a radian a step for a long body), sleep: an island (bodies linked by contacts and joints) whose
+touch it, so they do not pass through a wall between two steps; against moving kinematic bodies, a bullet also
+against moving dynamic ones, with the motion relative to them, and carried on with what they hit, again only
+as far as what does not move lets them) and a ray of each centre of mass along that way; the turning is
+covered only by the speculative contacts, up to about a radian a step for a long body), sleep: an island (bodies linked by contacts and joints) whose
 bodies all moved slower than `sleep_speed` for `time_to_sleep` sleeps until something touches it.
 
 Determinism: everything in slot order, pairs sorted, no hash containers, no threads; the same bits on every

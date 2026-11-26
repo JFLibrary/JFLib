@@ -275,6 +275,20 @@ impl Acc {
         self.spring *= k;
         self.cone *= k;
     }
+
+    /// a distance joint's impulses gone (a rope gone slack with its anchors together)
+    fn clear_distance(&mut self) {
+        self.spring = 0.0;
+        self.lower = 0.0;
+        self.upper = 0.0;
+        self.point.x = 0.0;
+    }
+}
+
+/// a distance joint with its anchors together and no minimum: a rope that pulls nothing (a rod or a minimum
+/// pushes them apart along a fixed axis)
+fn slack_rope(g: &Geo, min: f64) -> bool {
+    !(g.d.length() > 1e-9 || min > 0.0)
 }
 
 impl JointRt {
@@ -481,9 +495,14 @@ impl JointRt {
                 apply_angular(a, b, acc.ang);
                 apply(a, b, ra, g.rb, g.ya * acc.perp[0] + g.za * acc.perp[1]);
             }
-            JointKind::Distance { .. } => {
-                let u = self.distance_axis(&g, a, b);
-                apply(a, b, g.ra, g.rb, u * (acc.spring + acc.lower - acc.upper + acc.point.x));
+            JointKind::Distance { min, .. } => {
+                // a rope (min 0) with its anchors together pulls nothing, as in `solve`: its old impulses go
+                if !slack_rope(&g, min) {
+                    let u = self.distance_axis(&g, a, b);
+                    apply(a, b, g.ra, g.rb, u * (acc.spring + acc.lower - acc.upper + acc.point.x));
+                } else {
+                    self.acc.clear_distance();
+                }
             }
         }
     }
@@ -567,9 +586,11 @@ impl JointRt {
             JointKind::Distance { min: lo, max: hi, spring } => {
                 let g = self.geo(a, b);
                 let len = g.d.length();
-                // anchors together: a rope (min 0) pulls nothing, a rod or a minimum pushes apart along a fixed
-                // axis (from a's centre to b's, else the frame's X)
-                if len > 1e-9 || lo > 0.0 {
+                // anchors together: a rope (min 0) pulls nothing (and keeps no impulse), a rod or a minimum
+                // pushes apart along a fixed axis (from a's centre to b's, else the frame's X)
+                if slack_rope(&g, lo) {
+                    self.acc.clear_distance();
+                } else {
                     let u = self.distance_axis(&g, a, b);
                     if lo < hi {
                         if let Some(s) = spring {
