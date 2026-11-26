@@ -26,8 +26,8 @@ verify_chain), as Trust::System decides on these machines: the system's answer, 
 check of the leaf's name.  A server's chains only (the system checks those).  Each answer is
 held against limbo's and against netio's own (x509chain): "same" where the system and netio
 answer alike, otherwise than limbo (netio's differences, docs/EXTERNAL_SUITES.md); where the
-system answers otherwise than both, SYSTEM_KNOWN says why (by testcase id), and a difference
-not listed there is a failure.  The reason of each refusal (unknown CA, expired, name, usage,
+system answers otherwise than both, SYSTEM_KNOWN says why (a test of the testcase and the
+system's message), and a difference not listed there is a failure.  The reason of each refusal (unknown CA, expired, name, usage,
 another) is shown with --list."""
 import argparse
 import base64
@@ -59,11 +59,42 @@ LACKS = {
     "has-mldsa": "ML-DSA keys: netio knows Ed25519, RSA, P-256 and P-384",
     "max-chain-depth": "no chain depth of the caller's choosing (verify_chain has its own limit)",
 }
+def ids(*names):
+    """a SYSTEM_KNOWN test: one of these testcases"""
+    return lambda t, msg: t["id"] in names
+
+
+def win_cn_constraints(t, msg):
+    """bettertls's name constraints with an IP address as the peer name, refused for the name"""
+    p = t["expected_peer_name"]
+    return t["id"].startswith("bettertls::nameconstraints::") and bool(p) and p["kind"] == "IP" and "0x800B010F" in msg
+
+
 # where a system answers otherwise than limbo and netio's own check, and why: target ->
-# [(regex on the testcase id, reason)]; --system --list shows each answer
+# [(reason, test(testcase, the system's message))]; --system --list shows each answer.  What
+# the leaf alone decides, netio checks after the system's yes (x509::check_leaf): a CA's
+# certificate as the server's, keyCertSign or name constraints in a leaf, a key netio does not
+# read are refused everywhere and need no entry.
 SYSTEM_KNOWN = {
     "linux": [],
-    "win": [],
+    "win": [
+        ("CryptoAPI holds a CA's DNS name constraints against the subject's CN when the leaf names "
+         "only an IP address (CN test.localhost outside them: CERT_E_CN_NO_MATCH); RFC 5280 leaves the "
+         "CN of such a leaf alone -- stricter, refused", win_cn_constraints),
+        ("CryptoAPI takes SHA-1 signatures below a root of one's own (it refuses them for the roots of "
+         "Microsoft's program, the public web); bettertls's paths whose every way has a SHA-1 signature",
+         ids("bettertls::pathbuilding::tc8", "bettertls::pathbuilding::tc15", "bettertls::pathbuilding::tc41",
+             "bettertls::pathbuilding::tc47", "bettertls::pathbuilding::tc74", "bettertls::pathbuilding::tc80")),
+        ("CryptoAPI does not hold an excluded name against a wildcard (*.example.com below a CA that "
+         "excludes bar.example.com, asked for bar.example.com): CVE-2025-61727's ambiguity of RFC 5280 "
+         "and RFC 9525", ids("cve::cve-2025-61727", "rfc5280::nc::nc-forbids-dnsname-wildcard-san")),
+        ("CryptoAPI does not judge the trust anchor it was given: a root without basicConstraints, with "
+         "an empty subject (and a leaf with that empty issuer), a P-192 key, an RSA key under 2048 bits "
+         "or of a length not divisible by 8",
+         ids("rfc5280::root-missing-basic-constraints", "rfc5280::ca-empty-subject", "rfc5280::ee-empty-issuer",
+             "webpki::forbidden-p192-root", "webpki::forbidden-weak-rsa-key-in-root",
+             "webpki::forbidden-rsa-not-divisible-by-8-in-root")),
+    ],
     "mac": [],
 }
 REASONS = {0: "another reason", 1: "unknown CA", 2: "expired", 3: "name", 4: "revoked", 5: "usage"}
@@ -137,10 +168,10 @@ def system_skip(t):
     return None
 
 
-def known(target, t):
+def known(target, t, msg):
     """the reason a system's other answer is listed with, or None"""
-    for pat, why in SYSTEM_KNOWN.get(target, []):
-        if re.search(pat, t["id"]):
+    for why, test in SYSTEM_KNOWN.get(target, []):
+        if test(t, msg):
             return why
     return None
 
@@ -202,8 +233,8 @@ def system_main(opt, exe, tcs):
         elif acc is not None and own[t["id"]][0] == acc:
             # netio's own check answers the same: one of its differences (docs/EXTERNAL_SUITES.md)
             rows.append((t, "SAME", msg))
-        elif acc is not None and known(opt.target, t):
-            rows.append((t, "KNOWN", msg + ("; " if msg else "") + "listed: " + known(opt.target, t)))
+        elif acc is not None and known(opt.target, t, msg):
+            rows.append((t, "KNOWN", msg + ("; " if msg else "") + "listed: " + known(opt.target, t, msg)))
         else:
             rows.append((t, "FAIL", msg))
     if opt.show:

@@ -466,8 +466,9 @@ mod apple {
                 -67820 => Reason::Revoked,
                 // errSecHostNameMismatch
                 -67602 => Reason::Name,
-                // errSecNotTrusted, errSecCreateChainFailed
-                -67843 | -2_147_409_652 => Reason::UnknownCa,
+                // errSecNotTrusted, errSecCreateChainFailed (no path to an anchor: what macOS 15
+                // says of a CA it does not know)
+                -67843 | -25318 => Reason::UnknownCa,
                 // errSecInvalidExtendedKeyUsage
                 -67609 => Reason::Usage,
                 _ => Reason::Other,

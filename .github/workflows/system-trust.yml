@@ -87,6 +87,10 @@ jobs:
       - name: coretest's checks of the system's trust
         run: build/${{ matrix.target }}/coretest --only systrust
       - name: badssl.com through Trust::System
+        # also after a red step before: each says something of its own
+        if: success() || failure()
         run: python -u tools/tls_web_check.py --internet-only --target ${{ matrix.target }}
       - name: x509-limbo through the system's checks
+        # also after a red step before: each says something of its own
+        if: success() || failure()
         run: python -u tools/limbo_check.py --system --target ${{ matrix.target }}

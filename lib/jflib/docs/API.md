@@ -43878,12 +43878,21 @@ KU_CRL_SIGN: u8 = 0x02
   whether a signature over `data` was made with this certificate's key
 - **`fn signed_by(&self, issuer: &Cert) -> bool`**
   whether `issuer` signed this certificate
+- **`fn eku_allows(&self, u: Usage) -> bool`**
+  whether the extended key usage allows this purpose (no extended key usage: every purpose)
 - **`fn names(&self, host: &str) -> bool`**
   whether the certificate names this host (DNS name, case-insensitive; IP address)
 
 - **`fn verify_chain(chain: &[Cert], anchors: &[Cert], now: i64, name: Option<&str>, usage: Usage) -> Result<(), String>`**
   check a chain (leaf first) against trusted anchors: a path from the leaf through the other
   certificates of the chain (in any order) to an anchor
+
+- **`fn check_leaf(leaf: &Cert, now: i64, name: Option<&str>, usage: Usage) -> Result<(), String>`**
+  the checks of verify_chain that concern the leaf alone: no unknown critical extension,
+  valid at `now`, for this usage (extended key usage), allowed to sign (key usage
+  digitalSignature), no CA's extensions on a certificate that is no CA (keyCertSign, name
+  constraints: RFC 5280 4.2.1.9, 4.2.1.10), and the name.  netio::roots asks them after a
+  system's verifier said yes to the path, so the leaf follows the same rules everywhere
 
 - **`struct CertBuilder`**
   what a new certificate says
@@ -46284,8 +46293,9 @@ roots -- the system's certificate authorities for TLS clients of public servers
 
   verify_system(chain, host, ocsp, now) -> Result<(), Refused>
        Windows, macOS, iOS: the system checks the chain (plat::certs: its roots and policy,
-       the stapled OCSP response), then netio the leaf's name once more (Cert::names, the
-       same answer on every system); Linux: a path to one of the bundle's CAs (verify_chain)
+       the stapled OCSP response), then netio the leaf once more (x509::check_leaf: its name,
+       usage and extensions, and a key netio takes: the same rules on every system); Linux:
+       a path to one of the bundle's CAs (verify_chain)
   verify_system_roots(chain, host, roots, now)
        the same with only these CAs trusted, nothing fetched: the system's checks against a
        PKI of one's own (tools/limbo_check.py --system); an empty host checks no name

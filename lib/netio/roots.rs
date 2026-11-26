@@ -2,8 +2,9 @@
 //
 //   verify_system(chain, host, ocsp, now) -> Result<(), Refused>
 //        Windows, macOS, iOS: the system checks the chain (plat::certs: its roots and policy,
-//        the stapled OCSP response), then netio the leaf's name once more (Cert::names, the
-//        same answer on every system); Linux: a path to one of the bundle's CAs (verify_chain)
+//        the stapled OCSP response), then netio the leaf once more (x509::check_leaf: its name,
+//        usage and extensions, and a key netio takes: the same rules on every system); Linux:
+//        a path to one of the bundle's CAs (verify_chain)
 //   verify_system_roots(chain, host, roots, now)
 //        the same with only these CAs trusted, nothing fetched: the system's checks against a
 //        PKI of one's own (tools/limbo_check.py --system); an empty host checks no name
@@ -14,13 +15,14 @@
 //   Refused { reason, text }, Reason (UnknownCa, Expired, Name, Revoked, Usage, Other):
 //        plat::certs's
 
+use alloc::format;
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use plat::sync::Mutex;
 
-use crate::x509::{verify_chain, Cert, Usage};
+use crate::x509::{check_leaf, verify_chain, Cert, PubKey, Usage};
 
 pub use plat::certs::{Reason, Refused};
 
@@ -96,9 +98,15 @@ fn system(chain: &[Cert], host: &str, ocsp: Option<&[u8]>, roots: Option<&[Cert]
         }
     };
     match os {
-        // the name once more: a system that also takes the subject's CN, or a DNS name for an
-        // IP address, says the same here as everywhere else
-        Some(Ok(())) if !host.is_empty() && !leaf.names(host) => Err(Refused::new(Reason::Name, "the certificate is not for this name (netio's check after the system's)")),
+        // the leaf once more as netio checks it everywhere (x509::check_leaf): a system that
+        // takes the subject's CN as a name, a CA's certificate as a server's, keyCertSign or
+        // name constraints in a leaf, says the same here as on Linux
+        Some(Ok(())) => {
+            if matches!(leaf.key, PubKey::Other) {
+                return Err(Refused::new(Reason::Other, "a key netio does not take (netio's check after the system's)"));
+            }
+            check_leaf(leaf, now, Some(host).filter(|h| !h.is_empty()), Usage::Server).map_err(|text| Refused { reason: leaf_reason(leaf, host, now), text: format!("{} (netio's check after the system's)", text) })
+        }
         Some(r) => r,
         None => {
             let bundle;
@@ -110,15 +118,25 @@ fn system(chain: &[Cert], host: &str, ocsp: Option<&[u8]>, roots: Option<&[Cert]
                 }
             };
             verify_chain(chain, anchors, now, Some(host).filter(|h| !h.is_empty()), Usage::Server).map_err(|text| {
-                let reason = if now < leaf.not_before || now > leaf.not_after {
-                    Reason::Expired
-                } else if !host.is_empty() && !leaf.names(host) {
-                    Reason::Name
-                } else {
-                    Reason::UnknownCa
+                let reason = match leaf_reason(leaf, host, now) {
+                    Reason::Other => Reason::UnknownCa,
+                    r => r,
                 };
                 Refused { reason, text }
             })
         }
+    }
+}
+
+/// the reason a leaf is refused for: expired, another name, another usage, else Other
+fn leaf_reason(leaf: &Cert, host: &str, now: i64) -> Reason {
+    if now < leaf.not_before || now > leaf.not_after {
+        Reason::Expired
+    } else if !host.is_empty() && !leaf.names(host) {
+        Reason::Name
+    } else if !leaf.eku_allows(Usage::Server) {
+        Reason::Usage
+    } else {
+        Reason::Other
     }
 }
