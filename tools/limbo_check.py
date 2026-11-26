@@ -228,7 +228,10 @@ def system_main(opt, exe, tcs):
             continue
         want = t["expected_result"] == "SUCCESS"
         acc, msg = sysg[t["id"]]
-        if acc == want:
+        if acc is None or own[t["id"]][0] is None:
+            # no answer from either run (a crash, a timeout): a failure, whatever the other said
+            rows.append((t, "FAIL", msg if acc is None else "netio's own check: " + own[t["id"]][1]))
+        elif acc == want:
             rows.append((t, "PASS", msg))
         elif acc is not None and own[t["id"]][0] == acc:
             # netio's own check answers the same: one of its differences (docs/EXTERNAL_SUITES.md)
@@ -266,9 +269,9 @@ def system_main(opt, exe, tcs):
         if lst:
             print(f"\n{title} ({len(lst)}):")
             for t, m in lst:
-                got_ = "no answer" if t["id"] in unanswered else "SUCCESS" if t["expected_result"] == "FAILURE" else "FAILURE"
+                got_ = "no answer" if t["id"] in unanswered else "the system " + ("SUCCESS" if t["expected_result"] == "FAILURE" else "FAILURE")
                 feats = f" [{', '.join(t['features'])}]" if t["features"] else ""
-                print(f"  {t['id']}{feats}: expected {t['expected_result']}, the system {got_}" + (f" ({m})" if m else ""))
+                print(f"  {t['id']}{feats}: expected {t['expected_result']}, {got_}" + (f" ({m})" if m else ""))
     kn = collections.Counter(m.split("listed: ", 1)[1] for _, st, m in rows if st == "KNOWN")
     if kn:
         print("\nknown differences of the system:")
