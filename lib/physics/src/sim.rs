@@ -7,9 +7,10 @@
 // body that an awake one would touch wakes with its island.  Then the substeps of the soft solver
 // (solver.rs, joint.rs), restitution, the new poses (into the World, so queries and the character controller
 // see them), a sweep of fast bodies by their translation against what does not move (they stop where they first
-// touch it, so they do not pass through a wall between two steps; a bullet also against moving bodies, with the
-// motion relative to them) and a ray of each centre of mass; the turning is covered only by the speculative
-// contacts, up to about a radian a step for a long body), sleep: an island (bodies linked by contacts and joints) whose
+// touch it, so they do not pass through a wall between two steps; against moving kinematic bodies, a bullet also
+// against moving dynamic ones, with the motion relative to them, and carried on with what they hit, again only
+// as far as what does not move lets them) and a ray of each centre of mass along that way; the turning is
+// covered only by the speculative contacts, up to about a radian a step for a long body), sleep: an island (bodies linked by contacts and joints) whose
 // bodies all moved slower than `sleep_speed` for `time_to_sleep` sleeps until something touches it.
 //
 // Determinism: everything in slot order, pairs sorted, no hash containers, no threads; the same bits on every
@@ -1668,6 +1669,8 @@ impl Simulation {
                         sidx[j as usize] == NONE && may(j, other.layers).is_some_and(|o| !o.dynamic() || (bullet && !o.bullet))
                     };
                     // the sweep of a fast body: when it moved farther than its speculative contacts reached
+                    // where a body that hit a moving one met it, when it is carried on from there
+                    let mut via: Option<Vec3> = None;
                     if r.bullet || ml > max(r.extent_max, max(p.speculative_distance, 0.0)) {
                         let iso0 = Iso::new(c0 - r.rot.rotate(r.mass.center), r.rot);
                         // the first hit: where along the motion, the normal, how far what it hit moved in the step
@@ -1697,29 +1700,50 @@ impl Simulation {
                         }
                         if let Some((f, n, dj)) = best {
                             if f > 0.0 && f < 1.0 {
-                                // where they meet, and against a body that moved carried on with it for the rest of
-                                // the step (so the two do not pass each other: the body stays where the hit left
-                                // it relative to the other); a slop off the surface (along its normal, so a body
-                                // that grazes it keeps its way): the next step meets it with a gap, which its
-                                // speculative contact closes exactly
-                                let at = if dj == Vec3::ZERO { c0 + motion * f } else { c0 + (motion - dj) * f + dj };
-                                r.center = at + n * slop;
+                                // where they meet, a slop off the surface (along its normal, so a body that grazes
+                                // it keeps its way): the next step meets it with a gap, which its speculative
+                                // contact closes exactly.  Against a body that moved: carried on with it for the
+                                // rest of the step (so the two do not pass each other: the body stays where the hit
+                                // left it relative to the other), but only as far as what does not move lets it
+                                // (a cast of that way; stopped by a wall, it keeps a slop from the wall instead)
+                                r.center = if dj == Vec3::ZERO {
+                                    c0 + motion * f + n * slop
+                                } else {
+                                    let hit = c0 + motion * f;
+                                    let carry = dj * (1.0 - f);
+                                    via = Some(hit);
+                                    let iso_hit = Iso::new(hit - r.rot.rotate(r.mass.center), r.rot);
+                                    match self.world.cast_where(&body.shape, &iso_hit, carry, still) {
+                                        Some((_, w)) if w.fraction > 0.0 && w.fraction < 1.0 => hit + carry * w.fraction + w.normal * slop,
+                                        _ => hit + carry + n * slop,
+                                    }
+                                };
                                 swept += 1;
                             }
                         }
                     }
                     // the centre of mass never passes through what does not move: a body that turned into the
                     // ground faster than its contacts could follow still has its centre on the right side, so
-                    // its contacts push it out (a two-sided triangle would otherwise push it on through)
-                    let motion = r.center - c0;
-                    let ml = motion.length();
-                    if ml > 0.0 {
-                        if let Some((_, h)) = self.world.ray_cast_where(c0, motion, 1.0, still) {
-                            if h.t > 0.0 && h.t < 1.0 {
-                                r.center = c0 + motion * max(h.t - slop / ml, 0.0);
-                                swept += 1;
+                    // its contacts push it out (a two-sided triangle would otherwise push it on through).  Along
+                    // the way it went: straight, or to where it met a moving body and on with it.
+                    let mut from = c0;
+                    for leg in 0..2 {
+                        let to = if leg == 0 { via.unwrap_or(r.center) } else { r.center };
+                        let way = to - from;
+                        let wl = way.length();
+                        if wl > 0.0 {
+                            if let Some((_, h)) = self.world.ray_cast_where(from, way, 1.0, still) {
+                                if h.t > 0.0 && h.t < 1.0 {
+                                    r.center = from + way * max(h.t - slop / wl, 0.0);
+                                    swept += 1;
+                                    break;
+                                }
                             }
                         }
+                        if via.is_none() {
+                            break;
+                        }
+                        from = to;
                     }
                 }
                 ends[k] = Some((c0, r));

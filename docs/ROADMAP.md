@@ -2712,7 +2712,7 @@ Crates, die einer JF-App folgen:
   Schwerpunkts gegen alles, was sich nicht bewegt, schlafende Inseln, Kontakt- und Sensorereignisse. Gelenke: Kugel mit
   Kegel und Verdrehung, Scharnier, fest, Schieber, Abstand (Seil, Stange), mit Grenzen, Motoren und Federn, genug für
   Ragdolls. `Simulation` ist `Clone`: eine Kopie rechnet zu denselben Bits weiter (Zurückspulen im Netzspiel). Geprüft in
-  `physicstest` mit acht neuen Gruppen (1793 Prüfungen: Massen gegen geschlossene Formen, Scheiben und Tonons Tetraeder,
+  `physicstest` mit acht neuen Gruppen (1796 Prüfungen: Massen gegen geschlossene Formen, Scheiben und Tonons Tetraeder,
   freie Bewegung gegen die genauen Summen des Integrators, Reibung, Restitution, Rollen, Stapel, Pendelperioden, Ketten,
   Grenzen, Ragdolls, ein Kügelchen mit 500 m/s gegen eine 1 mm dünne Wand, Würfe mit 150 m/s auf den Boden, zufällige
   Szenen mit allen Gelenken ohne Energiegewinn); eine dritte Prüfsumme, gleich unter Linux, Windows (Wine) und in

@@ -213,6 +213,10 @@ pub fn mass_tests(c: &mut Ctx) {
     // allowed, in any frame
     let near = Mat3::from_cols(Vec3::new(1.0, 1e-5, 0.0), Vec3::new(1e-5, 1.0, 0.0), Vec3::ZERO);
     c.check(!MassProps::new(1.0, Vec3::ZERO, near).is_valid(), || "a tensor 1e-5 off the triangle inequality is valid".into());
+    // the bound itself: a moment over the sum of the others by 2^-27 (1.9e-9 of the sum 4) is refused, by 2^-29
+    // (0.47e-9) not, in its own axes and turned
+    let over = |e: i64| Mat3::diagonal(Vec3::new(1.0, 1.0, 2.0 + p2(e)));
+    c.check(!MassProps::new(1.0, Vec3::ZERO, over(-27)).is_valid() && MassProps::new(1.0, Vec3::ZERO, over(-29)).is_valid(), || "the bound of 1e-9 of the moments' sum".into());
     // a rod's and a plate's tensor (tr(I)/2 - I has an eigenvalue 0) turned anyhow stay valid, of any size;
     // the plate's moment over the sum of the others by 1e-7 does not
     let mut rng = Rng::new(43);
@@ -223,8 +227,10 @@ pub fn mass_tests(c: &mut Ctx) {
             lost += usize::from(!MassProps::new(1.0, Vec3::ZERO, Mat3::diagonal(diag * s).rotated(q)).is_valid());
         }
         kept += usize::from(MassProps::new(1.0, Vec3::ZERO, Mat3::diagonal(Vec3::new(1.0, 2.0, 3.0 * (1.0 + 1e-7))).rotated(q)).is_valid());
+        kept += usize::from(MassProps::new(1.0, Vec3::ZERO, over(-27).rotated(q)).is_valid());
+        lost += usize::from(!MassProps::new(1.0, Vec3::ZERO, over(-29).rotated(q)).is_valid());
     }
-    c.check(lost == 0 && kept == 0, || format!("turned rods and plates: {} of 400 not valid, {} of 100 just off valid", lost, kept));
+    c.check(lost == 0 && kept == 0, || format!("turned rods, plates and the bound: {} of 500 not valid, {} of 200 just off valid", lost, kept));
     c.check(Shape::cuboid(Vec3::new(-1.0, -1.0, 1.0)).mass_properties(rho).is_none() && Shape::sphere(-0.5).mass_properties(rho).is_none() && Shape::capsule(0.5, -0.1).mass_properties(rho).is_none(), || "negative sizes gave a mass".into());
     c.check(Shape::capsule(0.0, 0.3).mass_properties(rho).is_some(), || "a capsule of half height 0 (a ball) gave no mass".into());
     let tiny = Mat3::diagonal(Vec3::splat(1e-105)).inverse();
@@ -1148,6 +1154,23 @@ pub fn ccd_tests(c: &mut Ctx) {
             ahead = ahead.min(sim.state(wall).expect("wall").center.x - sim.state(shot).expect("shot").center.x);
         }
         c.check(ahead > 0.6 - 0.01, || format!("a bullet and a kinematic box racing at each other: the box {} m ahead of it (0.6 touching)", ahead));
+    }
+    // a fast box hit by a kinematic one that crosses its way is carried on, but not through a small static
+    // block on that way; without the block it goes all the way
+    for block in [true, false] {
+        let mut sim = Simulation::with_params(no_gravity());
+        if block {
+            sim.add(RigidBody::fixed(Shape::cuboid(Vec3::splat(0.125)), Iso::at(Vec3::new(3.25, 4.0, 0.0)))).expect("block");
+        }
+        let fast = sim.add(RigidBody::dynamic(Shape::cuboid(Vec3::splat(1.0)), Iso::IDENTITY).with_velocity(Vec3::new(480.0, 0.0, 0.0))).expect("fast");
+        sim.add(RigidBody::kinematic(Shape::cuboid(Vec3::splat(1.0)), Iso::at(Vec3::new(6.0, -8.0, 0.0))).with_velocity(Vec3::new(0.0, 960.0, 0.0))).expect("kinematic");
+        sim.step(DT);
+        let y = sim.state(fast).expect("fast").center.y;
+        if block {
+            c.check(y < 4.0 - 0.125 - 1.0 + 0.001 && y > 0.0, || format!("carried towards a static block: the box at y {} (the block from 3.875, the box's half size 1)", y));
+        } else {
+            c.check(y > 7.9, || format!("carried with nothing in the way: the box at y {} (8 with the kinematic one)", y));
+        }
     }
     // a pellet at 500 m/s does not pass a 1 mm wall, a box or a mesh; without the sweep it does
     for (mesh, continuous) in [(false, true), (true, true), (false, false)] {

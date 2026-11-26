@@ -52,8 +52,10 @@ impl MassProps {
     }
 
     /// mass, centre and tensor finite, the mass positive, the tensor symmetric with principal moments that are
-    /// non-negative and keep the triangle inequality, in its own axes (what a solid body can have; each within
-    /// 1e-9 of the moments' sum, of any size; the zero tensor of [`MassProps::point`] is one)
+    /// non-negative and keep the triangle inequality, in its own axes: what a solid body can have, of any size.
+    /// Each principal moment is below the sum of the other two plus 1e-9 times the sum of all three (so the
+    /// moments of a rod or a plate, which meet the inequality exactly, pass in any frame); the zero tensor of
+    /// [`MassProps::point`] is valid.
     pub fn is_valid(&self) -> bool {
         if !(self.mass > 0.0 && self.mass.is_finite() && self.center.is_finite() && self.inertia.is_finite()) {
             return false;
@@ -71,11 +73,11 @@ impl MassProps {
         }
         // a solid body's tensor is tr(S) 1 - S for the second moment S of its mass, which is positive
         // semidefinite: S = tr(I)/2 1 - I has the eigenvalues (I2 + I3 - I1) / 2 ... of the principal moments,
-        // in any frame.  Its smallest is at least -tol when S + tol 1 is positive definite, which the pivots
-        // of its LDL^T factors tell (each positive; their rounding is about 1e-16 of the sum, far below tol,
-        // also for a rod or a plate, whose S has an eigenvalue 0).
+        // in any frame.  I1 < I2 + I3 + tol is (I2 + I3 - I1) / 2 > -tol / 2: S + tol/2 1 positive definite,
+        // which the pivots of its LDL^T factors tell (each positive; their rounding is about 1e-16 of the sum,
+        // far below tol / 2, also for a rod or a plate, whose S has an eigenvalue 0).
         let s = |r: usize, c: usize| -(i.at(r, c) + i.at(c, r)) * 0.5;
-        let dg = t * 0.5 + tol;
+        let dg = t * 0.5 + tol * 0.5;
         let (s00, s11, s22) = (dg - i.at(0, 0), dg - i.at(1, 1), dg - i.at(2, 2));
         let (s01, s02, s12) = (s(0, 1), s(0, 2), s(1, 2));
         if !(s00 > 0.0) {
