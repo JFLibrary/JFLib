@@ -257,14 +257,16 @@ def system_main(opt, exe, tcs):
     tot = collections.Counter(st for _, st, _ in rows)
     for g, n in list(by.items()) + [("total", tot)]:
         print(f"  {g:14} " + " ".join(f"{n[c]:5}" for c in cols))
-    hard = [(t, m) for t, st, m in rows if st == "FAIL" and not optional(t)]
-    soft = [(t, m) for t, st, m in rows if st == "FAIL" and optional(t)]
+    # a crash or a timeout (no answer) is a failure of the run, optional testcase or not
+    unanswered = {i for i, (acc, _) in sysg.items() if acc is None} | {i for i, (acc, _) in own.items() if acc is None}
+    hard = [(t, m) for t, st, m in rows if st == "FAIL" and (not optional(t) or t["id"] in unanswered)]
+    soft = [(t, m) for t, st, m in rows if st == "FAIL" and optional(t) and t["id"] not in unanswered]
     for title, lst in (("the system answers otherwise than netio and limbo, not listed (FAILURES)", hard),
                        ("the same in optional behaviour (pedantic / RFC 5280 beyond the web PKI)", soft)):
         if lst:
             print(f"\n{title} ({len(lst)}):")
             for t, m in lst:
-                got_ = "SUCCESS" if t["expected_result"] == "FAILURE" else "FAILURE"
+                got_ = "no answer" if t["id"] in unanswered else "SUCCESS" if t["expected_result"] == "FAILURE" else "FAILURE"
                 feats = f" [{', '.join(t['features'])}]" if t["features"] else ""
                 print(f"  {t['id']}{feats}: expected {t['expected_result']}, the system {got_}" + (f" ({m})" if m else ""))
     kn = collections.Counter(m.split("listed: ", 1)[1] for _, st, m in rows if st == "KNOWN")
@@ -331,13 +333,15 @@ def main():
     tot = collections.Counter(st for _, st, _ in rows)
     print(f"  {'total':14} {tot['PASS']:5} {tot['FAIL']:5} {tot['SKIP']:5}")
 
-    hard = [(t, m) for t, st, m in rows if st == "FAIL" and not optional(t)]
-    soft = [(t, m) for t, st, m in rows if st == "FAIL" and optional(t)]
+    # a crash or a timeout (no answer) is a failure of the run, optional testcase or not
+    unanswered = {i for i, (acc, _) in got.items() if acc is None}
+    hard = [(t, m) for t, st, m in rows if st == "FAIL" and (not optional(t) or t["id"] in unanswered)]
+    soft = [(t, m) for t, st, m in rows if st == "FAIL" and optional(t) and t["id"] not in unanswered]
     for title, lst in (("FAILURES", hard), ("failures of optional behaviour (pedantic / RFC 5280 beyond the web PKI)", soft)):
         if lst:
             print(f"\n{title} ({len(lst)}):")
             for t, m in lst:
-                got_ = "SUCCESS" if t["expected_result"] == "FAILURE" else "FAILURE"
+                got_ = "no answer" if t["id"] in unanswered else "SUCCESS" if t["expected_result"] == "FAILURE" else "FAILURE"
                 feats = f" [{', '.join(t['features'])}]" if t["features"] else ""
                 print(f"  {t['id']}{feats}: expected {t['expected_result']}, netio {got_}" + (f" ({m})" if m else ""))
     sk = collections.Counter(m for _, st, m in rows if st == "SKIP")

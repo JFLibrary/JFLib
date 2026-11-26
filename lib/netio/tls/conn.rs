@@ -2639,8 +2639,8 @@ fn check_trust(trust: &Trust, chain: &[Cert], name: Option<&String>, usage: Usag
                 Usage::Server => crate::roots::verify_system(chain, name, ocsp, now),
                 _ => Err(Refused::new(Reason::UnknownCa, "the system's CAs are for servers")),
             };
-            // the extra CAs only where the system knows no CA of the chain: a refusal for a
-            // revoked or expired certificate, a wrong name or usage stands
+            // the extra CAs only where the system finds no path to a CA it trusts (UnknownCa):
+            // a refusal for a revoked or expired certificate, a wrong name or usage stands
             let r = match system {
                 Err(e) if e.reason == Reason::UnknownCa && !extra.is_empty() => verify_chain(chain, extra, now, Some(name).filter(|n| !n.is_empty()), usage).map_err(|_| e),
                 r => r,

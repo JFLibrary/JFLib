@@ -46625,7 +46625,7 @@ tls -- TLS 1.3 servers and clients, and TLS 1.2 towards public servers (RFC 8446
   Ed25519, ECDSA, RSA; PKCS #8, SEC 1, PKCS #1)
   Trust::Anchors(CAs) / Pinned(SHA-256 of the leaf) / Any (trust on first use: the caller
   shows the fingerprint and pins it) / System(extra CAs) (the operating system's check; the
-  extra CAs where it knows no CA of the chain)
+  extra CAs where it finds no path to a CA it trusts)
 
 conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over a Stream.
 ```
@@ -46651,8 +46651,9 @@ conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over 
   - `System(Vec<Cert>)` -- the operating system's certificate authorities, and these as well (a company CA): the
     system checks the chain (Windows CryptoAPI, Apple's Security framework with the stapled
     OCSP response; on Linux the distribution's bundle: crate::roots), these count only where
-    it knows no CA of the chain; the alert follows its reason (expired, revoked, another
-    name or usage, unknown CA).  Allows TLS 1.2 and the public suites
+    its refusal is that it finds no path to a CA it trusts (roots::Reason::UnknownCa); the
+    alert follows its reason (expired, revoked, another name or usage, unknown CA).  Allows
+    TLS 1.2 and the public suites
   - `Custom(Verifier)` -- a check the program brings (a PKI of its own, keys pinned by their SPKI, Certificate
     Transparency, the platform's verifier, a test peer); a client offers with it what it
     offers with System (TLS 1.2, the public suites)

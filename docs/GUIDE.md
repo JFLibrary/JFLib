@@ -2820,7 +2820,7 @@ crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)
   by the system (Windows CryptoAPI and macOS / iOS's Security framework, with the stapled OCSP
   response; Linux against the distribution's CA bundle, or `SSL_CERT_FILE` / `SSL_CERT_DIR`),
   then the leaf's name by netio once more; the extra CAs (a company CA) count only where the
-  system knows no CA of the chain, and a refusal names its reason (expired, revoked, another
+  system finds no path to a CA it trusts (`roots::Reason::UnknownCa`), and a refusal names its reason (expired, revoked, another
   name, unknown CA; `netio::roots::verify_system` answers it as `roots::Reason`);
   `netio::trust::system_connector(extra)` gives the connector for `Client`.
   OCSP stapling: `ServerConfig::ocsp` (`Arc<tls::Staples>`, kept current by

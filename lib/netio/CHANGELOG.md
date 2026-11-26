@@ -65,7 +65,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - DNS: an answer counts only with addresses of the asked name, or of the name its CNAME chain in the answer leads to (at most 8 steps); records for other names in an answer were taken as well
 - PEM (`pem::decode_all`) is read line by line, each line compared with the markers, instead of with a substring search across the text, whose steps depended on which Base64 characters a private key has (tools/ct_check.py's memcheck found it); a marker must stand on a line of its own (RFC 7468)
 - TLS: the secrets of the key schedule are wiped when a connection is dropped, and a traffic secret when KeyUpdate replaces it (also the copies a handshake made of them); a hybrid key exchange wipes its ECDH secret when the ML-KEM half is refused
-- `Trust::System(extra)`: the extra CAs (a company CA) count only where the system knows no CA of the chain. A chain the system refused for another reason -- a certificate the system knows to be revoked, an expired one, one for another name or purpose -- stays refused; before, it was taken when it also led to one of the extra CAs (a company CA the system trusts as well)
+- `Trust::System(extra)`: the extra CAs (a company CA) count only where the system's refusal is that it finds no path to a CA it trusts (`Reason::UnknownCa`). A chain the system refused for another reason -- a certificate the system knows to be revoked, an expired one, one for another name or purpose -- stays refused; before, it was taken when it also led to one of the extra CAs (a company CA the system trusts as well)
 
 ## [0.2.1] - 2026-11-16
 

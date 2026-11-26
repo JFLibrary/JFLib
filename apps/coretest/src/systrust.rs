@@ -2,7 +2,7 @@
 // the system's checks against a CA of one's own (verify_system_roots: Windows CryptoAPI with an
 // exclusive root, Apple's Security framework with only these anchors, Linux verify_chain) and
 // the reason of each refusal; Trust::System's extra CAs (a company CA) in a handshake, taken
-// only where the system knows no CA of the chain; a server's client_auth with System; on
+// only where the system finds no path to a CA it trusts (UnknownCa); a server's client_auth with System; on
 // Linux the bundle of SSL_CERT_FILE and SSL_CERT_DIR.  Public servers: tools/tls_web_check.py
 // --internet (badssl.com), limbo through the system: tools/limbo_check.py --system.
 
