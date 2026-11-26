@@ -29275,34 +29275,66 @@ Source: [`lib/plat/certs.rs`](../lib/plat/certs.rs)
 ```text
 certs -- the operating system's trusted certificate authorities
 
-  verify_tls_server(chain, host) -> Option<Result<(), String>>
+  verify_tls_server(chain, host, ocsp, time) -> Option<Result<(), Refused>>
        Windows: CryptoAPI builds and checks the chain (leaf first, DER) for a TLS server of
-       that name, with the machine's and user's roots, enterprise policy and automatic root
-       updates; Some(Err(text)) when it refuses.  macOS and iOS: the Security framework
-       (SecTrustEvaluateWithError), likewise.  Linux: None (netio checks against the bundle).
+       that name at that time (Unix seconds), with the machine's and user's roots, enterprise
+       policy and automatic root updates (like for every program there, Windows may fetch a
+       missing intermediate or root); the leaf's revocation from the stapled OCSP response
+       (ocsp) and what Windows has cached, nothing fetched for it.  macOS and iOS: the
+       Security framework (SecTrustEvaluateWithError) with the system's and the user's roots
+       and trust settings and the stapled response, without network access.  Some(Err) says
+       why the system refuses.  Linux: None (netio checks against the bundle).
+  verify_tls_server_roots(chain, host, roots, time) -> Option<Result<(), Refused>>
+       the same with only these CAs as trust anchors (DER), not the system's: nothing
+       fetched, no revocation; the system's checks against a PKI of one's own
+       (tools/limbo_check.py --system).  An empty host: no name checked.  Linux: None.
+  Refused { reason, text }   Reason: UnknownCa, Expired, Name, Revoked, Usage, Other; text:
+       the system's own words (and its code)
   root_bundle() -> Option<Vec<u8>>
-       Linux: the PEM file of the distribution's CA bundle (Debian / Ubuntu, Fedora / RHEL,
-       openSUSE, Alpine); macOS: /etc/ssl/cert.pem.  Windows, iOS: None.
-
-Revocation is not checked (no network access during the handshake).
+       Linux: PEM -- the file SSL_CERT_FILE names, else the distribution's CA bundle (Debian /
+       Ubuntu, Fedora / RHEL, openSUSE, Alpine), and the files in the folders of SSL_CERT_DIR
+       (':' between them), as OpenSSL takes the two; macOS: /etc/ssl/cert.pem.  Windows,
+       iOS: None.
 ```
+
+- **`enum Reason`**
+  why the system refused a server's chain
+  - `UnknownCa` -- no path to a CA it trusts: a self-signed certificate, a CA of one's own, a missing
+    intermediate
+  - `Expired` -- a certificate of the chain has expired or is not valid yet
+  - `Name` -- the certificate is not for this name
+  - `Revoked` -- a certificate of the chain is revoked
+  - `Usage` -- a certificate is not for a TLS server (its extended key usage)
+  - `Other` -- another reason (the text says which)
+
+- **`struct Refused`**
+  the system's refusal: the reason and the system's own words
+  - `reason: Reason`
+  - `text: String`
+
+**`impl Refused`**
+
+- **`fn new(reason: Reason, text: impl Into<String>) -> Refused`**
 
 - **`fn root_bundle() -> Option<Vec<u8>>`** *(Linux)*
 
 - **`fn root_bundle() -> Option<Vec<u8>>`** *(Windows)*
 
-- **`fn verify_tls_server(_chain: &[&[u8]], _host: &str) -> Option<Result<(), String>>`** *(Linux)*
+- **`fn verify_tls_server(_chain: &[&[u8]], _host: &str, _ocsp: Option<&[u8]>, _time: i64) -> Option<Result<(), Refused>>`** *(Linux)*
 
-- **`fn verify_tls_server(chain: &[&[u8]], host: &str) -> Option<Result<(), String>>`** *(Windows)*
+- **`fn verify_tls_server_roots(_chain: &[&[u8]], _host: &str, _roots: &[&[u8]], _time: i64) -> Option<Result<(), Refused>>`** *(Linux)*
+
+- **`fn verify_tls_server(chain: &[&[u8]], host: &str, ocsp: Option<&[u8]>, time: i64) -> Option<Result<(), Refused>>`** *(Windows)*
+
+- **`fn verify_tls_server_roots(chain: &[&[u8]], host: &str, roots: &[&[u8]], time: i64) -> Option<Result<(), Refused>>`** *(Windows)*
 
 - **`fn root_bundle() -> Option<Vec<u8>>`** *(Apple)*
   macOS: the system's PEM bundle (/etc/ssl/cert.pem, updated with the system); iOS: None.  Apple's
   own trust decision is verify_tls_server.
 
-- **`fn verify_tls_server(chain: &[&[u8]], host: &str) -> Option<Result<(), String>>`** *(Apple)*
-  macOS and iOS: the Security framework builds and checks the chain (leaf first, DER) for a TLS
-  server of that name, with the system's and the user's roots and trust settings, without network
-  access (SecTrustSetNetworkFetchAllowed false); Some(Err(text)) when it refuses.
+- **`fn verify_tls_server(chain: &[&[u8]], host: &str, ocsp: Option<&[u8]>, time: i64) -> Option<Result<(), Refused>>`** *(Apple)*
+
+- **`fn verify_tls_server_roots(chain: &[&[u8]], host: &str, roots: &[&[u8]], time: i64) -> Option<Result<(), Refused>>`** *(Apple)*
 
 ### `plat/rand.rs`
 
@@ -46250,16 +46282,38 @@ Source: [`lib/netio/roots.rs`](../lib/netio/roots.rs)
 ```text
 roots -- the system's certificate authorities for TLS clients of public servers
 
-  verify_system(chain, host, now)   Windows: CryptoAPI checks the chain (plat::certs);
-                                    Linux: a path to one of the bundle's CAs (verify_chain)
-  system_anchors()                  Linux: the distribution's CA bundle, parsed once
+  verify_system(chain, host, ocsp, now) -> Result<(), Refused>
+       Windows, macOS, iOS: the system checks the chain (plat::certs: its roots and policy,
+       the stapled OCSP response), then netio the leaf's name once more (Cert::names, the
+       same answer on every system); Linux: a path to one of the bundle's CAs (verify_chain)
+  verify_system_roots(chain, host, roots, now)
+       the same with only these CAs trusted, nothing fetched: the system's checks against a
+       PKI of one's own (tools/limbo_check.py --system); an empty host checks no name
+  system_anchors()
+       the bundle's CAs (Linux: plat::certs::root_bundle; macOS: /etc/ssl/cert.pem, where a
+       stapled response's issuer is looked for), parsed once and again when the bundle
+       changed (looked at once a minute at most); reload(): look again at the next check
+  Refused { reason, text }, Reason (UnknownCa, Expired, Name, Revoked, Usage, Other):
+       plat::certs's
 ```
 
-- **`fn system_anchors() -> Arc<Vec<Cert>>`**
-  the CA certificates of the system bundle (empty on Windows: CryptoAPI decides there)
+Re-exports: `plat::certs::{Reason, Refused}`
 
-- **`fn verify_system(chain: &[Cert], host: &str, now: i64) -> Result<(), String>`**
-  a server chain (leaf first) against the system's trust for this host name
+- **`fn reload()`**
+  read the bundle again at the next check, not only after a minute (a program that has just
+  set SSL_CERT_FILE or SSL_CERT_DIR, or updated the bundle itself)
+
+- **`fn system_anchors() -> Arc<Vec<Cert>>`**
+  the CA certificates of the system bundle (empty on Windows and iOS: the system decides there)
+
+- **`fn verify_system(chain: &[Cert], host: &str, ocsp: Option<&[u8]>, now: i64) -> Result<(), Refused>`**
+  a server chain (leaf first) against the system's trust for this host name, with the
+  stapled OCSP response the server sent (the system reads it; netio checks it as well:
+  tls/conn.rs check_staple)
+
+- **`fn verify_system_roots(chain: &[Cert], host: &str, roots: &[Cert], now: i64) -> Result<(), Refused>`**
+  a server chain against only these CAs, with the system's checks (Linux: verify_chain's);
+  an empty host checks no name
 
 ### `netio/server.rs`
 
@@ -46560,7 +46614,8 @@ tls -- TLS 1.3 servers and clients, and TLS 1.2 towards public servers (RFC 8446
   Identity::new(chain, key) / Identity::from_pem(certs, key): a chain and its key (PrivateKey:
   Ed25519, ECDSA, RSA; PKCS #8, SEC 1, PKCS #1)
   Trust::Anchors(CAs) / Pinned(SHA-256 of the leaf) / Any (trust on first use: the caller
-  shows the fingerprint and pins it) / System(extra CAs) (the operating system's CAs)
+  shows the fingerprint and pins it) / System(extra CAs) (the operating system's check; the
+  extra CAs where it knows no CA of the chain)
 
 conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over a Stream.
 ```
@@ -46583,8 +46638,11 @@ conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over 
   - `Anchors(Vec<Cert>)` -- certificates issued by one of these CAs
   - `Pinned(Vec<[u8; 32]>)` -- exactly these leaf certificates (SHA-256 of the DER)
   - `Any` -- anything (only to read the fingerprint for a trust decision)
-  - `System(Vec<Cert>)` -- the operating system's certificate authorities, and these as well (a company CA);
-    allows TLS 1.2 and the public suites (crate::roots)
+  - `System(Vec<Cert>)` -- the operating system's certificate authorities, and these as well (a company CA): the
+    system checks the chain (Windows CryptoAPI, Apple's Security framework with the stapled
+    OCSP response; on Linux the distribution's bundle: crate::roots), these count only where
+    it knows no CA of the chain; the alert follows its reason (expired, revoked, another
+    name or usage, unknown CA).  Allows TLS 1.2 and the public suites
   - `Custom(Verifier)` -- a check the program brings (a PKI of its own, keys pinned by their SPKI, Certificate
     Transparency, the platform's verifier, a test peer); a client offers with it what it
     offers with System (TLS 1.2, the public suites)

@@ -1,8 +1,18 @@
 // roots -- the system's certificate authorities for TLS clients of public servers
 //
-//   verify_system(chain, host, now)   Windows: CryptoAPI checks the chain (plat::certs);
-//                                     Linux: a path to one of the bundle's CAs (verify_chain)
-//   system_anchors()                  Linux: the distribution's CA bundle, parsed once
+//   verify_system(chain, host, ocsp, now) -> Result<(), Refused>
+//        Windows, macOS, iOS: the system checks the chain (plat::certs: its roots and policy,
+//        the stapled OCSP response), then netio the leaf's name once more (Cert::names, the
+//        same answer on every system); Linux: a path to one of the bundle's CAs (verify_chain)
+//   verify_system_roots(chain, host, roots, now)
+//        the same with only these CAs trusted, nothing fetched: the system's checks against a
+//        PKI of one's own (tools/limbo_check.py --system); an empty host checks no name
+//   system_anchors()
+//        the bundle's CAs (Linux: plat::certs::root_bundle; macOS: /etc/ssl/cert.pem, where a
+//        stapled response's issuer is looked for), parsed once and again when the bundle
+//        changed (looked at once a minute at most); reload(): look again at the next check
+//   Refused { reason, text }, Reason (UnknownCa, Expired, Name, Revoked, Usage, Other):
+//        plat::certs's
 
 use alloc::string::String;
 use alloc::sync::Arc;
@@ -12,29 +22,103 @@ use plat::sync::Mutex;
 
 use crate::x509::{verify_chain, Cert, Usage};
 
-static ANCHORS: Mutex<Option<Arc<Vec<Cert>>>> = Mutex::new(None);
+pub use plat::certs::{Reason, Refused};
 
-/// the CA certificates of the system bundle (empty on Windows: CryptoAPI decides there)
-pub fn system_anchors() -> Arc<Vec<Cert>> {
-    let mut g = ANCHORS.lock();
-    if let Some(a) = g.as_ref() {
-        return a.clone();
-    }
-    let text = plat::certs::root_bundle().map(|b| String::from_utf8_lossy(&b).into_owned()).unwrap_or_default();
-    let certs: Vec<Cert> = crate::pem::decode_all(&text, "CERTIFICATE").iter().filter_map(|d| Cert::parse(d)).collect();
-    let a = Arc::new(certs);
-    *g = Some(a.clone());
-    a
+struct Bundle {
+    anchors: Arc<Vec<Cert>>,
+    /// SHA-256 of the bundle's bytes
+    hash: [u8; 32],
+    /// when the bundle was last read (Unix ns)
+    read_ns: i64,
 }
 
-/// a server chain (leaf first) against the system's trust for this host name
-pub fn verify_system(chain: &[Cert], host: &str, now: i64) -> Result<(), String> {
+static BUNDLE: Mutex<Option<Bundle>> = Mutex::new(None);
+
+/// how long the bundle read last counts before it is read again (ns)
+const LOOK_NS: i64 = 60_000_000_000;
+
+/// read the bundle again at the next check, not only after a minute (a program that has just
+/// set SSL_CERT_FILE or SSL_CERT_DIR, or updated the bundle itself)
+pub fn reload() {
+    if let Some(b) = BUNDLE.lock().as_mut() {
+        b.read_ns = i64::MIN;
+    }
+}
+
+/// the CA certificates of the system bundle (empty on Windows and iOS: the system decides there)
+pub fn system_anchors() -> Arc<Vec<Cert>> {
+    let now = plat::unix_time_ns();
+    let mut g = BUNDLE.lock();
+    if let Some(b) = g.as_ref() {
+        // (a clock set back counts as a minute gone)
+        if now >= b.read_ns && now.saturating_sub(b.read_ns) < LOOK_NS {
+            return b.anchors.clone();
+        }
+    }
+    let bytes = plat::certs::root_bundle().unwrap_or_default();
+    let hash = crypto::sha256(&bytes);
+    if let Some(b) = g.as_mut() {
+        if b.hash == hash {
+            b.read_ns = now;
+            return b.anchors.clone();
+        }
+    }
+    let text = String::from_utf8_lossy(&bytes);
+    let anchors = Arc::new(crate::pem::decode_all(&text, "CERTIFICATE").iter().filter_map(|d| Cert::parse(d)).collect::<Vec<Cert>>());
+    *g = Some(Bundle { anchors: anchors.clone(), hash, read_ns: now });
+    anchors
+}
+
+/// a server chain (leaf first) against the system's trust for this host name, with the
+/// stapled OCSP response the server sent (the system reads it; netio checks it as well:
+/// tls/conn.rs check_staple)
+pub fn verify_system(chain: &[Cert], host: &str, ocsp: Option<&[u8]>, now: i64) -> Result<(), Refused> {
     if host.is_empty() {
-        return Err(String::from("no host name to check"));
+        return Err(Refused::new(Reason::Name, "no host name to check"));
     }
+    system(chain, host, ocsp, None, now)
+}
+
+/// a server chain against only these CAs, with the system's checks (Linux: verify_chain's);
+/// an empty host checks no name
+pub fn verify_system_roots(chain: &[Cert], host: &str, roots: &[Cert], now: i64) -> Result<(), Refused> {
+    system(chain, host, None, Some(roots), now)
+}
+
+fn system(chain: &[Cert], host: &str, ocsp: Option<&[u8]>, roots: Option<&[Cert]>, now: i64) -> Result<(), Refused> {
+    let Some(leaf) = chain.first() else { return Err(Refused::new(Reason::Other, "no certificate")) };
     let ders: Vec<&[u8]> = chain.iter().map(|c| c.der.as_slice()).collect();
-    if let Some(r) = plat::certs::verify_tls_server(&ders, host) {
-        return r;
+    let os = match roots {
+        None => plat::certs::verify_tls_server(&ders, host, ocsp, now),
+        Some(r) => {
+            let r: Vec<&[u8]> = r.iter().map(|c| c.der.as_slice()).collect();
+            plat::certs::verify_tls_server_roots(&ders, host, &r, now)
+        }
+    };
+    match os {
+        // the name once more: a system that also takes the subject's CN, or a DNS name for an
+        // IP address, says the same here as everywhere else
+        Some(Ok(())) if !host.is_empty() && !leaf.names(host) => Err(Refused::new(Reason::Name, "the certificate is not for this name (netio's check after the system's)")),
+        Some(r) => r,
+        None => {
+            let bundle;
+            let anchors: &[Cert] = match roots {
+                Some(r) => r,
+                None => {
+                    bundle = system_anchors();
+                    &bundle
+                }
+            };
+            verify_chain(chain, anchors, now, Some(host).filter(|h| !h.is_empty()), Usage::Server).map_err(|text| {
+                let reason = if now < leaf.not_before || now > leaf.not_after {
+                    Reason::Expired
+                } else if !host.is_empty() && !leaf.names(host) {
+                    Reason::Name
+                } else {
+                    Reason::UnknownCa
+                };
+                Refused { reason, text }
+            })
+        }
     }
-    verify_chain(chain, &system_anchors(), now, Some(host).filter(|h| !h.is_empty()), Usage::Server)
 }

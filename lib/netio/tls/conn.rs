@@ -40,6 +40,7 @@ use super::record::{ECDHE_ECDSA_AES128_GCM, ECDHE_ECDSA_AES256_GCM, ECDHE_ECDSA_
 use super::record::{TLS_AES_128_GCM_SHA256, TLS_AES_256_GCM_SHA384, TLS_CHACHA20_POLY1305_SHA256};
 use super::session::{self, Session, TicketData, Tickets, FRESH_WINDOW_MS, MAX_LIFETIME};
 use super::{ClientConfig, Hello, Identity, Revocation, ServerConfig, TlsError, Trust};
+use crate::roots::{Reason, Refused};
 use crate::x509::{ocsp, verify_chain, Cert, PrivateKey, PubKey, SigAlg, Usage};
 use crypto::ecdsa::Curve;
 use crypto::HashAlg;
@@ -1127,7 +1128,8 @@ impl Conn {
                 if self.peer.is_empty() {
                     return Err(fail(AL_DECODE_ERROR, "the server sent no certificate"));
                 }
-                self.check_server_chain()?;
+                // the chain is checked with the ServerKeyExchange, after the stapled response
+                // that may come between (the system reads it with the chain)
                 self.add(msg);
                 self.state = State::Client12Ske;
                 Ok(())
@@ -1140,6 +1142,7 @@ impl Conn {
                 Ok(())
             }
             (State::Client12Ske, HS_SERVER_KEY_EXCHANGE) => {
+                self.check_server_chain()?;
                 self.check_staple()?;
                 self.server_key_exchange(body)?;
                 self.add(msg);
@@ -1629,12 +1632,12 @@ impl Conn {
 
     fn check_server_chain(&mut self) -> Result<(), TlsError> {
         let cfg = self.ccfg.as_ref().ok_or(fail(AL_INTERNAL_ERROR, "config"))?;
-        check_trust(&cfg.trust, &self.peer, Some(&cfg.server_name), Usage::Server)
+        check_trust(&cfg.trust, &self.peer, Some(&cfg.server_name), Usage::Server, self.staple.as_deref())
     }
 
     fn check_client_chain(&mut self) -> Result<(), TlsError> {
         let trust = self.scfg.as_ref().and_then(|c| c.client_auth.as_ref()).ok_or(fail(AL_UNEXPECTED_MESSAGE, "certificate not requested"))?;
-        check_trust(trust, &self.peer, None, Usage::Client)
+        check_trust(trust, &self.peer, None, Usage::Client, None)
     }
 
     /// a client asks for a stapled OCSP response when it checks the certificate against a CA
@@ -2293,7 +2296,7 @@ impl Conn {
             Some(_) if t.chain.is_empty() => cfg.client_auth_optional,
             Some(trust) => {
                 let certs: Vec<Cert> = t.chain.iter().filter_map(|d| Cert::parse(d)).collect();
-                t.client_trust == session::trust_hash(trust) && certs.len() == t.chain.len() && check_trust(trust, &certs, None, Usage::Client).is_ok()
+                t.client_trust == session::trust_hash(trust) && certs.len() == t.chain.len() && check_trust(trust, &certs, None, Usage::Client, None).is_ok()
             }
         }
     }
@@ -2605,7 +2608,9 @@ fn verify_cv(body: &[u8], leaf: &Cert, server: bool, hash: &[u8]) -> Result<(), 
     Ok(())
 }
 
-fn check_trust(trust: &Trust, chain: &[Cert], name: Option<&String>, usage: Usage) -> Result<(), TlsError> {
+/// the chain against the trust; ocsp: the server's stapled response, handed to the system with
+/// Trust::System (netio checks it itself in check_staple)
+fn check_trust(trust: &Trust, chain: &[Cert], name: Option<&String>, usage: Usage, ocsp: Option<&[u8]>) -> Result<(), TlsError> {
     if matches!(trust, Trust::Anchors(_) | Trust::System(_)) && name.is_some_and(|n| n.is_empty()) {
         return Err(fail(AL_BAD_CERTIFICATE, "no server name to check"));
     }
@@ -2628,13 +2633,27 @@ fn check_trust(trust: &Trust, chain: &[Cert], name: Option<&String>, usage: Usag
             if expired {
                 return Err(fail(AL_CERTIFICATE_EXPIRED, "certificate expired"));
             }
-            if crate::roots::verify_system(chain, name, now).is_ok() {
-                return Ok(());
-            }
-            if !extra.is_empty() && verify_chain(chain, extra, now, Some(name).filter(|n| !n.is_empty()), usage).is_ok() {
-                return Ok(());
-            }
-            Err(if !name.is_empty() && !leaf.names(name) { fail(AL_BAD_CERTIFICATE, "certificate for another name") } else { fail(AL_UNKNOWN_CA, "certificate not trusted") })
+            // the system's CAs are for servers; a server's client_auth with System takes the
+            // extra CAs only
+            let system = match usage {
+                Usage::Server => crate::roots::verify_system(chain, name, ocsp, now),
+                _ => Err(Refused::new(Reason::UnknownCa, "the system's CAs are for servers")),
+            };
+            // the extra CAs only where the system knows no CA of the chain: a refusal for a
+            // revoked or expired certificate, a wrong name or usage stands
+            let r = match system {
+                Err(e) if e.reason == Reason::UnknownCa && !extra.is_empty() => verify_chain(chain, extra, now, Some(name).filter(|n| !n.is_empty()), usage).map_err(|_| e),
+                r => r,
+            };
+            r.map_err(|e| match e.reason {
+                Reason::UnknownCa if !name.is_empty() && !leaf.names(name) => fail(AL_BAD_CERTIFICATE, "certificate for another name"),
+                Reason::UnknownCa => fail(AL_UNKNOWN_CA, "certificate not trusted"),
+                Reason::Expired => fail(AL_CERTIFICATE_EXPIRED, "certificate expired"),
+                Reason::Name => fail(AL_BAD_CERTIFICATE, "certificate for another name"),
+                Reason::Revoked => fail(AL_CERTIFICATE_REVOKED, "the certificate is revoked"),
+                Reason::Usage => fail(AL_UNSUPPORTED_CERTIFICATE, "certificate not for a TLS server"),
+                _ => fail(AL_BAD_CERTIFICATE, "certificate refused by the system's check"),
+            })
         }
         Trust::Custom(check) => check(chain, name.map(|s| s.as_str()).unwrap_or(""), now).map_err(|_| fail(AL_BAD_CERTIFICATE, "certificate refused by the program's check")),
     }

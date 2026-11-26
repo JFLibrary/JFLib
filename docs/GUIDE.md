@@ -2817,7 +2817,11 @@ crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)
   The chain check honours name constraints for wildcards by the names they stand for and the
   extended key usage of every CA on the path (a CA for client certificates certifies no server).
   `Trust::System(extra)` connects to public servers: TLS 1.3 or TLS 1.2 with ECDHE, the chain built and checked
-  against the system's authorities (Windows CryptoAPI, Linux CA bundle) and extra CAs;
+  by the system (Windows CryptoAPI and macOS / iOS's Security framework, with the stapled OCSP
+  response; Linux against the distribution's CA bundle, or `SSL_CERT_FILE` / `SSL_CERT_DIR`),
+  then the leaf's name by netio once more; the extra CAs (a company CA) count only where the
+  system knows no CA of the chain, and a refusal names its reason (expired, revoked, another
+  name, unknown CA; `netio::roots::verify_system` answers it as `roots::Reason`);
   `netio::trust::system_connector(extra)` gives the connector for `Client`.
   OCSP stapling: `ServerConfig::ocsp` (`Arc<tls::Staples>`, kept current by
   `netio::ocsp::refresh(&staples, &client, &chain, issuer)`, which says when to call it again)

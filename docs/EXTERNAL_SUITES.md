@@ -12,6 +12,8 @@ python build_rs.py app coretest --target linux
 python tools/wycheproof_check.py      # C2SP/wycheproof @ 65ca494727a5: 79 files, 24 MB
 python tools/acvp_check.py            # usnistgov/ACVP-Server @ 975de31eb83d: 11 files, 15 MB
 python tools/limbo_check.py           # C2SP/x509-limbo @ b12423782a88: limbo.json, 42 MB
+python tools/limbo_check.py --system  # ... through the system's checks (Windows, macOS; Linux: verify_chain)
+python tools/tls_web_check.py --internet-only   # badssl.com through Trust::System
 python tools/tlsfuzzer_check.py       # tlsfuzzer @ 51aad6e9ae42, tlslite-ng @ 7e95ea1a86c0: netio's TLS 1.3 server
 python tools/tlsanvil_check.py        # TLS-Anvil @ c1762f4 (Temurin 21, Maven 3.9.9; 850 MB): netio's TLS client
 python tools/tlsanvil_check.py --server   # ... netio's TLS 1.3 server (RSA certificate)
@@ -218,6 +220,51 @@ change which names or keys netio trusts:
 
 The 5 testcases with directory-name constraints, skipped before netio processed them, are run
 and pass.
+
+### Through the system's checks (`--system`)
+
+`Trust::System` lets the system decide on Windows and macOS (`lib/plat/certs.rs`), so limbo
+runs through those checks too: `python tools/limbo_check.py --system` hands each server
+testcase to `netio::roots::verify_system_roots` (coretest's `--vectors` operation `x509system`).
+Windows CryptoAPI gets the testcase's trusted certificates as the only roots of a chain engine
+of its own, Apple's Security framework as its only anchors, with the validation time and the
+peer name; nothing is fetched and no revocation is asked. After the system's yes, netio checks the
+leaf's name itself, as `Trust::System` does. On Linux the path is `verify_chain`.
+
+Each answer is held against limbo's and against netio's own (`x509chain`):
+
+- **pass:** the system answers as limbo expects.
+- **same:** the system and netio answer alike, otherwise than limbo. These are netio's
+  differences above.
+- **known:** the system answers otherwise than netio and limbo. `SYSTEM_KNOWN` in the tool lists
+  these per system with the reason.
+- **fail:** a difference that is not listed. The tool exits with 1.
+
+`.github/workflows/system-trust.yml` runs this on Windows, macOS and Linux runners, together with
+coretest's group `systrust` and badssl.com (below), on every change of the trust code and on
+Mondays: the systems' checks change with their updates.
+
+| System | Pass | Same | Known | Fail | Skipped |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Linux (`verify_chain`) | 9 721 | 41 | 0 | 0 | 45 |
+
+### badssl.com through `Trust::System`
+
+`python tools/tls_web_check.py --internet-only [--target linux|win|mac]` connects with
+`coretest --tls-web` (`Trust::System`) to public hosts:
+
+- **Must work:** www.google.com, github.com, and badssl.com's TLS 1.2-only, RSA-2048/4096 and
+  P-256/384 hosts.
+- **Must fail, with the reason:** expired and sha384 ("certificate expired"), wrong.host
+  ("certificate for another name"), self-signed and untrusted-root ("certificate not
+  trusted").
+- **Shown, not counted:** revoked and incomplete-chain. The answers differ by system:
+  - Revocation: Windows reads its cache and the staple, Apple works without network access,
+    Linux sees only a staple, and badssl's server sends none.
+  - A missing intermediate: Windows may fetch it, the others refuse.
+
+badssl's known-bad roots (superfish and the like) serve expired certificates, so netio says
+"expired" before it asks about the root. They are not in the list.
 
 ## tlsfuzzer
 

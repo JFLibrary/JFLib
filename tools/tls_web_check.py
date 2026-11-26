@@ -1,6 +1,7 @@
 """tls_web_check.py -- netio's TLS client for public servers against OpenSSL and the internet.
 
     python tools/tls_web_check.py [--internet]      (runs in WSL / Linux: needs openssl)
+    python tools/tls_web_check.py --internet-only [--target linux|win|mac]   (any system, no openssl)
 
 A test PKI made with openssl (an RSA root, an ECDSA intermediate, server certificates with
 RSA-2048, RSA-PSS, ECDSA P-256 and P-384 keys) and `openssl s_server -www` in one setting at a
@@ -16,10 +17,13 @@ or refuse with the expected reason:
   refused  unknown CA, wrong host name, expired certificate, only pure ML-KEM key exchange,
            TLS 1.1, a server certificate signed with SHA-1
 
---internet adds public servers (system trust, Windows build too when run from Windows):
-www.google.com, github.com, and badssl.com's TLS 1.2-only, RSA-2048/4096, P-256/384 hosts (must work)
-and its expired / wrong-host / self-signed / untrusted-root hosts (must fail).  (Hosts of a public test
-service: a failure there can also mean it changed.)"""
+--internet adds public servers (Trust::System: the system's checks on Windows and macOS, the
+bundle on Linux; the Windows build too when run from Windows): www.google.com, github.com, and
+badssl.com's TLS 1.2-only, RSA-2048/4096, P-256/384 hosts (must work) and its expired /
+wrong-host / self-signed / untrusted-root hosts (must fail, each with its reason: expired,
+another name, not trusted); revoked and incomplete-chain are shown, not counted (what a system
+knows of revocation or fetches differs).  --internet-only runs just these with build/TARGET/coretest (.github/workflows/
+system-trust.yml).  (Hosts of a public test service: a failure there can also mean it changed.)"""
 import os
 import socket
 import subprocess
@@ -101,6 +105,15 @@ def make_pki(d):
 
 
 def main():
+    if "--internet-only" in sys.argv:
+        i = sys.argv.index("--target") + 1 if "--target" in sys.argv else 0
+        target = sys.argv[i] if i else "win" if os.name == "nt" else "mac" if sys.platform == "darwin" else "linux"
+        exe = ROOT / "build" / target / ("coretest.exe" if target == "win" else "coretest")
+        if not exe.exists():
+            sys.exit(f"tls_web_check: {exe.relative_to(ROOT)} is missing (python build_rs.py app coretest --target {target})")
+        bad = internet_checks([str(exe)], target)
+        print("tls_web_check --internet-only:", "all ok" if not bad else f"{bad} failures")
+        return 1 if bad else 0
     internet = "--internet" in sys.argv
     if os.name == "nt":
         wsl = "/mnt/" + str(ROOT)[0].lower() + str(ROOT)[2:].replace("\\", "/")
@@ -190,19 +203,28 @@ def main():
 def internet_checks(cmd, tag):
     ok_hosts = ["https://www.google.com/", "https://github.com/", "https://tls-v1-2.badssl.com:1012/", "https://rsa2048.badssl.com/",
                 "https://rsa4096.badssl.com/", "https://ecc256.badssl.com/", "https://ecc384.badssl.com/"]
-    # sha384.badssl.com: its certificate expired in 2022
-    bad_hosts = ["https://expired.badssl.com/", "https://wrong.host.badssl.com/", "https://self-signed.badssl.com/",
-                 "https://untrusted-root.badssl.com/", "https://sha384.badssl.com/"]
+    # refused, with the reason (tls/conn.rs check_trust); sha384.badssl.com: its certificate
+    # expired in 2022 (badssl's known-bad roots, superfish and the like, serve expired
+    # certificates as well: that is what netio says first)
+    bad_hosts = {"https://expired.badssl.com/": "certificate expired", "https://wrong.host.badssl.com/": "certificate for another name",
+                 "https://self-signed.badssl.com/": "certificate not trusted", "https://untrusted-root.badssl.com/": "certificate not trusted",
+                 "https://sha384.badssl.com/": "certificate expired"}
+    # shown, not counted: revocation (Windows from its cache and the staple, Apple without
+    # network access, Linux the staple only), a missing intermediate (Windows may fetch it)
+    info_hosts = ["https://revoked.badssl.com/", "https://incomplete-chain.badssl.com/"]
     bad = 0
-    for u in ok_hosts + bad_hosts:
+    for u in ok_hosts + list(bad_hosts) + info_hosts:
         try:
             out = subprocess.run(cmd + ["--tls-web", u], capture_output=True, text=True, timeout=40).stdout.strip()
         except subprocess.TimeoutExpired:
             out = "timeout"
-        want_ok = u in ok_hosts
-        ok = out.startswith("TLS") if want_ok else out.startswith("error TLS")
+        if u in info_hosts:
+            print(f"info [{tag}] {u:42} {out[:110]}")
+            continue
+        ok = out.startswith("TLS") if u in ok_hosts else out.startswith("error TLS: " + bad_hosts[u])
         bad += not ok
-        print(f"{'ok  ' if ok else 'FAIL'} [{tag}] {u:42} {out[:90]}")
+        want = "" if ok or u in ok_hosts else f"  (wanted: {bad_hosts[u]})"
+        print(f"{'ok  ' if ok else 'FAIL'} [{tag}] {u:42} {out[:110]}{want}")
     return bad
 
 
