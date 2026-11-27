@@ -32,6 +32,8 @@
 //     WT_SHOW       ShowWindow(w, a[0]) (SW_SHOWMINNOACTIVE, SW_SHOWNOACTIVATE: a test that leaves the
 //                   keyboard and the other windows alone) -> 1
 //   win_test_image(w) -> (w, h, px)   the client area as the window shows it (BitBlt from its DC)
+//   win_test_composed(w) -> (w, h, px)  the client area as the system composes it, without what
+//                   lies on top (PrintWindow, PW_RENDERFULLCONTENT: the GPU child's swapchain too)
 //   win_test_screen(x, y, w, h) -> px  a part of the screen as it shows now (any thread)
 //   win_test_post(hwnd, msg, wp, lp)  PostMessageW by handle (any thread)
 //   win_test_window_at(x, y) -> HWND  the window at a screen point (any thread)
@@ -58,6 +60,7 @@ unsafe extern "system" {
     fn EnumThreadWindows(tid: u32, f: unsafe extern "system" fn(isize, isize) -> i32, lp: isize) -> i32;
     fn EnumChildWindows(h: isize, f: unsafe extern "system" fn(isize, isize) -> i32, lp: isize) -> i32;
     fn GetClassNameW(h: isize, buf: *mut u16, n: i32) -> i32;
+    fn PrintWindow(h: isize, dc: isize, flags: u32) -> i32;
     fn GetDlgCtrlID(h: isize) -> i32;
     fn PostMessageW(h: isize, m: u32, wp: usize, lp: isize) -> i32;
     fn OpenClipboard(h: isize) -> i32;
@@ -111,6 +114,8 @@ const WM_COMMAND: u32 = 0x0111;
 const WM_CHAR: u32 = 0x0102;
 const IDOK: usize = 1;
 const IDCANCEL: usize = 2;
+const PW_CLIENTONLY: u32 = 1;
+const PW_RENDERFULLCONTENT: u32 = 2; // Windows 8.1: DWM renders the window, DirectX content too
 const AC_TRIES: u32 = 50; // timer ticks to find the dialog
 
 fn rgb(c: u32) -> i64 {
@@ -246,6 +251,19 @@ pub fn win_test(op: u32, w: i32, a: [i32; 4]) -> i64 {
 /// a DIB section; under DWM the window's own surface, also where other windows cover it) ->
 /// (w, h, rows of w * 4 bytes B, G, R, x)
 pub fn win_test_image(w: i32) -> Option<(i32, i32, alloc::vec::Vec<u8>)> {
+    client_pixels(w, false)
+}
+
+/// (test aid) window w's client area as the system composes it: PrintWindow with
+/// PW_RENDERFULLCONTENT, so the swapchain of its GPU child too, and nothing of what lies on top of
+/// it (other windows, overlays that take no clicks, shadows) -> (w, h, rows of w * 4 bytes B, G, R, x)
+pub fn win_test_composed(w: i32) -> Option<(i32, i32, alloc::vec::Vec<u8>)> {
+    client_pixels(w, true)
+}
+
+// the client area of window w in a DIB section: BitBlt from the window's DC, or (composed) what
+// PrintWindow renders of it
+fn client_pixels(w: i32, composed: bool) -> Option<(i32, i32, alloc::vec::Vec<u8>)> {
     let r = rec(w)?;
     let h = r.hwnd.get();
     let mut rc = Rect::default();
@@ -257,17 +275,22 @@ pub fn win_test_image(w: i32) -> Option<(i32, i32, alloc::vec::Vec<u8>)> {
     }
     let bmi = super::BitmapInfoHeader { size: 40, w: cw, h: -ch, planes: 1, bits: 32, ..Default::default() };
     let mut bits: *mut u8 = core::ptr::null_mut();
-    // SAFETY: a memory DC and a DIB section of cw x ch 32-bit pixels, the window's DC; all made
-    // here are freed again, the window's DC released.
+    // SAFETY: a memory DC and a DIB section of cw x ch 32-bit pixels, our window and its DC; all
+    // made here are freed again, the window's DC released.
     unsafe {
         let mdc = super::CreateCompatibleDC(0);
         let bmp = if mdc != 0 { super::CreateDIBSection(mdc, &bmi, 0, &mut bits, 0, 0) } else { 0 };
         let mut out = None;
         if bmp != 0 && !bits.is_null() {
             let old = super::SelectObject(mdc, bmp);
-            let dc = GetDC(h);
-            let ok = super::BitBlt(mdc, 0, 0, cw, ch, dc, 0, 0, super::SRCCOPY) != 0;
-            ReleaseDC(h, dc);
+            let ok = if composed {
+                PrintWindow(h, mdc, PW_CLIENTONLY | PW_RENDERFULLCONTENT) != 0
+            } else {
+                let dc = GetDC(h);
+                let ok = super::BitBlt(mdc, 0, 0, cw, ch, dc, 0, 0, super::SRCCOPY) != 0;
+                ReleaseDC(h, dc);
+                ok
+            };
             super::GdiFlush();
             if ok {
                 out = Some((cw, ch, core::slice::from_raw_parts(bits, (cw * ch * 4) as usize).to_vec()));

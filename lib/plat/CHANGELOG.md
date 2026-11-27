@@ -110,6 +110,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - Wayland: an event for an object that is already gone closed only the first 8 of its file descriptors, the rest stayed open; every one is closed now. The event arguments are decoded by a pure function (decode_args), which the fuzz checks reach; a message that does not hold what its signature says ends the connection as before (ROADMAP section 13, U6)
 - `net::resolve` on Windows, macOS and iOS keeps the zone of a link-local IPv6 address the system resolver returns (sin6_scope_id; a name under .local often has one): the addresses came back without it, and a connection to them failed
 - iOS: a change of dark mode, contrast, motion or text size while the app ran never reached it (no E_SETTINGS): the host now marks the app as started when UIKit takes over
+- `win_test_composed(w)` (test aid): window w's client area as the system composes it, PrintWindow with `PW_RENDERFULLCONTENT` on Windows (the GPU child's swapchain too, nothing of what lies on top: other windows, overlays that take no clicks, shadows; None on the other systems). With it ui's `gpu expect screen` no longer fails where an overlay such as Discord's or the GPU driver's draws over a script's window, which hit tests (`WT_FROM_POINT`) pass through. docs/GPU.md
 
 ### Security
 
