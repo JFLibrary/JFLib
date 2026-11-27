@@ -424,9 +424,11 @@ pub(crate) fn commit(app: &mut Diagrammer, ui: &mut Ui) {
         return;
     }
     let owner = diagram_core::Owner::Page(page);
-    // (JD21 jumps) line jumps are drawing only: they route nothing again
-    // (JD21 route) nor does separating and overlapping lines (kept for Visio)
-    let reroute = changes.iter().any(|(c, _, _)| !c.starts_with("LineJump") && !c.starts_with("PageLineJump") && !c.starts_with("LineAdjust"));
+    // (JD21 jumps) line jump cells route nothing again, (JD21v) but lay the connectors' jumps
+    // again (rows of their Geometry); (JD21 route) separating and overlapping lines neither
+    let jump_cell = |c: &str| c.starts_with("LineJump") || c.starts_with("PageLineJump");
+    let reroute = changes.iter().any(|(c, _, _)| !jump_cell(c) && !c.starts_with("LineAdjust"));
+    let jumps = changes.iter().any(|(c, _, _)| jump_cell(c));
     let _ = edit_doc::edit(o, t("Layout und Routing"), true, |tx, eng| {
         for (cell, v, unit) in &changes {
             let a = tx.single(cell);
@@ -434,7 +436,7 @@ pub(crate) fn commit(app: &mut Diagrammer, ui: &mut Ui) {
         }
         eng.recalc(tx, &[s])?;
         if !reroute {
-            return Ok(());
+            return if jumps { diagram_core::jumps::lay_page(tx, eng, page) } else { Ok(()) };
         }
         // every dynamic connector of the page takes the new style and clearance
         let conns: Vec<ShapeRef> = tx.doc().top_shapes(owner).filter(|&c| diagram_core::glue::is_connector(tx.doc(), c)).collect();

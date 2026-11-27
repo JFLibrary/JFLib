@@ -7,23 +7,26 @@
 //   shown(app) / toggle(app, ui)   LINE_JUMPS: checked while the page shown has jumps
 //                             (LineJumpCode not 0); off writes 0, on the code the page had before
 //                             in this session, else 1 (horizontal lines, the value of Visio's
-//                             files); one undo step
+//                             files); the page's connectors are laid again (jumps::lay_page); one
+//                             undo step
 //   available(app, id)        LINE_JUMPS needs a page, CONN_BEHAVIOR a selected dynamic connector
 //   menu_states(app, ui)      every pass: Verbinder-Verhalten shows in the shape's menu only
 //                             while a connector is selected
 //   open(app, ui) / dialog(app, ui)   Verbinder-Verhalten (Visio: Entwicklertools › Verhalten ›
 //                             Verbinder › Linienübergänge): add (ConLineJumpCode), style
 //                             (ConLineJumpStyle), horizontal and vertical direction
-//                             (ConLineJumpDirX / Y) for every selected connector, one undo step;
+//                             (ConLineJumpDirX / Y) for every selected connector, routed again
+//                             (glue::update: their jumps anew), one undo step;
 //                             (JD21 route) before them the rows Weg (route_ui.rs: ShapeRouteStyle
 //                             with its direction, ConFixedCode, ConLineRouteExt; a new style or
 //                             appearance routes the connectors anew)
 //   style_names(page)         the jump styles' names: the page's (Bogen .. 7 Seiten, LineJumpStyle
 //                             1 .. 9) or the connector's (Seitenvorgabe first, 0 .. 9)
 //
-// What the codes mean and how the jumps are drawn: lib/diagram_core/src/render/jumps.rs.  The
-// drawing follows by itself: a page cell builds the page anew (viewer::sync), a connector's
-// cells make it and the connectors it crosses anew (render::affected).
+// What the codes mean and which rows the jumps are: lib/diagram_core/src/jumps.rs.  (JD21v) As
+// in Visio the jumps are rows of the connectors' Geometry, written when connectors are laid: a
+// changed line jump cell lays the connectors again (the page's: all of them where they are, a
+// connector's: it is routed again).  The drawing follows the changed shapes (viewer::sync).
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -112,7 +115,9 @@ pub(crate) fn toggle(app: &mut Diagrammer, ui: &mut Ui) {
     let _ = edit_doc::edit(o, commands::label(LINE_JUMPS), true, |tx, eng| {
         let a = tx.single("LineJumpCode");
         tx.set_constant(sheet, &a, Value::Num(code), None)?;
-        eng.recalc(tx, &[sheet])
+        eng.recalc(tx, &[sheet])?;
+        // (JD21v) the jumps are rows of the connectors: laid again
+        diagram_core::jumps::lay_page(tx, eng, page)
     });
     ui.repass();
 }
@@ -228,6 +233,10 @@ fn apply(app: &mut Diagrammer) {
         }
         if reroute {
             diagram_core::glue::reset(tx, eng, &conns)?;
+        } else {
+            // (JD21v) routed again as Visio does when their line jump cells change: their jumps
+            // (rows of their Geometry) and their partners' anew
+            diagram_core::glue::update(tx, eng, &conns)?;
         }
         Ok(())
     });

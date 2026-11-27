@@ -1,19 +1,25 @@
 // jumps -- (JD21, CN-06) line jumps: a drawing of crossing dynamic connectors built as
 // JFDiagrammer builds it, one page per jump style, per LineJumpCode, per direction, a size, close
 // crossings, slanted straight connectors and connectors with settings of their own; the jumps
-// in the display list, the cells written and read back, the SVG and PNG export
+// in the connectors' Geometry (JD21v: written when they are laid, as Visio does), written and
+// read back, the SVG and PNG export; a file Visio laid anew against the same laying here
 //
 //   check(h)          group "jumps": every page's jumps (count per connector, style, side,
 //                     width) against what the page asks for; written and read back: the page's
-//                     and the connectors' line jump cells and their Geometry rows unchanged (the
-//                     jumps are no geometry), the same jumps after reading; the SVG export holds
-//                     them (cubic pieces, gaps), the PNG export shows an arc above the line
+//                     and the connectors' line jump cells and their Geometry rows with the
+//                     jumps, the same jumps after reading; the SVG export holds them (cubic
+//                     pieces, gaps), the PNG export shows an arc above the line
 //   write(dir)        --write-jd21-jumps DIR: JD21-Gegenprobe-Linienuebergaenge.vsdx and a PNG
 //                     of each page drawn by JFDiagrammer's drawing code, to lay next to Visio
+//   compare(file)     --compare-visio-jumps FILE: a drawing Visio saved after it laid every
+//                     connector anew in page order (jd21v_jumps.vbs): the same laying here, and
+//                     every connector's rows against Visio's (types, points, bows, POLYLINE
+//                     numbers to 1e-6 in) -> 0: all equal
 //
 // The pages: three horizontal connectors (y 2, 4, 6 in, x 1 .. 9) and three vertical ones (x 3,
-// 5, 7, y 1 .. 7), drawn in that order (the verticals lie above and have the higher IDs), each
-// with free ends; a title box above them says what Visio should show.
+// 5, 7, y 1 .. 7), laid in that order (the verticals lie above and have the higher IDs), each
+// with free ends; a title box above them says what Visio should show.  The first page is called
+// "Vorgabe" (Visio renames a page named like a style, "Standard").
 
 use alloc::format;
 use alloc::string::String;
@@ -21,8 +27,9 @@ use alloc::vec::Vec;
 
 use diagram_core::formula::Engine;
 use diagram_core::ops::{self, Basic};
-use diagram_core::render::{self, Jump, JumpStyle, Options};
-use diagram_core::{glue, CellAddr, DocKind, Document, Owner, PageRef, ShapeRef, SheetRef, Text, Value};
+use diagram_core::jumps::{self, Jump, JumpStyle};
+use diagram_core::render::Options;
+use diagram_core::{glue, route_edit, CellAddr, DocKind, Document, Owner, PageRef, ShapeRef, SheetRef, Text, Value};
 use diagram_io::vsdx::{self, Measure, WriteOptions};
 use diagram_view::export::{raster, svg};
 use diagram_view::PageView;
@@ -45,7 +52,7 @@ struct Spec {
 enum Layout {
     /// the grid
     Grid,
-    /// the middle horizontal brought to the front
+    /// the middle horizontal brought to the front and laid again (moved by nothing)
     MiddleOnTop,
     /// the grid, the middle vertical 0.05 in right of the first
     Close,
@@ -63,7 +70,7 @@ const BASE: [(&str, f64); 2] = [("LineToLineX", 0.125), ("LineToLineY", 0.125)];
 
 // i18n: none (the file is for the user's look in Visio, German like the instructions)
 const SPECS: [Spec; 23] = [
-    Spec { name: "Standard", cells: &[], layout: Layout::Grid, title: "Ohne Linienübergangs-Zellen der Seite: Visios Vorgabe (JFDiagrammer: waagerechte springen, Bogen nach oben)", want: ([3; 3], [0; 3]), look: Some((JumpStyle::Arc, [0.0, 1.0])) },
+    Spec { name: "Vorgabe", cells: &[], layout: Layout::Grid, title: "Ohne Linienübergangs-Zellen der Seite: Visios Vorgabe (waagerechte springen, Bogen nach oben, 2/3 von 2,5 mm breit)", want: ([3; 3], [0; 3]), look: Some((JumpStyle::Arc, [0.0, 1.0])) },
     Spec { name: "Stil Bogen", cells: &[(CODE, 1.0), (STYLE, 1.0)], layout: Layout::Grid, title: "Stil 1 Bogen: waagerechte springen", want: ([3; 3], [0; 3]), look: Some((JumpStyle::Arc, [0.0, 1.0])) },
     Spec { name: "Stil Lücke", cells: &[(CODE, 1.0), (STYLE, 2.0)], layout: Layout::Grid, title: "Stil 2 Lücke", want: ([3; 3], [0; 3]), look: Some((JumpStyle::Gap, [0.0, 1.0])) },
     Spec { name: "Stil Quadrat", cells: &[(CODE, 1.0), (STYLE, 3.0)], layout: Layout::Grid, title: "Stil 3 Quadrat", want: ([3; 3], [0; 3]), look: Some((JumpStyle::Square, [0.0, 1.0])) },
@@ -75,15 +82,15 @@ const SPECS: [Spec; 23] = [
     Spec { name: "Stil 7 Seiten", cells: &[(CODE, 1.0), (STYLE, 9.0)], layout: Layout::Grid, title: "Stil 9: 7 Seiten", want: ([3; 3], [0; 3]), look: Some((JumpStyle::Sides(7), [0.0, 1.0])) },
     Spec { name: "Wo keine", cells: &[(CODE, 0.0)], layout: Layout::Grid, title: "LineJumpCode 0: keine Linienübergänge", want: ([0; 3], [0; 3]), look: None },
     Spec { name: "Wo senkrecht", cells: &[(CODE, 2.0)], layout: Layout::Grid, title: "LineJumpCode 2: senkrechte springen (Vorgabe-Richtung)", want: ([0; 3], [3; 3]), look: Some((JumpStyle::Arc, [-1.0, 0.0])) },
-    Spec { name: "Wo zuletzt verlegt", cells: &[(CODE, 3.0)], layout: Layout::MiddleOnTop, title: "LineJumpCode 3: zuletzt verlegte (die senkrechten sind neuer; die mittlere waagerechte liegt oben)", want: ([0; 3], [3; 3]), look: None },
-    Spec { name: "Wo zuletzt angezeigt", cells: &[(CODE, 4.0)], layout: Layout::MiddleOnTop, title: "LineJumpCode 4: die obere springt (die mittlere waagerechte liegt ganz oben)", want: ([0, 3, 0], [2; 3]), look: None },
-    Spec { name: "Wo zuerst angezeigt", cells: &[(CODE, 5.0)], layout: Layout::MiddleOnTop, title: "LineJumpCode 5: die untere springt (die mittlere waagerechte liegt ganz oben)", want: ([3, 0, 3], [1; 3]), look: None },
+    Spec { name: "Wo zuletzt verlegt", cells: &[(CODE, 3.0)], layout: Layout::MiddleOnTop, title: "LineJumpCode 3: zuletzt verlegte (die senkrechten nach den waagerechten, die mittlere waagerechte zuletzt neu verlegt)", want: ([0, 3, 0], [2; 3]), look: None },
+    Spec { name: "Wo zuletzt angezeigt", cells: &[(CODE, 4.0)], layout: Layout::MiddleOnTop, title: "LineJumpCode 4: die obere springt (die mittlere waagerechte ganz oben und neu verlegt)", want: ([0, 3, 0], [2; 3]), look: None },
+    Spec { name: "Wo zuerst angezeigt", cells: &[(CODE, 5.0)], layout: Layout::MiddleOnTop, title: "LineJumpCode 5: die untere springt (die mittlere waagerechte ganz oben und neu verlegt)", want: ([3, 0, 3], [1; 3]), look: None },
     Spec { name: "Richtung unten", cells: &[(CODE, 1.0), ("PageLineJumpDirX", 2.0)], layout: Layout::Grid, title: "PageLineJumpDirX 2: waagerechte springen nach unten", want: ([3; 3], [0; 3]), look: Some((JumpStyle::Arc, [0.0, -1.0])) },
     Spec { name: "Richtung rechts", cells: &[(CODE, 2.0), ("PageLineJumpDirY", 2.0)], layout: Layout::Grid, title: "PageLineJumpDirY 2: senkrechte springen nach rechts", want: ([0; 3], [3; 3]), look: Some((JumpStyle::Arc, [1.0, 0.0])) },
     Spec { name: "Richtung links", cells: &[(CODE, 2.0), ("PageLineJumpDirY", 1.0)], layout: Layout::Grid, title: "PageLineJumpDirY 1: senkrechte springen nach links", want: ([0; 3], [3; 3]), look: Some((JumpStyle::Arc, [-1.0, 0.0])) },
     Spec { name: "Größe", cells: &[(CODE, 1.0), ("LineJumpFactorX", 3.0), ("LineJumpFactorY", 0.3)], layout: Layout::Grid, title: "LineJumpFactorX 3 (waagerecht groß), LineToLineX 0,125 in", want: ([3; 3], [0; 3]), look: Some((JumpStyle::Arc, [0.0, 1.0])) },
-    Spec { name: "Nah", cells: &[(CODE, 1.0)], layout: Layout::Close, title: "Zwei senkrechte 1,3 mm nebeneinander: ein breiter Sprung (angenommen)", want: ([2; 3], [0; 3]), look: None },
-    Spec { name: "Schräg", cells: &[(CODE, 1.0)], layout: Layout::Slanted, title: "Gerade Verbinder schräg: die flachere springt, beim X die obere (angenommen)", want: ([0; 3], [0; 3]), look: None },
+    Spec { name: "Nah", cells: &[(CODE, 1.0)], layout: Layout::Close, title: "Zwei senkrechte 1,3 mm nebeneinander: ein breiter Sprung, halb so hoch wie breit", want: ([2; 3], [0; 3]), look: None },
+    Spec { name: "Schräg", cells: &[(CODE, 1.0)], layout: Layout::Slanted, title: "Gerade Verbinder schräg: die flachere springt, beim X (gleiche Steigung) keine", want: ([0; 3], [0; 3]), look: None },
     Spec { name: "Eigene immer", cells: &[(CODE, 0.0)], layout: Layout::Always, title: "Seite keine; oberste waagerechte ConLineJumpCode 2 (immer)", want: ([0, 0, 3], [0; 3]), look: None },
     Spec { name: "Eigene nie Stil", cells: &[(CODE, 1.0)], layout: Layout::Own, title: "Seite waagerecht; oben: nie; Mitte: Quadrat nach unten; mittlere senkrechte: keiner springt", want: ([2, 2, 0], [0; 3]), look: None },
 ];
@@ -145,14 +152,23 @@ fn build() -> Result<(Document, Vec<Built>), String> {
                 vs.push(line(&mut tx, &mut eng, owner, [x, 1.0], [x, 7.0])?);
             }
         }
+        let all: Vec<ShapeRef> = hs.iter().chain(&vs).copied().collect();
         match spec.layout {
-            Layout::MiddleOnTop => tx.bring_to_front(hs[1]).map_err(err)?,
-            Layout::Always => set(&mut tx, SheetRef::Shape(hs[2]), "ConLineJumpCode", 2.0)?,
+            Layout::MiddleOnTop => {
+                // to the front and laid again (as a nudge in Visio): the last one laid
+                tx.bring_to_front(hs[1]).map_err(err)?;
+                glue::update(&mut tx, &mut eng, &[hs[1]]).map_err(err)?;
+            }
+            Layout::Always => {
+                set(&mut tx, SheetRef::Shape(hs[2]), "ConLineJumpCode", 2.0)?;
+                jumps::lay_again(&mut tx, &mut eng, &all).map_err(err)?;
+            }
             Layout::Own => {
                 set(&mut tx, SheetRef::Shape(hs[2]), "ConLineJumpCode", 1.0)?;
                 set(&mut tx, SheetRef::Shape(hs[1]), "ConLineJumpStyle", 3.0)?;
                 set(&mut tx, SheetRef::Shape(hs[1]), "ConLineJumpDirX", 2.0)?;
                 set(&mut tx, SheetRef::Shape(vs[1]), "ConLineJumpCode", 4.0)?;
+                jumps::lay_again(&mut tx, &mut eng, &all).map_err(err)?;
             }
             _ => {}
         }
@@ -165,12 +181,8 @@ fn build() -> Result<(Document, Vec<Built>), String> {
     Ok((doc, out))
 }
 
-fn jumps_of(d: &render::Drawing, s: ShapeRef) -> Vec<Jump> {
-    d.jumps().find(|(c, _)| *c == s).map(|(_, j)| j.to_vec()).unwrap_or_default()
-}
-
-fn draw(doc: &Document, page: PageRef) -> render::Drawing {
-    render::build(doc, page, &mut render::ApproxMeasure, &Options::default())
+fn jumps_of(doc: &Document, s: ShapeRef) -> Vec<Jump> {
+    jumps::read(doc, s)
 }
 
 fn num(doc: &Document, s: SheetRef, cell: &str) -> Option<f64> {
@@ -193,32 +205,36 @@ pub(crate) fn check(h: &mut H) {
     };
     // the jumps of every page
     for (spec, b) in SPECS.iter().zip(&built) {
-        let d = draw(&doc, b.page);
-        let hs: Vec<usize> = b.hs.iter().map(|&s| jumps_of(&d, s).len()).collect();
-        let vs: Vec<usize> = b.vs.iter().map(|&s| jumps_of(&d, s).len()).collect();
+        let hs: Vec<usize> = b.hs.iter().map(|&s| jumps_of(&doc, s).len()).collect();
+        let vs: Vec<usize> = b.vs.iter().map(|&s| jumps_of(&doc, s).len()).collect();
         if spec.layout == Layout::Slanted {
-            let n: Vec<usize> = b.slanted.iter().map(|&s| jumps_of(&d, s).len()).collect();
-            h.check("jumps: slanted straight connectors (flat one twice, the X's upper once)", n == [0, 1, 2], format!("{n:?}"));
+            let n: Vec<usize> = b.slanted.iter().map(|&s| jumps_of(&doc, s).len()).collect();
+            h.check("jumps: slanted straight connectors (the flat one twice, the X none)", n == [0, 0, 2], format!("{n:?}"));
             continue;
         }
         h.check(&format!("jumps: page {} counts", spec.name), hs == spec.want.0 && vs == spec.want.1, format!("{hs:?} {vs:?}"));
         if let Some((style, side)) = spec.look {
-            let all: Vec<Jump> = b.hs.iter().chain(&b.vs).flat_map(|&s| jumps_of(&d, s)).collect();
-            let ok = !all.is_empty() && all.iter().all(|j| j.style == style && (j.normal[0] - side[0]).abs() < 1e-9 && (j.normal[1] - side[1]).abs() < 1e-9);
+            let all: Vec<Jump> = b.hs.iter().chain(&b.vs).flat_map(|&s| jumps_of(&doc, s)).collect();
+            let gap = style == JumpStyle::Gap;
+            let ok = !all.is_empty() && all.iter().all(|j| j.style == style && (gap || ((j.normal[0] - side[0]).abs() < 1e-9 && (j.normal[1] - side[1]).abs() < 1e-9)));
             h.check(&format!("jumps: page {} style and side", spec.name), ok, format!("{:?}", all.first().map(|j| (j.style, j.normal))));
         }
+        if spec.name == "Vorgabe" {
+            let w = jumps_of(&doc, b.hs[0]).first().map_or(0.0, |j| j.width());
+            h.check("jumps: a page without the cells: 2/3 of 2.5 mm", (w - 2.5 / 25.4 * 2.0 / 3.0).abs() < 1e-9, format!("{w}"));
+        }
         if spec.name == "Größe" {
-            let j = jumps_of(&d, b.hs[0]);
-            let w = j.first().map_or(0.0, |j| j.to - j.from);
+            let w = jumps_of(&doc, b.hs[0]).first().map_or(0.0, |j| j.width());
             h.check("jumps: size LineJumpFactorX 3 x LineToLineX 0.125", (w - 0.375).abs() < 1e-9, format!("{w}"));
         }
         if spec.name == "Nah" {
-            let j = jumps_of(&d, b.hs[0]);
-            let w = j.first().map_or(0.0, |j| j.to - j.from);
-            h.check("jumps: close crossings merged", (w - (0.05 + 0.125 * 2.0 / 3.0)).abs() < 1e-9, format!("{w}"));
+            let j = jumps_of(&doc, b.hs[0]);
+            let (w, ht) = j.first().map_or((0.0, 0.0), |j| (j.width(), j.height));
+            let want = 0.05 + 0.125 * 2.0 / 3.0;
+            h.check("jumps: close crossings merged, half as high as wide", (w - want).abs() < 1e-9 && (ht - want * 0.5).abs() < 1e-9, format!("{w} {ht}"));
         }
         if spec.name == "Eigene nie Stil" {
-            let j = jumps_of(&d, b.hs[1]);
+            let j = jumps_of(&doc, b.hs[1]);
             let ok = j.len() == 2 && j.iter().all(|j| j.style == JumpStyle::Square && j.normal[1] < 0.0);
             h.check("jumps: a connector's own style and direction", ok, format!("{:?}", j.first().map(|j| (j.style, j.normal))));
         }
@@ -246,7 +262,6 @@ pub(crate) fn check(h: &mut H) {
         for c in page_cells {
             cells_ok &= num(&doc, SheetRef::Page(b.page), c) == num(&back, SheetRef::Page(pb), c);
         }
-        let (d0, d1) = (draw(&doc, b.page), draw(&back, pb));
         for &s in b.hs.iter().chain(&b.vs).chain(&b.slanted) {
             let id = doc.shape(s).map_or(0, |x| x.id());
             let Some(t) = back.shape_by_id(Owner::Page(pb), id) else {
@@ -256,14 +271,14 @@ pub(crate) fn check(h: &mut H) {
             for c in con_cells {
                 cells_ok &= num(&doc, SheetRef::Shape(s), c) == num(&back, SheetRef::Shape(t), c);
             }
-            rows_ok &= geometry_rows(&doc, s) == geometry_rows(&back, t) && geometry_rows(&back, t) <= 4;
-            let (a, z) = (jumps_of(&d0, s), jumps_of(&d1, t));
+            let (a, z) = (jumps_of(&doc, s), jumps_of(&back, t));
+            rows_ok &= geometry_rows(&doc, s) == geometry_rows(&back, t);
             n += a.len();
-            same_jumps &= a.len() == z.len() && a.iter().zip(&z).all(|(x, y)| (x.from - y.from).abs() < 1e-9 && x.style == y.style);
+            same_jumps &= a.len() == z.len() && a.iter().zip(&z).all(|(x, y)| (x.start[0] - y.start[0]).abs() < 1e-9 && (x.start[1] - y.start[1]).abs() < 1e-9 && x.style == y.style && (x.height - y.height).abs() < 1e-9);
         }
     }
     h.check("jumps: page and connector line jump cells read back", cells_ok, String::new());
-    h.check("jumps: the connectors' Geometry rows unchanged (jumps are no geometry)", rows_ok, String::new());
+    h.check("jumps: the connectors' Geometry rows with their jumps read back", rows_ok, String::new());
     h.check("jumps: the same jumps after reading", same_jumps && n > 50, format!("{n} jumps"));
     // the SVG export: arcs as cubic pieces, gaps as sub-paths
     let mut fonts = crate::render::fonts();
@@ -356,4 +371,105 @@ pub(crate) fn write(dir: &str) -> i32 {
         }
     }
     status
+}
+
+// a row of a connector's first Geometry section as compared: type, point on the page, A's
+// number (ArcTo's bow), the numbers of a POLYLINE
+type RowSeen = (String, [f64; 2], f64, Vec<f64>);
+
+fn rows_seen(doc: &Document, c: ShapeRef) -> Vec<RowSeen> {
+    let sheet = SheetRef::Shape(c);
+    let Some(&sk) = doc.geometry(sheet).first() else { return Vec::new() };
+    let m = doc.page_xform(c);
+    let (Some(x), Some(y), Some(a)) = (doc.sym("X"), doc.sym("Y"), doc.sym("A")) else { return Vec::new() };
+    doc.rows(sheet, sk)
+        .into_iter()
+        .map(|r| {
+            let cell = |s| doc.resolve(sheet, &CellAddr::row(sk, r.key, s));
+            let p = m.apply([cell(x).num().unwrap_or(0.0), cell(y).num().unwrap_or(0.0)]);
+            let kind = String::from(r.kind.map_or("", |k| doc.str(k)));
+            let (bow, poly) = match cell(a).value() {
+                Value::Num(v) => (v, Vec::new()),
+                Value::Text(t) => (0.0, diagram_core::geometry::parse_args(doc.str(t), "POLYLINE").unwrap_or_default()),
+                _ => (0.0, Vec::new()),
+            };
+            let bow = if kind == "ArcTo" { bow } else { 0.0 };
+            (kind, p, bow, poly)
+        })
+        .collect()
+}
+
+fn same_rows(a: &[RowSeen], b: &[RowSeen]) -> bool {
+    let near = |x: f64, y: f64| (x - y).abs() <= 1e-6;
+    a.len() == b.len()
+        && a.iter().zip(b).all(|(r, s)| r.0 == s.0 && near(r.1[0], s.1[0]) && near(r.1[1], s.1[1]) && near(r.2, s.2) && r.3.len() == s.3.len() && r.3.iter().zip(&s.3).all(|(x, y)| near(*x, *y)))
+}
+
+fn describe(rows: &[RowSeen]) -> String {
+    let mut t = String::new();
+    for r in rows {
+        let tag = match r.0.as_str() {
+            "MoveTo" => "M",
+            "LineTo" => "L",
+            "ArcTo" => "A",
+            "PolylineTo" => "P",
+            k => k,
+        };
+        t.push_str(&format!("{tag}({:.4},{:.4}", r.1[0], r.1[1]));
+        if r.0 == "ArcTo" {
+            t.push_str(&format!(";{:.4}", r.2));
+        }
+        t.push_str(") ");
+    }
+    t
+}
+
+/// --compare-visio-jumps FILE: every connector of every page laid anew in page order as Visio's
+/// check did (each along Visio's way without its jumps), the rows against Visio's -> 0: equal
+pub(crate) fn compare(path: &str) -> i32 {
+    let Some(bytes) = plat::read_file(path) else {
+        crate::out(&format!("cannot read {path}\n"));
+        return 1;
+    };
+    let mut doc = match vsdx::read(&bytes, &vsdx::Limits::VSDX) {
+        Ok(l) => l.doc,
+        Err(e) => {
+            crate::out(&format!("read {path}: {e}\n"));
+            return 1;
+        }
+    };
+    let mut eng = Engine::new();
+    let pages: Vec<PageRef> = doc.pages().collect();
+    let (mut total, mut bad) = (0usize, 0usize);
+    for (k, &page) in pages.iter().enumerate() {
+        let conns: Vec<ShapeRef> = doc.top_shapes(Owner::Page(page)).filter(|&s| glue::is_connector(&doc, s)).collect();
+        if conns.is_empty() {
+            continue;
+        }
+        let visio: Vec<Vec<RowSeen>> = conns.iter().map(|&c| rows_seen(&doc, c)).collect();
+        let ways: Vec<Vec<[f64; 2]>> = conns.iter().map(|&c| jumps::way(&doc, c).unwrap_or_else(|| glue::path(&doc, c))).collect();
+        let mut tx = doc.transaction("Visio");
+        for (&c, w) in conns.iter().zip(&ways) {
+            if let Err(e) = route_edit::set_way(&mut tx, &mut eng, c, w) {
+                crate::out(&format!("page {}: laying a connector: {e:?}\n", k + 1));
+            }
+        }
+        tx.commit();
+        let name = doc.page(page).and_then(|p| p.header.name.or(p.header.name_u)).map(|s| String::from(doc.str(s))).unwrap_or_default();
+        let mut equal = 0;
+        for (&c, v) in conns.iter().zip(&visio) {
+            total += 1;
+            let ours = rows_seen(&doc, c);
+            if same_rows(&ours, v) {
+                equal += 1;
+            } else {
+                bad += 1;
+                let id = doc.shape(c).map_or(0, |s| s.id());
+                crate::out(&format!("  page {} shape {id}:\n    Visio {}\n    ours  {}\n", k + 1, describe(v), describe(&ours)));
+            }
+        }
+        crate::out(&format!("page {} {name}: {equal} of {} connectors as Visio\n", k + 1, conns.len()));
+    }
+    crate::out(&format!("{} of {total} connectors as Visio\n", total - bad));
+    i32::from(bad > 0 || total == 0)
 }

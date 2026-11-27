@@ -4,12 +4,11 @@
 //                                    texts measured with the fonts drawn), the scene made of
 //                                    it, pictures decoded
 //   view.update(&doc, &mut fonts, &shapes) -> Option<[f64; 4]>   (JD7) the named shapes (their
-//                                    top-level shapes; JD21: and the connectors whose line jumps
-//                                    they change, render::affected) made anew in the list and
-//                                    the scene; the
-//                                    box of what changed, old and new place (paper inches;
-//                                    a zero box: nothing drawn either way); None: shapes came,
-//                                    went or changed their order -- the page was built anew
+//                                    top-level shapes, render::affected) made anew in the list
+//                                    and the scene; the box of what changed, old and new place
+//                                    (paper inches; a zero box: nothing drawn either way); None:
+//                                    shapes came, went or changed their order -- the page was
+//                                    built anew
 //   view.draw(dc, sf, r, &cam)       the page on the CPU into the rectangle r of a surface
 //                                    (render2d's CPU path; gradients and pictures in between)
 //   view.render(w, h) -> Surface     the page fitted into w x h pixels on its colour (XRGB)
@@ -169,8 +168,7 @@ impl PageView {
     /// themes) need PageView::new
     pub fn update(&mut self, doc: &Document, fonts: &mut FontSet, shapes: &[ShapeRef]) -> Option<[f64; 4]> {
         let page = self.drawing.page?;
-        // the top-level shapes named and their items now; (JD21) with the connectors whose line
-        // jumps they change (render::rebuild makes those anew too)
+        // the top-level shapes named and their items now
         let mut olds: Vec<(ShapeRef, Range<usize>)> = Vec::new();
         for top in render::affected(doc, &self.drawing, &self.opts, shapes) {
             if olds.iter().any(|o| o.0 == top) {

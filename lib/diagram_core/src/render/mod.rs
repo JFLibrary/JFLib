@@ -8,9 +8,7 @@
 //                                   anew in their place; false: shapes came, went or changed
 //                                   their order (build anew)
 //   render::affected(&doc, &drawing, &Options, &shapes) -> tops   (JD21) the top-level shapes
-//                                   rebuild makes anew for these shapes: theirs and those of the
-//                                   connectors whose line jumps they change
-//   drawing.jumps()                 (JD21, jumps.rs) the line jumps drawn, per connector
+//                                   rebuild makes anew for these shapes
 //   Drawing { width, height, scale, items, fonts, notes }   in paper inches, y up, the origin at
 //                                   the page's bottom left corner; items in painter's order
 //   drawing.query(rect, &mut out)   the items whose boxes touch a rectangle (a grid over the
@@ -34,9 +32,8 @@
 // picture, the lines of the sections without NoLine with their line ends, the text.  Not
 // drawn: deleted subshapes (Del, ID 4294967295, no Type), guides, sections with NoShow,
 // shapes whose layers are all hidden.  A layer's colour (Color not 255) colours its members.
-// (JD21) Where two dynamic connectors of a page cross, one of them hops over the other (line
-// jumps, CN-06, jumps.rs): worked out before the page's shapes are drawn and put into the
-// connector's line (its shadow and line ends follow); no cell changes, nothing is routed.
+// (JD21) Line jumps are rows of the connectors' Geometry (crate::jumps writes them when
+// connectors are laid): drawn as the rest of the geometry.
 //
 // Values Visio caches as "Themed" (the Theme style and a few shapes) are resolved against the
 // page's theme: the theme part whose schemeEnum the page's ThemeIndex names (colours by
@@ -47,7 +44,6 @@
 // inches (geometry times PageScale / DrawingScale).
 
 mod index;
-mod jumps;
 mod rebuild;
 pub mod style;
 mod text;
@@ -69,7 +65,6 @@ use crate::sheet::{CellAddr, RowKey, SecKey};
 use crate::strings::Sym;
 
 pub use index::Grid;
-pub use jumps::{Jump, JumpStyle};
 pub use rebuild::{affected, rebuild};
 pub use text::{measure_text, ApproxMeasure, Face, Measure, TextItem, TextRun};
 pub use theme::{no_theme_color, ThemeInfo};
@@ -114,8 +109,6 @@ pub struct Drawing {
     pub(crate) tops: Vec<Top>,
     /// the document's themes, parsed once (rebuild uses them again)
     themes: Vec<Option<ThemeInfo>>,
-    /// (JD21) per page drawn: its connectors and their line jumps (rebuild keeps them current)
-    pub(crate) jumps: Vec<jumps::PageJumps>,
 }
 
 /// a top-level shape of a drawing: where its items start, what it noted
@@ -160,12 +153,6 @@ impl Drawing {
     pub(crate) fn top_of_item(&self, i: usize) -> Option<usize> {
         let k = self.tops.partition_point(|t| t.start as usize <= i);
         k.checked_sub(1)
-    }
-
-    /// (JD21) the line jumps drawn: every connector that got some, with them (the pages in
-    /// painter's order, background pages first; the connectors in painter's order)
-    pub fn jumps(&self) -> impl Iterator<Item = (ShapeRef, &[Jump])> + '_ {
-        self.jumps.iter().flat_map(|p| p.drawn())
     }
 }
 
@@ -363,7 +350,6 @@ pub fn build(doc: &Document, page: PageRef, measure: &mut dyn Measure, opts: &Op
     d.tops = core::mem::take(&mut b.tops);
     d.notes = merge_notes(&d.tops);
     d.themes = core::mem::take(&mut b.themes);
-    d.jumps = core::mem::take(&mut b.jumps);
     let bounds = d.bounds().map_or([0.0, 0.0, d.width, d.height], |bb| union(bb, [0.0, 0.0, d.width, d.height]));
     d.grid = Grid::build(&d.items, bounds);
     d
@@ -433,10 +419,6 @@ pub(crate) struct Builder<'d, 'm> {
     notes: Vec<(Note, u32)>,
     /// "Themed" values worked out by the formula engine
     themed: themed::Themed,
-    /// (JD21) the line jumps of the pages built (rebuild: of the drawing's pages) and the one
-    /// of the page being built
-    jumps: Vec<jumps::PageJumps>,
-    cur_jumps: Option<usize>,
 }
 
 impl<'d, 'm> Builder<'d, 'm> {
@@ -463,8 +445,6 @@ impl<'d, 'm> Builder<'d, 'm> {
             tops: Vec::new(),
             notes: Vec::new(),
             themed: themed::Themed::default(),
-            jumps: Vec::new(),
-            cur_jumps: None,
         }
     }
 
@@ -589,11 +569,6 @@ impl<'d, 'm> Builder<'d, 'm> {
 
     fn page(&mut self, page: PageRef) {
         self.context(page);
-        // (JD21) the page's connectors and their line jumps before anything is drawn
-        let first = self.tops.len() as u32;
-        let pj = self.page_jumps(page, first);
-        self.jumps.push(pj);
-        self.cur_jumps = Some(self.jumps.len() - 1);
         let m = Xform::scale(self.scale, self.scale);
         let tops: Vec<ShapeRef> = self.doc.top_shapes(Owner::Page(page)).collect();
         for r in tops {
@@ -636,8 +611,6 @@ impl<'d, 'm> Builder<'d, 'm> {
                 Some((ix, Layer { visible, print, color }))
             })
             .collect();
-        // (JD21) the page's line jumps, when they are worked out already (rebuild)
-        self.cur_jumps = self.jumps.iter().position(|j| j.page == Some(page));
     }
 
     fn page_theme(&self, page: PageRef) -> Option<ThemeInfo> {
@@ -745,8 +718,7 @@ impl<'d, 'm> Builder<'d, 'm> {
         if geometry {
             let (fill, line) = self.outlines(sheet, w, h);
             let fill = fill.map(m);
-            // (JD21) a connector's line with its line jumps
-            let line = self.jumped(r, line.map(m));
+            let line = line.map(m);
             if self.effects(sheet) {
                 self.note(Note::Effects);
             }
@@ -766,7 +738,7 @@ impl<'d, 'm> Builder<'d, 'm> {
 
     /// a shape's geometry in its local coordinates: the area (the closed sub-paths of the
     /// sections without NoFill) and the line (the sections without NoLine), sections with
-    /// NoShow left out, Rounding applied (the line jumps take the same line, jumps.rs)
+    /// NoShow left out, Rounding applied
     fn outlines(&self, sheet: SheetRef, w: f64, h: f64) -> (Path, Path) {
         let sections = self.doc.geometry_paths(sheet, w, h);
         let mut fill = Path::default();
