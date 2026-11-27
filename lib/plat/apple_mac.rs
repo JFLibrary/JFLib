@@ -86,6 +86,10 @@ pub use pad_os::{gc_test_disconnect, gc_test_pad};
 #[path = "apple_mac_gpu.rs"]
 mod gpu;
 pub use gpu::*;
+// the scan dialog (scan.rs): ImageKit's device browser and scanner view
+#[path = "apple_mac_scan.rs"]
+pub(crate) mod scan_dialog;
+pub use scan_dialog::{mac_scan_close, mac_scan_shown};
 // the colour pick and pictures of the screen (screen.rs): NSColorSampler, ScreenCaptureKit
 #[path = "apple_mac_screen.rs"]
 pub(crate) mod screen_os;

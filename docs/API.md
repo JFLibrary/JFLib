@@ -73,7 +73,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: windows, input, files, threads, network, processes, desktop services
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [web_net.rs](#platweb_netrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [pid.rs](#platpidrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [apple_power_ios.rs](#platapple_power_iosrs) · [share.rs](#platsharers) · [win_share.rs (Windows)](#platwin_sharers-windows) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_plock.rs (Windows)](#platwin_plockrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_pad.rs (Windows)](#platwin_padrs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_pad.rs (Linux)](#platlinux_padrs-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_share.rs (Apple)](#platapple_ios_sharers-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_ios_pad.rs (Apple)](#platapple_ios_padrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_pad.rs (Apple)](#platapple_mac_padrs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_screen.rs (Apple)](#platapple_mac_screenrs-apple) · [apple_mac_share.rs (Apple)](#platapple_mac_sharers-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [android_thread.rs](#platandroid_threadrs) · [clipdrop.rs](#platclipdroprs) · [fuzz.rs](#platfuzzrs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [keycode.rs](#platkeycoders) · [plock.rs](#platplockrs) · [pad.rs](#platpadrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [web_net.rs](#platweb_netrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [pid.rs](#platpidrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [apple_power_ios.rs](#platapple_power_iosrs) · [scan.rs](#platscanrs) · [share.rs](#platsharers) · [win_share.rs (Windows)](#platwin_sharers-windows) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_plock.rs (Windows)](#platwin_plockrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_pad.rs (Windows)](#platwin_padrs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_pad.rs (Linux)](#platlinux_padrs-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_share.rs (Apple)](#platapple_ios_sharers-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_ios_pad.rs (Apple)](#platapple_ios_padrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_pad.rs (Apple)](#platapple_mac_padrs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_scan.rs (Apple)](#platapple_mac_scanrs-apple) · [apple_mac_screen.rs (Apple)](#platapple_mac_screenrs-apple) · [apple_mac_share.rs (Apple)](#platapple_mac_sharers-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [android_thread.rs](#platandroid_threadrs) · [clipdrop.rs](#platclipdroprs) · [fuzz.rs](#platfuzzrs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [keycode.rs](#platkeycoders) · [plock.rs](#platplockrs) · [pad.rs](#platpadrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [formats](#formats) -- bounded JSON with exact numbers, typed JSON records, an XML subset, the text encodings of the web
@@ -30893,6 +30893,60 @@ hold still answers: the request is noted for an app that starts later in the pro
 - **`fn ios_idle_timer_off() -> bool`**
   (tests) UIApplication's idleTimerDisabled now (false outside an app)
 
+### `plat/scan.rs`
+
+Source: [`lib/plat/scan.rs`](../lib/plat/scan.rs)
+
+```text
+scan -- pictures from a scanner through the system's own dialog
+
+  scan_available() -> bool      the system has a scan dialog here (macOS; elsewhere not yet)
+  scan_start(title) -> Result<(), ScanError>   the dialog in a window titled `title`: the user
+                                 chooses the device, previews, sets the area and the resolution
+                                 and scans; Busy while one is open, Unavailable where there is
+                                 none.  Call it from the UI thread.
+  scan_poll() -> Option<Result<Scanned, ScanError>>   None while the dialog is open (or none
+                                 was), then once: the scanned file, Cancelled (the window closed
+                                 without a scan) or Failed (the device or the system)
+  scan_open() -> bool            a dialog is open (its answer not taken yet)
+
+Scanned: the file as the scanner wrote it -- its name and bytes (macOS: PNG unless the user
+chose another format in the dialog); the app decodes it like a file it opened.  The answer
+wakes the UI (plat::wake).  Scanning needs no right of the app's manifest: the user starts it
+and chooses in the system's dialog, as in the file dialog.
+
+macOS (apple_mac_scan.rs): ImageKit's device browser (local and network scanners: USB,
+AirScan / eSCL, Bonjour) beside its scanner view (IKScannerDeviceView over ImageCaptureCore,
+the dialog Preview shows), the scan written to a folder of its own in the temp folder, read
+and removed.  An app under the App Sandbox needs the USB and network entitlements for it.
+Windows (WIA) and Linux (SANE) follow; until then Unavailable there, in the browser and on
+Android and iOS.
+```
+
+- **`enum ScanError`**
+  why no picture came
+  - `Unavailable` -- no scan dialog on this system
+  - `Cancelled` -- the user closed the dialog without a scan
+  - `Busy` -- a dialog is open already
+  - `Failed(String)` -- the device or the system failed: what it said
+
+- **`struct Scanned`**
+  a scanned picture: the file as the scanner wrote it
+  - `name: String` -- its name ("Scan.png")
+  - `data: Vec<u8>` -- its bytes
+
+- **`fn scan_available() -> bool`**
+  whether the system has a scan dialog here
+
+- **`fn scan_start(title: &str) -> Result<(), ScanError>`**
+  open the system's scan dialog in a window titled `title`; the answer comes through scan_poll
+
+- **`fn scan_poll() -> Option<Result<Scanned, ScanError>>`**
+  the open dialog's answer: None while it is open (or none was), then once
+
+- **`fn scan_open() -> bool`**
+  a dialog is open (its answer not taken yet)
+
 ### `plat/share.rs`
 
 Source: [`lib/plat/share.rs`](../lib/plat/share.rs)
@@ -37372,6 +37426,35 @@ as all of AppKit; lib/gpu may use the layer on its own thread (nextDrawable, dra
 
 - **`fn gpu_test_presented() -> Vec<(u64, u64)>`**
   (bench: Wayland's presentation feedback) nothing here
+
+### `plat/apple_mac_scan.rs` (Apple)
+
+Source: [`lib/plat/apple_mac_scan.rs`](../lib/plat/apple_mac_scan.rs)
+
+```text
+apple_mac_scan -- (scan.rs) macOS's scan dialog: ImageKit over ImageCaptureCore
+
+  available() -> bool            ImageKit's scanner view is there (Quartz.framework, loaded at
+                                 the first use)
+  start(title) -> Result         a window of its own: IKDeviceBrowserView (local and network
+                                 scanners, no cameras) beside IKScannerDeviceView (the dialog
+                                 Preview shows: overview, area, resolution, format, "Scan")
+  mac_scan_shown() / mac_scan_close()   (tests) the window on screen, closed as by its close
+                                 button
+
+The device chosen in the browser goes to the scanner view (its document UTI set to PNG first;
+the view's format menu may change it).  The view scans into a folder of its own below the temp
+folder (file-based transfer); the first file it reports is read, removed and answered, and the
+window closes.  Closing the window without a scan answers Cancelled; an error of the scan
+answers Failed.  Everything runs on the main thread; the delegate is one object for the
+process.
+```
+
+- **`fn mac_scan_shown() -> bool`**
+  (tests) the scan window is on screen
+
+- **`fn mac_scan_close() -> bool`**
+  (tests) the scan window closed as by its close button -> false when none is open
 
 ### `plat/apple_mac_screen.rs` (Apple)
 
