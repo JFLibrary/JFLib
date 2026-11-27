@@ -239,16 +239,28 @@ fn shown_rect(r: [i32; 4]) -> Option<Vec<u8>> {
         plat::win_test_screen(w[0] + r[0], w[1] + r[1], r[2], r[3])
     } else {
         let (w, h, px) = plat::win_test_image(0)?;
-        if r[0] < 0 || r[1] < 0 || r[0] + r[2] > w || r[1] + r[3] > h {
-            return None;
-        }
-        let mut v = Vec::with_capacity((r[2] * r[3] * 4) as usize);
-        for y in r[1]..r[1] + r[3] {
-            let at = (y * w + r[0]) as usize * 4;
-            v.extend_from_slice(&px[at..at + r[2] as usize * 4]);
-        }
-        Some(v)
+        crop(w, h, &px, r)
     }
+}
+
+/// (Windows) the rectangle r of the main window as the system composes it, without what lies on top of it (an
+/// overlay that takes no clicks, such as Discord's or the GPU driver's, which hit tests pass through)
+fn composed_rect(r: [i32; 4]) -> Option<Vec<u8>> {
+    let (w, h, px) = plat::win_test_composed(0)?;
+    crop(w, h, &px, r)
+}
+
+/// the rectangle r of a picture of w x h pixels (rows of w * 4 bytes)
+fn crop(w: i32, h: i32, px: &[u8], r: [i32; 4]) -> Option<Vec<u8>> {
+    if r[0] < 0 || r[1] < 0 || r[0] + r[2] > w || r[1] + r[3] > h {
+        return None;
+    }
+    let mut v = Vec::with_capacity((r[2] * r[3] * 4) as usize);
+    for y in r[1]..r[1] + r[3] {
+        let at = (y * w + r[0]) as usize * 4;
+        v.extend_from_slice(&px[at..at + r[2] as usize * 4]);
+    }
+    Some(v)
 }
 
 /// the rectangle r of the framebuffer, rows of B, G, R, x
@@ -888,7 +900,16 @@ impl Test {
                         }
                         Some(got) => {
                             let (n, m) = rgb_diff(&got, &want);
-                            self.ok(m <= 1, &format!("veils on the screen against the CPU's picture ({} x {}): {n} pixels differ (largest {m})", r[2], r[3]));
+                            // (hit tests pass through what takes no clicks: the window as the system composes it says
+                            // whether the difference is ours)
+                            if m > 1 && composed_rect(r).is_some_and(|c| rgb_diff(&c, &want).1 <= 1) {
+                                out(&format!(
+                                    "note: veils on the screen: {n} pixels differ (largest {m}), but the window as the system composes it \
+                                     equals the CPU's picture: something that takes no clicks lies on top of ours (an overlay)"
+                                ));
+                            } else {
+                                self.ok(m <= 1, &format!("veils on the screen against the CPU's picture ({} x {}): {n} pixels differ (largest {m})", r[2], r[3]));
+                            }
                         }
                     }
                     let (i, o) = (self.view_info(ui, 0, VIEW_ID), ui.gpu_output(0));
