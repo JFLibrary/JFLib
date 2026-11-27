@@ -218,8 +218,13 @@ pub fn run(t: &mut T) {
         both_loopback(dns::resolve_with("app.localhost.", 80, &silent)) && both_loopback(dns::resolve_with("LOCALHOST.", 80, &silent)));
     t.check("an absolute name under .localhost (plat)", both_loopback(plat::net::resolve("app.localhost.", 80)));
     let sys = Config::system();
-    t.check("Config::system: name servers (link-local ones with their zone)",
-        !sys.nameservers.is_empty() && sys.nameservers.iter().all(|a| !link_local(&a.ip) || a.scope != 0));
+    if cfg!(target_os = "android") {
+        // no /etc/resolv.conf: netd keeps the servers, names go through getaddrinfo (dns::resolve)
+        t.check("Config::system: no name servers on Android", sys.nameservers.is_empty() && sys.hosts.is_empty());
+    } else {
+        t.check("Config::system: name servers (link-local ones with their zone)",
+            !sys.nameservers.is_empty() && sys.nameservers.iter().all(|a| !link_local(&a.ip) || a.scope != 0));
+    }
     link_local_server(t);
 }
 

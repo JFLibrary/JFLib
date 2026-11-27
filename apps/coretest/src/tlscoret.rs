@@ -426,7 +426,7 @@ fn interop_pki() -> (Cert, Identity) {
 /// --tls-core-pki DIR: ca.pem, leaf.pem, leaf.key for the other side
 pub fn write_pki(dir: &str) -> i32 {
     let (root, id) = interop_pki();
-    let w = |name: &str, s: String| plat::write_file(&plat::fs::join(dir, name), s.as_bytes());
+    let w = |name: &str, s: String| plat::write_file(&crate::join(dir, name), s.as_bytes());
     let ok = w("ca.pem", netio::pem::encode("CERTIFICATE", &root.der)) && w("leaf.pem", netio::pem::encode("CERTIFICATE", &id.chain[0])) && w("leaf.key", netio::pem::encode("PRIVATE KEY", &netio::x509::ed25519_pkcs8(id.key.seed())));
     if ok { 0 } else { 1 }
 }

@@ -588,7 +588,7 @@ pub fn tool(args: &[String]) -> i32 {
     };
     match a.as_slice() {
         ["pki", dir, url, ..] => {
-            let w = |name: &str, b: &[u8]| plat::write_file(&plat::fs::join(dir, name), b);
+            let w = |name: &str, b: &[u8]| plat::write_file(&crate::join(dir, name), b);
             let server = Cert::parse(&p.server.chain[0]).unwrap_or_default();
             let n = now();
             let sign = |c: &Cert, st: Status| ResponseBuilder { status: st, ..ResponseBuilder::good(n) }.sign(c, &p.ca, None, &p.ca_key).unwrap_or_default();

@@ -1,17 +1,15 @@
 // platx -- the server-side parts of plat: sync (threads, channel), rand, net (loopback TCP /
 // UDP over IPv4 and IPv6, Unix sockets, timeouts, refused connections), fs (private files, metadata, listing,
-// links, times, free space), the local time zone; on Android sync and rand (AN1)
+// links, times, free space), the local time zone; on Android sync and rand (AN1), net without Unix
+// sockets (AN2: and the app without android.permission.INTERNET, android_net)
 
-#[cfg(not(target_os = "android"))]
 use alloc::format;
-#[cfg(not(target_os = "android"))]
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 #[cfg(not(target_os = "android"))]
 use plat::fs;
-#[cfg(not(target_os = "android"))]
 use plat::net::{IpAddr, NetErrorKind, SocketAddr, TcpListener, TcpStream, UdpSocket};
 use plat::sync::{channel, Condvar, Mutex, RecvError, RwLock};
 
@@ -23,7 +21,13 @@ pub fn run(t: &mut T) {
     {
         sync(t);
         rand(t);
-        t.later("net: TCP, UDP, Unix sockets (AN2)");
+        if android_net(t) {
+            addrs(t);
+            tcp(t, IpAddr::LOCALHOST_V4);
+            tcp(t, IpAddr::LOCALHOST_V6);
+            udp(t);
+        }
+        t.later("net: Unix sockets (AN3: their files)");
         t.later("fs, watch, the local zone (AN3)");
         t.later("service (AN4: Unsupported)");
     }
@@ -139,7 +143,6 @@ fn rand(t: &mut T) {
     t.check("random balance", (ones as i64 - 262_144).abs() < 2600);
 }
 
-#[cfg(not(target_os = "android"))]
 fn addrs(t: &mut T) {
     t.eq("parse v4", SocketAddr::parse("10.0.0.5:9443"), Some(SocketAddr::new(IpAddr::V4([10, 0, 0, 5]), 9443)));
     t.eq("parse v6", SocketAddr::parse("[::1]:80").map(|a| format!("{}", a)), Some(String::from("[::1]:80")));
@@ -154,7 +157,6 @@ fn addrs(t: &mut T) {
     t.check("resolve localhost", r.is_ok_and(|v| v.iter().any(|a| a.ip.is_loopback())));
 }
 
-#[cfg(not(target_os = "android"))]
 fn tcp(t: &mut T, ip: IpAddr) {
     let fam = if matches!(ip, IpAddr::V4(_)) { "v4" } else { "v6" };
     let Ok(l) = TcpListener::bind(&SocketAddr::new(ip, 0)) else {
@@ -227,7 +229,6 @@ fn tcp(t: &mut T, ip: IpAddr) {
     }
 }
 
-#[cfg(not(target_os = "android"))]
 fn udp(t: &mut T) {
     let a = UdpSocket::bind(&SocketAddr::new(IpAddr::LOCALHOST_V4, 0));
     let b = UdpSocket::bind(&SocketAddr::new(IpAddr::LOCALHOST_V4, 0));
@@ -599,4 +600,44 @@ fn service(t: &mut T) {
     let u = plat::service::unit_text(&spec);
     t.check("unit: control characters in the description are spaces", u.contains("Description=Ein ExecStartPre=/bin/evil  Dienst\n") && !u.contains('\r'));
     t.check("not a service: no stop request", !plat::service::stop_requested());
+}
+
+/// Android (docs/ANDROID.md AN2) -> whether the app may use the network.  With
+/// android.permission.INTERNET: getaddrinfo (Bionic, netd) through the system's hosts file, the
+/// device's interfaces and addresses without netlink, its name.  Without it every IPv4 and IPv6
+/// socket and every lookup is refused with NetError::no_internet and a word on the manifest; the
+/// line "plat: no network: ..." shows it (tools/android_console.py --no-internet expects it)
+#[cfg(target_os = "android")]
+fn android_net(t: &mut T) -> bool {
+    use plat::net::{if_index, local_addrs, resolve, NetError};
+    let any4 = SocketAddr::new(IpAddr::LOCALHOST_V4, 0);
+    if let Err(e) = UdpSocket::bind(&any4) {
+        if !e.no_internet() {
+            t.check(&format!("net: a UDP socket ({})", e), false);
+            return false;
+        }
+        plat::write_stdout(format!("plat: no network: {}\n", e).as_bytes());
+        let text = format!("{}", e);
+        t.check("no INTERNET: the message names the manifest's permission", text.contains("android.permission.INTERNET") && e.kind == NetErrorKind::Denied);
+        let none = |r: Result<(), NetError>| r.is_err_and(|e| e.no_internet());
+        t.check("no INTERNET: TCP listener", none(TcpListener::bind(&any4).map(|_| ())));
+        t.check("no INTERNET: TCP connection", none(TcpStream::connect(&SocketAddr::new(IpAddr::LOCALHOST_V4, 9), 2000).map(|_| ())));
+        t.check("no INTERNET: IPv6", none(UdpSocket::bind(&SocketAddr::new(IpAddr::LOCALHOST_V6, 0)).map(|_| ())));
+        t.check("no INTERNET: a name through the system's resolver", none(resolve("example.org", 443).map(|_| ())));
+        // numbers and localhost need no lookup
+        t.check("no INTERNET: localhost still resolves", resolve("localhost", 80).is_ok());
+        return false;
+    }
+    // Android's /system/etc/hosts names ::1 ip6-localhost: getaddrinfo without a name server
+    let r = resolve("ip6-localhost", 80);
+    t.check(&format!("getaddrinfo: ip6-localhost through the system's hosts file ({:?})", r), r.as_ref().is_ok_and(|v| v.contains(&SocketAddr::new(IpAddr::LOCALHOST_V6, 80))));
+    let r = resolve("no-such-name.invalid", 80);
+    t.check(&format!("getaddrinfo: an unknown name -> NotFound ({:?})", r), r.is_err_and(|e| e.kind == NetErrorKind::NotFound));
+    let addrs = local_addrs();
+    t.check(&format!("local addresses: loopback among them ({:?})", addrs), addrs.iter().any(|a| a.ip == IpAddr::LOCALHOST_V4));
+    plat::write_stdout(format!("plat: local addresses {}\n", addrs.iter().map(|a| format!("{}", a.ip)).collect::<Vec<_>>().join(" ")).as_bytes());
+    t.check("if_index lo", if_index("lo").is_some_and(|i| i > 0));
+    t.check("hostname", !plat::net::hostname().is_empty());
+    t.check("dns_servers: netd keeps them", plat::net::dns_servers().is_empty());
+    true
 }

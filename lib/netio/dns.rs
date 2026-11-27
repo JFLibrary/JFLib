@@ -2,16 +2,20 @@
 //
 //   resolve(host, port) -> NetResult<Vec<SocketAddr>>   numeric addresses, "localhost" and
 //                     names under .localhost, with a final dot as well (the loopback addresses,
-//                     RFC 6761) directly, on every system; Windows, macOS and iOS: the system
-//                     resolver (plat::net::resolve, getaddrinfo on Apple: VPNs with name
+//                     RFC 6761) directly, on every system; Windows, macOS, iOS and Android: the
+//                     system resolver (plat::net::resolve, getaddrinfo on Apple: VPNs with name
 //                     servers of their own, .local over mDNS, iOS's profiles and the app
-//                     sandbox, none of which /etc/resolv.conf shows); Linux: /etc/hosts, then
+//                     sandbox, none of which /etc/resolv.conf shows; on Android Bionic's, which
+//                     asks netd: private DNS, VPNs, the app's network); Linux: /etc/hosts, then
 //                     the name servers of /etc/resolv.conf
 //                     (search domains, ndots)
-//   resolve_with(host, port, &Config)   the same with a given configuration (tests)
+//   resolve_with(host, port, &Config)   the same with a given configuration (tests, a server
+//                                       of one's own)
 //   Config::system()                    /etc/hosts + /etc/resolv.conf; Windows: the hosts file
 //                                       of %SystemRoot% and the DNS servers of the adapters
-//                                       (plat::net::dns_servers)
+//                                       (plat::net::dns_servers); Android: no name servers
+//                                       (there is no /etc/resolv.conf, netd keeps them) and no
+//                                       hosts: resolve_with answers numbers and localhost only
 //
 // Name servers on IPv6 link-local addresses carry their zone into the socket address
 // (sin6_scope_id): "nameserver fe80::1%eth0" (the interface by name or by number, "%2";
@@ -19,7 +23,7 @@
 // interface of this computer is left out.
 //
 // Queries of this resolver (resolve on Linux, resolve_with everywhere; the system resolver of
-// Windows, macOS and iOS checks its answers in its own way): A and AAAA over UDP (2 s per server
+// Windows, macOS, iOS and Android checks its answers in its own way): A and AAAA over UDP (2 s per server
 // and attempt, two rounds), over TCP when the answer is truncated; an answer must come from the
 // server asked and carry the query's id and question (an NXDOMAIN too), and only addresses of the
 // asked name count, or of the name its CNAME chain in the answer leads to (at most 8 steps):
@@ -66,6 +70,9 @@ impl Config {
             let root = plat::env("SystemRoot").unwrap_or_else(|| String::from("C:\\Windows"));
             c.hosts = read(&format!("{}\\System32\\drivers\\etc\\hosts", root));
             return c;
+        }
+        if cfg!(target_os = "android") {
+            return Config { ndots: 1, ..Config::default() };
         }
         let mut c = Config::from_resolv_conf(&read("/etc/resolv.conf"));
         c.hosts = read("/etc/hosts");
@@ -392,7 +399,7 @@ pub fn resolve_with(host: &str, port: u16, cfg: &Config) -> NetResult<Vec<Socket
 
 /// the addresses of a host (see the top of this file)
 pub fn resolve(host: &str, port: u16) -> NetResult<Vec<SocketAddr>> {
-    if cfg!(any(windows, target_vendor = "apple")) {
+    if cfg!(any(windows, target_vendor = "apple", target_os = "android")) {
         return plat::net::resolve(host, port);
     }
     // numbers and localhost need no system files (an app's rules may not grant them)

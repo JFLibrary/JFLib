@@ -125,20 +125,41 @@ fn version_code(version: &str) -> Result<u32, String> {
     Ok(code as u32)
 }
 
+/// the rules of PERMISSIONS: the permission of each line (after `ask`), comments left out; None:
+/// the app has no PERMISSIONS, so it may do everything
+fn permission_keys(dir: &Path) -> Option<Vec<String>> {
+    let text = fs::read_to_string(dir.join("PERMISSIONS")).ok()?;
+    Some(text.lines().filter_map(|l| {
+        let mut words = l.split('#').next().unwrap_or("").split_whitespace();
+        let first = words.next()?;
+        Some(if first == "ask" { words.next()? } else { first }.to_string())
+    }).collect())
+}
+
+/// whether the manifest needs android.permission.INTERNET (docs/ANDROID.md, decision 5): the app
+/// has no PERMISSIONS (it may do everything) or names net.connect or net.listen there.  Without it
+/// the kernel refuses the app every socket (plat::net: NetError::no_internet)
+fn wants_internet(keys: Option<&[String]>) -> bool {
+    keys.is_none_or(|k| k.iter().any(|k| k == "net.connect" || k == "net.listen"))
+}
+
 /// the manifest of an app without android/AndroidManifest.xml: the shared host under the app's id
 /// (PACKAGE app_id=, else org.example.NAME), its display name, the location permission when
-/// PERMISSIONS names `location`
+/// PERMISSIONS names `location`, INTERNET when the app may use the network (wants_internet)
 fn default_manifest(dir: &Path, name: &str, version: &str, icon: bool) -> Result<String, String> {
     let meta = crate::pkgmeta::Meta::read(dir);
     let get = |k: &str| meta.get(k).map(String::from);
     let id = get("app_id").unwrap_or_else(|| format!("org.example.{}", name.chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '_' }).collect::<String>()));
     let label = get("display").unwrap_or_else(|| name.to_string()).replace('&', "&amp;").replace('<', "&lt;").replace('"', "&quot;");
     let code = version_code(version)?;
-    let location = fs::read_to_string(dir.join("PERMISSIONS")).unwrap_or_default().lines()
-        .any(|l| l.split('#').next().unwrap_or("").split_whitespace().any(|w| w == "location"));
-    let perms = if location {
-        "    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\" />\n    <uses-permission android:name=\"android.permission.ACCESS_COARSE_LOCATION\" />\n"
-    } else { "" };
+    let keys = permission_keys(dir);
+    let mut perms = String::new();
+    if wants_internet(keys.as_deref()) {
+        perms.push_str("    <uses-permission android:name=\"android.permission.INTERNET\" />\n");
+    }
+    if keys.as_deref().is_some_and(|k| k.iter().any(|k| k == "location")) {
+        perms.push_str("    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\" />\n    <uses-permission android:name=\"android.permission.ACCESS_COARSE_LOCATION\" />\n");
+    }
     Ok(format!(r#"<?xml version="1.0" encoding="utf-8"?>
 <!-- made by cargo jflib android: JFLib's Java host (package org.jflib.gallery) under the app's id.
      Write android/AndroidManifest.xml to change it (and android/res/ for its icon). -->
@@ -165,17 +186,27 @@ fn default_manifest(dir: &Path, name: &str, version: &str, icon: bool) -> Result
 }
 
 /// what PERMISSIONS allows but the manifest does not declare, and a manifest that hides the app
-/// from phones without Vulkan (tools/android.py's manifest_gaps)
+/// from phones without Vulkan (tools/android.py's manifest_gaps).  An own manifest needs INTERNET
+/// only for net.connect and net.listen: an app without PERMISSIONS that wrote its own may well have
+/// left it out (its sockets then say so, NetError::no_internet)
 fn manifest_gaps(manifest: &str, dir: &Path) -> Result<(), String> {
+    gaps(manifest, permission_keys(dir).as_deref())
+}
+
+fn gaps(manifest: &str, keys: Option<&[String]>) -> Result<(), String> {
     for tag in manifest.split("<uses-feature").skip(1).map(|t| t.split('>').next().unwrap_or("")) {
         if tag.contains("android.hardware.vulkan") && !tag.contains("android:required=\"false\"") {
             return Err("the manifest requires Vulkan: the app must start without it (android:required=\"false\")".to_string());
         }
     }
-    let location = fs::read_to_string(dir.join("PERMISSIONS")).unwrap_or_default().lines()
-        .any(|l| l.split('#').next().unwrap_or("").split_whitespace().any(|w| w == "location"));
-    if location && !manifest.contains("ACCESS_FINE_LOCATION") && !manifest.contains("ACCESS_COARSE_LOCATION") {
+    let Some(keys) = keys else { return Ok(()) };
+    let has = |k: &str| keys.iter().any(|x| x == k);
+    if has("location") && !manifest.contains("ACCESS_FINE_LOCATION") && !manifest.contains("ACCESS_COARSE_LOCATION") {
         return Err("PERMISSIONS has `location`: the manifest needs ACCESS_FINE_LOCATION and / or ACCESS_COARSE_LOCATION".to_string());
+    }
+    if (has("net.connect") || has("net.listen")) && !manifest.contains("android.permission.INTERNET") {
+        return Err("PERMISSIONS has `net.connect` or `net.listen`: the manifest needs \
+                    <uses-permission android:name=\"android.permission.INTERNET\" /> (without it Android refuses every socket)".to_string());
     }
     Ok(())
 }
@@ -360,7 +391,7 @@ pub(crate) fn run_cmd(args: &[String]) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{debuggable, version_code};
+    use super::{debuggable, gaps, version_code, wants_internet};
 
     // every version its own code, in the versions' order
     #[test]
@@ -381,5 +412,20 @@ mod tests {
         assert!(debuggable(r#"<application android:debuggable="@bool/debug">"#));
         assert!(!debuggable(r#"<application android:debuggable="false">"#));
         assert!(!debuggable(r#"<application android:allowBackup="false">"#));
+    }
+
+    // INTERNET without PERMISSIONS or with net.connect / net.listen (docs/ANDROID.md, decision 5)
+    #[test]
+    fn internet_follows_the_network_rules() {
+        let keys = |k: &[&str]| k.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert!(wants_internet(None));
+        assert!(!wants_internet(Some(&keys(&["fs.user", "print"]))));
+        assert!(wants_internet(Some(&keys(&["fs.user", "net.connect"]))));
+        assert!(wants_internet(Some(&keys(&["net.listen"]))));
+        let with = r#"<uses-permission android:name="android.permission.INTERNET" />"#;
+        assert!(gaps("<manifest>", Some(&keys(&["net.connect"]))).is_err());
+        assert!(gaps(with, Some(&keys(&["net.connect"]))).is_ok());
+        assert!(gaps("<manifest>", Some(&keys(&["print"]))).is_ok());
+        assert!(gaps("<manifest>", None).is_ok());
     }
 }

@@ -106,12 +106,12 @@ pub mod style_netlab {
     pub use ::style_netlab::STYLE;
 }
 
-// plat has no fs and net on these two targets
+// plat has no fs on these two targets (Android: AN3), the browser no sockets
 #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 pub use cas;
 #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 pub use datastore;
-#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
+#[cfg(not(target_arch = "wasm32"))]
 pub use netio;
 #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 pub use update;

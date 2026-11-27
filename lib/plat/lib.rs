@@ -123,7 +123,7 @@ pub mod service;
 #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub mod watch;
 /// The operating system's trusted certificate authorities (TLS clients of public servers).
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 pub mod certs;
 // The system's cryptographic random numbers (fill_random, random_bytes): Windows, Linux, Apple
 // and Android; not in the browser (there the page's crypto.getRandomValues).

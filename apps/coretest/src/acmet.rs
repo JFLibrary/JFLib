@@ -537,7 +537,7 @@ pub fn pebble() -> i32 {
     let arg = |k: &str| plat::arg_value(k).unwrap_or_default();
     // the PKI of --tls-pki DIR --key p256: Pebble's https certificate is its server.pem
     let p = pki(60, Kind::P256);
-    let same = plat::read_file(&plat::fs::join(&arg("--acme-pebble"), "ca.pem")).and_then(|b| netio::pem::decode(&String::from_utf8_lossy(&b), "CERTIFICATE"));
+    let same = plat::read_file(&crate::join(&arg("--acme-pebble"), "ca.pem")).and_then(|b| netio::pem::decode(&String::from_utf8_lossy(&b), "CERTIFICATE"));
     if same.as_deref() != Some(&p.ca.der[..]) {
         plat::write_stderr(b"--acme-pebble DIR: not the PKI of --tls-pki DIR --key p256\n");
         return 2;

@@ -28614,10 +28614,12 @@ net -- TCP, UDP and Unix domain sockets (IPv4 and IPv6) with timeouts
             /sys/class/net/NAME/ifindex, else ioctl SIOCGIFINDEX; Windows: if_nametoindex) or
             by number ("%2")
   local_addrs() -> this computer's addresses (port 0, link-local ones with their scope):
-            Windows GetAdaptersAddresses; Linux SIOCGIFCONF (IPv4), /proc/net/if_inet6 (IPv6)
+            Windows GetAdaptersAddresses; Linux and Android SIOCGIFCONF (IPv4),
+            /proc/net/if_inet6 (IPv6; an Android app may not read it: then IPv4 only)
   dns_servers() -> (Windows) the DNS servers of the adapters that are up, with their scope
             (the well-known site-local fec0:0:0:ffff::1..3 Windows lists without IPv6 DNS
-            are left out); Linux: empty (netio::dns reads /etc/resolv.conf)
+            are left out); Linux: empty (netio::dns reads /etc/resolv.conf); Android: empty
+            (netd keeps them, names go through getaddrinfo)
   TcpListener::bind(&addr) / accept() / accept_timeout(ms) / local_addr()
   TcpStream::connect(&addr, timeout_ms) / read / write / write_all / read_exact,
             set_read_timeout / set_write_timeout (ms, None = block), set_nodelay,
@@ -28627,17 +28629,24 @@ net -- TCP, UDP and Unix domain sockets (IPv4 and IPv6) with timeouts
   UnixListener::bind(path) / accept() / accept_timeout(ms); connect_unix(path, timeout_ms)
             (bind removes only a socket file nobody listens on; the drop only its own)
             -> UnixStream (the stream calls of TcpStream; addresses and nodelay do not apply)
-            Linux, and Windows 10 1803 and later (AF_UNIX)
+            Linux, and Windows 10 1803 and later (AF_UNIX); not on Android yet (plat::fs, AN3)
   resolve(host, port): numeric addresses, "localhost" and names under .localhost (the loopback
-            addresses, RFC 6761; with a final dot as well); Windows, macOS and iOS also the
-            system resolver (GetAddrInfoW, getaddrinfo).  Linux: other names NotFound, since
+            addresses, RFC 6761; with a final dot as well); Windows, macOS, iOS and Android
+            also the system resolver (GetAddrInfoW, getaddrinfo; on Android Bionic's, which asks
+            netd: private DNS, VPNs, the network of the app).  Linux: other names NotFound, since
             there is no libc here: netio::dns resolves them (/etc/hosts, the name servers).
   NetError: the kinds callers act on, with the OS code
 
 (G7d) Everywhere: the addresses, NetError and host_port.  The sockets, names and interfaces are
-Windows', Linux's and Apple's; the browser has WebSocket instead (web_net.rs: the page's
-WebSocket through the JS host, net.connect checked on the URL's host and port), Android nothing
-yet (docs/ANDROID.md).
+Windows', Linux's, Apple's and Android's; the browser has WebSocket instead (web_net.rs: the
+page's WebSocket through the JS host, net.connect checked on the URL's host and port).
+
+Android (docs/ANDROID.md AN2) takes the Linux sockets with rt::kernel's numbers, names through
+Bionic's getaddrinfo (there is no /etc/resolv.conf), interfaces without netlink and without MAC
+addresses.  An app whose manifest lacks android.permission.INTERNET gets no IPv4 or IPv6 socket:
+socket() answers EACCES where the kernel checks the group inet, EPERM where netd's eBPF program
+checks (Android 15 on the emulator).  Either becomes NetErrorKind::Denied with that code and a
+word on the manifest (NetError::no_internet; a lookup that fails checks for it as well).
 
 The app's permissions (policy.rs, net.connect / net.listen) are checked before connect,
 bind, send_to and a name lookup; Unix sockets follow the file rules (fs.write on the path).
@@ -28698,7 +28707,7 @@ one thread may read while another writes (Arc<TcpStream>).
 - **`fn dns_servers() -> Vec<SocketAddr>`**
   (Windows) the DNS servers of the network adapters that are up (port 53, link-local ones
   with their scope), in the system's adapter order; Linux: empty (netio::dns reads
-  /etc/resolv.conf)
+  /etc/resolv.conf); Android: empty (netd keeps them)
 
 - **`enum NetErrorKind`**
   - `TimedOut`
@@ -28709,7 +28718,9 @@ one thread may read while another writes (Arc<TcpStream>).
   - `Unreachable`
   - `NotFound`
   - `Eof` -- the peer closed the connection before all bytes arrived (read_exact)
-  - `Denied` -- the app's permissions (apps/NAME/PERMISSIONS) do not allow the address or name
+  - `Denied` -- the app's permissions (apps/NAME/PERMISSIONS) do not allow the address or name; on
+    Android with code 13 (EACCES) or 1 (EPERM): the app's manifest lacks
+    android.permission.INTERNET (NetError::no_internet)
   - `Other`
 
 - **`struct NetError`**
@@ -28719,6 +28730,11 @@ one thread may read while another writes (Arc<TcpStream>).
 **`impl NetError`**
 
 - **`const fn new(kind: NetErrorKind, code: i32) -> NetError`**
+- **`fn no_internet(&self) -> bool`**
+  (Android) the app's manifest lacks android.permission.INTERNET: Android refuses it every
+  IPv4 and IPv6 socket (EACCES or EPERM), and the system's resolver every name.  The manifest
+  `cargo jflib android` writes has it when the app has no PERMISSIONS or names net.connect
+  or net.listen there; an own AndroidManifest.xml needs it too.  Always false elsewhere
 
 - **`type NetResult<T> = Result<T, NetError>`**
 
@@ -28832,8 +28848,8 @@ one thread may read while another writes (Arc<TcpStream>).
 - **`fn resolve(host: &str, port: u16) -> NetResult<Vec<SocketAddr>>`**
   the addresses of a host: numeric forms, "localhost" and names under .localhost, with a final
   dot as well (both loopback addresses, RFC 6761 6.3, as netio::dns answers them) everywhere;
-  on Windows, macOS and iOS other names through the system resolver, on Linux NotFound for them
-  (no libc here: netio::dns::resolve reads /etc/hosts and asks the name servers).  The
+  on Windows, macOS, iOS and Android other names through the system resolver, on Linux NotFound
+  for them (no libc here: netio::dns::resolve reads /etc/hosts and asks the name servers).  The
   addresses of a name are registered with the app's rules (policy::net_resolved), so a rule
   for the name (app.localhost:8080) covers connections to them
 
@@ -29298,18 +29314,19 @@ certs -- the operating system's trusted certificate authorities
        and the stapled response, without network access.  Either way the system's policy
        applies to the extra CAs as well, and its answer is the whole answer.  Some(Err) says
        why the system refuses.  Linux: None (netio checks against the bundle, then the extra
-       CAs).
+       CAs).  Android: None as well (the same way with the system's CA folders).
   verify_tls_server_roots(chain, host, roots, time) -> Option<Result<(), Refused>>
        the same with only these CAs as trust anchors (DER), not the system's: nothing
        fetched, no revocation; the system's checks against a PKI of one's own
-       (tools/limbo_check.py --system).  An empty host: no name checked.  Linux: None.
+       (tools/limbo_check.py --system).  An empty host: no name checked.  Linux, Android: None.
   Refused { reason, text }   Reason: UnknownCa, Expired, Name, Revoked, Usage, Other; text:
        the system's own words (and its code)
   root_bundle() -> Option<Vec<u8>>
        Linux: PEM -- the file SSL_CERT_FILE names, else the distribution's CA bundle (Debian /
        Ubuntu, Fedora / RHEL, openSUSE, Alpine), and the files in the folders of SSL_CERT_DIR
-       (':' between them), as OpenSSL takes the two; macOS: /etc/ssl/cert.pem.  Windows,
-       iOS: None.
+       (':' between them), as OpenSSL takes the two; macOS: /etc/ssl/cert.pem; Android: the
+       system's CA folder (/apex/com.android.conscrypt/cacerts, else
+       /system/etc/security/cacerts; only the system's CAs).  Windows, iOS: None.
 ```
 
 - **`enum Reason`**
@@ -29335,9 +29352,24 @@ certs -- the operating system's trusted certificate authorities
 
 - **`fn root_bundle() -> Option<Vec<u8>>`** *(Windows)*
 
-- **`fn verify_tls_server(_chain: &[&[u8]], _host: &str, _ocsp: Option<&[u8]>, _extra: &[&[u8]], _time: i64) -> Option<Result<(), Refused>>`** *(Linux)*
+```rust
+/// the CA folders of Android, newest first: Conscrypt's APEX (Android 14 and later, updated with
+/// Conscrypt), else the system image's
+ANDROID_CA_DIRS: [&str; 2] = ["/apex/com.android.conscrypt/cacerts", "/system/etc/secu ...
+```
 
-- **`fn verify_tls_server_roots(_chain: &[&[u8]], _host: &str, _roots: &[&[u8]], _time: i64) -> Option<Result<(), Refused>>`** *(Linux)*
+- **`fn root_bundle() -> Option<Vec<u8>>`**
+  Android: the system's CAs (docs/ANDROID.md decision 6) -- the files of the first folder of
+  ANDROID_CA_DIRS that has any, one certificate per file (its PEM, then a text dump), in the
+  order of their names.  The CAs the user installed stay out, as for every Android app since API
+  24 (Network Security Config); so do SSL_CERT_FILE and SSL_CERT_DIR
+
+- **`fn android_ca_dir() -> Option<&'static str>`**
+  (Android) the folder root_bundle reads: the first of ANDROID_CA_DIRS with files in it
+
+- **`fn verify_tls_server(_chain: &[&[u8]], _host: &str, _ocsp: Option<&[u8]>, _extra: &[&[u8]], _time: i64) -> Option<Result<(), Refused>>`**
+
+- **`fn verify_tls_server_roots(_chain: &[&[u8]], _host: &str, _roots: &[&[u8]], _time: i64) -> Option<Result<(), Refused>>`**
 
 - **`fn verify_tls_server(chain: &[&[u8]], host: &str, ocsp: Option<&[u8]>, extra: &[&[u8]], time: i64) -> Option<Result<(), Refused>>`** *(Windows)*
 
@@ -46077,16 +46109,20 @@ dns -- host names to addresses
 
   resolve(host, port) -> NetResult<Vec<SocketAddr>>   numeric addresses, "localhost" and
                     names under .localhost, with a final dot as well (the loopback addresses,
-                    RFC 6761) directly, on every system; Windows, macOS and iOS: the system
-                    resolver (plat::net::resolve, getaddrinfo on Apple: VPNs with name
+                    RFC 6761) directly, on every system; Windows, macOS, iOS and Android: the
+                    system resolver (plat::net::resolve, getaddrinfo on Apple: VPNs with name
                     servers of their own, .local over mDNS, iOS's profiles and the app
-                    sandbox, none of which /etc/resolv.conf shows); Linux: /etc/hosts, then
+                    sandbox, none of which /etc/resolv.conf shows; on Android Bionic's, which
+                    asks netd: private DNS, VPNs, the app's network); Linux: /etc/hosts, then
                     the name servers of /etc/resolv.conf
                     (search domains, ndots)
-  resolve_with(host, port, &Config)   the same with a given configuration (tests)
+  resolve_with(host, port, &Config)   the same with a given configuration (tests, a server
+                                      of one's own)
   Config::system()                    /etc/hosts + /etc/resolv.conf; Windows: the hosts file
                                       of %SystemRoot% and the DNS servers of the adapters
-                                      (plat::net::dns_servers)
+                                      (plat::net::dns_servers); Android: no name servers
+                                      (there is no /etc/resolv.conf, netd keeps them) and no
+                                      hosts: resolve_with answers numbers and localhost only
 
 Name servers on IPv6 link-local addresses carry their zone into the socket address
 (sin6_scope_id): "nameserver fe80::1%eth0" (the interface by name or by number, "%2";
@@ -46094,7 +46130,7 @@ plat::net::ip_scope_parse), the adapter's index on Windows.  A server whose zone
 interface of this computer is left out.
 
 Queries of this resolver (resolve on Linux, resolve_with everywhere; the system resolver of
-Windows, macOS and iOS checks its answers in its own way): A and AAAA over UDP (2 s per server
+Windows, macOS, iOS and Android checks its answers in its own way): A and AAAA over UDP (2 s per server
 and attempt, two rounds), over TCP when the answer is truncated; an answer must come from the
 server asked and carry the query's id and question (an NXDOMAIN too), and only addresses of the
 asked name count, or of the name its CNAME chain in the answer leads to (at most 8 steps):
