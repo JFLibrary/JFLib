@@ -62,6 +62,8 @@ pub struct Labels {
     pub min: String,
     /// Func::Max
     pub max: String,
+    /// Func::Median
+    pub median: String,
     /// the rows over all groups
     pub grand: String,
     /// a true value
@@ -73,7 +75,7 @@ pub struct Labels {
 impl Default for Labels {
     fn default() -> Labels {
         let s = String::from;
-        Labels { total: s("Total"), average: s("Average"), count: s("Count"), min: s("Minimum"), max: s("Maximum"), grand: s("Grand total"), yes: s("TRUE"), no: s("FALSE") }
+        Labels { total: s("Total"), average: s("Average"), count: s("Count"), min: s("Minimum"), max: s("Maximum"), median: s("Median"), grand: s("Grand total"), yes: s("TRUE"), no: s("FALSE") }
     }
 }
 
@@ -86,6 +88,7 @@ impl Labels {
             Func::Count => &self.count,
             Func::Min => &self.min,
             Func::Max => &self.max,
+            Func::Median => &self.median,
         }
     }
 }
@@ -399,6 +402,10 @@ fn matches(f: &Filter, r: &Raw, case: bool, env: &Env) -> bool {
 }
 
 fn passes(doc: &Document, s: ShapeRef, def: &ReportDef) -> bool {
+    // Visio leaves the criteria out of a definition with AdvancedFilter="1" (its check in JD19)
+    if def.advanced_filter {
+        return true;
+    }
     let mut ok = true;
     for (k, f) in def.filters.iter().enumerate() {
         let m = matches(f, &raw(doc, s, &f.property), def.case_sensitive, &doc.fields);
@@ -513,6 +520,14 @@ fn summary(rows: &[&Vec<Raw>], k: usize, f: Func) -> Option<(f64, Option<Unit>)>
             if f == Func::Total { sum } else { sum / nums.len() as f64 }
         }
         Func::Min => nums.iter().copied().fold(f64::INFINITY, f64::min),
+        // the middle one, of an even number the mean of the two middle ones (Visio's: 99 and
+        // 800.5 give 449.75)
+        Func::Median => {
+            let mut v = nums;
+            v.sort_by(|a, b| a.partial_cmp(b).unwrap_or(core::cmp::Ordering::Equal));
+            let n = v.len();
+            if n % 2 == 1 { v[n / 2] } else { (v[n / 2 - 1] + v[n / 2]) / 2.0 }
+        }
         _ => nums.iter().copied().fold(f64::NEG_INFINITY, f64::max),
     };
     Some((v, unit))
@@ -554,13 +569,15 @@ pub fn run(doc: &Document, def: &ReportDef, ctx: &Ctx) -> Table {
         }
         Ordering::Equal
     });
-    let cols: Vec<usize> = {
-        let mut v: Vec<usize> = (0..def.fields.len()).filter(|&k| def.fields[k].display).collect();
-        v.sort_by_key(|&k| def.fields[k].order);
-        v
-    };
     let grouping = def.grouping.clone().unwrap_or_default();
     let gk = (grouping.field != 0).then(|| def.fields.iter().position(|f| f.id == grouping.field)).flatten();
+    // the columns in DisplayOrder, the grouping field first (Visio's report does so: Standort
+    // before Name although its DisplayOrder was 2, JD19's check)
+    let cols: Vec<usize> = {
+        let mut v: Vec<usize> = (0..def.fields.len()).filter(|&k| def.fields[k].display).collect();
+        v.sort_by_key(|&k| (Some(k) != gk, def.fields[k].order));
+        v
+    };
     let funcs_of = |k: usize| Func::of_mask(def.fields[k].summary);
     let used: Vec<Func> = FUNCS.iter().copied().filter(|f| cols.iter().any(|&k| def.fields[k].summary & f.bit() != 0)).collect();
     let mut table = Table { title: String::from(def.heading()), columns: Vec::new(), rows: Vec::new(), shapes: taken.len() };

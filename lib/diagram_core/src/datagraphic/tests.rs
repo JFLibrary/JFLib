@@ -254,10 +254,26 @@ fn applying_makes_callouts_that_compute_from_the_shape() {
     assert!(near(single_num(doc, SheetRef::Shape(txt), "PinY"), -gap - 0.125));
     // Visio's cells on the shape and on the callout; the layer
     let uid = doc.str(doc.master(m).unwrap().header.unique_id.unwrap());
-    assert_eq!(user_formula(doc, SheetRef::Shape(a), "visDGDisplayFormat"), Some(alloc::format!("USE(\"{uid}\")")));
+    // USE({UniqueID}) bare, as Visio writes it (Visio recognised no graphic named USE("{..}"))
+    assert_eq!(user_formula(doc, SheetRef::Shape(a), "visDGDisplayFormat"), Some(alloc::format!("USE({uid})")));
     assert_eq!(user_formula(doc, SheetRef::Shape(a), "visDGDefaultPos").as_deref(), Some("PNT(6,3)"));
+    // a point stored as Visio stores it: V='PNT(6,3)' U='PNT' (not the number 6)
+    let pos = doc.resolve(SheetRef::Shape(a), &CellAddr::row(SecKey::one(doc.sym("User").unwrap()), RowKey::Named(doc.sym("visDGDefaultPos").unwrap()), doc.sym("Value").unwrap()));
+    assert_eq!(pos.unit(), Some(Unit::Point));
+    assert_eq!(pos.value().text().map(|t| doc.str(t)), Some("PNT(6,3)"));
     assert!(num(doc, SheetRef::Shape(a), "Control", "msvDGPosition", "X").is_some_and(|x| near(x, 2.0 * 1.25)));
-    assert_eq!(user_num(doc, SheetRef::Shape(bar), "visDGCalloutItem"), Some(1.0));
+    // the instance names its item as Visio's own instances do: DEPENDSON(the item's shape ID in
+    // the master), a Boolean 0
+    let item_id = item_shape_id(doc, m, 1).unwrap();
+    assert_eq!(user_formula(doc, SheetRef::Shape(bar), "visDGCalloutItem"), Some(alloc::format!("DEPENDSON({item_id})")));
+    assert_eq!(user_num(doc, SheetRef::Shape(bar), "visDGCalloutItem"), Some(0.0));
+    // the master's items carry Visio's mark 5, its shapes start at ID 5, its UniqueID has the
+    // pattern Visio gives its masters (else Visio changes it and USE() names nothing)
+    let g = master_group(doc, m).unwrap();
+    assert_eq!(doc.shape(g).unwrap().id(), 5);
+    let k = doc.shape(g).unwrap().children().next().unwrap();
+    assert_eq!(user_num(doc, SheetRef::Shape(k), "visDGCalloutItem"), Some(5.0));
+    assert!(uid.ends_with("-8E40-00608CF305B2}"), "{uid}");
     let ix = doc.layer_by_name(f.page, LAYER_U).unwrap();
     assert_eq!(doc.layer_members(bar), vec![ix]);
     assert!(near(user_num(doc, SheetRef::Page(f.page), "msvDGCalloutGap").unwrap(), gap));
@@ -331,6 +347,13 @@ fn colour_by_value_and_removal_restore_the_shape() {
     apply_to(&mut f, &[a, b, c], m);
     assert_eq!(fill(&f.doc, a), "#00ff00");
     assert_eq!(fill(&f.doc, b), "#ff0000");
+    // the colour in the User cell carries U='COLOR' as Visio writes it (unmarked, Visio read
+    // "#00ff00" back as 0: black after its next recalculation)
+    let cbv = CellAddr::row(SecKey::one(f.doc.sym("User").unwrap()), RowKey::Named(f.doc.sym("visDGCBVFill").unwrap()), f.doc.sym("Value").unwrap());
+    assert_eq!(f.doc.resolve(SheetRef::Shape(a), &cbv).unit(), Some(Unit::Color));
+    // a themed fill falls back to the theme's value named for a User cell, not THEMEVAL()
+    assert_eq!(in_user_cell(s(" THEMEVAL( ) "), "FillColor"), "THEMEVAL(\"FillColor\")");
+    assert_eq!(in_user_cell(s("RGB(1,2,3)"), "FillColor"), "RGB(1,2,3)");
     // the shape keeps its kind (no callouts), its colours are kept
     assert_eq!(f.doc.shape(a).unwrap().header().kind, ShapeKind::Shape);
     assert!(user_text(&f.doc, SheetRef::Shape(a), "visDGOldColors").is_some_and(|t| t.contains("FillForegnd=F:RGB(1,2,3)")));

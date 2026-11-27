@@ -369,7 +369,7 @@ fn visio_shaped(h: &mut H, src: &Document) {
         tx.set_user_formula(ts, "visDGDisplayFormat", "USE(\"{0F1E2D3C-4B5A-4978-8695-A4B3C2D1E0F9}\")").map_err(e)?;
         let k = tx.add_instance(Owner::Page(d.page), cm, 0.0, 0.0).map_err(e)?;
         tx.move_shape(k, Some(target), None).map_err(e)?;
-        tx.set_user(SheetRef::Shape(k), "visDGCalloutItem", Value::Num(1.0), None).map_err(e)?;
+        tx.set_user(SheetRef::Shape(k), "visDGCalloutItem", Value::Num(5.0), None).map_err(e)?;
         let _ = tx.commit();
         let _ = cm;
         Ok((d.doc, m, d.boxes[1]))

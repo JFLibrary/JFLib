@@ -57,14 +57,12 @@ pub(crate) fn all() -> Vec<(&'static str, ReportDef)> {
     let mut net = def(t("Netzwerkgeräte"), t("Geräte mit IP-Adresse: Netzwerkname, Adressen und Hersteller, nach Netzwerkname sortiert."));
     net.fields = vec![master(1), data(2, "NetworkName", t("Netzwerkname")), data(3, "IPAddress", t("IP-Adresse")), data(4, "SubnetMask", t("Subnetzmaske")), data(5, "MACAddress", t("MAC-Adresse")), data(6, "Manufacturer", t("Hersteller"))];
     net.filters.push(exists("IPAddress"));
-    net.advanced_filter = true;
     net.sorts.push(Sort::new(1, 2, true));
 
     let mut eq = def(t("Netzwerkausstattung"), t("Hersteller, Produkt-, Serien- und Inventarnummern und Standorte der Geräte, nach Hersteller gruppiert."));
     eq.fields = vec![data(1, "Manufacturer", t("Hersteller")), master(2), data(3, "ProductNumber", t("Produktnummer")), data(4, "SerialNumber", t("Seriennummer")), data(5, "AssetNumber", t("Inventarnummer")), data(6, "Building", t("Gebäude")), data(7, "Room", t("Raum"))];
     eq.fields[1].summary = Func::Count.bit();
     eq.filters.push(exists("Manufacturer"));
-    eq.advanced_filter = true;
     if let Some(g) = eq.grouping.as_mut() {
         g.field = 1;
         g.grand_summary = true;
@@ -75,7 +73,6 @@ pub(crate) fn all() -> Vec<(&'static str, ReportDef)> {
     let mut pc = def(t("Computer"), t("Computer und Server mit Betriebssystem, Prozessor, Arbeitsspeicher und Festplatte."));
     pc.fields = vec![data(1, "NetworkName", t("Netzwerkname")), master(2), data(3, "OperatingSystem", t("Betriebssystem")), data(4, "CPU", t("Prozessor")), data(5, "Memory", t("Arbeitsspeicher")), data(6, "HardDriveSize", t("Festplatte")), data(7, "IPAddress", t("IP-Adresse"))];
     pc.filters.push(exists("OperatingSystem"));
-    pc.advanced_filter = true;
     pc.sorts.push(Sort::new(1, 1, true));
 
     let mut rack = def(t("Rackgeräte"), t("Geräte im Rack mit ihren Höheneinheiten; die Summe zeigt den belegten Platz."));
@@ -83,7 +80,6 @@ pub(crate) fn all() -> Vec<(&'static str, ReportDef)> {
     rack.fields[3].data_type = 2;
     rack.fields[3].summary = Func::Total.bit();
     rack.filters.push(exists("RackUnits"));
-    rack.advanced_filter = true;
     rack.precision = 0;
 
     vec![("inventory", inv), ("network_devices", net), ("network_equipment", eq), ("computers", pc), ("rack", rack)]

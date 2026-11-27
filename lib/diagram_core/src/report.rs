@@ -27,10 +27,16 @@
 // Assumptions where no source says (Annahmen; the user's own Visio file will settle them):
 // * SelectDrawingDataMethod: 1 every page, 2 the current page (both seen), 3 the selected
 //   shapes (not seen); another number reads as Scope::Other and runs over every page.
-// * Condition (1, 3 and 8 seen): 1 =, 2 <>, 3 >, 4 >=, 5 <, 6 <=, 7 does not exist, 8 exists
-//   (CONDITIONS below: one table to change).
-// * SummaryTypes (0, 1, 3 seen) a bit mask in the order of Visio's dialog: 1 total, 2 average,
-//   4 count, 8 minimum, 16 maximum (Func::bit).
+// * Condition, checked in Visio 16 (a definition per code run through Visio's report add-on,
+//   Auslastung against 60): 1 =, 2 <>, 3 >, 4 <, 5 >=, 6 <=, 8 exists; Visio's own definitions
+//   (INVENTRY.VRD) write "exists" as 8 with Value 1 and PropertyDataType 3 (a Boolean), so "does
+//   not exist" is written as 8 with Value 0 (diagram_io::report; 7 is read as it too, earlier
+//   JFDiagrammer files wrote it, Visio gives no report for 7).
+// * AdvancedFilter: Visio's own definitions write 0; with 1 Visio leaves the criteria out (every
+//   code gave every shape), so they count only without it (run.rs, as Visio).
+// * SummaryTypes is a bit mask, checked in Visio 16 (JD19's Visio check: a definition with each
+//   bit alone run through Visio's report add-on): 1 count, 2 total, 4 average, 8 minimum,
+//   16 maximum, 32 median (Func::bit); Visio's grand total row shows the total alone.
 // * Tag 1 a built-in field, 2 shape data, 3 a user cell (seen); Type and PropertyDataType are
 //   the shape data types of diagram_core::data::kind (0 text, 2 number, 3 Boolean seen).
 // * ItemDisplay 1 shows the shapes' rows with the summaries, 0 only the summaries (one row per
@@ -39,10 +45,14 @@
 //   name but one with that label counts too (Visio's dialog lists the fields by label).
 // * NAMEINFO is the shape's name as shown (Name), NAMEIDINFO its NameID ("Sheet.5"); lengths
 //   (PINXINFO ...) in the unit of their cell, else the page's.
-// * Visio's output "Visio-Shape" is an embedded Excel object (NO-22: not here); which cell marks
-//   it is not known.  The table shape here is JFDiagrammer's own: User.JFD_Report = 1,
+// * Visio's output "Visio-Shape" is an embedded Excel object (NO-22: not here), an instance of
+//   its hidden master "Report shape" that names the definition only in RUNADDONWARGS formulas
+//   (EventDrop, the actions "Bericht aktualisieren" and "Bericht erstellen"; seen in JD19's
+//   check).  The table shape here is JFDiagrammer's own: User.JFD_Report = 1,
 //   JFD_ReportName, JFD_ReportDef (a copy of the definition) or JFD_ReportLink (the
 //   definition's name in the drawing or a .vrd path), on the layer the app names ("Bericht").
+//
+// The columns are in DisplayOrder with the grouping field first, as Visio's report shows them.
 //
 // Which shapes a report sees (run.rs): the top-level shapes of the pages of its scope (the
 // foreground pages for "every page") or the selected shapes; a group without master and without
@@ -186,14 +196,16 @@ impl Property {
     }
 }
 
-/// a summary function of a column (SummaryTypes, a bit each)
+/// a summary function of a column (SummaryTypes, a bit each; Visio's bits, checked in Visio 16)
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Func {
-    /// the sum: bit 1
+    /// the sum: bit 2
     Total,
-    /// the mean: bit 2
+    /// the mean: bit 4
     Average,
-    /// the number of rows: bit 4
+    /// the middle value: bit 32
+    Median,
+    /// the number of rows: bit 1
     Count,
     /// the smallest number: bit 8
     Min,
@@ -202,17 +214,18 @@ pub enum Func {
 }
 
 /// the functions in the order of the dialog (and of the summary rows)
-pub const FUNCS: [Func; 5] = [Func::Total, Func::Average, Func::Count, Func::Min, Func::Max];
+pub const FUNCS: [Func; 6] = [Func::Total, Func::Average, Func::Median, Func::Count, Func::Min, Func::Max];
 
 impl Func {
     /// its bit in SummaryTypes
     pub fn bit(self) -> u32 {
         match self {
-            Func::Total => 1,
-            Func::Average => 2,
-            Func::Count => 4,
+            Func::Count => 1,
+            Func::Total => 2,
+            Func::Average => 4,
             Func::Min => 8,
             Func::Max => 16,
+            Func::Median => 32,
         }
     }
 
@@ -283,8 +296,8 @@ pub const CONDITIONS: [(Condition, u32); 8] = [
     (Condition::Eq, 1),
     (Condition::Ne, 2),
     (Condition::Gt, 3),
-    (Condition::Ge, 4),
-    (Condition::Lt, 5),
+    (Condition::Lt, 4),
+    (Condition::Ge, 5),
     (Condition::Le, 6),
     (Condition::NotExists, 7),
     (Condition::Exists, 8),

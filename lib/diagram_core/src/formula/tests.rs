@@ -1614,6 +1614,39 @@ fn recalc_updates_dependents_and_undo_restores() {
     eng.refresh(&t.doc, &ch.sheets());
 }
 
+// (JD19) a Value cell's result carries the unit Visio marks its type with: a string STR, a
+// colour COLOR, a point PNT ("PNT(6,3)"); a number after a colour or point drops the mark.
+// Without it Visio read "Wert" and "#c6e0b4" back as 0 and PNT(6,3) as 6.
+#[test]
+fn value_cells_mark_strings_colours_and_points() {
+    let mut t = tiny(4.0);
+    let dep = user_addr(&t.doc, "Dep");
+    let mut eng = Engine::new();
+    let _ = eng.calculate(&t.doc);
+    let mut tx = t.doc.transaction("Typ");
+    let cases: [(&str, Option<&str>, Option<Unit>); 5] = [
+        ("\"Wert\"", Some("Wert"), Some(Unit::Str)),
+        ("RGB(198,224,180)", Some("#c6e0b4"), Some(Unit::Color)),
+        ("PNT(6,3)", Some("PNT(6,3)"), Some(Unit::Point)),
+        ("PNT(1.5,-0.25)", Some("PNT(1.5,-0.25)"), Some(Unit::Point)),
+        ("5", None, None),
+    ];
+    for (f, text, unit) in cases {
+        tx.set_formula(t.b, &dep, f).unwrap();
+        eng.recalc(&mut tx, &[t.b]).unwrap();
+        let r = tx.doc().resolve(t.b, &dep);
+        assert_eq!(r.unit(), unit, "{f}");
+        match text {
+            Some(s) => assert!(r.value().text().is_some_and(|x| tx.doc().str(x).eq_ignore_ascii_case(s)), "{f}"),
+            None => assert_eq!(r.num(), Some(5.0), "{f}"),
+        }
+    }
+    // a cell typed by its name keeps its unit: Width stays a length
+    tx.set_formula(t.a, &single(names::WIDTH), "3 in").unwrap();
+    eng.recalc(&mut tx, &[t.a]).unwrap();
+    assert_ne!(tx.doc().resolve(t.a, &single(names::WIDTH)).unit(), Some(Unit::Str));
+}
+
 #[test]
 fn recalc_after_set_formula_clears_stale() {
     let mut t = tiny(4.0);

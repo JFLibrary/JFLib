@@ -69,7 +69,7 @@ pub(crate) struct Wizard {
     f_pick: i32,
     // Teilergebnisse...
     group: i32,
-    funcs: Vec<[i32; 5]>,
+    funcs: Vec<[i32; 6]>,
     func_col: i32,
     only_sums: i32,
     grand: i32,
@@ -404,7 +404,8 @@ fn finish(app: &mut Diagrammer) -> bool {
     def.name = name.clone();
     def.title = w.title.clone();
     def.description = w.desc.clone();
-    def.advanced_filter = !def.filters.is_empty();
+    // Visio applies the criteria only without AdvancedFilter (its check in JD19)
+    def.advanced_filter = false;
     def.user_cells = w.show_all != 0;
     def.hidden_properties = w.show_all != 0;
     if def.grouping.is_none() {
@@ -599,7 +600,7 @@ fn open_sub(app: &mut Diagrammer, sub: u8) {
             w.group = cols.iter().position(|&id| id == g.field).map_or(0, |k| k as i32 + 1);
             w.funcs = cols.iter().map(|&id| {
                 let mask = w.def.field(id).map_or(0, |f| f.summary);
-                let mut v = [0; 5];
+                let mut v = [0; 6];
                 for (i, f) in FUNCS.iter().enumerate() {
                     v[i] = (mask & f.bit() != 0) as i32;
                 }
@@ -785,7 +786,7 @@ fn totals(app: &mut Diagrammer, ui: &mut Ui) {
     ui.list_end(&mut sel);
     w.func_col = sel;
     ui.box_begin(0, BOX_V, 4);
-    let fnames = [t("Summe"), t("Mittelwert"), t("Anzahl"), t("Minimum"), t("Maximum")];
+    let fnames = [t("Summe"), t("Mittelwert"), t("Median"), t("Anzahl"), t("Minimum"), t("Maximum")];
     if let Some(v) = w.funcs.get_mut(sel.max(0) as usize).filter(|_| sel >= 0) {
         for (i, f) in fnames.iter().enumerate() {
             ui.checkbox(ID_SUB + 0x100 + i as u32, f, &mut v[i]);

@@ -37,7 +37,7 @@
 //   (Sheet.5!Prop.Tasks, SortKey = the field's label), User.visDGDefaultPos follows the shape's
 //   control point Controls.msvDGPosition (seven snap points across, BOUND), the pin is a formula
 //   of the position and ThePage!User.msvDGCalloutGap, the callout lies on the layer "Data
-//   Graphic".  The shape itself gets User.visDGDisplayFormat = USE("{UniqueID of the master}"),
+//   Graphic".  The shape itself gets User.visDGDisplayFormat = USE({UniqueID of the master}),
 //   visDGDefaultPos, msvLayoutIncludeSubshapes and Controls.msvDGPosition.
 // * Positions: PNT(h, v), h 0..6 = far left, left edge, left, centre, right, right edge, far
 //   right; v 0..6 = below, bottom edge, bottom, middle, top, top edge, above.  The instance
@@ -46,6 +46,26 @@
 //   formula of Prop.msvCalloutField and its Min/Max, an icon set shows the geometry section
 //   whose NoShow is false for User.msvCalloutIconNumber (-1: none), a text callout shows a text
 //   field with the value in Prop.msvCalloutPropValueFormat.
+//
+// Checked in Visio 16 (JD19's Visio check, 2026-11-27: files of JFDiagrammer opened by Visio
+// through its automation, Visio's own graphics and callouts read, variants of them tried):
+// * Visio takes a subshape of the graphic as an item when it has User.visDGCalloutItem = 5,
+//   msvCalloutType ("Text Callout" -> text, "Data Bar" -> data bar ...), visDGItemID,
+//   visDGField0, visDGCalloutField and visDGUseMaster = USE("<an existing callout master>").
+// * A callout master counts when its shape has visDGCalloutItem = 5, visDGDefaultPos = 0,
+//   visDGStackHeight = 0 and the ID 5 (Visio's masters start at 5; Master::new does so now).
+// * Visio gives every master a UniqueID ending in -8E40-00608CF305B2 when it opens a file; a
+//   graphic written here has such an ID (visio_uid), so the shapes' USE({UniqueID}) keeps naming
+//   it.  USE takes the UniqueID bare, a master's name quoted.
+// * An instance on a shape names its item with visDGCalloutItem = DEPENDSON(the item's shape ID
+//   in the master), a Boolean 0; Visio's own pin formulas differ from ours but read the same
+//   cells.
+// * Value cells keep their type in the file (formula::Engine): a string U='STR', a colour
+//   U='COLOR', a point "PNT(h,v)" U='PNT' -- unmarked, Visio read them as numbers.
+// * Text and data bar items are Visio's items then (its dialogs list them, it applies the
+//   graphic itself); icon set and colour-by-value items are not: how Visio keeps their rules is
+//   its own and Visio's automation cannot make one to look at.  Visio draws and keeps them as
+//   written.  Visio's own legend (Page.DropLegend) builds nothing for these graphics.
 //
 // Assumptions where nothing public says how Visio does it ([NF] in the research; read back by
 // JFDiagrammer, kept by Visio as ordinary cells):
@@ -69,8 +89,8 @@
 //   of the callout master's shape); instances on shapes are instances as in Visio.
 // * visDGUseMaster and visDGDisplayFormat: USE() is not computed by the engine, so the value
 //   written with it (254, as seen in Visio's files) stays.
-// * visDGCalloutItem on an instance = the item's ID; visDGStackHeight = the distance to the
-//   item's place (items at one position stack downwards, above the shape upwards).
+// * visDGStackHeight = the distance to the item's place (items at one position stack
+//   downwards, above the shape upwards).
 // * The helper cells User.JFD_DGH and User.JFD_DGV (the position 0..6 the instance's pin
 //   formulas read) are ours: Visio's own pin formulas are not known; ours give the same places.
 // * Shape-Text ausblenden: HideText = TRUE on the shape (the old value kept as above); the
@@ -101,6 +121,10 @@ use crate::units::Unit;
 pub const LAYER_U: &str = "Data Graphic";
 /// the gap between a shape and the callouts outside it (inches, on paper; Visio's 1/16 in)
 pub const GAP: f64 = 0.0625;
+/// User.visDGCalloutItem: Visio's mark of a data graphic callout (its callout masters, the items
+/// of its graphics and their instances carry 5; an item without it is no item for Visio)
+pub const CALLOUT_ITEM: f64 = 5.0;
+
 /// the value Visio stores with a USE() formula
 const USE_VALUE: f64 = 254.0;
 
@@ -467,7 +491,7 @@ fn user_formula(doc: &Document, sheet: SheetRef, name: &str) -> Option<String> {
     }
 }
 
-// the string inside USE("...")
+// the argument of USE("name") or USE({UniqueID}) (Visio writes a UniqueID without quotes)
 fn use_arg(f: &str) -> Option<String> {
     let t = f.trim();
     let head = t.get(..4)?;
@@ -475,8 +499,23 @@ fn use_arg(f: &str) -> Option<String> {
         return None;
     }
     let body = t[4..].trim().strip_suffix(')')?.trim();
+    if body.starts_with('{') && body.ends_with('}') {
+        return Some(String::from(body));
+    }
     let inner = body.strip_prefix('"')?.strip_suffix('"')?;
     Some(inner.replace("\"\"", "\""))
+}
+
+// USE()'s argument as Visio writes it: a UniqueID in braces bare (USE({C187082C-...}): Visio's
+// check of JD19 recognised no data graphic named by USE("{...}")), a master's name quoted
+fn use_formula(arg: &str) -> String {
+    let a = arg.trim();
+    let guid = a.len() == 38 && a.starts_with('{') && a.ends_with('}') && a[1..37].chars().all(|c| c.is_ascii_hexdigit() || c == '-');
+    if guid {
+        format!("USE({a})")
+    } else {
+        format!("USE({})", quoted(arg))
+    }
 }
 
 fn single(tx: &mut Transaction, name: &str) -> CellAddr {
@@ -502,7 +541,7 @@ fn set_user_num(tx: &mut Transaction, sheet: SheetRef, name: &str, value: f64) -
 
 // a USE() formula with the value Visio stores with it
 fn set_user_use(tx: &mut Transaction, sheet: SheetRef, name: &str, arg: &str) -> Result<(), EditError> {
-    tx.set_user_formula(sheet, name, &format!("USE({})", quoted(arg)))?;
+    tx.set_user_formula(sheet, name, &use_formula(arg))?;
     let a = user_addr(tx, name);
     tx.set_result(sheet, &a, Value::Num(USE_VALUE), None)
 }
@@ -558,6 +597,17 @@ fn guid(parts: &[&str]) -> String {
     format!("{{{d1:08X}-{d2:04X}-{d3:04X}-{d4:04X}-{d5:012X}}}")
 }
 
+// (JD19) a UniqueID in the pattern of Visio's masters: Visio keeps the first three groups of a
+// master's UniqueID and puts -8E40-00608CF305B2 after them when it opens a file (every master of
+// Visio's has it), so a shape's USE({UniqueID}) named nothing any more and Visio saw no graphic
+// on it; an ID of that pattern stays as it is
+fn visio_uid(uid: &str) -> String {
+    match uid.get(..20) {
+        Some(head) if uid.len() == 38 => format!("{head}8E40-00608CF305B2}}"),
+        _ => String::from(uid),
+    }
+}
+
 // ---------------------------------------------------------------- reading
 
 /// whether master m is a data graphic (User.visUSEType = 1 in its page sheet)
@@ -601,6 +651,13 @@ pub fn read(doc: &Document, m: MasterRef) -> Option<DataGraphic> {
     }
     g.next_item = g.next_item.max(g.items.iter().map(|i| i.id + 1).max().unwrap_or(1));
     Some(g)
+}
+
+// the shape ID of item `id` in data graphic m (its subshape with User.visDGItemID = id)
+fn item_shape_id(doc: &Document, m: MasterRef, id: u32) -> Option<u32> {
+    let group = master_group(doc, m)?;
+    let kids: Vec<ShapeRef> = doc.shape(group)?.children().collect();
+    kids.into_iter().find(|&k| user_num(doc, SheetRef::Shape(k), "visDGItemID") == Some(id as f64)).and_then(|k| doc.shape(k).map(|x| x.id()))
 }
 
 fn read_item(doc: &Document, group: ShapeRef, k: ShapeRef) -> Option<Item> {
@@ -1060,7 +1117,7 @@ fn fill_master(tx: &mut Transaction, m: MasterRef, g: &DataGraphic, src: Option<
         if let Some(p) = it.pos {
             tx.set_user_formula(ks, "JFD_DGPos", &p.pnt())?;
         }
-        set_user_num(tx, ks, "visDGCalloutItem", 1.0)?;
+        set_user_num(tx, ks, "visDGCalloutItem", CALLOUT_ITEM)?;
         set_user_str(tx, ks, "visDGField0", &it.field)?;
         set_user_num(tx, ks, "visDGItemID", it.id as f64)?;
         if it.kind != Kind::ColorByValue {
@@ -1127,7 +1184,7 @@ pub fn create(tx: &mut Transaction, eng: &mut Engine, g: &DataGraphic, src: Opti
         let name = unique_name(tx.doc(), &g.name);
         let m = tx.add_master(&name, &name)?;
         let id = tx.doc().master(m).map_or(0, |x| x.header.id);
-        let uid = guid(&["JFDiagrammer data graphic", &name, &format!("{id}"), &format!("{}", tx.doc().masters().count())]);
+        let uid = visio_uid(&guid(&["JFDiagrammer data graphic", &name, &format!("{id}"), &format!("{}", tx.doc().masters().count())]));
         set_master_attrs(tx, m, &uid)?;
         let mut g = g.clone();
         g.name = name;
@@ -1265,6 +1322,18 @@ fn old_state(tx: &mut Transaction, sheet: SheetRef, cell: &str) -> String {
     }
 }
 
+// a cell's formula moved into a User cell: THEMEVAL() means the theme's value of the cell it
+// stands in and is #VALUE! in a User cell (Visio's check of JD19), so the theme's value is named
+// there as Visio's own User cells name it (THEMEVAL("FillColor"))
+fn in_user_cell(f: String, name: &str) -> String {
+    let bare: String = f.chars().filter(|c| !c.is_whitespace()).collect();
+    if bare.eq_ignore_ascii_case("THEMEVAL()") {
+        format!("THEMEVAL(\"{name}\")")
+    } else {
+        f
+    }
+}
+
 // the formula that gives what a cell shows now (its own or inherited formula, else its value)
 fn current_formula(doc: &Document, sheet: SheetRef, addr: &CellAddr, fallback: &str) -> String {
     let r = doc.resolve(sheet, addr);
@@ -1340,7 +1409,7 @@ pub fn apply(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef], m: Mas
             if applied(tx.doc(), s).is_some() {
                 remove(tx, eng, &[s])?;
             }
-            if apply_one(tx, s, page, &g, &key, layer_name, &mut sheets)? {
+            if apply_one(tx, s, page, (m, &g), &key, layer_name, &mut sheets)? {
                 done.push(s);
             }
         }
@@ -1356,7 +1425,7 @@ fn callouts_parent(doc: &Document, s: ShapeRef) -> bool {
     user_row(doc, SheetRef::Shape(s), "visDGCalloutItem").is_some()
 }
 
-fn apply_one(tx: &mut Transaction, s: ShapeRef, page: PageRef, g: &DataGraphic, key: &str, layer_name: &str, sheets: &mut Vec<SheetRef>) -> Result<bool, EditError> {
+fn apply_one(tx: &mut Transaction, s: ShapeRef, page: PageRef, (m, g): (MasterRef, &DataGraphic), key: &str, layer_name: &str, sheets: &mut Vec<SheetRef>) -> Result<bool, EditError> {
     let sid = tx.doc().shape(s).map_or(0, |x| x.id());
     // the items whose fields the shape has
     let mut plan: Vec<(&Item, String, String)> = Vec::new();
@@ -1418,13 +1487,13 @@ fn apply_one(tx: &mut Transaction, s: ShapeRef, page: PageRef, g: &DataGraphic, 
     for (it, f, label) in plan {
         if it.kind == Kind::ColorByValue {
             let fill_addr = tx.single("FillForegnd");
-            let otherwise = current_formula(tx.doc(), sheet, &fill_addr, "RGB(255,255,255)");
+            let otherwise = in_user_cell(current_formula(tx.doc(), sheet, &fill_addr, "RGB(255,255,255)"), "FillColor");
             let ff = shade_formula(&it.shades, it.ranges, &format!("({f})"), false, &otherwise);
             tx.set_user_formula(sheet, "visDGCBVFill", &ff)?;
             force(tx, sheet, &fill_addr, "User.visDGCBVFill")?;
             if it.shades.iter().any(|x| x.text.is_some()) {
                 let caddr = old_addr(tx, "Char.Color");
-                let otherwise = current_formula(tx.doc(), sheet, &caddr, "0");
+                let otherwise = in_user_cell(current_formula(tx.doc(), sheet, &caddr, "0"), "TextColor");
                 let tf = shade_formula(&it.shades, it.ranges, &format!("({f})"), true, &otherwise);
                 tx.set_user_formula(sheet, "JFD_DGCBVText", &tf)?;
                 // a shape without its own character row: the text colour stays (Annahme)
@@ -1450,7 +1519,16 @@ fn apply_one(tx: &mut Transaction, s: ShapeRef, page: PageRef, g: &DataGraphic, 
             "visDGDefaultPos",
             &format!("PNT({},{})", control_k(sid, "X", "Width"), control_k(sid, "Y", "Height")),
         )?;
-        set_user_num(tx, ks, "visDGCalloutItem", it.id as f64)?;
+        // the item it shows, as Visio links them: DEPENDSON(the item's shape ID in the master),
+        // a Boolean 0 (Visio's own instances of JD19's check)
+        match item_shape_id(tx.doc(), m, it.id) {
+            Some(id) => {
+                tx.set_user_formula(ks, "visDGCalloutItem", &format!("DEPENDSON({id})"))?;
+                let a = user_addr(tx, "visDGCalloutItem");
+                tx.set_result_unit(ks, &a, Value::Num(0.0), None, Some(Unit::Bool))?;
+            }
+            None => set_user_num(tx, ks, "visDGCalloutItem", CALLOUT_ITEM)?,
+        }
         for x in subtree(tx.doc(), k) {
             tx.set_layers(x, &[layer])?;
             sheets.push(SheetRef::Shape(x));

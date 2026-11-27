@@ -158,7 +158,7 @@ impl Default for ReportsState {
 /// the summary rows' words in the window's language
 pub(crate) fn labels() -> Labels {
     let s = String::from;
-    Labels { total: s(t("Summe")), average: s(t("Mittelwert")), count: s(t("Anzahl")), min: s(t("Minimum")), max: s(t("Maximum")), grand: s(t("Gesamt")), yes: s(t("WAHR")), no: s(t("FALSCH")) }
+    Labels { total: s(t("Summe")), average: s(t("Mittelwert")), count: s(t("Anzahl")), min: s(t("Minimum")), max: s(t("Maximum")), median: s(t("Median")), grand: s(t("Gesamt")), yes: s(t("WAHR")), no: s(t("FALSCH")) }
 }
 
 /// a definition run against the open drawing: the page shown, the selection

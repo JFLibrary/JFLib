@@ -41,6 +41,11 @@ BottomMargin = 0 mm
 
 [User]
 msvCalloutType:  Value = "Text Callout"
+# Visios Kennzeichen eines Datengrafik-Callouts (JD19, Visio-Gegenprobe: ohne sie und ohne die
+# Shape-ID 5 des Masters zählt Visio die Elemente einer Datengrafik nicht)
+visDGCalloutItem:  Value = 5
+visDGDefaultPos:  Value = 0
+visDGStackHeight:  Value = 0
 # die Beschriftung: [Default] ist die Bezeichnung des Datenfelds (SortKey von msvCalloutField)
 L:  Value = IF(STRSAME(Prop.msvCalloutPropLabel,"[Default]"),Prop.msvCalloutField.SortKey,Prop.msvCalloutPropLabel)
 V:  Value = IF(Prop.msvCalloutPropShowValue,FORMAT(Prop.msvCalloutField,Prop.msvCalloutPropValueFormat),"")

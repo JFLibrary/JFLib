@@ -63,7 +63,6 @@ pub(crate) fn definitions() -> (ReportDef, ReportDef) {
     let mut f = Filter::new(1, Property::Data(s("Auslastung")), Condition::Exists, "");
     f.data_type = 2;
     list.filters.push(f);
-    list.advanced_filter = true;
     if let Some(g) = list.grouping.as_mut() {
         g.field = 2;
         g.grand_summary = true;
@@ -165,6 +164,12 @@ fn own(h: &mut H) {
 }
 
 // a text as Visio escapes it into an attribute value
+// a cell's value as the element's text, the way Visio 16 writes a long string with line breaks
+// (<Cell N='Value' U='STR'>&lt;?xml ...</Cell>, seen in Visio's re-saved JD19 check file)
+fn text(t: &str) -> String {
+    t.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+}
+
 fn attr(text: &str) -> String {
     text.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;").replace('\'', "&apos;").replace('\n', "&#10;")
 }
@@ -175,7 +180,7 @@ fn visio_like(h: &mut H) {
     let def = "<?xml version=\"1.0\"?>\n<VisioReportDefinition xmlns=\"urn:schemas-microsoft-com:office:visio:reportdefinition\" ReportExists=\"1\" SelectDrawingDataMethod=\"1\" Description=\"Alle Shapes mit Auslastung\" Precision=\"1\" ShowUnits=\"0\" CaseSensitive=\"0\" UserCells=\"0\" HiddenProperties=\"0\" AdvancedFilter=\"1\" FilterExpression=\"\" Version=\"3\">\
 <Name>JD19 Bericht</Name><Title>JD19-Test</Title>\
 <VisioRptDefField ID=\"1\" Display=\"1\" DisplayOrder=\"1\" Type=\"0\" SummaryTypes=\"0\" Tag=\"1\"><Name>TEXTINFO</Name><DisplayName>&lt;Displayed Text&gt;</DisplayName></VisioRptDefField>\
-<VisioRptDefField ID=\"2\" Display=\"1\" DisplayOrder=\"2\" Type=\"2\" SummaryTypes=\"1\" Tag=\"2\"><Name>Kosten</Name><DisplayName>Kosten</DisplayName></VisioRptDefField>\
+<VisioRptDefField ID=\"2\" Display=\"1\" DisplayOrder=\"2\" Type=\"2\" SummaryTypes=\"2\" Tag=\"2\"><Name>Kosten</Name><DisplayName>Kosten</DisplayName></VisioRptDefField>\
 <VisioRptDefFilter ID=\"1\" Property=\"Kosten\" Condition=\"3\" AndOr=\"1\" PropertyType=\"2\" PropertyDataType=\"2\" Value=\"100\" Unit=\"\"/>\
 <VisioRptDefGroup ID=\"1\" GroupingField=\"0\" ItemDisplay=\"1\" GrandSummary=\"0\" ExcludeDuplicates=\"0\"/>\
 <VisioRptDefSort ID=\"1\" SortField=\"2\" Ascending=\"1\" CaseSensitive=\"0\"/></VisioReportDefinition>";
@@ -192,8 +197,8 @@ fn visio_like(h: &mut H) {
     let mut p = crate::pkg::minimal(&shapes, "");
     let doc_xml = format!(
         "{DECL}<VisioDocument {NS}><StyleSheets><StyleSheet ID='0' NameU='No Style'/></StyleSheets><DocumentSheet LineStyle='0' FillStyle='0' TextStyle='0'>\
-<Section N='User'><Row N='visPropRpt1'><Cell N='Value' V='{}' U='STR'/><Cell N='Prompt' V=''/></Row><Row N='visPropRpt2'><Cell N='Value' V='{}' U='STR'/><Cell N='Prompt' V=''/></Row></Section></DocumentSheet></VisioDocument>",
-        attr(def),
+<Section N='User'><Row N='visPropRpt1'><Cell N='Value' U='STR'>{}</Cell><Cell N='Prompt' V=''/></Row><Row N='visPropRpt2'><Cell N='Value' V='{}' U='STR'/><Cell N='Prompt' V=''/></Row></Section></DocumentSheet></VisioDocument>",
+        text(def),
         attr(bad)
     );
     p.set("visio/document.xml", doc_xml);
@@ -204,7 +209,7 @@ fn visio_like(h: &mut H) {
     let st = rio::stored(&doc);
     let d = st.first().and_then(|x| x.def.clone().ok());
     let ok = d.as_ref().is_some_and(|d| d.name == "JD19 Bericht" && d.title == "JD19-Test" && d.precision == 1 && d.fields.len() == 2 && d.fields[0].property == Property::Builtin(Builtin::Text) && d.filters[0].condition == Condition::Gt && d.sorts.len() == 1);
-    h.check("reports/visio/model", ok, s("visPropRpt1 as Visio writes it: name, title, fields, criterion, sort"));
+    h.check("reports/visio/model", ok, s("visPropRpt1 as Visio writes it (the XML as the cell's text): name, title, fields, criterion, sort"));
     h.check("reports/visio/hostile", st.len() == 2 && st[1].def == Err(rio::ReportError::Unsupported), format!("visPropRpt2 with a DOCTYPE refused, the file opens ({:?})", st.get(1).map(|x| &x.def)));
     let t = d.map(|d| report::run(&doc, &d, &report::Ctx { page: doc.pages().next(), ..Default::default() })).unwrap_or_default();
     let rows: Vec<Vec<String>> = t.rows.iter().map(|r| r.cells.iter().map(|c| c.text.clone()).collect()).collect();
