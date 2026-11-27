@@ -95,7 +95,25 @@ SYSTEM_KNOWN = {
              "webpki::forbidden-p192-root", "webpki::forbidden-weak-rsa-key-in-root",
              "webpki::forbidden-rsa-not-divisible-by-8-in-root")),
     ],
-    "mac": [],
+    "mac": [
+        ("Apple's Security framework refuses limbo's saved chains of public servers, with their real "
+         "public roots given as the only anchors, as 'not standards compliant' (Security -67825), "
+         "probably its policy for publicly trusted certificates (Certificate Transparency) in this "
+         "setting; live through Trust::System the same kind of chain passes (tools/tls_web_check.py: "
+         "google.com, github.com, badssl.com)",
+         lambda t, msg: (t["id"].startswith("online::") or t["id"] == "webpki::cryptographydotio-chain") and "-67825" in msg),
+        ("Apple's Security framework refuses name constraints of forms it does not take -- a "
+         "directory name, an otherName -- also where they do not apply (Security -67689)",
+         ids("rfc5280::nc::permitted-dn-match", "rfc5280::nc::nc-forbids-othername-noop")),
+        ("Apple's Security framework refuses limbo's leaf with an Authority Information Access "
+         "extension (caIssuers) as not standards compliant (Security -67618)", ids("rfc5280::ee-aia")),
+        ("Apple's Security framework does not hold an excluded name against a wildcard (*.example.com "
+         "below a CA that excludes bar.example.com, asked for bar.example.com): CVE-2025-61727's "
+         "ambiguity of RFC 5280 and RFC 9525", ids("cve::cve-2025-61727", "rfc5280::nc::nc-forbids-dnsname-wildcard-san")),
+        ("Apple's Security framework does not judge the trust anchor it was given: a root with an "
+         "unknown critical extension, an RSA key of a length not divisible by 8",
+         ids("rfc5280::unknown-critical-extension-root", "webpki::forbidden-rsa-not-divisible-by-8-in-root")),
+    ],
 }
 REASONS = {0: "another reason", 1: "unknown CA", 2: "expired", 3: "name", 4: "revoked", 5: "usage"}
 

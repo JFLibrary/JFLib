@@ -247,6 +247,27 @@ Mondays: the systems' checks change with their updates.
 | System | Pass | Same | Known | Fail | Skipped |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Linux (`verify_chain`) | 9 721 | 41 | 0 | 0 | 45 |
+| Windows (windows-latest, CryptoAPI) | 9 621 | 39 | 102 | 0 | 45 |
+| macOS (macos-15, Security framework) | 9 708 | 32 | 22 | 0 | 45 |
+
+(2026-11-27, PR #45.) What the leaf alone decides, netio checks after the system says yes
+(`x509::check_leaf`). The first run showed CryptoAPI taking several such leaves: a CA's
+certificate as a server's, keyCertSign or name constraints in a leaf, and an explicit curve.
+They are now refused on every system and need no entry. The known differences are:
+
+- **Windows, stricter:** CryptoAPI applies a CA's DNS name constraints to the subject's CN when
+  the leaf names only an IP address (88 bettertls cases).
+- **Windows, more lenient:**
+  - SHA-1 signatures are taken below a root of one's own (6).
+  - The trust anchor itself is not judged (6).
+- **macOS, stricter:**
+  - limbo's saved chains of public servers fail as "not standards compliant" when their public
+    roots are the only anchors (17). The same kind of chain passes live through
+    `Trust::System`.
+  - Name constraints of forms Apple does not take are refused (2), and so is a leaf with an AIA
+    extension (1).
+- **macOS, more lenient:** the trust anchor itself is not judged (2).
+- **Both systems:** an excluded name is not applied to a wildcard (CVE-2025-61727, 2 each).
 
 ### badssl.com through `Trust::System`
 
@@ -260,8 +281,10 @@ Mondays: the systems' checks change with their updates.
   trusted").
 - **Shown, not counted:** revoked and incomplete-chain. The answers differ by system:
   - Revocation: Windows reads its cache and the staple, Apple works without network access,
-    Linux sees only a staple, and badssl's server sends none.
-  - A missing intermediate: Windows may fetch it, the others refuse.
+    Linux sees only a staple, and badssl's server sends none. On the 2026-11-27 runs all three
+    systems took revoked.badssl.com.
+  - A missing intermediate: Windows fetches it and takes incomplete-chain; macOS and Linux
+    refuse it as "not trusted".
 
 badssl's known-bad roots (superfish and the like) serve expired certificates, so netio says
 "expired" before it asks about the root. They are not in the list.
