@@ -58241,7 +58241,7 @@ the Visio Insights blog, ShapeSheets of files Visio saved; JD19 research):
   (Sheet.5!Prop.Tasks, SortKey = the field's label), User.visDGDefaultPos follows the shape's
   control point Controls.msvDGPosition (seven snap points across, BOUND), the pin is a formula
   of the position and ThePage!User.msvDGCalloutGap, the callout lies on the layer "Data
-  Graphic".  The shape itself gets User.visDGDisplayFormat = USE("{UniqueID of the master}"),
+  Graphic".  The shape itself gets User.visDGDisplayFormat = USE({UniqueID of the master}),
   visDGDefaultPos, msvLayoutIncludeSubshapes and Controls.msvDGPosition.
 * Positions: PNT(h, v), h 0..6 = far left, left edge, left, centre, right, right edge, far
   right; v 0..6 = below, bottom edge, bottom, middle, top, top edge, above.  The instance
@@ -58250,6 +58250,26 @@ the Visio Insights blog, ShapeSheets of files Visio saved; JD19 research):
   formula of Prop.msvCalloutField and its Min/Max, an icon set shows the geometry section
   whose NoShow is false for User.msvCalloutIconNumber (-1: none), a text callout shows a text
   field with the value in Prop.msvCalloutPropValueFormat.
+
+Checked in Visio 16 (JD19's Visio check, 2026-11-27: files of JFDiagrammer opened by Visio
+through its automation, Visio's own graphics and callouts read, variants of them tried):
+* Visio takes a subshape of the graphic as an item when it has User.visDGCalloutItem = 5,
+  msvCalloutType ("Text Callout" -> text, "Data Bar" -> data bar ...), visDGItemID,
+  visDGField0, visDGCalloutField and visDGUseMaster = USE("<an existing callout master>").
+* A callout master counts when its shape has visDGCalloutItem = 5, visDGDefaultPos = 0,
+  visDGStackHeight = 0 and the ID 5 (Visio's masters start at 5; Master::new does so now).
+* Visio gives every master a UniqueID ending in -8E40-00608CF305B2 when it opens a file; a
+  graphic written here has such an ID (visio_uid), so the shapes' USE({UniqueID}) keeps naming
+  it.  USE takes the UniqueID bare, a master's name quoted.
+* An instance on a shape names its item with visDGCalloutItem = DEPENDSON(the item's shape ID
+  in the master), a Boolean 0; Visio's own pin formulas differ from ours but read the same
+  cells.
+* Value cells keep their type in the file (formula::Engine): a string U='STR', a colour
+  U='COLOR', a point "PNT(h,v)" U='PNT' -- unmarked, Visio read them as numbers.
+* Text and data bar items are Visio's items then (its dialogs list them, it applies the
+  graphic itself); icon set and colour-by-value items are not: how Visio keeps their rules is
+  its own and Visio's automation cannot make one to look at.  Visio draws and keeps them as
+  written.  Visio's own legend (Page.DropLegend) builds nothing for these graphics.
 
 Assumptions where nothing public says how Visio does it ([NF] in the research; read back by
 JFDiagrammer, kept by Visio as ordinary cells):
@@ -58273,8 +58293,8 @@ JFDiagrammer, kept by Visio as ordinary cells):
   of the callout master's shape); instances on shapes are instances as in Visio.
 * visDGUseMaster and visDGDisplayFormat: USE() is not computed by the engine, so the value
   written with it (254, as seen in Visio's files) stays.
-* visDGCalloutItem on an instance = the item's ID; visDGStackHeight = the distance to the
-  item's place (items at one position stack downwards, above the shape upwards).
+* visDGStackHeight = the distance to the item's place (items at one position stack
+  downwards, above the shape upwards).
 * The helper cells User.JFD_DGH and User.JFD_DGV (the position 0..6 the instance's pin
   formulas read) are ours: Visio's own pin formulas are not known; ours give the same places.
 * Shape-Text ausblenden: HideText = TRUE on the shape (the old value kept as above); the
@@ -58289,6 +58309,9 @@ Every edit runs inside the caller's transaction (one undo step) and computes wha
 LAYER_U: &str = "Data Graphic"
 /// the gap between a shape and the callouts outside it (inches, on paper; Visio's 1/16 in)
 GAP: f64 = 0.0625
+/// User.visDGCalloutItem: Visio's mark of a data graphic callout (its callout masters, the items
+/// of its graphics and their instances carry 5; an item without it is no item for Visio)
+CALLOUT_ITEM: f64 = 5.0
 ```
 
 - **`enum Kind`**
@@ -59423,6 +59446,9 @@ a Del="1" mark; restore_row and restore_section remove it again.
 - **`fn set_result(&mut self, sheet: SheetRef, addr: &CellAddr, value: Value, error: Option<CellError>) -> Result<(), EditError>`**
   (the engine) store the result of the cell's formula for this sheet; a cell that
   inherits its formula gets an F="Inh" cell of its own
+- **`fn set_result_unit(&mut self, sheet: SheetRef, addr: &CellAddr, value: Value, error: Option<CellError>, unit: Option<Unit>) -> Result<(), EditError>`**
+  (JD19) set_result with the unit that marks the value's type in the file (the formula
+  engine: a Value cell's string is U='STR', a colour U='COLOR', a point U='PNT')
 - **`fn add_section(&mut self, sheet: SheetRef, name: &str) -> Result<SecKey, EditError>`**
   add a section of the sheet's own -> its key (Geometry: the next free index); Exists
   when the sheet has it already
@@ -62244,7 +62270,8 @@ the sheets are shape IDs of the same page or master.
 **`impl Master`**
 
 - **`fn new(header: MasterHeader) -> Master`**
-  an empty master with this header
+  an empty master with this header; its new shapes get IDs from 5 on, as Visio's (a file's
+  masters keep the IDs they have)
 - **`fn master_shape(&self) -> Option<u32>`**
   the slot of the shape instances inherit from (the first top-level shape)
 
@@ -63143,10 +63170,16 @@ numbers and names that XML carries.
 Assumptions where no source says (Annahmen; the user's own Visio file will settle them):
 * SelectDrawingDataMethod: 1 every page, 2 the current page (both seen), 3 the selected
   shapes (not seen); another number reads as Scope::Other and runs over every page.
-* Condition (1, 3 and 8 seen): 1 =, 2 <>, 3 >, 4 >=, 5 <, 6 <=, 7 does not exist, 8 exists
-  (CONDITIONS below: one table to change).
-* SummaryTypes (0, 1, 3 seen) a bit mask in the order of Visio's dialog: 1 total, 2 average,
-  4 count, 8 minimum, 16 maximum (Func::bit).
+* Condition, checked in Visio 16 (a definition per code run through Visio's report add-on,
+  Auslastung against 60): 1 =, 2 <>, 3 >, 4 <, 5 >=, 6 <=, 8 exists; Visio's own definitions
+  (INVENTRY.VRD) write "exists" as 8 with Value 1 and PropertyDataType 3 (a Boolean), so "does
+  not exist" is written as 8 with Value 0 (diagram_io::report; 7 is read as it too, earlier
+  JFDiagrammer files wrote it, Visio gives no report for 7).
+* AdvancedFilter: Visio's own definitions write 0; with 1 Visio leaves the criteria out (every
+  code gave every shape), so they count only without it (run.rs, as Visio).
+* SummaryTypes is a bit mask, checked in Visio 16 (JD19's Visio check: a definition with each
+  bit alone run through Visio's report add-on): 1 count, 2 total, 4 average, 8 minimum,
+  16 maximum, 32 median (Func::bit); Visio's grand total row shows the total alone.
 * Tag 1 a built-in field, 2 shape data, 3 a user cell (seen); Type and PropertyDataType are
   the shape data types of diagram_core::data::kind (0 text, 2 number, 3 Boolean seen).
 * ItemDisplay 1 shows the shapes' rows with the summaries, 0 only the summaries (one row per
@@ -63155,10 +63188,14 @@ Assumptions where no source says (Annahmen; the user's own Visio file will settl
   name but one with that label counts too (Visio's dialog lists the fields by label).
 * NAMEINFO is the shape's name as shown (Name), NAMEIDINFO its NameID ("Sheet.5"); lengths
   (PINXINFO ...) in the unit of their cell, else the page's.
-* Visio's output "Visio-Shape" is an embedded Excel object (NO-22: not here); which cell marks
-  it is not known.  The table shape here is JFDiagrammer's own: User.JFD_Report = 1,
+* Visio's output "Visio-Shape" is an embedded Excel object (NO-22: not here), an instance of
+  its hidden master "Report shape" that names the definition only in RUNADDONWARGS formulas
+  (EventDrop, the actions "Bericht aktualisieren" and "Bericht erstellen"; seen in JD19's
+  check).  The table shape here is JFDiagrammer's own: User.JFD_Report = 1,
   JFD_ReportName, JFD_ReportDef (a copy of the definition) or JFD_ReportLink (the
   definition's name in the drawing or a .vrd path), on the layer the app names ("Bericht").
+
+The columns are in DisplayOrder with the grouping field first, as Visio's report shows them.
 
 Which shapes a report sees (run.rs): the top-level shapes of the pages of its scope (the
 foreground pages for "every page") or the selected shapes; a group without master and without
@@ -63223,16 +63260,17 @@ BUILTINS: [Builtin; 8] = [Builtin::Text, Builtin::Master, Builtin::Name, Builtin
   the property of a tag and a name (an unknown tag reads as shape data)
 
 - **`enum Func`**
-  a summary function of a column (SummaryTypes, a bit each)
-  - `Total` -- the sum: bit 1
-  - `Average` -- the mean: bit 2
-  - `Count` -- the number of rows: bit 4
+  a summary function of a column (SummaryTypes, a bit each; Visio's bits, checked in Visio 16)
+  - `Total` -- the sum: bit 2
+  - `Average` -- the mean: bit 4
+  - `Median` -- the middle value: bit 32
+  - `Count` -- the number of rows: bit 1
   - `Min` -- the smallest number: bit 8
   - `Max` -- the largest number: bit 16
 
 ```rust
 /// the functions in the order of the dialog (and of the summary rows)
-FUNCS: [Func; 5] = [Func::Total, Func::Average, Func::Count, Func::Min, Func ...
+FUNCS: [Func; 6] = [Func::Total, Func::Average, Func::Median, Func::Count, F ...
 ```
 
 **`impl Func`**
@@ -63405,6 +63443,7 @@ the field.  Every criterion must hold, one with AndOr 0 is an "or" with the ones
   - `count: String` -- Func::Count
   - `min: String` -- Func::Min
   - `max: String` -- Func::Max
+  - `median: String` -- Func::Median
   - `grand: String` -- the rows over all groups
   - `yes: String` -- a true value
   - `no: String` -- a false value

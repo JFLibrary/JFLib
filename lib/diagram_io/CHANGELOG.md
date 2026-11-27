@@ -95,12 +95,14 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - (JD19) `report`: shape report definitions as Visio keeps them. `parse` and `to_xml` read and write the VisioReportDefinition XML, the same text as a `.vrd` file; reading is bounded and takes no DTD, unknown attributes and elements are kept. The definitions in the document sheet's `User.visPropRptN` rows are transactions (`stored`, `find`, `add`, `replace`, `rename`, `remove`)
 
 ### Changed
+- (JD19, Visio check) `report`: "exists" and "does not exist" are written as Visio's own definitions write them, Condition 8 with the Boolean Value 1 or 0 (an earlier 7 reads as "does not exist"); new definitions are written with `AdvancedFilter="0"`, with which Visio applies the criteria
 
 - (JD11) New documents are themed: a style "Theme" (ID 5) with THEMEVAL() cells, "Normal" based on it, "Connector" on the connector scheme's style 1, "Text Only" with the dark font style 1 and Visio's text contrast rule; the page shows the design NetLab, variant 1 (its theme part now carries Visio's extensions); the root style holds the NetLab look without a design
 - The stencil tool's SVG import keeps the document's order as JFNetworker's tools/vsym.py does: consecutive elements of one format share a subshape, a format that comes back later is a subshape of its own (before, every format was one layer where it first appeared and later parts vanished under the body); overlapping filled parts of one format get subshapes of their own (no holes from the even-odd rule); sub-paths of one kind share a Geometry section; an SVG group gets SelectMode 0; SVG masters get new UniqueIDs
 - The VSDX parts are read with jflib-formats' strict `formats::xml::Reader` instead of a reader of the crate's own (namespaces, positions and `skip` came along from it; the rules are the same). Every file diagramiotest writes is the same as before.
 
 ### Fixed
+- (JD19, Visio check) A `Cell` without `V` whose only content is text takes that text as its value: Visio 16 writes long strings with line breaks so (the report definitions of `User.visPropRptN`); before, the text went into the extras and the value stayed empty
 
 - The stencil tool rendered each master's icon after a recalculation of the whole stencil: a stencil of 150 masters took minutes; the icon instance now inherits the values computed for the master
 - (JD13) Rows of a shape's Geometry and Connection sections are written with their type `T`, as Visio writes them: a row that overrides an inherited one (a resized instance of a master) gets the inherited row's type, a Connection row without one `T='Connection'`. Without it Office's previewer (`VPREVIEW.EXE`, the preview pane of Windows Explorer) hung, and Explorer with it, and desktop Visio passed over the rows and drew such shapes with the master's geometry

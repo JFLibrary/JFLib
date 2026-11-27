@@ -96,6 +96,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - (JD19) Formulas: FORMAT and FORMATEX are computed with field.rs's pictures and the document's `Env` when the value reads only shape data and user cells without a length, angle or duration; other uses keep their stored value as before
 
 ### Changed
+- (JD19, Visio check) `Master::new`: a new master's shapes get IDs from 5, as Visio's masters; Visio takes a data graphic's callout master only when its shape has ID 5. Masters read from a file keep their IDs
+- (JD19, Visio check) Formulas: a Value cell (User, Prop, Field ...) keeps its result's type the way Visio marks it, a string with the unit STR, a colour COLOR, a point as `PNT(x,y)` with PNT (`Transaction::set_result_unit`); unmarked, Visio read texts, colours and points back as numbers
+- (JD19, Visio check) `datagraphic`: what Visio 16 needs to see a data graphic: items and callout masters carry `User.visDGCalloutItem = 5` (callout masters also `visDGDefaultPos` and `visDGStackHeight` 0), an instance names its item with `DEPENDSON(item shape ID)`, `USE({UniqueID})` without quotes, a graphic's UniqueID in the pattern Visio gives its masters (Visio changes other ones when it opens a file); colour by value falls back to `THEMEVAL("FillColor")` in its User cell. Visio lists and applies text and data bar items; icon sets and colour by value it draws but does not list
+- (JD19, Visio check) `report`: Visio's codes, each checked with Visio's report add-on: SummaryTypes 1 count, 2 total, 4 average, 8 minimum, 16 maximum, 32 median (`Func::Median` is new); Condition 4 is <, 5 >=; a definition with `advanced_filter` set runs without its criteria, as in Visio; the grouping column comes first
 
 - (JD8 rest) `Transaction::delete_layer` keeps the page's layers numbered without gaps: the layers
   after the deleted one move one down and the shapes' own LayerMember cells follow (as Visio numbers
