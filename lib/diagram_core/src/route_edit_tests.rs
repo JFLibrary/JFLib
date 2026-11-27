@@ -9,16 +9,23 @@
 use alloc::vec::Vec;
 
 use super::*;
-use crate::route_styles::tests::{assert_path, fx, near, upright_or_level, Fx};
+use crate::route_styles::tests::{assert_path, fx, near, upright_or_level, Fx, STUB};
 
-// A at (2, 2), B at (6, 4), the page's flowchart left to right: a Z bending at x = 4
+// A at (2, 2), B at (6, 4), the page's simple left to right: a Z bending at x = 4 (JD21v: Visio's
+// flowchart bends one stub after A)
 fn z() -> (Fx, ShapeRef, ShapeRef, ShapeRef) {
+    let (f, a, b, c) = z_in(18.0);
+    assert_path(&f.path(c), &[[2.5, 2.0], [4.0, 2.0], [4.0, 4.0], [5.5, 4.0]]);
+    (f, a, b, c)
+}
+
+// the same in another style
+fn z_in(code: f64) -> (Fx, ShapeRef, ShapeRef, ShapeRef) {
     let mut f = fx();
-    f.set(None, "RouteStyle", 6.0);
+    f.set(None, "RouteStyle", code);
     let a = f.rect(1, [2.0, 2.0], [1.0, 1.0]);
     let b = f.rect(2, [6.0, 4.0], [1.0, 1.0]);
     let c = f.connect(a, b);
-    assert_path(&f.path(c), &[[2.5, 2.0], [4.0, 2.0], [4.0, 4.0], [5.5, 4.0]]);
     (f, a, b, c)
 }
 
@@ -58,7 +65,7 @@ fn a_piece_moves_across_and_stays_upright() {
     assert_eq!(f.value(c, "ConFixedCode"), Some(1.0));
     // past the stub at A it cannot go
     assert!(apply(&mut f, c, Edit::Piece(1, [1.0, 3.0]), 0.0));
-    assert_path(&f.path(c), &[[2.5, 2.0], [2.625, 2.0], [2.625, 4.0], [5.5, 4.0]]);
+    assert_path(&f.path(c), &[[2.5, 2.0], [2.5 + STUB, 2.0], [2.5 + STUB, 4.0], [5.5, 4.0]]);
 }
 
 #[test]
@@ -66,7 +73,7 @@ fn an_end_piece_moves_with_a_jog() {
     let (mut f, _, _, c) = z();
     assert!(apply(&mut f, c, Edit::Piece(0, [3.0, 2.5]), 0.0));
     let p = f.path(c);
-    assert_path(&p, &[[2.5, 2.0], [2.625, 2.0], [2.625, 2.5], [4.0, 2.5], [4.0, 4.0], [5.5, 4.0]]);
+    assert_path(&p, &[[2.5, 2.0], [2.5 + STUB, 2.0], [2.5 + STUB, 2.5], [4.0, 2.5], [4.0, 4.0], [5.5, 4.0]]);
     assert!(upright_or_level(&p));
     // the only piece of a straight connection: a detour with two jogs
     let mut f = fx();
@@ -75,7 +82,7 @@ fn an_end_piece_moves_with_a_jog() {
     let c = f.connect(a, b);
     assert_path(&f.path(c), &[[2.5, 2.0], [5.5, 2.0]]);
     assert!(apply(&mut f, c, Edit::Piece(0, [4.0, 3.0]), 0.0));
-    let u = [[2.5, 2.0], [2.625, 2.0], [2.625, 3.0], [5.375, 3.0], [5.375, 2.0], [5.5, 2.0]];
+    let u = [[2.5, 2.0], [2.5 + STUB, 2.0], [2.5 + STUB, 3.0], [5.5 - STUB, 3.0], [5.5 - STUB, 2.0], [5.5, 2.0]];
     assert_path(&f.path(c), &u);
     // dragged back near the line it snaps there and the bends go
     assert!(apply(&mut f, c, Edit::Piece(2, [4.0, 2.03]), 0.05));
@@ -91,7 +98,7 @@ fn a_vertex_moves_both_pieces() {
     let (mut f, _, _, c) = z();
     assert!(apply(&mut f, c, Edit::Bend(1, [4.5, 2.8]), 0.0));
     let p = f.path(c);
-    assert_path(&p, &[[2.5, 2.0], [2.625, 2.0], [2.625, 2.8], [4.5, 2.8], [4.5, 4.0], [5.5, 4.0]]);
+    assert_path(&p, &[[2.5, 2.0], [2.5 + STUB, 2.0], [2.5 + STUB, 2.8], [4.5, 2.8], [4.5, 4.0], [5.5, 4.0]]);
     assert!(p.iter().any(|q| near(*q, [4.5, 2.8])));
 }
 
@@ -124,9 +131,10 @@ fn vertices_come_and_go() {
 
 // ---- 4. kept ways
 
+// (an organization chart left to right: it routes around shapes, simple ones do not)
 #[test]
 fn a_way_by_hand_is_kept_and_laid_anew_when_crossed() {
-    let (mut f, _, b, c) = z();
+    let (mut f, _, b, c) = z_in(4.0);
     assert!(apply(&mut f, c, Edit::Piece(1, [4.6, 3.0]), 0.0));
     // B goes up: the upright piece stays at x = 4.6 (freshly routed it would bend at 4)
     f.move_to(b, [6.0, 5.0]);
@@ -139,7 +147,7 @@ fn a_way_by_hand_is_kept_and_laid_anew_when_crossed() {
     assert!(p.windows(2).all(|s| !route::hits_box(s[0], s[1], &wb)), "{p:?}");
     assert!(!p.iter().any(|q| (q[0] - 4.6).abs() < 1e-9), "{p:?}");
     // never reroute: the way stays where it is, through the shape
-    let (mut f, _, b, c) = z();
+    let (mut f, _, b, c) = z_in(4.0);
     assert!(apply(&mut f, c, Edit::Piece(1, [4.6, 3.0]), 0.0));
     f.set(Some(c), "ConFixedCode", 2.0);
     f.move_to(b, [6.0, 5.0]);
@@ -177,12 +185,13 @@ fn a_straight_way_gets_vertices() {
     let a = f.rect(1, [2.0, 2.0], [1.0, 1.0]);
     let b = f.rect(2, [6.0, 4.0], [1.0, 1.0]);
     let c = f.connect(a, b);
-    assert_path(&f.path(c), &[[2.5, 2.25], [5.5, 3.75]]);
+    // (JD21v) Visio's straight style: corner to corner
+    assert_path(&f.path(c), &[[2.5, 2.5], [5.5, 3.5]]);
     let h = handles(&f.doc, c);
     assert!(h.len() == 1 && h[0].free && !way(&f.doc, c).unwrap().right, "{h:?}");
     // the midpoint dragged: a vertex there
     assert!(apply(&mut f, c, Edit::Piece(0, [4.0, 5.0]), 0.0));
-    assert_path(&f.path(c), &[[2.5, 2.25], [4.0, 5.0], [5.5, 3.75]]);
+    assert_path(&f.path(c), &[[2.5, 2.5], [4.0, 5.0], [5.5, 3.5]]);
     assert_eq!(f.value(c, "ConFixedCode"), Some(1.0));
     // B moves: the vertex stays, both ends dock towards it
     f.move_to(b, [6.0, 2.0]);

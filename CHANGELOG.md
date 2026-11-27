@@ -274,6 +274,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 
 ### Changed
 
+- **diagram_core:** (JD21v) The routing styles lay the ways a real Visio 16 laid in a counter-check: the direction gives only the axis; right angles and network straight across beside each other, else an L leaving the begin's top or bottom, past obstacles in the free part of a side; straight corner to corner; organization chart and flowchart bend one stub before the end's / after the begin's shape; tree one straight line; the stub and the clearance are half the page's AvenueSize; WalkPreference changes no way; ConFixedCode 6 / 0 after routing as Visio writes it
 - **plat:** (E2) `Event::y` of key events carries the key's character above its location: code that compared it with a `KL_*` takes `plat::key_location(y)` (`KeyEvent::location` is as before)
 - **plat:** Wayland's touchpad (its continuous axes) and macOS' trackpad deliver `E_WHEEL` in physical pixels with `WHEEL_PIXELS` instead of 120ths (Wayland: 12 a pixel, macOS: 3 a point); the UI makes notches of them as `wheel_lines()` lines of 16 DIP, so its views follow the fingers' way (they scrolled 4.8 times it on Wayland, 1.2 times on macOS)
 - **ui:** A notch of the wheel scrolls the system's lines (`ui.wheel_lines()`) in the library's views, no longer always three; headless runs stay at three

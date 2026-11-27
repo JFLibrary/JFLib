@@ -75,7 +75,8 @@
 //                                 the shapes they measure
 //   route_styles::*               (JD21) the routing styles of page and connector with their
 //                                 directions (flowchart, tree, organization chart, simple ...;
-//                                 CN-05, SS-40), shapes connectors may cross (SS-19)
+//                                 CN-05, SS-40), the ways they lay as Visio 16 does (JD21v),
+//                                 shapes connectors may cross (SS-19)
 //   route_edit::*                 (JD21) a connector's way by hand: midpoints and vertices
 //                                 moved, added, removed, the way kept when its shapes move (CN-04)
 //   pointglue::*                  (JD21) control points that glue to connection points and
