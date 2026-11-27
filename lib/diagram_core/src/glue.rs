@@ -44,20 +44,20 @@
 // way.  Rows of a master keep their indices where their type fits; else they get a Del mark
 // and new rows follow.
 //
-// Dynamic glue docks in the middle of a side of the target, on its outline (the farthest point
-// of its geometry on the line through its middle), on the side that gives the cheapest way
-// among the obstacles (length + bends; one search over the sides of both ends, route::best);
-// where the other end lies within a side's reach, the point straight opposite it is offered
-// too (Visio's files show such straight connections).  (JD15, SS-18) WalkPreference bit 1 / 2
-// (visWalkPrefBegNS / EndNS): that end prefers top and bottom -- a way from there wins when it is
-// as short and has as few bends as the cheapest one.  The straight style docks where the line
-// between the two ends leaves the outline.  Obstacles are the boxes of the page's top-level
-// shapes that are not 1-D (route.rs keeps the page's LineToNodeX/Y as clearance, else 1/8 in).
-// ConFixedCode 1 and 2 (reroute manually / never) keep the corners and only move the first and
-// last pieces; reset() routes them anew.  (JD21) 1 is laid anew when the kept way runs through
-// a shape (route_edit.rs); 3 .. 6 route freely (Visio writes them for the connectors it routes
-// itself); the styles with a direction choose the sides (route_styles.rs); ShapePermeableX/Y let
-// ways cross a shape (route::best_through).
+// Dynamic glue docks on the outline of the target (the farthest point of its geometry on a line
+// through it).  (JD21v) Where on it, and the way, the connector's routing style decides as Visio
+// 16 does (route_styles::route, checked against Visio's own ways): right angles straight across
+// in the middle of the overlap of two shapes beside each other, else an L leaving the begin's top
+// or bottom; around obstacles in the free part of the sides; else the cheapest way over the sides
+// (length + bends; route::best_through, which is also all ends glued to points or free get); where
+// the other end lies within a side's reach, the point straight opposite it is offered too.
+// (JD15, SS-18) WalkPreference changes none of these ways in Visio: kept, not read.  Obstacles
+// are the boxes of the page's top-level shapes that are not 1-D; the clearance is half the page's
+// AvenueSize (opts_for).  After routing ConFixedCode becomes 6 or 0 as
+// Visio writes it (route_styles::mark).  ConFixedCode 1 and 2 (reroute manually / never) keep the
+// corners and only move the first and last pieces; reset() routes them anew.  (JD21) 1 is laid
+// anew when the kept way runs through a shape (route_edit.rs); 3 .. 6 route freely (Visio writes
+// them for the connectors it routes itself); ShapePermeableX/Y let ways cross a shape.
 //
 // (JD21v) After routing, the line jumps of the connectors laid and of the connectors they cross
 // go into their Geometry (jumps.rs, as Visio writes them); detach takes the jumps over deleted
@@ -291,8 +291,8 @@ pub fn style(doc: &Document, shape: ShapeRef) -> Style {
         return Style::Curved;
     }
     match get("ShapeRouteStyle", "RouteStyle") {
-        // (JD21) network (9) as well (route_styles.rs)
-        Some(v) if v == 2.0 || v == 9.0 || v == 16.0 => Style::Straight,
+        // (JD21v) network (9) routes with right angles in Visio (route_styles.rs)
+        Some(v) if v == 2.0 || v == 16.0 => Style::Straight,
         _ => Style::RightAngle,
     }
 }
@@ -820,8 +820,11 @@ fn obstacles(doc: &Document, owner: Owner) -> Vec<(ShapeRef, [f64; 4])> {
     out
 }
 
-// the clearance (LineToNodeX/Y of the page, else 1/8 inch) and the cost of a bend (1/2 inch),
-// both on paper, in drawing units
+// the clearance and the cost of a bend (1/2 inch), both on paper, in drawing units.  (JD21v) The
+// clearance is half the page's AvenueSizeX/Y (Visio's default 7.5 mm where the page has none):
+// Visio keeps that much from obstacles and lays the stubs of its styles so (route_styles.rs;
+// AvenueSize 0.5 in gave 0.25 in, 0.1 in 0.05 in; LineToNode 0.4 in changed nothing, so it is
+// not read here)
 pub(crate) fn opts_for(doc: &Document, owner: Owner) -> Opts {
     let Owner::Page(p) = owner else { return Opts::default() };
     let sh = SheetRef::Page(p);
@@ -829,9 +832,9 @@ pub(crate) fn opts_for(doc: &Document, owner: Owner) -> Opts {
         (Some(ps), Some(ds)) if ps > 0.0 && ds > 0.0 && (ds / ps).is_finite() => ds / ps,
         _ => 1.0,
     };
-    let node = [num(doc, sh, "LineToNodeX"), num(doc, sh, "LineToNodeY")].into_iter().flatten().filter(|v| *v > 0.0 && v.is_finite()).fold(None::<f64>, |m, v| Some(m.map_or(v, |m| m.max(v))));
+    let avenue = [num(doc, sh, "AvenueSizeX"), num(doc, sh, "AvenueSizeY")].into_iter().flatten().filter(|v| *v > 0.0 && v.is_finite()).fold(None::<f64>, |m, v| Some(m.map_or(v, |m| m.max(v))));
     let d = Opts::default();
-    Opts { clearance: node.unwrap_or(d.clearance) * scale, bend: d.bend * scale }
+    Opts { clearance: avenue.unwrap_or(7.5 / 25.4) * 0.5 * scale, bend: d.bend * scale }
 }
 
 fn run(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef], force: bool) -> Result<(), EditError> {
@@ -972,30 +975,6 @@ fn candidates(doc: &Document, t: Target, at: [f64; 2], toward: [f64; 2], other: 
     }
 }
 
-// (JD15, SS-18) WalkPreference with bit 1 (Begin) or 2 (End) set: the end prefers the top and
-// bottom of its shape -- among ways as short and with as few bends as the cheapest one, a way
-// from those sides wins (Visio's sides, the default, need nothing: SIDES puts them first)
-fn prefer_walk(ca: &[Port], cb: &[Port], boxes: &[[f64; 4]], pass: &[u8], opts: &Opts, walk: i64, found: (usize, usize, Vec<[f64; 2]>)) -> (usize, usize, Vec<[f64; 2]>) {
-    if walk & 3 == 0 || found.2.len() < 2 {
-        return found;
-    }
-    let vertical = |p: &Port| p.dir.is_some_and(|d| d[0] == 0.0);
-    let pick = |ports: &[Port], on: bool| -> Vec<usize> { (0..ports.len()).filter(|&k| !on || vertical(&ports[k])).collect() };
-    let (ia, ib) = (pick(ca, walk & 1 != 0), pick(cb, walk & 2 != 0));
-    if ia.is_empty() || ib.is_empty() || (ia.len() == ca.len() && ib.len() == cb.len()) {
-        return found;
-    }
-    let (sa, sb): (Vec<Port>, Vec<Port>) = (ia.iter().map(|&k| ca[k]).collect(), ib.iter().map(|&k| cb[k]).collect());
-    let (i, j, way) = route::best_through(&sa, &sb, boxes, pass, opts);
-    let len = |w: &[[f64; 2]]| w.windows(2).map(|s| (s[1][0] - s[0][0]).abs() + (s[1][1] - s[0][1]).abs()).sum::<f64>();
-    let (l0, l1) = (len(&found.2), len(&way));
-    if way.len() >= 2 && l1 <= l0 + 1e-9 * (1.0 + l0) && route::bends(&way) <= route::bends(&found.2) {
-        (ia[i], ib[j], way)
-    } else {
-        found
-    }
-}
-
 fn route_one(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef, force: bool, boxes: &[[f64; 4]], pass: &[u8]) -> Result<(), EditError> {
     let doc = tx.doc();
     let sheet = SheetRef::Shape(c);
@@ -1008,30 +987,37 @@ fn route_one(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef, force: bool, b
     let code = num(doc, sheet, "ConFixedCode").map_or(0, |v| v as i64);
     let fixed = !force && matches!(code, 1 | 2);
     let refs = [reference(doc, targets[0], bp), reference(doc, targets[1], ep)];
-    // (JD15, SS-18) WalkPreference: bit 1 Begin, bit 2 End prefer top and bottom
-    // (visWalkPrefBegNS, visWalkPrefEndNS), else the sides
-    let walk = num(doc, sheet, "WalkPreference").filter(|v| v.is_finite()).unwrap_or(0.0) as i64;
     let ca = candidates(doc, targets[0], bp, refs[1], facing(doc, targets[1], ep), style);
     let cb = candidates(doc, targets[1], ep, refs[0], facing(doc, targets[0], bp), style);
-    let pts = if style == Style::Straight {
+    // (JD21v, CN-05) the way of the connector's style as Visio lays it (route_styles::route; the
+    // shapes of ends glued to whole shapes).  (JD15, SS-18) WalkPreference changes none of these
+    // ways in Visio (the counter-check): it is kept, not read
+    let shapes = [crate::route_styles::shape(doc, targets[0]), crate::route_styles::shape(doc, targets[1])];
+    let lay = || crate::route_styles::route(crate::route_styles::of(doc, c), [shapes[0].as_ref(), shapes[1].as_ref()], &ca, &cb, boxes, pass, &opts);
+    let (pts, router) = if style == Style::Straight {
         // (JD21, CN-04) a straight way with vertices of its own keeps them
         match fixed.then(|| crate::route_edit::kept_polyline(doc, c, &targets)).flatten() {
-            Some(p) => p,
-            None => route::straight(&ca[0], &cb[0]),
+            Some(p) => (p, None),
+            None => {
+                let r = lay();
+                (r.way, Some(r.router))
+            }
         }
     } else {
-        // (JD21, CN-05) a style with a direction chooses the sides (route_styles::plan), else one
-        // search over the ports of both ends: the cheapest pair of sides among the obstacles
-        let way = match crate::route_styles::plan(crate::route_styles::of(doc, c), &ca, &cb, boxes, pass, &opts) {
-            Some(found) => found.2,
-            None => prefer_walk(&ca, &cb, boxes, pass, &opts, walk, route::best_through(&ca, &cb, boxes, pass, &opts)).2,
-        };
         match fixed.then(|| crate::route_edit::kept(doc, c, code, &ca, &cb, boxes, pass, &opts)).flatten() {
-            Some(p) => p,
-            None => way,
+            Some(p) => (p, None),
+            None => {
+                let r = lay();
+                (r.way, Some(r.router))
+            }
         }
     };
-    write_route(tx, eng, c, &targets, &pts, style)
+    write_route(tx, eng, c, &targets, &pts, style)?;
+    // (JD21v) ConFixedCode 6 / 0 afterwards, as Visio writes it
+    match router {
+        Some(r) => crate::route_styles::mark(tx, c, r),
+        None => Ok(()),
+    }
 }
 
 // the Width or Height formula of a connector for a side of length d (None: leave it)

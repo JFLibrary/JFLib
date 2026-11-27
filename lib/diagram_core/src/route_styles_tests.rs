@@ -5,6 +5,9 @@
 //   2. every style with a direction in every direction: the sides the ends use, the bends
 //   3. simple styles ignore obstacles, straight ones draw one line
 //   4. ShapePermeableX / Y: a way straight through a shape, only in its direction
+//
+// (JD21v) the ways against Visio's own: route_styles_visio_tests.rs.  Without page cells the stub
+// is half of Visio's default AvenueSize (7.5 mm / 2: STUB)
 
 use alloc::vec;
 use alloc::vec::Vec;
@@ -13,6 +16,9 @@ use super::*;
 use crate::formula::Engine;
 use crate::glue::{self, Target};
 use crate::{CellAddr, DocKind, Document, Owner, Page, PageHeader, PageRef, Row, RowKey, SecKey, Section, ShapeData, ShapeKind, ShapeRef, SheetRef, Unit, Value};
+
+/// (JD21v) the stub of a page without layout cells: half of Visio's AvenueSize 7.5 mm
+pub(crate) const STUB: f64 = 7.5 / 25.4 / 2.0;
 
 pub(crate) fn close(a: f64, b: f64) -> bool {
     (a - b).abs() <= 1e-9 * (1.0 + b.abs())
@@ -153,7 +159,8 @@ fn codes_both_ways() {
     assert_eq!(RouteStyle::new(Kind::Tree, None).code(), 7);
     assert_eq!(RouteStyle::new(Kind::Tree, Some(Dir::Left)).code(), 15);
     assert_eq!(RouteStyle::new(Kind::Network, Some(Dir::Up)), RouteStyle { kind: Kind::Network, dir: None });
-    assert!(Kind::CentreToCentre.straight() && Kind::Network.straight() && !Kind::Simple.straight());
+    // (JD21v) network routes with right angles in Visio
+    assert!(Kind::CentreToCentre.straight() && Kind::Straight.straight() && !Kind::Network.straight() && !Kind::Simple.straight());
 }
 
 #[test]
@@ -163,12 +170,15 @@ fn the_connector_overrides_the_page() {
     let b = f.rect(2, [4.0, 2.0], [1.0, 1.0]);
     let c = f.connect(a, b);
     assert_eq!(of(&f.doc, c), RouteStyle::RIGHT_ANGLE);
-    // right angles: an L from A's bottom to B's left side (cheaper than a Z)
+    // right angles: an L leaving A's bottom into B's left side (Visio's: the begin vertically)
     assert_path(&f.path(c), &[[2.0, 5.5], [2.0, 2.0], [3.5, 2.0]]);
-    // the page's flowchart top to bottom: bottom to top, a Z bending halfway
+    assert_eq!(f.value(c, "ConFixedCode"), Some(6.0));
+    // the page's flowchart top to bottom: bottom to top, a Z bending one stub under A
     let p = with_page_style(&mut f, 5.0, c);
     assert_eq!(of(&f.doc, c), RouteStyle::from_code(5).unwrap());
-    assert_path(&p, &[[2.0, 5.5], [2.0, 4.0], [4.0, 4.0], [4.0, 2.5]]);
+    assert_path(&p, &[[2.0, 5.5], [2.0, 5.5 - STUB], [4.0, 5.5 - STUB], [4.0, 2.5]]);
+    // the style's own way: ConFixedCode 0 again, as Visio writes it
+    assert_eq!(f.value(c, "ConFixedCode"), Some(0.0));
     // the connector's own right angles win
     f.set(Some(c), "ShapeRouteStyle", 1.0);
     f.update(&[c]);
@@ -182,7 +192,8 @@ fn the_connector_overrides_the_page() {
 // ---- 2. styles with a direction
 
 // shape B a step along `d` from A and to its side, a connector A -> B in `code`: the first
-// piece leaves A along d, the last one arrives travelling along d
+// piece leaves A along d, the last one arrives travelling along d (the tree: one straight line
+// from side to side)
 #[test]
 fn every_direction_names_the_sides() {
     let dirs: [(Dir, [f64; 2]); 4] = [(Dir::Down, [0.0, -1.0]), (Dir::Right, [1.0, 0.0]), (Dir::Up, [0.0, 1.0]), (Dir::Left, [-1.0, 0.0])];
@@ -197,6 +208,13 @@ fn every_direction_names_the_sides() {
             let style = RouteStyle::new(kind, Some(dir));
             let p = with_page_style(&mut f, style.code() as f64, c);
             let n = p.len();
+            if kind == Kind::Tree {
+                // from the middle of A's side facing d to the middle of B's facing back
+                let ma = [10.0 + d[0] * 0.5, 10.0 + d[1] * 0.5];
+                let mb = [10.0 + d[0] * 3.5 + across[0], 10.0 + d[1] * 3.5 + across[1]];
+                assert_path(&p, &[ma, mb]);
+                continue;
+            }
             assert!(upright_or_level(&p), "{style:?}: {p:?}");
             assert_eq!(heading(p[0], p[1]), d, "{style:?} leaves A: {p:?}");
             assert_eq!(heading(p[n - 2], p[n - 1]), d, "{style:?} arrives at B: {p:?}");
@@ -205,37 +223,54 @@ fn every_direction_names_the_sides() {
     }
 }
 
+// (JD21v) Visio: the organization chart bends one stub before B, the flowchart one after A, the
+// tree draws one line, simple bends halfway; the direction gives only the axis
 #[test]
-fn org_chart_halfway_tree_early() {
+fn where_the_styles_bend() {
     let mut f = fx();
     let a = f.rect(1, [2.0, 6.0], [1.0, 1.0]);
     let b = f.rect(2, [4.0, 2.0], [1.0, 1.0]);
     let c = f.connect(a, b);
-    assert_path(&with_page_style(&mut f, 3.0, c), &[[2.0, 5.5], [2.0, 4.0], [4.0, 4.0], [4.0, 2.5]]);
-    // the tree bends one clearance (1/8 in) under A
-    assert_path(&with_page_style(&mut f, 7.0, c), &[[2.0, 5.5], [2.0, 5.375], [4.0, 5.375], [4.0, 2.5]]);
-    // left to right: one clearance right of A
+    let org = [[2.0, 5.5], [2.0, 2.5 + STUB], [4.0, 2.5 + STUB], [4.0, 2.5]];
+    assert_path(&with_page_style(&mut f, 3.0, c), &org);
+    // bottom to top: the same way (B lies below)
+    assert_path(&with_page_style(&mut f, 10.0, c), &org);
+    assert_path(&with_page_style(&mut f, 5.0, c), &[[2.0, 5.5], [2.0, 5.5 - STUB], [4.0, 5.5 - STUB], [4.0, 2.5]]);
+    assert_path(&with_page_style(&mut f, 7.0, c), &[[2.0, 5.5], [4.0, 2.5]]);
+    assert_path(&with_page_style(&mut f, 17.0, c), &[[2.0, 5.5], [2.0, 4.0], [4.0, 4.0], [4.0, 2.5]]);
+    // left to right
     let mut f = fx();
     let a = f.rect(1, [2.0, 2.0], [1.0, 1.0]);
     let b = f.rect(2, [6.0, 4.0], [1.0, 1.0]);
     let c = f.connect(a, b);
-    assert_path(&with_page_style(&mut f, 8.0, c), &[[2.5, 2.0], [2.625, 2.0], [2.625, 4.0], [5.5, 4.0]]);
+    assert_path(&with_page_style(&mut f, 8.0, c), &[[2.5, 2.0], [5.5, 4.0]]);
+    assert_path(&with_page_style(&mut f, 4.0, c), &[[2.5, 2.0], [5.5 - STUB, 2.0], [5.5 - STUB, 4.0], [5.5, 4.0]]);
+    assert_path(&with_page_style(&mut f, 6.0, c), &[[2.5, 2.0], [2.5 + STUB, 2.0], [2.5 + STUB, 4.0], [5.5, 4.0]]);
+    assert_path(&with_page_style(&mut f, 18.0, c), &[[2.5, 2.0], [4.0, 2.0], [4.0, 4.0], [5.5, 4.0]]);
 }
 
+// (JD21v) Visio: shapes beside each other across the style's axis leave the organization chart
+// and the flowchart to the right-angle router (ConFixedCode 6); the tree and simple turn to the
+// other axis
 #[test]
-fn flowchart_keeps_to_the_flow_only_along_it() {
-    // side by side: the cheapest sides (straight across)
+fn styles_beside_the_axis() {
     let mut f = fx();
     let a = f.rect(1, [2.0, 2.0], [1.0, 1.0]);
     let b = f.rect(2, [6.0, 2.0], [1.0, 1.0]);
     let c = f.connect(a, b);
-    assert_path(&with_page_style(&mut f, 5.0, c), &[[2.5, 2.0], [5.5, 2.0]]);
-    // the organization chart keeps to bottom and top: down, across, up over B, down into it
-    let p = with_page_style(&mut f, 3.0, c);
-    let n = p.len();
-    assert_eq!(heading(p[0], p[1]), [0.0, -1.0], "{p:?}");
-    assert_eq!(heading(p[n - 2], p[n - 1]), [0.0, -1.0], "{p:?}");
-    assert!(near(p[0], [2.0, 1.5]) && near(p[n - 1], [6.0, 2.5]), "{p:?}");
+    for code in [5.0, 3.0, 12.0, 10.0, 7.0, 17.0] {
+        assert_path(&with_page_style(&mut f, code, c), &[[2.5, 2.0], [5.5, 2.0]]);
+        let fixed = if code == 7.0 || code == 17.0 { 0.0 } else { 6.0 };
+        assert_eq!(f.value(c, "ConFixedCode").unwrap_or(0.0), fixed, "{code}");
+    }
+    // B a little lower: the router's line in the middle of the overlap, the tree's from middle to
+    // middle, simple's Z halfway across
+    f.move_to(b, [6.0, 1.8]);
+    assert_path(&with_page_style(&mut f, 3.0, c), &[[2.5, 1.9], [5.5, 1.9]]);
+    assert_path(&with_page_style(&mut f, 7.0, c), &[[2.5, 2.0], [5.5, 1.8]]);
+    assert_path(&with_page_style(&mut f, 17.0, c), &[[2.5, 2.0], [4.0, 2.0], [4.0, 1.8], [5.5, 1.8]]);
+    // simple horizontal-vertical: one stub after A
+    assert_path(&with_page_style(&mut f, 21.0, c), &[[2.5, 2.0], [2.5 + STUB, 2.0], [2.5 + STUB, 1.8], [5.5, 1.8]]);
 }
 
 // ---- 3. simple and straight
@@ -265,7 +300,7 @@ fn simple_styles_ignore_obstacles() {
 
 #[test]
 fn straight_styles_draw_one_line() {
-    for code in [2.0, 9.0, 16.0] {
+    for code in [2.0, 16.0] {
         let mut f = fx();
         let a = f.rect(1, [2.0, 2.0], [1.0, 1.0]);
         let b = f.rect(2, [6.0, 2.0], [1.0, 1.0]);
@@ -274,6 +309,24 @@ fn straight_styles_draw_one_line() {
         assert_path(&with_page_style(&mut f, code, c), &[[2.5, 2.0], [5.5, 2.0]]);
         assert_eq!(glue::style(&f.doc, c), glue::Style::Straight, "{code}");
     }
+    // (JD21v) network routes with right angles: past the shape in the middle of the free part of
+    // the overlap (the upper one of two alike)
+    let mut f = fx();
+    let a = f.rect(1, [2.0, 2.0], [1.0, 1.0]);
+    let b = f.rect(2, [6.0, 2.0], [1.0, 1.0]);
+    let _w = f.rect(3, [4.0, 2.0], [0.5, 0.5]);
+    let c = f.connect(a, b);
+    assert_path(&with_page_style(&mut f, 9.0, c), &[[2.5, 2.375], [5.5, 2.375]]);
+    assert_eq!(glue::style(&f.doc, c), glue::Style::RightAngle);
+    // straight diagonal: corner to corner; centre to centre: from middle to middle
+    let mut f = fx();
+    let a = f.rect(1, [2.0, 2.0], [1.0, 1.0]);
+    let b = f.rect(2, [6.0, 4.0], [1.0, 1.0]);
+    let c = f.connect(a, b);
+    assert_path(&with_page_style(&mut f, 2.0, c), &[[2.5, 2.5], [5.5, 3.5]]);
+    assert_eq!(f.value(c, "ConFixedCode").unwrap_or(0.0), 0.0);
+    assert_path(&with_page_style(&mut f, 16.0, c), &[[2.5, 2.25], [5.5, 3.75]]);
+    assert_eq!(f.value(c, "ConFixedCode"), Some(6.0));
 }
 
 // ---- 4. permeable shapes

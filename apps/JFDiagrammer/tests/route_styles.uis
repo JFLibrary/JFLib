@@ -3,10 +3,11 @@
 # routing style and its direction as two rows (Visio's 23 RouteStyle codes) and the appearance,
 # separating and overlapping of lines.  Right angles: an L from the upper shape's bottom to the
 # lower one's left side.  Organigramm von oben nach unten: out at the bottom, in from above,
-# bending halfway; the lower shape moved: the same style.  Von links nach rechts: out on the
-# right, in on the left.  The direction is greyed for styles without one.  Verbinder-Verhalten (a
-# connector's menu) has the rows Weg: Gerade on the connector itself wins over the page (one
-# straight line), undone.
+# (JD21v, as Visio 16) bending one stub above the lower shape; the lower shape moved: the same
+# style.  Von links nach rechts: out on the right, in on the left, bending one stub before it.
+# The direction is greyed for styles without one.  Verbinder-Verhalten (a connector's menu) has
+# the rows Weg: Gerade on the connector itself wins over the page (one straight line, corner to
+# corner as in Visio), undone.
 cmd 4404
 drag 500,330 640,420
 drag 760,530 900,620
@@ -39,7 +40,7 @@ click button:"OK"
 expect listitem:"Sheet.6" rect 651 374 176 204
 shot build/JFDiagrammer-route-styles.png
 # Verbinder-Verhalten: Gerade on the connector
-click 739,470
+click 700,375
 expect listitem:"Sheet.6" selected
 cmd 7200
 expect dialog:"Verbinder-Verhalten" exists
@@ -47,6 +48,6 @@ expect text:"Weg" exists
 click #2032205840
 click "Gerade"
 click button:"OK"
-expect listitem:"Sheet.6" rect 651 420 176 109
+expect listitem:"Sheet.6" rect 651 424 176 101
 key ctrl+z
 expect listitem:"Sheet.6" rect 651 374 176 204

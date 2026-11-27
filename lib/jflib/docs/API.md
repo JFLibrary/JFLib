@@ -57599,7 +57599,8 @@ a file loses nothing, and the behaviour Visio files carry works without translat
                                 the shapes they measure
   route_styles::*               (JD21) the routing styles of page and connector with their
                                 directions (flowchart, tree, organization chart, simple ...;
-                                CN-05, SS-40), shapes connectors may cross (SS-19)
+                                CN-05, SS-40), the ways they lay as Visio 16 does (JD21v),
+                                shapes connectors may cross (SS-19)
   route_edit::*                 (JD21) a connector's way by hand: midpoints and vertices
                                 moved, added, removed, the way kept when its shapes move (CN-04)
   jumps::*                      (JD21) line jumps where connectors cross, written into the
@@ -60661,20 +60662,20 @@ MoveTo and one NURBSTo over the corners).  Controls.TextPosition goes to the mid
 way.  Rows of a master keep their indices where their type fits; else they get a Del mark
 and new rows follow.
 
-Dynamic glue docks in the middle of a side of the target, on its outline (the farthest point
-of its geometry on the line through its middle), on the side that gives the cheapest way
-among the obstacles (length + bends; one search over the sides of both ends, route::best);
-where the other end lies within a side's reach, the point straight opposite it is offered
-too (Visio's files show such straight connections).  (JD15, SS-18) WalkPreference bit 1 / 2
-(visWalkPrefBegNS / EndNS): that end prefers top and bottom -- a way from there wins when it is
-as short and has as few bends as the cheapest one.  The straight style docks where the line
-between the two ends leaves the outline.  Obstacles are the boxes of the page's top-level
-shapes that are not 1-D (route.rs keeps the page's LineToNodeX/Y as clearance, else 1/8 in).
-ConFixedCode 1 and 2 (reroute manually / never) keep the corners and only move the first and
-last pieces; reset() routes them anew.  (JD21) 1 is laid anew when the kept way runs through
-a shape (route_edit.rs); 3 .. 6 route freely (Visio writes them for the connectors it routes
-itself); the styles with a direction choose the sides (route_styles.rs); ShapePermeableX/Y let
-ways cross a shape (route::best_through).
+Dynamic glue docks on the outline of the target (the farthest point of its geometry on a line
+through it).  (JD21v) Where on it, and the way, the connector's routing style decides as Visio
+16 does (route_styles::route, checked against Visio's own ways): right angles straight across
+in the middle of the overlap of two shapes beside each other, else an L leaving the begin's top
+or bottom; around obstacles in the free part of the sides; else the cheapest way over the sides
+(length + bends; route::best_through, which is also all ends glued to points or free get); where
+the other end lies within a side's reach, the point straight opposite it is offered too.
+(JD15, SS-18) WalkPreference changes none of these ways in Visio: kept, not read.  Obstacles
+are the boxes of the page's top-level shapes that are not 1-D; the clearance is half the page's
+AvenueSize (opts_for).  After routing ConFixedCode becomes 6 or 0 as
+Visio writes it (route_styles::mark).  ConFixedCode 1 and 2 (reroute manually / never) keep the
+corners and only move the first and last pieces; reset() routes them anew.  (JD21) 1 is laid
+anew when the kept way runs through a shape (route_edit.rs); 3 .. 6 route freely (Visio writes
+them for the connectors it routes itself); ShapePermeableX/Y let ways cross a shape.
 
 (JD21v) After routing, the line jumps of the connectors laid and of the connectors they cross
 go into their Geometry (jumps.rs, as Visio writes them); detach takes the jumps over deleted
@@ -62573,12 +62574,14 @@ learn.microsoft.com VisFromParts, VisToParts, Cell.GlueTo; Visio 2002 Developer 
   .Y<r> of the vertex (relative rows: times Width and Height), Width*fx and Height*fy of the
   handle, Controls.<row> and Controls.<row>.Y of the control point (assumed); DirX, DirY 0,
   Type 0.  A row with these formulas that is there already is used again.
-* An end on a guide (assumed, the Visio-Gegenprobe checks it): a horizontal guide gives the
-  end's Y the formula Sheet.G!PinY (vertical: X = Sheet.G!PinX), the other coordinate stays a
-  value; Connect FromCell=BeginX (EndX) FromPart=9 (12) ToSheet=G ToCell=Angle ToPart=2
-  (visGuideY; a vertical guide 1, visGuideX).  GlueTo's text names two connections "to the
-  guide's Angle cell"; one entry per end is written here (glue::glue replaces it like any).
-  Only top-level 1-D shapes and guides that run across or up the page.
+* An end on a guide (JD21, as Visio 16 writes it; Visio check visio-run2 [glue]): both
+  coordinates of the end INTERSECTX/INTERSECTY(Sheet.G!PinX, Sheet.G!PinY, Sheet.G!Angle, the
+  end's point, Sheet.G!Angle+90 deg) -- the foot of the point on the guide's line, so the end
+  follows the guide and keeps its place along it; two Connect entries, FromCell BeginX and
+  BeginY (EndX, EndY), FromPart 7 and 8 (10 and 11), ToSheet=G, ToCell=Angle, ToPart=4
+  (glue::glue replaces both like any).  An older form Visio still reads: the coordinate the
+  guide fixes = Sheet.G!PinY (PinX), one entry ToPart 2 (1).  Only top-level 1-D shapes and
+  guides that run across or up the page.
 
 The connection point tool (Visio's: Ctrl+click on a selected shape adds a point, a drag moves
 it, Del takes it out; the point's menu sets its kind): a new row's X and Y are Width*k and
@@ -63807,7 +63810,7 @@ Source: [`lib/diagram_core/src/route_styles.rs`](../lib/diagram_core/src/route_s
 
 ```text
 route_styles -- (JD21, CN-05, SS-40, SS-19) the routing styles of a page and of a connector with
-their directions, and the shapes connectors may cross
+their directions, the ways they lay, and the shapes connectors may cross
 
   Kind, RouteStyle { kind, dir }      a style and its direction (organization chart, flowchart,
                                       tree and simple have one; the others None)
@@ -63820,72 +63823,96 @@ their directions, and the shapes connectors may cross
   permeable_place(doc, shape)         ShapePermeablePlace: a layout may place shapes on it
                                       (layout::diagram leaves it out of the obstacles)
   dynamics_off(doc, owner) -> bool    the page's DynamicsOff
-  plan(style, &a_ports, &b_ports, ..) (crate) the way of a style with a direction: the sides
-                                      the ends may use, the obstacles, where the bends go;
-                                      None: the plain right-angle search (glue::route_one)
+  (crate) shape(doc, target) -> Option<Shape>   a dynamic end's shape: box, middle, outline
+  (crate) route(style, [shapes], &a_ports, &b_ports, ..) -> Routed   the way of a connector in its
+                                      style and whether Visio's right-angle router lays it
+  (crate) mark(tx, connector, router) ConFixedCode afterwards as Visio writes it (6 / 0)
 
 Visio's rules -- belegt (Microsoft Learn: the cells RouteStyle, ShapeRouteStyle, ConFixedCode,
 ShapePermeableX/Y/Place, DynamicsOff, CtrlAsInput, LineAdjustFrom/To, LineRouteExt; the archived
 Visio 2002 developer pages "Creating Routable and Other 1-D Connectors" and "Designing Shapes for
-Automatic Layout"; the Visio blog "Improved flowchart routing in Visio 2010"; the Visio 2000
-user's guide, chapter 6):
+Automatic Layout"; the Visio 2000 user's guide, chapter 6):
 * RouteStyle / ShapeRouteStyle: 0 default (right angle), 1 right angle, 2 straight,
   3/4/10/11 organization chart top to bottom / left to right / bottom to top / right to left,
   5/6/12/13 flowchart, 7/8/14/15 tree (the same four directions), 9 network, 16 centre to
   centre, 17/18/19/20 simple (top to bottom, left to right, bottom to top, right to left),
   21 simple horizontal-vertical, 22 simple vertical-horizontal.  ShapeRouteStyle 0 takes the
-  page's; "setting a connector's ShapeRouteStyle cell to 7 creates a routable connector that
-  always routes as if it's contained in a tree diagram in top-to-bottom orientation".
-* Flowchart top to bottom: connectors generally leave the bottom of the shape they come from and
-  reach the top of the one they go to; since Visio 2010 other sides where the two shapes are
-  close along the direction's axis; static glue keeps its points, only dynamic ends move.
+  page's.
 * ShapePermeableX / Y: TRUE lets connectors route horizontally / vertically through the
   (placeable) shape.  ShapePermeablePlace: shapes may be placed on top of it by a layout
   (layout.rs).  ObjType 4: routing behaves as if the shape did not exist (glue.rs).
 * DynamicsOff: TRUE turns off "placeable shapes move and connectors reroute around other shapes
   and connectors".  CtrlAsInput: which shape is the parent of a control handle's glue -- not
-  routing, kept for Visio.  LineAdjustFrom (0 unrelated lines, 1 all, 2 none, 3 the routing
-  style's default) and LineAdjustTo (0 the routing style's default, 1 lines close to each
-  other, 2 none, 3 related lines): which connectors routed on top of each other are spaced
-  apart / lined up -- kept for Visio and shown in Seite einrichten, connectors here are not
-  spaced apart (open).  LineRouteExt / ConLineRouteExt: 0 default, 1 straight, 2 curved (the
-  appearance, glue.rs).
+  routing, kept for Visio.  LineAdjustFrom / LineAdjustTo: which connectors routed on top of each
+  other are spaced apart / lined up -- kept for Visio and shown in Seite einrichten, connectors
+  here are not spaced apart (open).  LineRouteExt / ConLineRouteExt: 0 default, 1 straight,
+  2 curved (the appearance, glue.rs).
 * ConFixedCode: 0 reroute freely, 1 reroute as needed (manual reroute), 2 never reroute,
-  3 reroute on crossover, 4 .. 6 internal (route_edit.rs keeps a way by hand).  The local corpus
-  (two Visio drawings, 104 dynamic connectors): every page's RouteStyle and every
-  ShapeRouteStyle 0; ConFixedCode 0 (38, from the style), 3 (15), 4 (4), 5 (44), 6 (3), never 1
-  or 2; one style of each drawing has ShapePermeableX/Y/Place 1; so there are no stored ways of
-  the other styles to compare with (diagramiotest group route counts them).
+  3 reroute on crossover, 4 .. 6 internal (route_edit.rs keeps a way by hand).
 
-Angenommen (no source describes the ways; the user's check in Visio may correct it):
-* Straight (2), network (9) and centre to centre (16) draw one straight line, docked where the
-  line between the two shapes' middles leaves their outlines (as straight was before JD21).
-* A style with a direction names the side an end uses: the begin leaves its shape in the
-  direction (the bottom for top to bottom), the end comes into its shape against it (the top).
-  Organization chart and tree keep to these sides always (a way against the flow goes round);
-  flowchart only where the end's shape lies at least two clearances further along the
-  direction than the begin's, else the cheapest sides (Visio 2010's exception).  Static and
-  free ends keep their points whatever the style.
-* Organization chart bends halfway between the shapes (the bus in the middle); tree bends right
-  after the begin's shape (one clearance past it), so that the branches to all children share
-  the line under their parent; flowchart bends halfway.
-* Simple (17 .. 20) keeps to the sides like an organization chart but routes around nothing
-  but the two glued shapes; simple horizontal-vertical leaves the begin's shape on a left or
-  right side and comes into the end's from above or below (an L), vertical-horizontal the
-  other way round.
-* A 2-D shape's ShapeRouteStyle does not change the connectors glued to it (Visio lists the cell
-  for placeable shapes, its effect there is unknown).
+(JD21v) The ways as a real Visio 16 lays them -- belegt by the counter-check of 2026-11-27
+(Documents\JFLib-jd21-visio-check: visio-run3 grid.txt, every style against a child in ten places
+around its parent, the tests in route_styles_visio_tests.rs; visio-route-1 / -2, Visio's own
+drawings with obstacles, permeable shapes, WalkPreference, ConFixedCode; visio-run2 [route] and
+visio-route-3, our drawing after a move: 63 of 100 ways the same, the rest below under "Not
+here").  A is the connector's begin shape, B its end shape (both glued dynamically); "the
+stub" is half the page's AvenueSize (route clearance, glue::opts_for: 3.75 mm by default;
+AvenueSize 0.5 in gave 0.25 in, LineToNode 0.4 in nothing); "overlap" means the two boxes share
+a stretch along an axis:
+* The direction of a style decides nothing but its axis: bottom to top lays the same ways as top
+  to bottom, right to left as left to right (the sides come from where B lies).
+* Right angle (0, 1) and network (9; not straight): B beside A (overlap across the axis): one
+  straight line in the middle of the overlap.  Else an L that leaves A vertically (top or bottom,
+  at its middle) and comes into B's side from the side (at its middle) -- for squares, tall and
+  wide shapes, far and near, whatever WalkPreference says (it has no effect on these ways), and
+  the other way round when the connector runs from the lower shape (the begin leaves
+  vertically).  Obstacles (placeable shapes): each leg of the straight line or the L runs in the
+  middle of the part of its band (the stretch of the shape's side it may leave from) that no
+  obstacle between the shapes covers -- the nearest such part, then the one towards the other
+  shape, then the higher one; no part free: the L leaving A sideways (horizontal, then vertical);
+  neither: a detour around the obstacles at the stub's distance (route.rs; Visio's detours were
+  matched in form, not always in the side they pass).  Visio writes ConFixedCode 6.
+* Straight (2): B beside A: the right-angle's straight line (ConFixedCode 6); else a line from
+  A's corner nearest to B to B's corner nearest to A (0).  Obstacles do not matter.
+* Centre to centre (16): the line between the middles, from outline to outline (6).
+* Organization chart (3/4/10/11) and flowchart (5/6/12/13): B beyond A along the axis: out of A's
+  side facing B at its middle, into B's side facing A at its middle; one straight line when the
+  middles line up, else a Z whose middle piece runs one stub before B (organization chart) or one
+  stub after A (flowchart); where an obstacle lies on that piece, at the other of the two places
+  (Visio did so), where both are blocked or the straight line is, around the obstacles keeping to
+  the two sides.  B beside A (overlap along the axis): the right-angle router (ConFixedCode 6),
+  else 0.
+* Tree (7/8/14/15): one straight line from the middle of A's side facing B to the middle of B's
+  side facing A, along the axis -- across it when B lies beside A; obstacles do not matter (0).
+* Simple (17 .. 20): like the tree's sides, one line when the middles line up, else a Z bending
+  halfway between the two sides; obstacles do not matter (0).
+* Simple horizontal-vertical (21) / vertical-horizontal (22): an L out of A's side (21) or its top
+  or bottom (22), into B's top or bottom (21) or its side (22), through the middles; B beside A
+  (no L): one line when the middles line up, else a Z -- above or below A bending one stub before
+  B, to its left or right one stub after A (both styles alike); obstacles do not matter (0).
+* After routing Visio writes ConFixedCode 6 where its right-angle router laid the way and 0 where
+  a style laid its own (also over 4, 5, 6 and 0 set before); 1, 2 and 3 stay (mark).
+Angenommen: ends glued to connection points or free keep the rules from before (the sides of
+the direction, the right-angle search); a stub longer than the gap gives the middle; Visio's only
+data had the parent at the begin (organization chart before B, flowchart after A are taken as
+before the end and after the begin).  Not here: Visio's obstacles are placeable shapes only
+(ObjType 1; a drawn rectangle with ObjType 0 is crossed even when glued to), glue.rs still routes
+around every 2-D shape; LineAdjustFrom/To: two connectors leaving one side are spread apart
+along it by Visio (seen in the counter-check of our drawing), not here.  In our own drawings
+Visio laid the stubs of organization chart and flowchart larger (0.264 in for our connectors,
+0.189 in for its own there; 0.148 in in its drawings): not arrows, line weight, text, other
+connectors or LineToNode -- unexplained, the drawing's theme is left (JD21v handover).
 ```
 
 - **`enum Kind`**
   a routing style without its direction
   - `RightAngle` -- right angles around obstacles (also the page default)
-  - `Straight` -- one straight line
-  - `OrgChart` -- right angles, the bend halfway, the sides of the direction always
-  - `Flowchart` -- right angles, the sides of the direction where the shapes lie along it
-  - `Tree` -- right angles, the bend right after the begin's shape, the sides of the direction always
-  - `Network` -- one straight line
-  - `Simple` -- the sides of the direction, around nothing but the glued shapes
+  - `Straight` -- one straight line, corner to corner (beside each other: across in the middle)
+  - `OrgChart` -- right angles, the bend one stub before the end's shape
+  - `Flowchart` -- right angles, the bend one stub after the begin's shape
+  - `Tree` -- one straight line between the middles of the facing sides
+  - `Network` -- right angles, as RightAngle (Visio lays the same ways)
+  - `Simple` -- right angles bending halfway, around nothing
   - `SimpleHV` -- leave horizontally, arrive vertically, around nothing
   - `SimpleVH` -- leave vertically, arrive horizontally, around nothing
   - `CentreToCentre` -- one straight line between the middles
@@ -63895,12 +63922,12 @@ Angenommen (no source describes the ways; the user's check in Visio may correct 
 - **`fn directed(self) -> bool`**
   whether the style has a direction
 - **`fn straight(self) -> bool`**
-  whether the style draws one straight line
+  whether the style draws one straight line (straight, centre to centre)
 
 - **`struct RouteStyle`**
   a routing style and its direction (Visio's RouteStyle / ShapeRouteStyle)
   - `kind: Kind` -- the style
-  - `dir: Option<Dir>` -- the flow (directed kinds only)
+  - `dir: Option<Dir>` -- the flow (directed kinds only; the ways use only its axis)
 
 **`impl RouteStyle`**
 

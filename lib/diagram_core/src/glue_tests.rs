@@ -367,10 +367,9 @@ fn glued_shapes_become_placeable() {
     assert_eq!(objtype(&f, b), Some(4.0));
 }
 
-// (JD15, SS-18) WalkPreference decides between ways of the same cost: B diagonal to A, both ends
-// dynamic -- by default the begin leaves A's side (Visio's side to side), with bit 1
-// (visWalkPrefBegNS) its top; bit 2 (visWalkPrefEndNS) docks the end on B's bottom; a dearer way
-// is never taken for it (B straight right of A: side to side whatever the bits say)
+// (JD15, SS-18; JD21v) WalkPreference changes no way of a dynamic connector: B diagonal to A, both
+// ends dynamic -- Visio 16 left A's top and came into B's left side for 0, 1, 2 and 3 alike (the
+// counter-check visio-route-1); B straight right of A: side to side
 #[test]
 fn walk_preference_picks_the_sides() {
     let mut f = fx();
@@ -385,16 +384,11 @@ fn walk_preference_picks_the_sides() {
         tx.commit();
         path(&f.doc, c)
     };
-    let p = path(&f.doc, c);
-    assert_eq!(route::bends(&p), 1, "{p:?}");
-    assert_pt!(p[0], [2.5, 2.0]);
-    let p = walk(&mut f, 1.0);
-    assert_path(&p, &[[2.0, 2.5], [2.0, 6.0], [5.5, 6.0]]);
-    let p = walk(&mut f, 2.0);
-    assert_path(&p, &[[2.5, 2.0], [6.0, 2.0], [6.0, 5.5]]);
-    // back to the default
-    let p = walk(&mut f, 0.0);
-    assert_pt!(p[0], [2.5, 2.0]);
+    let l = [[2.0, 2.5], [2.0, 6.0], [5.5, 6.0]];
+    assert_path(&path(&f.doc, c), &l);
+    for v in [1.0, 2.0, 3.0, 0.0] {
+        assert_path(&walk(&mut f, v), &l);
+    }
     // a dearer way is never taken
     f.move_to(b, [6.0, 2.0]).unwrap();
     let p = walk(&mut f, 3.0);
@@ -928,8 +922,9 @@ fn a_fixed_route_keeps_its_corners() {
 #[test]
 fn the_page_scale_and_spacing_count() {
     let mut f = fx();
-    // 1:10 and a spacing of 0.25 in on paper: the clearance is 2.5 drawing inches
-    let cells = vec![cnum(&mut f.doc, "PageScale", 1.0), cnum(&mut f.doc, "DrawingScale", 10.0), cnum(&mut f.doc, "LineToNodeX", 0.25)];
+    // 1:10 and a spacing of 0.5 in on paper: the clearance (JD21v: half the AvenueSize, LineToNode
+    // does not count) is 2.5 drawing inches
+    let cells = vec![cnum(&mut f.doc, "PageScale", 1.0), cnum(&mut f.doc, "DrawingScale", 10.0), cnum(&mut f.doc, "AvenueSizeX", 0.5), cnum(&mut f.doc, "LineToNodeX", 1.0)];
     f.doc.page_mut(f.page).unwrap().sheet.cells = cells;
     let o = opts_for(&f.doc, f.owner);
     assert!(close(o.clearance, 2.5) && close(o.bend, 5.0), "{o:?}");
