@@ -12,22 +12,29 @@
 // are clamped to their precision.
 //
 // Damaged or truncated data: a packet whose header runs out ends the tile (what is decoded so far
-// stays); a body that runs out gives its code-blocks what is there.
+// stays), so does a code-block that is given more passes than its bit-planes hold; a body that
+// runs out ends the tile after the contribution it cuts (its arithmetic-coded part is kept, raw
+// passes are not, nothing after it).  The position progressions visit the precincts there are
+// (not every point of the grid); `MAX_VISITS` bounds the packets looked at.
 
 use crate::codestream::{div_ceil, Codestream, Global, Params, Poc, Quant, Style};
-use crate::t1::{seg_max_passes, Seg, T1};
+use crate::t1::{raw_pass, seg_max_passes, Seg, MAX_P0, T1};
 use crate::{dwt, Error};
 use alloc::vec;
 use alloc::vec::Vec;
 
 /// limits of one decode against hostile files
+#[derive(Default)]
 pub(crate) struct Budget {
     pub cblks: u64,
     pub precincts: u64,
+    /// the packets the progressions looked at (sent or not)
+    pub visits: u64,
 }
 
 pub(crate) const MAX_CBLKS: u64 = 1 << 22;
 pub(crate) const MAX_PRECINCTS: u64 = 1 << 22;
+pub(crate) const MAX_VISITS: u64 = 1 << 28;
 
 /// ceil(a / 2^s)
 pub(crate) fn ceil_shift(a: u32, s: u32) -> u32 {
@@ -396,13 +403,19 @@ struct Stream<'a> {
 
 /// read packet (layer, r, k) of component c; false when the data ran out
 fn packet(s: &mut Stream, tc: &mut TComp, r: u32, k: usize, layer: u32, budget: &mut Budget) -> Result<bool, Error> {
+    let roi = tc.roi;
     let res = &mut tc.res[r as usize];
     if k >= res.precincts.len() {
         return Ok(true);
     }
     precinct(res, r, k, budget)?;
+    // the magnitude bit-planes of each band with the ROI shift
+    let mut planes = [0u32; 3];
+    for (p, b) in planes.iter_mut().zip(&res.bands) {
+        *p = b.mb + roi;
+    }
     if s.sop && s.body.get(s.pos) == Some(&0xFF) && s.body.get(s.pos + 1) == Some(&0x91) {
-        s.pos += 6;
+        s.pos = (s.pos + 6).min(s.body.len());
     }
     let style = tc.cbstyle;
     let in_band = s.hdr.is_none();
@@ -449,6 +462,12 @@ fn packet(s: &mut Stream, tc: &mut TComp, r: u32, k: usize, layer: u32, budget: 
                     }
                     let Some(n) = num_passes(b) else { return Ok(false) };
                     let cb = &mut pb.cblks[leaf];
+                    // a cleanup pass in the first bit-plane, three passes in each one below: more
+                    // than that is damage (and would make segments without end)
+                    let most = (3 * planes[bi].saturating_sub(cb.zbp)).saturating_sub(2);
+                    if cb.passes + n > most {
+                        return Ok(false);
+                    }
                     loop {
                         let Some(v) = b.bit() else { return Ok(false) };
                         if v == 0 {
@@ -496,194 +515,185 @@ fn packet(s: &mut Stream, tc: &mut TComp, r: u32, k: usize, layer: u32, budget: 
     if in_band {
         s.pos = own.p;
     }
-    // the bodies
-    let mut ran_out = false;
+    // the bodies (the header may have ended past the data: a stuffed bit or a marker cut off)
+    if s.pos > s.body.len() {
+        return Ok(false);
+    }
     for c in &s.contribs {
         let cb = &mut pbands[c.band].cblks[c.cb];
-        if let Some(first) = c.new_seg {
-            cb.segs.push(SegBuf { first, passes: 0, data: Vec::new() });
+        let take = (c.len as usize).min(s.body.len() - s.pos);
+        let whole = take == c.len as usize;
+        // cut short: an arithmetic-coded part still decodes (its end reads as the padding of
+        // C.3.4); raw bits that are not there would be made up
+        if whole || take > 0 && !raw_pass(style, cb.passes) {
+            if let Some(first) = c.new_seg {
+                cb.segs.push(SegBuf { first, passes: 0, data: Vec::new() });
+            }
+            if let Some(g) = cb.segs.last_mut() {
+                g.passes += c.take;
+                g.data.extend_from_slice(&s.body[s.pos..s.pos + take]);
+            }
+            cb.passes += c.take;
         }
-        let avail = s.body.len().saturating_sub(s.pos);
-        let take = (c.len as usize).min(avail);
-        if let Some(g) = cb.segs.last_mut() {
-            g.passes += c.take;
-            g.data.extend_from_slice(&s.body[s.pos..s.pos + take]);
-        }
-        cb.passes += c.take;
         s.pos += take;
-        if take < c.len as usize {
-            ran_out = true;
+        if !whole {
+            return Ok(false);
         }
     }
-    Ok(!ran_out)
+    Ok(true)
+}
+
+/// what the progression needs of a resolution
+struct RGeo {
+    x0: u32,
+    y0: u32,
+    ppx: u32,
+    ppy: u32,
+    npx: u32,
+    npy: u32,
+}
+
+/// what the progression needs of a tile-component
+struct Geo {
+    dx: u32,
+    dy: u32,
+    levels: u32,
+    res: Vec<RGeo>,
+}
+
+impl Geo {
+    fn of(c: &TComp) -> Geo {
+        let res = c.res.iter().map(|r| RGeo { x0: r.x0, y0: r.y0, ppx: r.ppx, ppy: r.ppy, npx: r.npx, npy: r.npy }).collect();
+        Geo { dx: c.dx, dy: c.dy, levels: c.levels, res }
+    }
+}
+
+/// a precinct where a position progression reaches it
+#[derive(Clone, Copy)]
+struct At {
+    y: u64,
+    x: u64,
+    c: u32,
+    r: u32,
+    k: u32,
+}
+
+/// every precinct of the tile with the point of the reference grid where the position orders
+/// (B.12.1.3 to B.12.1.5) reach it: they run over the grid (y, then x) and send the precinct of
+/// (c, r) at (x, y) where y is a multiple of YRsiz * 2^(PPy + NL - r), or is ty0 when the
+/// resolution does not start on such a line (the same for x).  Each precinct has exactly one such
+/// point: its row j is reached at ty0 (j = 0, not aligned) or at (y0 / 2^PPy + j) * YRsiz *
+/// 2^(PPy + NL - r), below ty1.
+fn positions(comps: &[Geo], rect: (u32, u32, u32, u32), budget: &mut Budget) -> Result<Vec<At>, Error> {
+    let mut v = Vec::new();
+    // the point of row (column) j: tile start t0, resolution start s, precinct exponent pp (at most
+    // 15), levels below lv, sub-sampling d
+    let at = |j: u32, t0: u32, s: u32, pp: u32, lv: u32, d: u32| -> u64 {
+        if j == 0 && s & ((1u32 << pp) - 1) != 0 {
+            return t0 as u64;
+        }
+        let g = ((s >> pp) as u64 + j as u64) as u128;
+        // below ty1 < 2^32 for each precinct there is (the shifts stay below 2^100)
+        (((g << (pp + lv)) * d as u128).min(u64::MAX as u128)) as u64
+    };
+    for (c, g) in comps.iter().enumerate() {
+        for (r, res) in g.res.iter().enumerate() {
+            let lv = g.levels - r as u32;
+            let n = res.npx as u64 * res.npy as u64;
+            budget.visits += n;
+            if budget.visits > MAX_VISITS {
+                return Err(Error::Limit);
+            }
+            for py in 0..res.npy {
+                let y = at(py, rect.1, res.y0, res.ppy, lv, g.dy);
+                for px in 0..res.npx {
+                    let x = at(px, rect.0, res.x0, res.ppx, lv, g.dx);
+                    v.push(At { y, x, c: c as u32, r: r as u32, k: py * res.npx + px });
+                }
+            }
+        }
+    }
+    Ok(v)
 }
 
 /// the progression of packets (B.12) with POC volumes: f(layer, r, c, k) for each packet, until it
 /// returns false
-fn progression(comps: &[TComp], rect: (u32, u32, u32, u32), g: &Global, pocs: &[Poc], mut f: impl FnMut(u32, u32, usize, usize) -> Result<bool, Error>) -> Result<(), Error> {
+fn progression(comps: &[Geo], rect: (u32, u32, u32, u32), g: &Global, pocs: &[Poc], budget: &mut Budget, mut f: impl FnMut(u32, u32, usize, usize, &mut Budget) -> Result<bool, Error>) -> Result<(), Error> {
     let nc = comps.len();
     let maxres = comps.iter().map(|c| c.levels + 1).max().unwrap_or(1);
     let layers = g.layers as u32;
     // the next layer of each precinct (a packet is sent once)
-    let mut next: Vec<Vec<Vec<u16>>> = comps.iter().map(|c| c.res.iter().map(|r| vec![0u16; r.precincts.len()]).collect()).collect();
+    let mut next: Vec<Vec<Vec<u16>>> = comps.iter().map(|c| c.res.iter().map(|r| vec![0u16; r.npx as usize * r.npy as usize]).collect()).collect();
     let default = [Poc { rs: 0, cs: 0, lye: g.layers, re: 33, ce: nc as u16, prog: g.prog }];
     let vols: &[Poc] = if pocs.is_empty() { &default } else { pocs };
+    // the precincts in the order of each position progression (RPCL, PCRL, CPRL), made once
+    let mut orders: [Option<Vec<At>>; 3] = [None, None, None];
+    // emit (l, r, c, k) when it is the precinct's next layer
+    let mut emit = |l: u32, r: u32, c: usize, k: usize, next: &mut Vec<Vec<Vec<u16>>>, budget: &mut Budget| -> Result<bool, Error> {
+        budget.visits += 1;
+        if budget.visits > MAX_VISITS {
+            return Err(Error::Limit);
+        }
+        let n = &mut next[c][r as usize][k];
+        if *n as u32 != l {
+            return Ok(true);
+        }
+        *n += 1;
+        f(l, r, c, k, budget)
+    };
     for v in vols {
         let (l1, r0, r1, c0, c1) = ((v.lye as u32).min(layers), v.rs as u32, (v.re as u32).min(maxres), v.cs as usize, (v.ce as usize).min(nc));
         if r0 >= r1 || c0 >= c1 || l1 == 0 {
             continue;
         }
-        // emit (l, r, c, k) when it is the precinct's next layer
-        let mut emit = |l: u32, r: u32, c: usize, k: usize, next: &mut Vec<Vec<Vec<u16>>>| -> Result<bool, Error> {
-            let n = &mut next[c][r as usize][k];
-            if *n as u32 != l {
-                return Ok(true);
-            }
-            *n += 1;
-            f(l, r, c, k)
-        };
-        match v.prog {
-            0 | 1 => {
-                let lrcp = v.prog == 0;
-                let (outer, inner) = if lrcp { (l1, r1) } else { (r1, l1) };
-                for a in 0..outer {
-                    for bb in 0..inner {
-                        let (l, r) = if lrcp { (a, bb) } else { (bb, a) };
-                        if r < r0 {
+        if v.prog <= 1 {
+            let lrcp = v.prog == 0;
+            let (outer, inner) = if lrcp { (l1, r1) } else { (r1, l1) };
+            for a in 0..outer {
+                for bb in 0..inner {
+                    let (l, r) = if lrcp { (a, bb) } else { (bb, a) };
+                    if r < r0 {
+                        continue;
+                    }
+                    for c in c0..c1 {
+                        if r > comps[c].levels {
                             continue;
                         }
-                        for c in c0..c1 {
-                            if r > comps[c].levels {
-                                continue;
-                            }
-                            for k in 0..comps[c].res[r as usize].precincts.len() {
-                                if !emit(l, r, c, k, &mut next)? {
-                                    return Ok(());
-                                }
+                        let res = &comps[c].res[r as usize];
+                        for k in 0..res.npx as usize * res.npy as usize {
+                            if !emit(l, r, c, k, &mut next, budget)? {
+                                return Ok(());
                             }
                         }
                     }
                 }
             }
-            _ => {
-                // the position orders: steps of the smallest precinct on the reference grid
-                let mut xstep = u64::MAX;
-                let mut ystep = u64::MAX;
-                for c in &comps[c0..c1] {
-                    for r in r0..r1.min(c.levels + 1) {
-                        let res = &c.res[r as usize];
-                        let lv = c.levels - r;
-                        if res.ppx + lv < 32 {
-                            xstep = xstep.min((c.dx as u64) << (res.ppx + lv));
-                        }
-                        if res.ppy + lv < 32 {
-                            ystep = ystep.min((c.dy as u64) << (res.ppy + lv));
-                        }
-                    }
-                }
-                if xstep == u64::MAX || ystep == u64::MAX {
-                    continue;
-                }
-                let (tx0, ty0, tx1, ty1) = (rect.0 as u64, rect.1 as u64, rect.2 as u64, rect.3 as u64);
-                // the precinct at (x, y) of component c, resolution r, if one starts there
-                let at = |c: &TComp, r: u32, x: u64, y: u64| -> Option<usize> {
-                    if r > c.levels {
-                        return None;
-                    }
-                    let res = &c.res[r as usize];
-                    let lv = c.levels - r;
-                    let (rpx, rpy) = (res.ppx + lv, res.ppy + lv);
-                    if rpx >= 31 || rpy >= 31 || res.npx == 0 || res.npy == 0 || res.x0 == res.x1 || res.y0 == res.y1 {
-                        return None;
-                    }
-                    let (dx, dy) = (c.dx as u64, c.dy as u64);
-                    let ok_y = y % (dy << rpy) == 0 || (y == ty0 && ((res.y0 as u64) << lv) % (1u64 << rpy) != 0);
-                    let ok_x = x % (dx << rpx) == 0 || (x == tx0 && ((res.x0 as u64) << lv) % (1u64 << rpx) != 0);
-                    if !ok_x || !ok_y {
-                        return None;
-                    }
-                    let px = (x.div_ceil(dx << lv) >> res.ppx) - ((res.x0 as u64) >> res.ppx);
-                    let py = (y.div_ceil(dy << lv) >> res.ppy) - ((res.y0 as u64) >> res.ppy);
-                    let k = px + py * res.npx as u64;
-                    if px >= res.npx as u64 || k >= res.precincts.len() as u64 {
-                        return None;
-                    }
-                    Some(k as usize)
-                };
-                let ys = || {
-                    let mut y = ty0;
-                    core::iter::from_fn(move || {
-                        if y >= ty1 {
-                            return None;
-                        }
-                        let v = y;
-                        y += ystep - y % ystep;
-                        Some(v)
-                    })
-                };
-                let xs = || {
-                    let mut x = tx0;
-                    core::iter::from_fn(move || {
-                        if x >= tx1 {
-                            return None;
-                        }
-                        let v = x;
-                        x += xstep - x % xstep;
-                        Some(v)
-                    })
-                };
-                match v.prog {
-                    2 => {
-                        for r in r0..r1 {
-                            for y in ys() {
-                                for x in xs() {
-                                    for c in c0..c1 {
-                                        if let Some(k) = at(&comps[c], r, x, y) {
-                                            for l in 0..l1 {
-                                                if !emit(l, r, c, k, &mut next)? {
-                                                    return Ok(());
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    3 => {
-                        for y in ys() {
-                            for x in xs() {
-                                for c in c0..c1 {
-                                    for r in r0..r1 {
-                                        if let Some(k) = at(&comps[c], r, x, y) {
-                                            for l in 0..l1 {
-                                                if !emit(l, r, c, k, &mut next)? {
-                                                    return Ok(());
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    _ => {
-                        for c in c0..c1 {
-                            for y in ys() {
-                                for x in xs() {
-                                    for r in r0..r1 {
-                                        if let Some(k) = at(&comps[c], r, x, y) {
-                                            for l in 0..l1 {
-                                                if !emit(l, r, c, k, &mut next)? {
-                                                    return Ok(());
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+            continue;
+        }
+        let o = (v.prog as usize - 2).min(2);
+        if orders[o].is_none() {
+            let mut list = positions(comps, rect, budget)?;
+            match o {
+                0 => list.sort_unstable_by_key(|a| (a.r, a.y, a.x, a.c)),
+                1 => list.sort_unstable_by_key(|a| (a.y, a.x, a.c, a.r)),
+                _ => list.sort_unstable_by_key(|a| (a.c, a.y, a.x, a.r)),
+            }
+            orders[o] = Some(list);
+        }
+        let list = orders[o].as_ref().map_or(&[][..], |l| &l[..]);
+        // (also when every packet of the list was sent before: many volumes cost their passes)
+        budget.visits += list.len() as u64;
+        if budget.visits > MAX_VISITS {
+            return Err(Error::Limit);
+        }
+        for a in list {
+            let (c, r, k) = (a.c as usize, a.r, a.k as usize);
+            if c < c0 || c >= c1 || r < r0 || r >= r1 {
+                continue;
+            }
+            for l in next[c][r as usize][k] as u32..l1 {
+                if !emit(l, r, c, k, &mut next, budget)? {
+                    return Ok(());
                 }
             }
         }
@@ -709,7 +719,7 @@ pub(crate) struct OutComp {
 }
 
 /// the band's coefficients from its code-blocks
-fn band_coefs(tc: &TComp, r: usize, bi: usize, t1: &mut T1) -> Coefs {
+fn band_coefs(tc: &TComp, r: usize, bi: usize, t1: &mut T1) -> Result<Coefs, Error> {
     let res = &tc.res[r];
     let b = &res.bands[bi];
     let (bw, bh) = ((b.x1 - b.x0) as usize, (b.y1 - b.y0) as usize);
@@ -722,8 +732,9 @@ fn band_coefs(tc: &TComp, r: usize, bi: usize, t1: &mut T1) -> Coefs {
                 continue;
             }
             let p0 = (b.mb + tc.roi) as i32 - 1 - cb.zbp as i32;
-            if p0 > 29 {
-                continue;
+            if p0 > MAX_P0 {
+                // more than 60 bit-planes (guard bits and an ROI shift at their largest)
+                return Err(Error::Unsupported);
             }
             segs.clear();
             segs.extend(cb.segs.iter().map(|g| Seg { data: &g.data, passes: g.passes }));
@@ -739,12 +750,12 @@ fn band_coefs(tc: &TComp, r: usize, bi: usize, t1: &mut T1) -> Coefs {
                         continue;
                     }
                     let mut m = v.unsigned_abs();
-                    if roi > 0 && roi < 31 && (m >> 1) >= (1u32 << roi) {
+                    if roi > 0 && (m >> 1) >= (1u64 << roi) {
                         m >>= roi;
                     }
                     match &mut out {
                         Coefs::Int(o) => {
-                            let a = (m >> 1) as i32;
+                            let a = (m >> 1).min(i32::MAX as u64) as i32;
                             o[row + x] = if v < 0 { -a } else { a };
                         }
                         Coefs::Float(o) => {
@@ -756,17 +767,17 @@ fn band_coefs(tc: &TComp, r: usize, bi: usize, t1: &mut T1) -> Coefs {
             }
         }
     }
-    out
+    Ok(out)
 }
 
 /// the tile-component's samples at resolution `top` (inverse wavelet from resolution 0)
-fn comp_plane(tc: &TComp, top: usize, t1: &mut T1) -> Plane {
-    let mut cur = band_coefs(tc, 0, 0, t1);
+fn comp_plane(tc: &TComp, top: usize, t1: &mut T1) -> Result<Plane, Error> {
+    let mut cur = band_coefs(tc, 0, 0, t1)?;
     for r in 1..=top {
         let res = &tc.res[r];
-        let hl = band_coefs(tc, r, 0, t1);
-        let lh = band_coefs(tc, r, 1, t1);
-        let hh = band_coefs(tc, r, 2, t1);
+        let hl = band_coefs(tc, r, 0, t1)?;
+        let lh = band_coefs(tc, r, 1, t1)?;
+        let hh = band_coefs(tc, r, 2, t1)?;
         cur = match (cur, hl, lh, hh) {
             (Coefs::Int(ll), Coefs::Int(hl), Coefs::Int(lh), Coefs::Int(hh)) => {
                 let mut buf = dwt::interleave(&ll, &hl, &lh, &hh, res.x0, res.y0, res.x1, res.y1);
@@ -781,26 +792,26 @@ fn comp_plane(tc: &TComp, top: usize, t1: &mut T1) -> Plane {
             _ => unreachable!(),
         };
     }
-    match cur {
+    Ok(match cur {
         Coefs::Int(v) => Plane::Int(v),
         Coefs::Float(v) => Plane::Float(v),
-    }
+    })
 }
 
-/// round half to even (|v| below 2^22)
+/// round half to even: exact in f64 for |v| below 2^51 (every f32 there is), beyond that the
+/// conversion saturates; the caller clamps to the precision
 #[inline(always)]
 fn round_even(v: f32) -> i32 {
-    const MAGIC: f32 = 12_582_912.0;
-    let v = v.clamp(-4_000_000.0, 4_000_000.0);
-    ((v + MAGIC) - MAGIC) as i32
+    const MAGIC: f64 = 6_755_399_441_055_744.0; // 1.5 * 2^52
+    ((v as f64 + MAGIC) - MAGIC) as i32
 }
 
 /// the parameters of component c in tile t: COC of the tile, its COD, COC of the main header,
 /// its COD (A.6.1); the same for QCC / QCD and RGN
 fn comp_params<'p>(main: &'p Params, tile: &'p Params, c: usize) -> Option<(&'p Style, &'p Quant, u8)> {
-    let st = tile.coc[c].as_ref().or(tile.cod.as_ref()).or(main.coc[c].as_ref()).or(main.cod.as_ref())?;
-    let q = tile.qcc[c].as_ref().or(tile.qcd.as_ref()).or(main.qcc[c].as_ref()).or(main.qcd.as_ref())?;
-    let roi = tile.rgn[c].or(main.rgn[c]).unwrap_or(0);
+    let st = tile.coc.get(&c).or(tile.cod.as_ref()).or(main.coc.get(&c)).or(main.cod.as_ref())?;
+    let q = tile.qcc.get(&c).or(tile.qcd.as_ref()).or(main.qcc.get(&c)).or(main.qcd.as_ref())?;
+    let roi = tile.rgn.get(&c).or(main.rgn.get(&c)).copied().unwrap_or(0);
     Some((st, q, roi))
 }
 
@@ -820,14 +831,15 @@ pub(crate) fn decode(cs: &Codestream, t: usize, reduce: u32, budget: &mut Budget
     let body: Vec<u8> = if td.parts.len() == 1 { td.parts[0].to_vec() } else { td.parts.concat() };
     let mut s = Stream { body: &body, pos: 0, hdr: td.headers.as_ref().map(|h| Bits::new(h, 0)), sop: g.sop, eph: g.eph, contribs: Vec::new() };
     let pocs: &[Poc] = if tp.poc.is_empty() { &cs.main.poc } else { &tp.poc };
-    progression(&comps.iter().map(|c| geo_copy(c)).collect::<Vec<_>>(), rect, &g, pocs, |l, r, c, k| packet(&mut s, &mut comps[c], r, k, l, budget))?;
+    let geo: Vec<Geo> = comps.iter().map(Geo::of).collect();
+    progression(&geo, rect, &g, pocs, budget, |l, r, c, k, budget| packet(&mut s, &mut comps[c], r, k, l, budget))?;
     // the samples
     let mut planes: Vec<(Plane, u32, u32, u32, u32, u32)> = Vec::with_capacity(comps.len());
     for tc in &comps {
         let red = reduce.min(tc.levels);
         let top = (tc.levels - red) as usize;
         let res = &tc.res[top];
-        planes.push((comp_plane(tc, top, t1), res.x0, res.y0, res.x1, res.y1, red));
+        planes.push((comp_plane(tc, top, t1)?, res.x0, res.y0, res.x1, res.y1, red));
     }
     // the multiple-component transform
     if g.mct != 0 && planes.len() >= 3 {
@@ -898,42 +910,4 @@ pub(crate) fn decode(cs: &Codestream, t: usize, reduce: u32, budget: &mut Budget
         }
     }
     Ok(())
-}
-
-/// the geometry the progression needs (the precincts as counts only)
-fn geo_copy(c: &TComp) -> TComp {
-    TComp {
-        x0: c.x0,
-        y0: c.y0,
-        x1: c.x1,
-        y1: c.y1,
-        dx: c.dx,
-        dy: c.dy,
-        levels: c.levels,
-        reversible: c.reversible,
-        cbstyle: c.cbstyle,
-        roi: c.roi,
-        prec: c.prec,
-        signed: c.signed,
-        res: c
-            .res
-            .iter()
-            .map(|r| Res {
-                x0: r.x0,
-                y0: r.y0,
-                x1: r.x1,
-                y1: r.y1,
-                ppx: r.ppx,
-                ppy: r.ppy,
-                npx: r.npx,
-                npy: r.npy,
-                bands: Vec::new(),
-                precincts: {
-                    let mut v = Vec::new();
-                    v.resize_with(r.precincts.len(), || None);
-                    v
-                },
-            })
-            .collect(),
-    }
 }
