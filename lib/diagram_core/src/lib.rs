@@ -81,6 +81,15 @@
 //   pointglue::*                  (JD21) control points that glue to connection points and
 //                                 follow them (SP-04), glue to vertices, handles, control points
 //                                 and guides (CN-02), the connection point tool (CN-01)
+//   datagraphic::*                (JD19) data graphics: callouts, data bars, icon sets and
+//                                 colour by value from a shape's data as Visio keeps them (a
+//                                 hidden master per graphic, callout instances as subshapes),
+//                                 the legend of lists and containers (DA-07, DA-08, ST-08)
+//   report::*                     (JD19) shape reports: Visio's report definitions as a model
+//                                 (their XML and the document sheet's visPropRptN rows are
+//                                 diagram_io::report), run into a table with groups and
+//                                 summaries, the table shape on the page and its refresh
+//                                 (DA-09, DA-13, EX-12)
 //
 // Rules that hold from the start: no std (only alloc), no unsafe code, nothing recalculated on
 // opening a file (connectors, layout and containers move only when something moves), and a
@@ -93,6 +102,7 @@ extern crate alloc;
 pub mod autoconn;
 mod cell;
 pub mod data;
+pub mod datagraphic;
 pub mod design;
 pub mod dock;
 mod document;
@@ -113,6 +123,7 @@ pub mod pagesetup;
 pub mod pointglue;
 pub mod render;
 pub mod replace;
+pub mod report;
 pub mod route;
 pub mod route_edit;
 pub mod route_styles;

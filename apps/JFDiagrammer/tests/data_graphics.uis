@@ -1,0 +1,100 @@
+#!args apps/JFDiagrammer/tests/jd19-dg.vsdx --no-system-fonts
+# JFDiagrammer, JD19: data graphics through the pane Datengrafikfelder and the gallery (DA-07,
+# DA-08, RD-04, RD-05, RD-08, AB-12) -- jd19-dg.vsdx (diagramiotest --write-dg) has five boxes
+# linked to the recordset "Geräte" (Name, Auslastung, Status, Kosten, Standort), no graphic.
+# Nothing selected, so every linked shape of the page takes part: a field switched on gets an
+# item (a number as a data bar, a text as text) in a new graphic "Daten – Geräte", the chosen
+# field gets the gallery's style, Position and Konfigurieren act on it; one undo step each;
+# Keine takes the field's item away, the last one the graphic off the shapes
+wait 100
+click tab:"Daten"
+# the gallery waits for a field
+expect button:"Fortschrittsleiste" disabled
+cmd 6412
+expect tab:"Datengrafikfelder" selected
+expect text:"Keine Datengrafik" exists
+expect checkbox:"Name" unchecked
+expect checkbox:"Auslastung" unchecked
+expect checkbox:"Standort" unchecked
+# Auslastung on: a data bar
+click checkbox:"Auslastung"
+expect checkbox:"Auslastung" checked
+expect text:"Datengrafik: Daten – Geräte" exists
+expect button:"Fortschrittsleiste" checked
+expect button:"Keine" unchecked
+# Status on (text), then the traffic light from the gallery
+click checkbox:"Status"
+expect checkbox:"Status" checked
+expect button:"Text" checked
+click button:"Ampel"
+expect button:"Ampel" checked
+expect button:"Text" unchecked
+# the gallery's flyout: every style by kind
+click button:"Alle Datengrafiken"
+expect "Symbolsatz" exists
+click button:"Pfeile"
+expect button:"Ampel" unchecked
+# Position: the chosen field (Status) above the shape, right of the middle
+cmd 6406
+expect "Horizontal" exists
+click "Oberhalb"
+cmd 6407
+expect dialog:"Element bearbeiten" exists
+expect #2100297744 text "Status"
+expect #2100297746 text "Symbolsatz"
+expect #2100297747 text "Pfeile"
+expect checkbox:"Standardposition verwenden" unchecked
+expect #2100297750 text "Oberhalb"
+expect #2100297749 text "Weit rechts"
+# the rules the shapes' values gave: OK, Warnung, Fehler, the rest not used
+expect #2100297792 text "ist gleich"
+expect #2100297793 text "OK"
+expect #2100297797 text "Warnung"
+expect #2100297801 text "Fehler"
+expect #2100297804 text "[nicht verwendet]"
+# Konfigurieren: centred below, the arrows' third icon for "Fehler" kept
+click #2100297749
+click "Zentriert"
+click button:"OK"
+expect dialog:"Element bearbeiten" missing
+cmd 6407
+expect #2100297749 text "Zentriert"
+expect #2100297750 text "Oberhalb"
+click button:"Abbrechen"
+# Standort as colour by value: each value its colour
+click checkbox:"Standort"
+click button:"Farbe nach Wert"
+expect button:"Farbe nach Wert" checked
+cmd 6407
+expect #2100297808 text "Jeder Wert eine Farbe"
+expect #2100297984 text "Raum 1"
+expect #2100297992 text "Raum 2"
+expect #2100298000 text "Raum 3"
+expect #2100297986 text "Hellgrün"
+click button:"Abbrechen"
+shot build/JFDiagrammer-data-graphics.png
+# undo: the colours, then the position, ...
+key ctrl+z
+expect button:"Text" checked
+key ctrl+z
+expect checkbox:"Standort" unchecked
+key ctrl+y
+key ctrl+y
+expect button:"Farbe nach Wert" checked
+# Keine: the chosen field's item goes
+click button:"Keine"
+expect checkbox:"Standort" unchecked
+expect checkbox:"Status" checked
+# the last item off: no graphic on the shapes any more
+click checkbox:"Status"
+click checkbox:"Auslastung"
+expect text:"Keine Datengrafik" exists
+# a selection: only Router gets a graphic
+click listitem:"Router"
+click checkbox:"Kosten"
+expect checkbox:"Kosten" checked
+click listitem:"Server A"
+expect checkbox:"Kosten" unchecked
+click listitem:"Router"
+expect checkbox:"Kosten" checked
+expect text:"Datengrafik: Daten – Geräte" exists

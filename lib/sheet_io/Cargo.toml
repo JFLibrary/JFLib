@@ -1,6 +1,6 @@
 [package]
 name = "jflib-sheet-io"
-description = "XLSX and CSV import: workbooks and delimited text as typed tables"
+description = "XLSX and CSV import and export: workbooks and delimited text as typed tables"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

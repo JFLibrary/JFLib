@@ -1,0 +1,115 @@
+# Datengrafik-Element Text (JD19, DA-07): zeigt den Wert des Datenfelds Prop.msvCalloutField im
+# Wertformat, die Beschriftung links, rechts, darüber, darunter oder gar nicht (Visios Zeilen
+# Prop.msvCalloutProp*, Prompt = Art des Eingabefelds, damit Visios Dialog sie bearbeiten kann).
+# Rahmen und Füllung aus den Optionen Border (None, Bottom, Outline) und Fill (None, Filled);
+# Farben aus dem Design (Normal).  Verborgener Master: die App setzt ihn als Untershape an.
+master: DG Text underlined
+name.de: Text unterstrichen
+name.en: Underlined text
+name.es: Texto subrayado
+name.it: Testo sottolineato
+name.fr: Texte souligné
+prompt.de: Datengrafik: zeigt den Wert eines Datenfelds als Text, wahlweise mit Beschriftung.
+prompt.en: Data graphic: shows the value of a data field as text, optionally with a label.
+prompt.es: Gráfico de datos: muestra el valor de un campo de datos como texto, opcionalmente con etiqueta.
+prompt.it: Grafico dati: mostra il valore di un campo dati come testo, facoltativamente con etichetta.
+prompt.fr: Graphique de données : affiche la valeur d'un champ de données sous forme de texte, avec une étiquette au choix.
+hidden: true
+text.de: {fld 0}
+text.en: {fld 0}
+text.es: {fld 0}
+text.it: {fld 0}
+text.fr: {fld 0}
+
+[Shape]
+Width = 30 mm
+Width.us = 1.2 in
+Height = 6 mm
+Height.us = 0.25 in
+TxtWidth = Width
+TxtHeight = Height
+TxtPinX = Width*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+LeftMargin = 0.5 mm
+LeftMargin.us = 0.02 in
+RightMargin = 0.5 mm
+RightMargin.us = 0.02 in
+TopMargin = 0 mm
+BottomMargin = 0 mm
+
+[User]
+msvCalloutType:  Value = "Text Callout"
+# die Beschriftung: [Default] ist die Bezeichnung des Datenfelds (SortKey von msvCalloutField)
+L:  Value = IF(STRSAME(Prop.msvCalloutPropLabel,"[Default]"),Prop.msvCalloutField.SortKey,Prop.msvCalloutPropLabel)
+V:  Value = IF(Prop.msvCalloutPropShowValue,FORMAT(Prop.msvCalloutField,Prop.msvCalloutPropValueFormat),"")
+# die Lage der Beschriftung: 0 keine, 1 links, 2 rechts, 3 darüber, 4 darunter
+P:  Value = LOOKUP(Prop.msvCalloutPropLabelPosition,"Not Shown;Left of Value;Right of Value;Above Value;Below Value")
+
+[Property]
+msvCalloutField:  Type = 0; Value = "123"; Prompt = "String"; SortKey = "Wert"
+        Label.de = Datenfeld
+        Label.en = Data field
+        Label.es = Campo de datos
+        Label.it = Campo dati
+        Label.fr = Champ de données
+msvCalloutPropShowValue:  Type = 3; Value = TRUE; Prompt = "Bool"
+        Label.de = Wert anzeigen
+        Label.en = Show value
+        Label.es = Mostrar valor
+        Label.it = Mostra valore
+        Label.fr = Afficher la valeur
+msvCalloutPropValueFormat:  Type = 0; Value = ""; Prompt = "Format"
+        Label.de = Wertformat
+        Label.en = Value format
+        Label.es = Formato del valor
+        Label.it = Formato valore
+        Label.fr = Format de la valeur
+msvCalloutPropLabel:  Type = 0; Value = "[Default]"; Prompt = "String"
+        Label.de = Bezeichnung
+        Label.en = Label
+        Label.es = Etiqueta
+        Label.it = Etichetta
+        Label.fr = Étiquette
+msvCalloutPropLabelPosition:  Type = 1; Value = "Left of Value"; Prompt = "List"; Format = "Not Shown;Left of Value;Right of Value;Above Value;Below Value"
+        Label.de = Position der Bezeichnung
+        Label.en = Label position
+        Label.es = Posición de la etiqueta
+        Label.it = Posizione etichetta
+        Label.fr = Position de l'étiquette
+msvCalloutPropBorder:  Type = 1; Value = "Bottom"; Prompt = "List"; Format = "None;Bottom;Outline"
+        Label.de = Rahmen
+        Label.en = Border
+        Label.es = Borde
+        Label.it = Bordo
+        Label.fr = Bordure
+msvCalloutPropFill:  Type = 1; Value = "None"; Prompt = "List"; Format = "None;Filled"
+        Label.de = Füllung
+        Label.en = Fill
+        Label.es = Relleno
+        Label.it = Riempimento
+        Label.fr = Remplissage
+
+[Character]
+Row  Size = 8 pt
+
+[Field]
+Row  Value = IF(User.P=1,User.L&": "&User.V,IF(User.P=2,User.V&" "&User.L,IF(User.P=3,User.L&CHAR(10)&User.V,IF(User.P=4,User.V&CHAR(10)&User.L,User.V)))); Type = 0
+
+# der Kasten: Linie nur mit Rahmen Outline, Füllung nur mit Filled
+[Geometry]
+NoLine = NOT(STRSAME(Prop.msvCalloutPropBorder,"Outline"))
+NoFill = NOT(STRSAME(Prop.msvCalloutPropFill,"Filled"))
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# die Linie unten (Rahmen Bottom)
+[Geometry]
+NoFill = TRUE
+NoShow = NOT(STRSAME(Prop.msvCalloutPropBorder,"Bottom"))
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0

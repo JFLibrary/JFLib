@@ -1,0 +1,76 @@
+# Bewertungsbalken: vier Balken steigender Höhe; Symbol 0 füllt alle vier, 4 keinen
+# (Datengrafik-Element Symbolsatz, JD19, DA-07: User.msvCalloutIconNumber -1 keins, 0 bis 4; NoShow
+# und NoFill folgen ihr).  Einfarbig aus dem Design (Normal).  Verborgener Master.
+master: DG Rating
+name.de: Bewertungsbalken
+name.en: Rating bars
+name.es: Barras de valoración
+name.it: Barre di valutazione
+name.fr: Barres d'évaluation
+prompt.de: Datengrafik: vier Balken steigender Höhe, gefüllt nach der Bewertung.
+prompt.en: Data graphic: four bars of rising height, filled by the rating.
+prompt.es: Gráfico de datos: cuatro barras de altura creciente, rellenas según la valoración.
+prompt.it: Grafico dati: quattro barre di altezza crescente, riempite secondo la valutazione.
+prompt.fr: Graphique de données : quatre barres de hauteur croissante, remplies selon l'évaluation.
+hidden: true
+
+[Shape]
+Width = 6 mm
+Width.us = 0.25 in
+Height = 6 mm
+Height.us = 0.25 in
+Rounding = 0 mm
+
+[User]
+msvCalloutType:  Value = "Icon Set"
+msvCalloutIconCount:  Value = 5
+msvCalloutIconNumber:  Value = 0
+
+[Property]
+msvCalloutField:  Type = 0; Value = ""; Prompt = "String"; SortKey = "Wert"
+        Label.de = Datenfeld
+        Label.en = Data field
+        Label.es = Campo de datos
+        Label.it = Campo dati
+        Label.fr = Champ de données
+
+# Balken 1
+[Geometry]
+NoFill = User.msvCalloutIconNumber>3
+NoShow = User.msvCalloutIconNumber<0
+MoveTo  X = Width*0.08; Y = Height*0.1
+LineTo  X = Width*0.24; Y = Height*0.1
+LineTo  X = Width*0.24; Y = Height*0.3
+LineTo  X = Width*0.08; Y = Height*0.3
+LineTo  X = Width*0.08; Y = Height*0.1
+
+# Balken 2
+[Geometry]
+NoFill = User.msvCalloutIconNumber>2
+NoShow = User.msvCalloutIconNumber<0
+MoveTo  X = Width*0.31; Y = Height*0.1
+LineTo  X = Width*0.47; Y = Height*0.1
+LineTo  X = Width*0.47; Y = Height*0.5
+LineTo  X = Width*0.31; Y = Height*0.5
+LineTo  X = Width*0.31; Y = Height*0.1
+
+# Balken 3
+[Geometry]
+NoFill = User.msvCalloutIconNumber>1
+NoShow = User.msvCalloutIconNumber<0
+MoveTo  X = Width*0.54; Y = Height*0.1
+LineTo  X = Width*0.7; Y = Height*0.1
+LineTo  X = Width*0.7; Y = Height*0.7
+LineTo  X = Width*0.54; Y = Height*0.7
+LineTo  X = Width*0.54; Y = Height*0.1
+
+# Balken 4
+[Geometry]
+NoFill = User.msvCalloutIconNumber>0
+NoShow = User.msvCalloutIconNumber<0
+MoveTo  X = Width*0.77; Y = Height*0.1
+LineTo  X = Width*0.93; Y = Height*0.1
+LineTo  X = Width*0.93; Y = Height*0.9
+LineTo  X = Width*0.77; Y = Height*0.9
+LineTo  X = Width*0.77; Y = Height*0.1
+

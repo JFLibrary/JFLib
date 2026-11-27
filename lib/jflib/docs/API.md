@@ -109,9 +109,9 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [doc_io](#doc_io) -- conservative DOCX interchange and bounded file I/O
   <br>[lib.rs](#doc_io-crate-root) · [bibliography.rs](#doc_iobibliographyrs) · [bibtex.rs](#doc_iobibtexrs) · [clipboard.rs](#doc_ioclipboardrs) · [html_import.rs](#doc_iohtml_importrs) · [fragment.rs](#doc_iofragmentrs) · [exchange.rs](#doc_ioexchangers) · [library.rs](#doc_iolibraryrs) · [preservation.rs](#doc_iopreservationrs) · [preserved_text.rs](#doc_iopreserved_textrs) · [ris.rs](#doc_iorisrs) · [preserved_stories.rs](#doc_iopreserved_storiesrs)
 - [diagram_core](#diagram_core) -- the diagram model: ShapeSheet cells, formulas, geometry, routing and layout
-  <br>[src/autoconn.rs](#diagram_coresrcautoconnrs) · [src/cell.rs](#diagram_coresrccellrs) · [src/data.rs](#diagram_coresrcdatars) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/dock.rs](#diagram_coresrcdockrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/field.rs](#diagram_coresrcfieldrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/groups.rs](#diagram_coresrcgroupsrs) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/instance/detach.rs](#diagram_coresrcinstancedetachrs) · [src/layout.rs](#diagram_coresrclayoutrs) · [src/layout/adjust.rs](#diagram_coresrclayoutadjustrs) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/arcs.rs](#diagram_coresrcopsarcsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/draw.rs](#diagram_coresrcopsdrawrs) · [src/ops/picture.rs](#diagram_coresrcopspicturers) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/pagesetup.rs](#diagram_coresrcpagesetuprs) · [src/pointglue.rs](#diagram_coresrcpointgluers) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/jumps.rs](#diagram_coresrcrenderjumpsrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/replace.rs](#diagram_coresrcreplacers) · [src/route.rs](#diagram_coresrcrouters) · [src/route_edit.rs](#diagram_coresrcroute_editrs) · [src/route_styles.rs](#diagram_coresrcroute_stylesrs) · [src/shapeops.rs](#diagram_coresrcshapeopsrs) · [src/shapeops/frame.rs](#diagram_coresrcshapeopsframers) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/edge.rs](#diagram_coresrcstructureedgers) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/tools.rs](#diagram_coresrctoolsrs) · [src/tools/array.rs](#diagram_coresrctoolsarrayrs) · [src/tools/dimension.rs](#diagram_coresrctoolsdimensionrs) · [src/tools/number.rs](#diagram_coresrctoolsnumberrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
+  <br>[src/autoconn.rs](#diagram_coresrcautoconnrs) · [src/cell.rs](#diagram_coresrccellrs) · [src/data.rs](#diagram_coresrcdatars) · [src/datagraphic.rs](#diagram_coresrcdatagraphicrs) · [src/datagraphic/legend.rs](#diagram_coresrcdatagraphiclegendrs) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/dock.rs](#diagram_coresrcdockrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/field.rs](#diagram_coresrcfieldrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/groups.rs](#diagram_coresrcgroupsrs) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/instance/detach.rs](#diagram_coresrcinstancedetachrs) · [src/layout.rs](#diagram_coresrclayoutrs) · [src/layout/adjust.rs](#diagram_coresrclayoutadjustrs) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/arcs.rs](#diagram_coresrcopsarcsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/draw.rs](#diagram_coresrcopsdrawrs) · [src/ops/picture.rs](#diagram_coresrcopspicturers) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/pagesetup.rs](#diagram_coresrcpagesetuprs) · [src/pointglue.rs](#diagram_coresrcpointgluers) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/jumps.rs](#diagram_coresrcrenderjumpsrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/replace.rs](#diagram_coresrcreplacers) · [src/report.rs](#diagram_coresrcreportrs) · [src/report/run.rs](#diagram_coresrcreportrunrs) · [src/report/shape.rs](#diagram_coresrcreportshapers) · [src/route.rs](#diagram_coresrcrouters) · [src/route_edit.rs](#diagram_coresrcroute_editrs) · [src/route_styles.rs](#diagram_coresrcroute_stylesrs) · [src/shapeops.rs](#diagram_coresrcshapeopsrs) · [src/shapeops/frame.rs](#diagram_coresrcshapeopsframers) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/edge.rs](#diagram_coresrcstructureedgers) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/tools.rs](#diagram_coresrctoolsrs) · [src/tools/array.rs](#diagram_coresrctoolsarrayrs) · [src/tools/dimension.rs](#diagram_coresrctoolsdimensionrs) · [src/tools/number.rs](#diagram_coresrctoolsnumberrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
 - [diagram_io](#diagram_io) -- Visio file formats (the VSDX family) and diagram exports
-  <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/data.rs](#diagram_iosrcdatars) · [src/props.rs](#diagram_iosrcpropsrs) · [src/stencil.rs](#diagram_iosrcstencilrs) · [src/template.rs](#diagram_iosrctemplaters) · [src/textdraw.rs](#diagram_iosrctextdrawrs) · [src/vdx/mod.rs](#diagram_iosrcvdxmodrs) · [src/vss/mod.rs](#diagram_iosrcvssmodrs) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/windows.rs](#diagram_iosrcwindowsrs) · [src/xml.rs](#diagram_iosrcxmlrs)
+  <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/data.rs](#diagram_iosrcdatars) · [src/props.rs](#diagram_iosrcpropsrs) · [src/report.rs](#diagram_iosrcreportrs) · [src/stencil.rs](#diagram_iosrcstencilrs) · [src/template.rs](#diagram_iosrctemplaters) · [src/textdraw.rs](#diagram_iosrctextdrawrs) · [src/vdx/mod.rs](#diagram_iosrcvdxmodrs) · [src/vss/mod.rs](#diagram_iosrcvssmodrs) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/windows.rs](#diagram_iosrcwindowsrs) · [src/xml.rs](#diagram_iosrcxmlrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
   <br>[lib.rs](#rt-crate-root) · [boot.rs](#rtbootrs) · [cpu.rs](#rtcpurs) · [crash.rs](#rtcrashrs) · [fx.rs](#rtfxrs) · [kernel.rs](#rtkernelrs) · [sync.rs](#rtsyncrs) · [x87.rs](#rtx87rs) · [portable/fx.rs](#rtportablefxrs) · [portable/math.rs](#rtportablemathrs) · [hosted.rs](#rthostedrs)
 - [pdf](#pdf) -- PDF writer (vector pages, font subsets, links, outlines) and reader (encryption, text, outlines, forms, attachments, drawing pages)
@@ -131,7 +131,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [netchan](#netchan) -- Message channels for games: UDP with sequence numbers and acks, WebSocket, the browser's network
   <br>[lib.rs](#netchan-crate-root) · [src/client.rs](#netchansrcclientrs) · [src/conn.rs](#netchansrcconnrs) · [src/endpoint.rs](#netchansrcendpointrs) · [src/packet.rs](#netchansrcpacketrs) · [src/reliable.rs](#netchansrcreliablers) · [src/seal.rs](#netchansrcsealrs) · [src/server.rs](#netchansrcserverrs) · [src/ws.rs](#netchansrcwsrs)
 - [sheet_io](#sheet_io) -- XLSX and CSV import: workbooks and delimited text as typed tables
-  <br>[lib.rs](#sheet_io-crate-root) · [src/csv.rs](#sheet_iosrccsvrs) · [src/xlsx.rs](#sheet_iosrcxlsxrs)
+  <br>[lib.rs](#sheet_io-crate-root) · [src/csv.rs](#sheet_iosrccsvrs) · [src/xlsx.rs](#sheet_iosrcxlsxrs) · [src/xlsx_write.rs](#sheet_iosrcxlsx_writers)
 
 ## ui
 
@@ -57605,6 +57605,15 @@ a file loses nothing, and the behaviour Visio files carry works without translat
   pointglue::*                  (JD21) control points that glue to connection points and
                                 follow them (SP-04), glue to vertices, handles, control points
                                 and guides (CN-02), the connection point tool (CN-01)
+  datagraphic::*                (JD19) data graphics: callouts, data bars, icon sets and
+                                colour by value from a shape's data as Visio keeps them (a
+                                hidden master per graphic, callout instances as subshapes),
+                                the legend of lists and containers (DA-07, DA-08, ST-08)
+  report::*                     (JD19) shape reports: Visio's report definitions as a model
+                                (their XML and the document sheet's visPropRptN rows are
+                                diagram_io::report), run into a table with groups and
+                                summaries, the table shape on the page and its refresh
+                                (DA-09, DA-13, EX-12)
 
 Rules that hold from the start: no std (only alloc), no unsafe code, nothing recalculated on
 opening a file (connectors, layout and containers move only when something moves), and a
@@ -58187,6 +58196,402 @@ DURATION: u16 = 6
 /// currency
 CURRENCY: u16 = 7
 ```
+
+### `diagram_core/src/datagraphic.rs`
+
+Source: [`lib/diagram_core/src/datagraphic.rs`](../lib/diagram_core/src/datagraphic.rs)
+
+```text
+datagraphic -- (JD19) data graphics: callouts, data bars, icon sets and colours that show a
+shape's data (DA-07, DA-08, ST-08), stored as Visio stores them
+
+  DataGraphic, Item, Kind, Pos, Opt, Rule, Op, Shade   the model of a data graphic: its name,
+                                  its items (a text callout, a data bar, an icon set, a colour by
+                                  value; the field expression "{Label}" or a formula of such
+                                  fields, the callout master, the position or the graphic's
+                                  default, the options, icon rules, colours), the default
+                                  position, Shape-Text ausblenden, Rahmen
+  is_graphic(doc, m) / graphics(doc)   a master is a data graphic: User.visUSEType = 1 in its
+                                  page sheet
+  read(doc, m) -> DataGraphic      the model of a data graphic master (Visio's or ours)
+  create(tx, &g, src) -> MasterRef  a new data graphic master; the callout masters come from
+                                  the document or from `src` (the app's stencil)
+  update(tx, eng, m, &g, src)      the master written anew, every shape that uses it again
+  rename / duplicate / delete      the gallery's menu (delete: from every shape first)
+  applied(doc, shape) / shapes_with(doc, m) / callouts(doc, shape)
+  apply(tx, eng, shapes, m, layer) the graphic on shapes (an earlier one goes first)
+  remove(tx, eng, shapes)          the graphic off again, the old colours back
+  fields(doc, shapes)              the shape data fields the shapes have (label, row name)
+  resolve_field(doc, shape, expr)  "{Label}" -> the formula on the shape's Prop row
+  icon_formula(&rules) / shade_formula(..)   the compiled formulas of icon rules and colours
+  legend::*                        (ST-08, RD-07) the legend: a list of containers of lists
+
+How Visio keeps a data graphic (Visio 2007 developer article "Building Custom Data Graphics",
+the Visio Insights blog, ShapeSheets of files Visio saved; JD19 research):
+* The graphic is a hidden master: its page sheet has User.visUSEType = 1, visDGVisible,
+  visDGShowBorder, visDGHideText, visDGNextItemID, msvDGCalloutGap and the layer
+  "Data Graphic"; its shape is a group with User.visDGDefaultPos = PNT(h,v) (the default
+  position); every item is a subshape with User.msvCalloutType ("Text Callout", "Data Bar",
+  "Icon Set", "Heading"), visDGDefaultPos (TRUE: the item takes the default position),
+  visDGStackHeight, visDGCalloutItem, visDGField0 (the field expression), visDGItemID,
+  visDGUseMaster = USE("<callout master>"), visDGCalloutField = User.visDGField0, and its
+  options in Prop.msvCalloutProp* rows (Min, Max, Label, ValueFormat, ShowValue ...).
+* Applied to a shape, the shape becomes a group and gets one instance of each item's callout
+  master as a subshape: Prop.msvCalloutField's value is a formula on the shape's own Prop row
+  (Sheet.5!Prop.Tasks, SortKey = the field's label), User.visDGDefaultPos follows the shape's
+  control point Controls.msvDGPosition (seven snap points across, BOUND), the pin is a formula
+  of the position and ThePage!User.msvDGCalloutGap, the callout lies on the layer "Data
+  Graphic".  The shape itself gets User.visDGDisplayFormat = USE("{UniqueID of the master}"),
+  visDGDefaultPos, msvLayoutIncludeSubshapes and Controls.msvDGPosition.
+* Positions: PNT(h, v), h 0..6 = far left, left edge, left, centre, right, right edge, far
+  right; v 0..6 = below, bottom edge, bottom, middle, top, top edge, above.  The instance
+  rounds the control's place to -1..5 (= h - 1, "x * 4 / Width").
+* Rendering comes from the callout masters' own cells: a data bar's fill width is a geometry
+  formula of Prop.msvCalloutField and its Min/Max, an icon set shows the geometry section
+  whose NoShow is false for User.msvCalloutIconNumber (-1: none), a text callout shows a text
+  field with the value in Prop.msvCalloutPropValueFormat.
+
+Assumptions where nothing public says how Visio does it ([NF] in the research; read back by
+JFDiagrammer, kept by Visio as ordinary cells):
+* Icon rules: the instance gets Visio's one compiled formula User.msvCalloutIconNumber
+  (IFERROR(IF(cond0,0,IF(cond1,1,...-1)),-1)); the rules themselves stay in the master item's
+  User.JFD_IconRules ("op|a|b" per icon).  A Visio item without them keeps its own
+  msvCalloutIconNumber formula as read (Item::icon_formula) and passes it on.
+* Colour by value: the item is a subshape of the master group with msvCalloutType "Color By
+  Value" (no callout master); its method and colours stay in User.JFD_CBVMethod (0 each
+  value, 1 ranges) and User.JFD_CBVColors ("value|to|#fill|#text" per colour).  On a shape:
+  User.visDGCBVFill = IF(match, RGB(..), ..., the old fill formula), FillForegnd =
+  User.visDGCBVFill; a text colour goes through User.JFD_DGCBVText into Char.Color.
+  User.visDGOldColors keeps what the shape had (our own text: "cell=I" inherited, "cell=F:..."
+  an own formula, "cell=V:..." an own constant, for FillForegnd, Char.Color, HideText and the
+  kind "Kind=Shape") and puts it back when the graphic goes.
+* The shape, now a group, shows its own geometry behind the callouts (DisplayMode = 1, kept
+  and put back like the colours).
+* An item's own position: User.JFD_DGPos = PNT(h,v) with visDGDefaultPos FALSE; a Visio item
+  without it gets the position its pin in the group is nearest to.
+* An item of a master written here is an instance of its callout master (Visio writes a copy
+  of the callout master's shape); instances on shapes are instances as in Visio.
+* visDGUseMaster and visDGDisplayFormat: USE() is not computed by the engine, so the value
+  written with it (254, as seen in Visio's files) stays.
+* visDGCalloutItem on an instance = the item's ID; visDGStackHeight = the distance to the
+  item's place (items at one position stack downwards, above the shape upwards).
+* The helper cells User.JFD_DGH and User.JFD_DGV (the position 0..6 the instance's pin
+  formulas read) are ours: Visio's own pin formulas are not known; ours give the same places.
+* Shape-Text ausblenden: HideText = TRUE on the shape (the old value kept as above); the
+  border (visDGShowBorder) is kept and written but not drawn.
+
+Every edit runs inside the caller's transaction (one undo step) and computes what it wrote
+(Engine::recalc of the sheets it touched).
+```
+
+```rust
+/// the universal name of the layer data graphics lie on
+LAYER_U: &str = "Data Graphic"
+/// the gap between a shape and the callouts outside it (inches, on paper; Visio's 1/16 in)
+GAP: f64 = 0.0625
+```
+
+- **`enum Kind`**
+  the kind of an item (Visio's GraphicItem.Type codes)
+  - `IconSet` -- 2: one icon of a set chosen by rules
+  - `Text` -- 3: the value as text
+  - `DataBar` -- 4: a bar, stars, a thermometer ... between a minimum and a maximum
+  - `ColorByValue` -- 5: the shape's fill by its value
+  - `Heading` -- 6: a heading (Visio's; read and kept, not offered)
+
+**`impl Kind`**
+
+- **`fn code(self) -> u32`**
+  Visio's GraphicItem.Type
+- **`fn callout_type(self) -> &'static str`**
+  User.msvCalloutType as Visio writes it
+- **`fn parse(t: &str) -> Option<Kind>`**
+  the kind of a msvCalloutType text (case and spaces ignored)
+
+- **`struct Pos`**
+  a position at a shape: h 0..6 far left .. far right, v 0..6 below .. above
+  - `h: u8`
+  - `v: u8`
+
+**`impl Pos`**
+
+- **`const DEFAULT: Pos = Pos { h: H_FAR_RIGHT, v: V_MIDDLE }`**
+  far right, middle (Visio's default for new graphics)
+- **`fn pnt(self) -> String`**
+  PNT(h,v)
+- **`fn parse(t: &str) -> Option<Pos>`**
+  the position of a "PNT(h,v)" text (numbers clamped to 0..6)
+
+```rust
+/// horizontal positions
+H_FAR_LEFT: u8 = 0
+H_LEFT_EDGE: u8 = 1
+H_LEFT: u8 = 2
+H_CENTER: u8 = 3
+H_RIGHT: u8 = 4
+H_RIGHT_EDGE: u8 = 5
+H_FAR_RIGHT: u8 = 6
+/// vertical positions
+V_BELOW: u8 = 0
+V_BOTTOM_EDGE: u8 = 1
+V_BOTTOM: u8 = 2
+V_MIDDLE: u8 = 3
+V_TOP: u8 = 4
+V_TOP_EDGE: u8 = 5
+V_ABOVE: u8 = 6
+```
+
+- **`enum Opt`**
+  an option of an item: the value of a Prop.msvCalloutProp\* row
+  - `Num(f64)`
+  - `Text(String)`
+  - `Bool(bool)`
+
+**`impl Opt`**
+
+- **`fn num(&self) -> Option<f64>`**
+  as a number (a Boolean 1 or 0, a text parsed)
+- **`fn text(&self) -> String`**
+  as text
+
+- **`enum Op`**
+  a rule's test of a value
+  - `NotUsed` -- [nicht verwendet]: the icon is not used
+  - `Equal`
+  - `NotEqual`
+  - `Greater`
+  - `GreaterEq`
+  - `Less`
+  - `LessEq`
+  - `Between` -- between a and b (both included)
+  - `Contains`
+  - `NotContains`
+
+**`impl Op`**
+
+- **`const ALL: [Op; 10] = [Op::NotUsed, Op::Equal, Op::NotEqual, Op::Greater, Op::G ...`**
+  every test in the dialog's order
+- **`fn code(self) -> &'static str`**
+  the code in User.JFD_IconRules
+- **`fn parse(t: &str) -> Op`**
+
+- **`struct Rule`**
+  an icon's rule: shown when the value passes the test
+  - `op: Op`
+  - `a: String`
+  - `b: String` -- the upper bound of Between
+
+**`impl Rule`**
+
+- **`fn new(op: Op, a: &str, b: &str) -> Rule`**
+
+- **`struct Shade`**
+  a colour of a colour-by-value item: a value (or a range from `value` to `to`) and its fill
+  and text colour (0xRRGGBB)
+  - `value: String`
+  - `to: String` -- the end of a range ("" for each value)
+  - `fill: u32`
+  - `text: Option<u32>`
+
+- **`struct Item`**
+  an item of a data graphic
+  - `id: u32` -- visDGItemID
+  - `kind: Kind`
+  - `field: String` -- visDGField0: "{Label}" or a formula of such fields ("{Revenue}-{Expenses}")
+  - `callout: String` -- the NameU of the callout master ("" for a colour by value)
+  - `pos: Option<Pos>` -- None: the graphic's default position
+  - `options: Vec<(String, Opt)>` -- Prop.msvCalloutProp\* values: (row name, value)
+  - `rules: Vec<Rule>` -- icon sets: the rule of each icon (index = icon number)
+  - `ranges: bool` -- colour by value: ranges (else each value)
+  - `shades: Vec<Shade>`
+  - `icon_formula: Option<String>` -- an icon number formula read from a file whose rules are not known (kept)
+
+**`impl Item`**
+
+- **`fn new(kind: Kind, field: &str, callout: &str) -> Item`**
+  a new item of `kind` for field `field` ("{Label}") shown by callout master `callout`
+- **`fn opt(&self, name: &str) -> Option<&Opt>`**
+  an option's value
+- **`fn set_opt(&mut self, name: &str, v: Opt)`**
+  set an option
+- **`fn label(&self) -> Option<&str>`**
+  the label of a field expression that is one field ("{Kosten}" -> "Kosten")
+
+- **`struct DataGraphic`**
+  a data graphic
+  - `name: String` -- the master's name
+  - `items: Vec<Item>`
+  - `default_pos: Pos`
+  - `hide_text: bool` -- Shape-Text ausblenden (visDGHideText)
+  - `show_border: bool` -- Rahmen um Elemente an der Standardposition (visDGShowBorder)
+  - `next_item: u32` -- visDGNextItemID
+
+**`impl DataGraphic`**
+
+- **`fn new(name: &str) -> DataGraphic`**
+- **`fn push(&mut self, mut item: Item) -> usize`**
+  add an item (its ID handed out) -> its index
+- **`fn item_of(&self, field: &str) -> Option<usize>`**
+  the item of a field expression
+
+- **`fn parse_num(t: &str) -> Option<f64>`**
+  a number typed by a user or kept as text ("1,5" and "1.5" alike)
+
+- **`fn hex(c: u32) -> String`**
+  "#rrggbb" of 0xRRGGBB
+
+- **`fn parse_hex(t: &str) -> Option<u32>`**
+  0xRRGGBB of "#rrggbb"
+
+- **`fn user_text(doc: &Document, sheet: SheetRef, name: &str) -> Option<String>`**
+  a User cell's value as text (a number as written)
+
+- **`fn unique_name(doc: &Document, base: &str) -> String`**
+  a name no master of the document has (`base`, then "base (2)" ...)
+
+- **`fn is_graphic(doc: &Document, m: MasterRef) -> bool`**
+  whether master m is a data graphic (User.visUSEType = 1 in its page sheet)
+
+- **`fn graphics(doc: &Document) -> Vec<MasterRef>`**
+  the document's data graphics in master order
+
+- **`fn master_name(doc: &Document, m: MasterRef) -> String`**
+  the name of a master (Name, else NameU)
+
+- **`fn read(doc: &Document, m: MasterRef) -> Option<DataGraphic>`**
+  the model of data graphic master m (None: not a data graphic)
+
+- **`fn pin_formulas(gid: u32) -> (String, String)`**
+  the pin formulas of a callout inside group `gid` (its ID): PinX, PinY (stacked by
+  User.visDGStackHeight: down, up above the shape)
+
+- **`struct Field`**
+  a shape data field: its label (as shown) and row name
+  - `label: String`
+  - `row: String`
+
+- **`fn fields(doc: &Document, shapes: &[ShapeRef]) -> Vec<Field>`**
+  the shape data fields of the shapes, by row name, in the order they are met (the
+  callouts' own msvCallout\* rows left out)
+
+- **`fn field_expr(label: &str) -> String`**
+  "{Label}" of a field
+
+- **`fn resolve_field(doc: &Document, shape: ShapeRef, expr: &str, sheet: Option<u32>) -> Option<(String, String)>`**
+  a field expression on a shape -> (the formula, the label): every "{Label}" becomes the
+  shape's Prop row (`Sheet.N!Prop.Row` with `sheet` Some(N), else `Prop.Row`); None when the
+  shape lacks one of them
+
+- **`fn icon_formula(rules: &[Rule]) -> String`**
+  User.msvCalloutIconNumber of icon rules: the number of the first icon whose rule the value
+  passes, -1 for none (errors: -1)
+
+- **`fn shade_formula(shades: &[Shade], ranges: bool, value: &str, text: bool, otherwise: &str) -> String`**
+  the colour of a value: IF(match, RGB(..), ...) with `otherwise` when none matches
+
+- **`fn find_master(doc: &Document, name_u: &str) -> Option<MasterRef>`**
+  a master by NameU (else Name), ASCII case ignored
+
+- **`fn create(tx: &mut Transaction, eng: &mut Engine, g: &DataGraphic, src: Option<&Document>) -> Result<MasterRef, EditError>`**
+  a new data graphic master (hidden) for `g`; the callout masters its items name come from
+  the document or from `src` -> the master.  The caller recalculates nothing: the master's
+  cells are computed here.
+
+- **`fn update(tx: &mut Transaction, eng: &mut Engine, m: MasterRef, g: &DataGraphic, src: Option<&Document>, layer_name: &str) -> Result<Vec<ShapeRef>, EditError>`**
+  write data graphic master m anew from `g` (its name, items, positions, options) and put
+  it again on every shape that uses it -> those shapes
+
+- **`fn rename(tx: &mut Transaction, m: MasterRef, name: &str) -> Result<(), EditError>`**
+  rename a data graphic (Name and NameU; shapes keep it by its UniqueID)
+
+- **`fn duplicate(tx: &mut Transaction, eng: &mut Engine, m: MasterRef, name: &str) -> Result<MasterRef, EditError>`**
+  a copy of data graphic m under a new name ("name (2)" when taken) -> the copy
+
+- **`fn delete(tx: &mut Transaction, eng: &mut Engine, m: MasterRef) -> Result<(), EditError>`**
+  delete data graphic m: off every shape first, then the master (its callout masters stay)
+
+- **`fn applied(doc: &Document, shape: ShapeRef) -> Option<MasterRef>`**
+  the data graphic a shape shows (User.visDGDisplayFormat = USE("{UniqueID}" or name))
+
+- **`fn shapes_with(doc: &Document, m: MasterRef) -> Vec<ShapeRef>`**
+  every shape of the document's pages that shows data graphic m
+
+- **`fn callouts(doc: &Document, shape: ShapeRef) -> Vec<ShapeRef>`**
+  the data graphic callouts of a shape (subshapes with msvCalloutType and visDGCalloutItem)
+
+- **`fn page_layer(tx: &mut Transaction, page: PageRef, name: &str) -> Result<u32, EditError>`**
+  the page's layer for data graphics (NameUniv "Data Graphic"), added with `name` when the
+  page has none -> its index
+
+- **`fn apply(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef], m: MasterRef, layer_name: &str) -> Result<Vec<ShapeRef>, EditError>`**
+  put data graphic m on `shapes` (an earlier graphic goes first; shapes on pages only) ->
+  the shapes that show it now (a shape none of whose fields the graphic names is left out)
+
+- **`fn remove(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef]) -> Result<(), EditError>`**
+  take the data graphic off `shapes`: its callouts go, the shape's colours, text and kind
+  come back, the graphic's rows go
+
+- **`fn describe(item: &Item, kinds: &[&str; 4]) -> String`**
+  the text of a graphic's items for lists: "Kosten (Text)" ... (the caller's words)
+
+### `diagram_core/src/datagraphic/legend.rs`
+
+Source: [`lib/diagram_core/src/datagraphic/legend.rs`](../lib/diagram_core/src/datagraphic/legend.rs)
+
+```text
+legend -- (JD19, ST-08, RD-07) the legend of the data graphics on a page
+
+  Texts                       the words the legend writes (the caller's language): its title,
+                              the tests of icon rules, the line of a text item
+  groups(doc, page, &texts)   what the legend shows: one group per item of the graphics the
+                              page's shapes show (its field and kind once), each with its
+                              entries: an icon and its rule, a colour and its value or range,
+                              a bar and its range, a text item
+  insert(tx, eng, page, horizontal, &texts) -> ShapeRef   the legend as Visio 2010 and later
+                              build it: an outer list ("Legende", horizontal or vertical), one
+                              container per group with the field as its heading, inside an
+                              invisible list of the entries; at the top right of the page
+
+The legend is built with diagram_core::structure (Relationships on both sides, the lists
+laid out, the containers fitted) from plain shapes, so it is edited like any list: entries can
+be retyped and dragged.  Like Visio's it is not kept up to date: after the graphics change
+the user inserts it again.  Its outer list carries User.JFD_DGLegend = TRUE (own cell; how
+Visio marks its legend is not known).  The swatches are instances of the items' callout
+masters (an icon with its number fixed, a bar half full) and small rectangles in the colours.
+```
+
+- **`struct Texts`**
+  the words of a legend in the caller's language
+  - `title: String` -- the outer list's heading ("Legende")
+  - `text: String` -- the entry of a text item ("Wert als Text")
+  - `ops: [String; 10]` -- the tests in the order of Op::ALL ("", "=", "≠", ">" ... "zwischen", "enthält" ...)
+  - `icon: String` -- an icon whose rule is not known ("Symbol {}")
+
+- **`enum Swatch`**
+  the picture of an entry
+  - `Callout { master: MasterRef, icon: Option<i32>, value: Option<f64> }` -- an instance of a callout master: an icon number, a value for the field
+  - `Color(u32)` -- a rectangle in this colour (0xRRGGBB)
+  - `None` -- text only
+
+- **`struct Entry`**
+  an entry: its picture and text
+  - `swatch: Swatch`
+  - `text: String`
+
+- **`struct Group`**
+  a group: the field's label and the entries
+  - `label: String`
+  - `entries: Vec<Entry>`
+
+- **`fn groups(doc: &Document, page: PageRef, t: &Texts) -> Vec<Group>`**
+  the groups of the legend of the graphics shown on `page`
+
+- **`fn insert(tx: &mut Transaction, eng: &mut Engine, page: PageRef, horizontal: bool, t: &Texts, layer_name: &str) -> Result<ShapeRef, EditError>`**
+  the legend of the data graphics on `page` (see the file header) at the top right of the
+  page -> its outer list (Invalid: the page shows no data graphic)
+
+- **`fn is_legend(doc: &Document, s: ShapeRef) -> bool`**
+  whether a shape is (the outer list of) a data graphic legend
 
 ### `diagram_core/src/design/mod.rs`
 
@@ -59752,6 +60157,13 @@ engine binds the names to a document's string table once per formula text.
   - `Gt` -- >
   - `Le` -- &lt;=
   - `Ge` -- >=
+
+**`impl Func`**
+
+- **`fn by_name(name: &str) -> Option<Func>`**
+  the function of a name (any case); None for names the engine does not know
+- **`fn name(self) -> Option<&'static str>`**
+  the universal name (None for Unknown: Parsed::name has it)
 
 - **`enum SheetName`**
   the sheet part of a reference (in front of "!")
@@ -62697,6 +63109,424 @@ stay with the old ID -- not yet carried over.
   of this document: instance::import_master first), Name in language `lang` (instance::LANGS);
   see the head of this file -> the new shapes (the others are left alone)
 
+### `diagram_core/src/report.rs`
+
+Source: [`lib/diagram_core/src/report.rs`](../lib/diagram_core/src/report.rs)
+
+```text
+report -- (JD19) shape reports (DA-09, DA-13, AS-05, EX-12): Visio's report definitions as a
+model, run against a drawing into a table, put on a page as a table shape
+
+  ReportDef                     a definition as Visio's VisioReportDefinition describes it:
+                                name, title, description, which shapes (Scope), the criteria
+                                (Filter), the columns (Field: built-in fields, shape data,
+                                user cells; display names and order; summaries), grouping
+                                with subtotals, grand summary and duplicates (Grouping),
+                                up to three sort keys (Sort), precision, units, case; what a
+                                file had and the model does not know stays as data (attrs,
+                                extra) for the writer
+  run(doc, &def, &Ctx) -> Table   the result: title, columns, item rows, group headers,
+                                subtotal rows, the grand total; every cell as text (in the
+                                definition's precision, with units when it says so) and
+                                typed (for CSV and XLSX)
+  place(tx, eng, owner, at, &table, &Place) -> ShapeRef   the table shape: a group of cell
+                                shapes (title, header, grid, group and summary rows) on its
+                                own layer, marked with User.JFD_Report* (report/shape.rs)
+  report_shape(doc, shape) / refresh(tx, eng, shape, &table) / report_layer(..)   find a table
+                                shape (a cell of it too), build it anew in place (DA-13)
+
+The XML (VisioReportDefinition, .vrd files) and the definitions kept in the document sheet
+(User.visPropRptN, U="STR") are diagram_io::report: this crate holds no file format.  The
+codes below (Scope::code, Condition::code, Func::bit, Property::tag, Builtin::key) are the
+numbers and names that XML carries.
+
+Assumptions where no source says (Annahmen; the user's own Visio file will settle them):
+* SelectDrawingDataMethod: 1 every page, 2 the current page (both seen), 3 the selected
+  shapes (not seen); another number reads as Scope::Other and runs over every page.
+* Condition (1, 3 and 8 seen): 1 =, 2 <>, 3 >, 4 >=, 5 <, 6 <=, 7 does not exist, 8 exists
+  (CONDITIONS below: one table to change).
+* SummaryTypes (0, 1, 3 seen) a bit mask in the order of Visio's dialog: 1 total, 2 average,
+  4 count, 8 minimum, 16 maximum (Func::bit).
+* Tag 1 a built-in field, 2 shape data, 3 a user cell (seen); Type and PropertyDataType are
+  the shape data types of diagram_core::data::kind (0 text, 2 number, 3 Boolean seen).
+* ItemDisplay 1 shows the shapes' rows with the summaries, 0 only the summaries (one row per
+  group); GroupingField 0 groups nothing; a Boolean attribute is 1 or 0 (true / -1 read too).
+* A shape data field is named by its row name (Prop.<Name>); a shape that has no row of that
+  name but one with that label counts too (Visio's dialog lists the fields by label).
+* NAMEINFO is the shape's name as shown (Name), NAMEIDINFO its NameID ("Sheet.5"); lengths
+  (PINXINFO ...) in the unit of their cell, else the page's.
+* Visio's output "Visio-Shape" is an embedded Excel object (NO-22: not here); which cell marks
+  it is not known.  The table shape here is JFDiagrammer's own: User.JFD_Report = 1,
+  JFD_ReportName, JFD_ReportDef (a copy of the definition) or JFD_ReportLink (the
+  definition's name in the drawing or a .vrd path), on the layer the app names ("Bericht").
+
+Which shapes a report sees (run.rs): the top-level shapes of the pages of its scope (the
+foreground pages for "every page") or the selected shapes; a group without master and without
+shape data of its own stands for its members (a user's group of devices counts its devices),
+every other shape counts as one -- an instance's subshapes never.  Table shapes of reports
+are left out.  Summaries: Count counts the rows of the group, the others take the numbers.
+```
+
+- **`enum Scope`**
+  which shapes a report takes (SelectDrawingDataMethod)
+  - `AllPages` -- the shapes of every (foreground) page: 1
+  - `Page` -- the shapes of the current page: 2
+  - `Selection` -- the selected shapes: 3 (assumed)
+  - `Other(u32)` -- a number not known here (runs like AllPages, written back as read)
+
+**`impl Scope`**
+
+- **`fn code(self) -> u32`**
+  the code of SelectDrawingDataMethod
+- **`fn of(code: u32) -> Scope`**
+  the scope of a code
+
+- **`enum Builtin`**
+  a built-in field (Tag 1): its name in the definition
+  - `Text` -- TEXTINFO: the shape's text as shown (fields included)
+  - `Master` -- MASTERINFO: the name of the shape's master
+  - `Name` -- NAMEINFO: the shape's name
+  - `NameId` -- NAMEIDINFO: the shape's NameID ("Sheet.5")
+  - `PinX` -- PINXINFO
+  - `PinY` -- PINYINFO
+  - `Width` -- WIDTHINFO
+  - `Height` -- HEIGHTINFO
+  - `Other(String)` -- a name not known here (kept; it shows nothing)
+
+```rust
+/// the built-in fields in the order the wizard offers them
+BUILTINS: [Builtin; 8] = [Builtin::Text, Builtin::Master, Builtin::Name, Builtin:: ...
+```
+
+**`impl Builtin`**
+
+- **`fn key(&self) -> &str`**
+  the name in the definition (TEXTINFO ...)
+- **`fn of(key: &str) -> Builtin`**
+  the field of a name
+- **`fn is_length(&self) -> bool`**
+  whether its values are lengths
+
+- **`enum Property`**
+  what a column or a criterion reads from a shape
+  - `Builtin(Builtin)` -- a built-in field (Tag / PropertyType 1)
+  - `Data(String)` -- a shape data field by its row name (Prop.&lt;name>; Tag 2)
+  - `User(String)` -- a user cell by its row name (User.&lt;name>; Tag 3)
+
+**`impl Property`**
+
+- **`fn tag(&self) -> u32`**
+  Tag / PropertyType
+- **`fn key(&self) -> &str`**
+  the name the definition writes (TEXTINFO, the row name)
+- **`fn of(tag: u32, key: &str) -> Property`**
+  the property of a tag and a name (an unknown tag reads as shape data)
+
+- **`enum Func`**
+  a summary function of a column (SummaryTypes, a bit each)
+  - `Total` -- the sum: bit 1
+  - `Average` -- the mean: bit 2
+  - `Count` -- the number of rows: bit 4
+  - `Min` -- the smallest number: bit 8
+  - `Max` -- the largest number: bit 16
+
+```rust
+/// the functions in the order of the dialog (and of the summary rows)
+FUNCS: [Func; 5] = [Func::Total, Func::Average, Func::Count, Func::Min, Func ...
+```
+
+**`impl Func`**
+
+- **`fn bit(self) -> u32`**
+  its bit in SummaryTypes
+- **`fn of_mask(mask: u32) -> Vec<Func>`**
+  the functions of a SummaryTypes mask, in order
+
+- **`struct Field`**
+  a column of the report (VisioRptDefField)
+  - `id: u32` -- ID (groups and sort keys name it)
+  - `property: Property` -- what it shows (Tag with Name)
+  - `display_name: String` -- DisplayName: the column's heading ("" -- the property's name)
+  - `display: bool` -- Display: shown as a column
+  - `order: u32` -- DisplayOrder: the column's place (smaller first)
+  - `data_type: u16` -- Type: the data type (data::kind: 0 text, 2 number ...)
+  - `summary: u32` -- SummaryTypes (Func::bit)
+  - `attrs: Vec<(String, String)>` -- attributes not known here, kept
+
+**`impl Field`**
+
+- **`fn new(id: u32, property: Property, display_name: &str) -> Field`**
+  a shown column of a property with a heading
+- **`fn heading(&self) -> &str`**
+  the heading: DisplayName, else the property's name
+
+- **`enum Condition`**
+  a condition of a criterion (Condition; codes assumed, see the file head)
+  - `Eq` -- =
+  - `Ne` -- &lt;>
+  - `Gt` -- >
+  - `Ge` -- >=
+  - `Lt` -- &lt;
+  - `Le` -- &lt;=
+  - `Exists` -- the shape has the property
+  - `NotExists` -- the shape does not have it
+  - `Other(u32)` -- a code not known here (the criterion holds for no shape)
+
+```rust
+/// the conditions with their codes (one table: the assumption lives here)
+CONDITIONS: [(Condition, u32); 8] = [ (Condition::Eq, 1), (Condition::Ne, 2), (Condition::Gt, ...
+```
+
+**`impl Condition`**
+
+- **`fn code(self) -> u32`**
+  the code of Condition
+- **`fn of(code: u32) -> Condition`**
+  the condition of a code
+- **`fn has_value(self) -> bool`**
+  whether it compares with a value (Exists and NotExists do not)
+
+- **`struct Filter`**
+  a criterion: which shapes the report takes (VisioRptDefFilter)
+  - `id: u32` -- ID
+  - `property: Property` -- the property compared (PropertyType with Property)
+  - `condition: Condition` -- Condition
+  - `value: String` -- Value: what it compares with
+  - `unit: String` -- Unit: the value's unit code ("MM"; "" none)
+  - `data_type: u16` -- PropertyDataType (data::kind)
+  - `and: bool` -- AndOr: 1 and (Visio's criteria are all "and"), 0 or with the ones before
+  - `attrs: Vec<(String, String)>` -- attributes not known here, kept
+
+**`impl Filter`**
+
+- **`fn new(id: u32, property: Property, condition: Condition, value: &str) -> Filter`**
+  a criterion "property condition value"
+
+- **`struct Grouping`**
+  grouping and the summaries of the whole (VisioRptDefGroup)
+  - `id: u32` -- ID
+  - `field: u32` -- GroupingField: the ID of the field the rows are grouped by (0: none)
+  - `show_items: bool` -- ItemDisplay: the shapes' rows are shown (else only the summaries)
+  - `grand_summary: bool` -- GrandSummary: summaries over every row at the end
+  - `exclude_duplicates: bool` -- ExcludeDuplicates: a row the same as one before is left out
+  - `attrs: Vec<(String, String)>` -- attributes not known here, kept
+
+- **`struct Sort`**
+  a sort key (VisioRptDefSort)
+  - `id: u32` -- ID
+  - `field: u32` -- SortField: the field's ID
+  - `ascending: bool` -- Ascending
+  - `case_sensitive: bool` -- CaseSensitive
+  - `attrs: Vec<(String, String)>` -- attributes not known here, kept
+
+**`impl Sort`**
+
+- **`fn new(id: u32, field: u32, ascending: bool) -> Sort`**
+  a sort key on a field
+
+- **`struct ReportDef`**
+  a report definition (VisioReportDefinition; a .vrd file holds the same)
+  - `name: String` -- Name: what the list of reports shows
+  - `title: String` -- Title: the heading of the result ("" -- the name)
+  - `description: String` -- Description
+  - `scope: Scope` -- SelectDrawingDataMethod
+  - `precision: u32` -- Precision: decimals of numbers
+  - `show_units: bool` -- ShowUnits: lengths, angles and durations with their unit
+  - `case_sensitive: bool` -- CaseSensitive: criteria compare texts with case
+  - `user_cells: bool` -- UserCells: the wizard offers user cells (Visio's "Show all properties")
+  - `hidden_properties: bool` -- HiddenProperties: the wizard offers hidden shape data
+  - `advanced_filter: bool` -- AdvancedFilter: criteria were given (Visio's dialog Erweitert)
+  - `filter_expression: String` -- FilterExpression as read (written back unchanged)
+  - `exists: bool` -- ReportExists
+  - `version: String` -- Version ("3")
+  - `fields: Vec<Field>` -- the columns in file order
+  - `filters: Vec<Filter>` -- the criteria
+  - `grouping: Option<Grouping>` -- grouping and summaries (None: the file has no group element)
+  - `sorts: Vec<Sort>` -- the sort keys, the first one first
+  - `attrs: Vec<(String, String)>` -- root attributes not known here, kept
+  - `extra: Vec<String>` -- child elements not known here, as XML text, written back after the known ones
+
+**`impl ReportDef`**
+
+- **`fn new(name: &str) -> ReportDef`**
+  an empty definition named `name` (every page, two decimals, units shown)
+- **`fn field(&self, id: u32) -> Option<&Field>`**
+  a field by ID
+- **`fn columns(&self) -> Vec<&Field>`**
+  the shown fields in their display order (DisplayOrder, then file order)
+- **`fn heading(&self) -> &str`**
+  the title shown: Title, else Name
+- **`fn next_field_id(&self) -> u32`**
+  the next free field ID
+
+### `diagram_core/src/report/run.rs`
+
+Source: [`lib/diagram_core/src/report/run.rs`](../lib/diagram_core/src/report/run.rs)
+
+```text
+run -- a report definition run against a drawing: the shapes it takes, their values, the
+table with groups, summaries and the grand total
+
+  run(doc, &def, &Ctx) -> Table
+  Ctx { page, selection, labels }    the page shown, the selected shapes, the words of the
+                                     summary rows (the app's language; English by default)
+  Table { title, columns, rows, shapes }   rows of RowKind Item, Group (a group's heading),
+                                     Summary(f) (a group's subtotal), Grand(f) (over all);
+                                     None instead of a function: a row with several
+
+The layouts:
+* no grouping: the shapes' rows (sorted, duplicates left out when the definition says so),
+  then one row per summary function any column has (Grand), the function's name in the first
+  empty cell
+* grouping with the rows shown: per group a heading row (the group's value in its column),
+  its rows, one subtotal row per function; with GrandSummary the summaries over all at the end
+* grouping, summaries only (ItemDisplay 0): one row per group -- the group's value, then a
+  column per (field, function): "Anzahl" for the grouping field itself, else
+  "<field> (<function>)" -- and with GrandSummary a last row over all (Visio's inventory:
+  Master-Name and the count of each)
+
+Summaries take the numbers of a column, also numbers kept as text ("450" in a text field).
+Values: a number in the definition's precision with the drawing's decimal sign
+(Document::fields), with the unit's abbreviation when ShowUnits is on and the unit has one
+(lengths in the unit of their cell, per cent, angles, durations); dates in the general date
+format; Booleans as Labels::yes / no; texts as they are.  Each cell also carries its value
+typed (Val): the number in the shown unit, rounded to the precision, for CSV and XLSX.
+Sorting compares numbers as numbers and texts by their characters (case as the sort key
+says); an empty or missing value comes first.  Criteria: =, <>, <, <=, >, >= compare numbers
+when both sides are numbers (the criterion's value in its Unit, else in the shape's unit),
+else texts (case as the definition says); exists / does not exist ask whether the shape has
+the field.  Every criterion must hold, one with AndOr 0 is an "or" with the ones before.
+```
+
+- **`struct Labels`**
+  the words of the summary rows and of truth values (the app's language)
+  - `total: String` -- Func::Total
+  - `average: String` -- Func::Average
+  - `count: String` -- Func::Count
+  - `min: String` -- Func::Min
+  - `max: String` -- Func::Max
+  - `grand: String` -- the rows over all groups
+  - `yes: String` -- a true value
+  - `no: String` -- a false value
+
+**`impl Labels`**
+
+- **`fn func(&self, f: Func) -> &str`**
+  the word of a function
+
+- **`struct Ctx<'a>`**
+  where a report runs
+  - `page: Option<PageRef>` -- the page shown (Scope::Page)
+  - `selection: &'a [ShapeRef]` -- the selected shapes (Scope::Selection)
+  - `labels: Labels` -- the words of the summary rows
+
+- **`enum Val`**
+  a cell's value, typed
+  - `Empty` -- nothing
+  - `Num(f64)` -- a number in the unit shown
+  - `Text(String)` -- a text
+  - `Bool(bool)` -- a truth value
+  - `Date(f64)` -- a date (days since 30 December 1899)
+
+- **`struct Cell`**
+  a cell of the table: its text and its value
+  - `text: String` -- as shown
+  - `value: Val` -- typed
+
+- **`enum RowKind`**
+  what a row of the table is
+  - `Item` -- a shape's row (summaries only: a group's row)
+  - `Group` -- a group's heading
+  - `Summary(Option<Func>)` -- a group's subtotal (None: several functions in one row)
+  - `Grand(Option<Func>)` -- the summary over all (None: several functions in one row)
+
+- **`struct Row`**
+  a row of the table
+  - `kind: RowKind` -- what it is
+  - `cells: Vec<Cell>` -- a cell per column
+
+- **`struct Column`**
+  a column of the table
+  - `name: String` -- its heading
+  - `numeric: bool` -- its values are numbers (right-aligned)
+
+- **`struct Table`**
+  a report's result
+  - `title: String` -- the title (the definition's Title, else its Name)
+  - `columns: Vec<Column>` -- the columns
+  - `rows: Vec<Row>` -- the rows
+  - `shapes: usize` -- how many shapes the report took
+
+- **`fn run(doc: &Document, def: &ReportDef, ctx: &Ctx) -> Table`**
+  run a definition against a drawing
+
+### `diagram_core/src/report/shape.rs`
+
+Source: [`lib/diagram_core/src/report/shape.rs`](../lib/diagram_core/src/report/shape.rs)
+
+```text
+shape -- (NO-22, DA-13) a report's table on the page: a group of cell shapes instead of
+Visio's embedded Excel object, found again and built anew in place
+
+  report_layer(tx, page, name, name_univ) -> index   the layer of report tables (found by
+                                      its universal name, else added)
+  place(tx, eng, owner, top_left, &table, &Place) -> the group
+  report_shape(doc, shape) -> Option<ReportShape>      the table a shape is (or is part of)
+  refresh(tx, eng, shape, &table) -> the new group     the same place, marks and layers
+
+The table: a title row (no line, no fill, 11 pt bold), the heading row (8 pt bold on a light
+grey), the rows (8 pt; group headings, subtotals and the grand total bold, the totals on a
+lighter grey), each cell a rectangle with its text (numeric columns right-aligned), grouped
+with ops::group (the members scale with the group as in any group).  Sizes are on paper
+(rows 0.2 in, columns by their longest text, 0.5 to 3.5 in) and grow with the page's scale.
+The group carries the marks: User.JFD_Report = 1, JFD_ReportName (the definition's name),
+JFD_ReportDef (a copy of the definition's XML, Visio's "Kopie der Berichtsdefinition") or
+JFD_ReportLink (where the definition is: "" the drawing's definition of that name, else the
+path of a .vrd file, Visio's "Verknüpfung mit der Berichtsdefinition"); SelectMode 0 (a click
+takes the table, not a cell).  At most MAX_ROWS rows are drawn, then a row "…".
+```
+
+```rust
+/// User cell of a report table: 1
+MARK: &str = "JFD_Report"
+/// User cell: the definition's name (STR)
+MARK_NAME: &str = "JFD_ReportName"
+/// User cell: a copy of the definition's XML (STR)
+MARK_DEF: &str = "JFD_ReportDef"
+/// User cell: where the definition is ("" the drawing, else a .vrd path; STR)
+MARK_LINK: &str = "JFD_ReportLink"
+/// the most rows a table shape draws
+MAX_ROWS: usize = 2000
+```
+
+- **`struct Place`**
+  what a placed table carries besides its cells
+  - `name: String` -- the definition's name
+  - `def_copy: Option<String>` -- a copy of the definition (its XML), or None when it is linked
+  - `link: Option<String>` -- the link when it is not copied: "" the drawing's definition of that name, else a .vrd path
+  - `layers: Vec<u32>` -- the layers of the page the table and its cells go on
+
+- **`struct ReportShape`**
+  a table shape found on a page
+  - `shape: ShapeRef` -- the group
+  - `name: String` -- JFD_ReportName
+  - `def: Option<String>` -- JFD_ReportDef (None: none or empty)
+  - `link: Option<String>` -- JFD_ReportLink (None: none)
+
+- **`fn report_shape(doc: &Document, shape: ShapeRef) -> Option<ReportShape>`**
+  the report table `shape` is, or belongs to (a cell of it)
+
+- **`fn report_layer(tx: &mut Transaction, page: PageRef, name: &str, name_univ: &str) -> Result<u32, EditError>`**
+  the layer report tables go on: the page's layer with this universal name, else a new one
+
+- **`fn place(tx: &mut Transaction, eng: &mut Engine, owner: Owner, at: [f64; 2], table: &Table, p: &Place) -> Result<ShapeRef, EditError>`**
+  put a report's table on a page or master: its top left corner at `at` (page coordinates)
+  -> the group
+
+- **`fn refresh(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, table: &Table) -> Result<ShapeRef, EditError>`**
+  build a report table anew where it is (its top left corner, its marks and layers stay), as
+  part of the caller's transaction -> the new group
+
 ### `diagram_core/src/route.rs`
 
 Source: [`lib/diagram_core/src/route.rs`](../lib/diagram_core/src/route.rs)
@@ -64610,6 +65440,10 @@ format follows the public specification [MS-VSDX]; no code of other implementati
   data::ado(&recordset) -> String
                       (JD18) a recordset's rows as an ADO persisted recordset (the recordset
                       parts of a .vsdx; Visio's DataAsXML format)
+  report::parse(xml) / report::to_xml(&def) / report::stored(&doc), add, replace, rename,
+                      remove   (JD19, DA-09) shape report definitions (diagram_core::report's
+                      model) as Visio's VisioReportDefinition XML (.vrd files the same) and
+                      as the document sheet's User rows visPropRptN, as transactions
   textdraw::parse(text, &opts, &limits) / textdraw::apply(tx, eng, page, &plan, &masters, &b)
                       (JD18, IM-08) a connected drawing from a text file: Shape and Link
                       records (Visio's text import) into a plan with problems per line, then
@@ -64788,6 +65622,99 @@ CT_CUSTOM: &str = "application/vnd.openxmlformats-officedocument.custom-pro ...
 - **`fn write(doc: &mut Document, p: &Props)`**
   make the property parts say `p` (see the module comment); parts whose entries did not change
   keep their bytes
+
+### `diagram_io/src/report.rs`
+
+Source: [`lib/diagram_io/src/report.rs`](../lib/diagram_io/src/report.rs)
+
+```text
+report -- (JD19, DA-09) shape report definitions as Visio keeps them: the XML of
+VisioReportDefinition (a .vrd file holds the same) and the document sheet's User rows
+visPropRpt1, visPropRpt2 ... (Value: that XML as a string, U="STR")
+
+  parse(text) -> Result<ReportDef, ReportError>   a definition read (diagram_core::report's
+                                      model; a BOM is skipped, a UTF-16 .vrd is decoded
+                                      by the caller, e.g. with text_of)
+  to_xml(&def) -> String              the same as Visio writes it: the declaration, the root
+                                      with its attributes, Name, Title, the fields,
+                                      criteria, the group, the sort keys, then the elements
+                                      not known here as they were read
+  stored(doc) -> Vec<Stored>          every visPropRptN row in the order of its number, read
+  find(doc, name) -> Option<Stored>   the one with this name (case ignored)
+  add(tx, &def) -> row name           a new row: the number after the largest one
+  replace(tx, row, &def)              the row's definition anew
+  rename(tx, row, name)               only the name (and the title, when it was the name)
+  remove(tx, row)                     the row goes; the definitions after it move up a row
+                                      (visPropRpt3 into visPropRpt2 ...), so the numbers
+                                      stay without gaps (Annahme: Visio reads them in order)
+
+Where Visio keeps them ([MS-VSDX] says nothing; two files Visio 16 saved, bvisual.net): the
+root VisioReportDefinition in the namespace NS with ReportExists, SelectDrawingDataMethod,
+Description, Precision, ShowUnits, CaseSensitive, UserCells, HiddenProperties,
+AdvancedFilter, FilterExpression, Version and the children Name, Title, VisioRptDefField (ID,
+Display, DisplayOrder, Type, SummaryTypes, Tag; Name, DisplayName), VisioRptDefFilter (ID,
+Property, Condition, AndOr, PropertyType, PropertyDataType, Value, Unit), VisioRptDefGroup (ID,
+GroupingField, ItemDisplay, GrandSummary, ExcludeDuplicates), VisioRptDefSort (ID, SortField,
+Ascending, CaseSensitive).  The codes and what is assumed about them: diagram_core::report.
+
+Reading: the crate's own pull reader (xml.rs: bounded, no DTD, no entity but the five, an
+error and never a panic), at most 16 levels and 64 attributes per element, MAX_BYTES of text,
+512 fields, criteria, sort keys and unknown elements each.  Elements are taken by their local
+name in the default namespace (NS or none); an unknown child of the root is kept as the text
+it was (one with a namespace prefix is left out: its declaration may be the root's), an
+unknown child of a field is not.  Attributes in no namespace that are not known are kept.
+Writing: double quotes as Visio writes them; esc() is the one place that escapes, and leaves
+out what XML 1.0 cannot carry.  A row whose text is no definition stays as it is (its
+Stored::def is the error); replace and remove take it like any other.
+```
+
+```rust
+/// the namespace of VisioReportDefinition
+NS: &str = "urn:schemas-microsoft-com:office:visio:reportdefinition"
+/// the longest definition read (bytes)
+MAX_BYTES: usize = 1 << 20
+/// the row names' prefix in the document sheet's User section
+ROW_PREFIX: &str = "visPropRpt"
+```
+
+- **`enum ReportError`**
+  why a text is no report definition
+  - `Syntax` -- not well-formed XML
+  - `Limit` -- too long, too deep, too many attributes or elements
+  - `Unsupported` -- a DOCTYPE or an encoding the reader does not take
+  - `NotReport` -- well-formed, but no VisioReportDefinition
+
+- **`fn parse(text: &str) -> R<ReportDef>`**
+  read a definition
+
+- **`fn to_xml(d: &ReportDef) -> String`**
+  the definition as XML (the text of a visPropRptN cell and of a .vrd file)
+
+- **`struct Stored`**
+  a definition kept in the document
+  - `row: String` -- the row's name (visPropRpt3)
+  - `index: u32` -- its number (3)
+  - `xml: String` -- the text of its Value cell
+  - `def: Result<ReportDef, ReportError>` -- the definition read from it
+
+- **`fn stored(doc: &Document) -> Vec<Stored>`**
+  the definitions of the document sheet, by their numbers
+
+- **`fn find(doc: &Document, name: &str) -> Option<Stored>`**
+  the definition named `name` (case ignored)
+
+- **`fn add(tx: &mut Transaction, def: &ReportDef) -> Result<String, EditError>`**
+  keep a new definition in the document -> its row's name
+
+- **`fn replace(tx: &mut Transaction, row: &str, def: &ReportDef) -> Result<(), EditError>`**
+  give a kept definition's row another definition
+
+- **`fn rename(tx: &mut Transaction, row: &str, name: &str) -> Result<(), EditError>`**
+  rename a kept definition (its title too when it was its name); a row that is no
+  definition is refused (Invalid)
+
+- **`fn remove(tx: &mut Transaction, row: &str) -> Result<(), EditError>`**
+  remove a kept definition; the ones after it move up a row
 
 ### `diagram_io/src/stencil.rs`
 
@@ -74275,8 +75202,9 @@ anything else (Error::Net with NetErrorKind::Denied).
 *XLSX and CSV import: workbooks and delimited text as typed tables* -- crate root [`lib/sheet_io/src/lib.rs`](../lib/sheet_io/src/lib.rs)
 
 ```text
-sheet_io -- XLSX and CSV import: workbooks and delimited text as typed tables (JFDiagrammer JD18,
-FEATURES.md IM-05 / IM-10, decision F6: "CSV und .xlsx in P2 mit XLSX-Leser in JFLib")
+sheet_io -- XLSX and CSV import and export: workbooks and delimited text as typed tables
+(JFDiagrammer JD18, FEATURES.md IM-05 / IM-10, decision F6: "CSV und .xlsx in P2 mit XLSX-Leser
+in JFLib"; the writers JD19, EX-12 shape reports and EX-16 data export as CSV / .xlsx)
 
   xlsx::Workbook::open(bytes, Limits) -> Workbook     the workbook part, its relationships,
        the shared strings and the styles (which number formats are dates); not the sheets yet
@@ -74288,7 +75216,18 @@ FEATURES.md IM-05 / IM-10, decision F6: "CSV und .xlsx in P2 mit XLSX-Leser in J
   csv::read(bytes, &Options) -> Csv                    RFC 4180 and what Excel writes: the
        encoding (BOM, UTF-8, else Windows-1252) and the delimiter (; , TAB |) detected
   csv::to_table(&csv, header, infer) -> Table          with numbers, booleans and dates typed
+  xlsx::write(&BookOut, &WriteOptions) -> Vec<u8>      typed rows as a workbook Excel opens
+       without repair (xlsx_write.rs): shared strings, dates with Excel's number formats, a
+       bold and frozen header, column widths, a filter; Excel's limits as errors
+  csv::write(rows, &WriteOptions) / csv::write_table -> Vec<u8>   delimiter, line end,
+       encoding (UTF-8 with or without BOM, UTF-16, Windows-1252), decimal comma, a guard
+       against formula injection
   Value, CellError, CellRef / parse_ref / col_name, Area / parse_area, civil / serial
+
+What is written reads back with the readers here as it was written (the tests check it), with
+the exceptions each writer names: Excel's newer errors and dates it cannot show become texts,
+NaN and infinities #NUM!; CSV has no types at all.  Writing is deterministic (no time stamps,
+the same rows give the same bytes) and bounded (xlsx::WriteOptions, csv::WriteOptions::max_bytes).
 
 Why a crate of its own: one crate per foreign format family, like dxf, gltf and pdf.  Not
 doc_io: that is jfWord's document model, and every user of a spreadsheet reader would pull in
@@ -74448,6 +75387,9 @@ csv -- delimited text: RFC 4180 and what Excel writes
   decode(bytes) -> (String, Encoding)  a BOM decides; else valid UTF-8; else Windows-1252
   detect_delimiter(text) -> u8         ; , TAB or |
   to_table(&csv, header, infer) -> Table   numbers, booleans and dates typed on request
+  write(rows, &WriteOptions) / write_table(&table, &WriteOptions) -> Vec<u8>   the other way
+       (JD19, FEATURES.md EX-12 / EX-16): delimiter, line end, encoding, decimal separator,
+       an optional guard against formula injection; what is written reads back with read
 
 The grammar: a field in quotes may hold the delimiter, line breaks and "" for a quote; records
 end with CR LF, LF or CR; the last record may end without a line break, and a line break at
@@ -74556,6 +75498,63 @@ bytes of one field; nothing recurses.
   ```text
   `d.m.yyyy` (`23.11.2026`, `1.2.2026 14:05`) as `Value::Date`
   ```
+
+- **`enum LineEnd`**
+  How the lines of a CSV file written end.
+  - `CrLf` -- CR LF, as Excel writes and RFC 4180 says
+  - `Lf` -- LF, as Unix tools write
+
+- **`struct WriteOptions`**
+  How a CSV file is written (`write`, `write_table`).
+  - `delimiter: u8` -- `,` `;` TAB or `|`: the delimiters `detect_delimiter` finds again
+  - `line_end: LineEnd` -- the line end
+  - `encoding: Encoding` -- the encoding: UTF-8 with BOM by default (Excel reads UTF-8 without BOM in the ANSI code
+    page); UTF-16 is written with its BOM; Windows-1252 refuses a character it lacks
+    (`WriteError::Unmappable`) rather than writing `?` for it
+  - `decimal: u8` -- the decimal separator of numbers: `.`, or `,` as German Excel writes them (then the
+    delimiter cannot be `,`; `to_table` reads them back with `;`)
+  - `guard_formulas: bool` -- a text starting with `=` `+` `-` `@` TAB or CR gets a leading `'`, so a spreadsheet
+    opening the file does not run it as a formula (CSV injection).  Off by default: it
+    changes the data (every program but Excel shows the `'`, and Excel shows it too in a
+    cell read from CSV), so the application decides, by who opens the file.  Only texts:
+    a Number -5 stays -5.
+  - `max_bytes: usize` -- the most bytes of the file written (`WriteError::Limit("max_bytes")`)
+
+**`impl WriteOptions`**
+
+- **`const DEFAULT: WriteOptions = WriteOptions { delimiter: b',', line_end: LineEnd::CrLf, ...`**
+  `,`, CR LF, UTF-8 with BOM, `.` as the decimal separator, no formula guard, up to
+  `CsvLimits::DEFAULT.bytes` (what `read` takes by default).
+- **`const GERMAN: WriteOptions = WriteOptions { delimiter: b';', decimal: b',', ..WriteOpt ...`**
+  As German Excel opens a CSV file with a double click: `;` and a decimal comma; else
+  `DEFAULT`.
+
+- **`enum WriteError`**
+  Why a CSV file was not written.
+  - `Options` -- a delimiter other than `,` `;` TAB `|`, a decimal separator other than `.` and `,`, or
+    `,` as both
+  - `Unmappable { record: usize, field: usize, ch: char, }` -- a character the encoding (Windows-1252) does not have
+  - `Limit(&'static str)` -- over a limit: the name of the field of `WriteOptions`
+
+**`impl WriteError`**
+
+- **`fn text(&self) -> String`**
+  The error as a sentence in English.
+
+- **`fn write(rows: &[Vec<Value>], opts: &WriteOptions) -> Result<Vec<u8>, WriteError>`**
+  Write rows as a CSV file: one record a row (rows may differ in length), each ending with the
+  line end, the last one too.  Fields: a Number as the shortest text that reads back with the
+  decimal separator of the options, no thousands separators (-0 as 0); NaN and the infinities
+  as `#NUM!` (as in `xlsx::write`); a Date as ISO 8601 text (`Value::text`: `2026-11-24`,
+  `2026-11-24 14:05:30`, a time alone `14:05:30`, which `to_table` keeps as text); a Bool as
+  TRUE / FALSE; an Error as Excel writes it (`#N/A`); Empty as an empty field; a Text as it
+  is.  A field is quoted when it holds the delimiter, a quote, CR or LF, starts or ends with a
+  space or TAB, or is a first field `sep=...`; a quote in it is doubled.  CSV has no types:
+  `read` and `to_table` give a Text that looks like a number back as a Number.
+
+- **`fn write_table(table: &Table, opts: &WriteOptions) -> Result<Vec<u8>, WriteError>`**
+  Write a table as a CSV file: a header record of its column names (texts; none for a table
+  without columns), then its rows (see `write`).
 
 ### `sheet_io/src/xlsx.rs`
 
@@ -74731,3 +75730,133 @@ never read; a shared-string index out of range is Invalid.
 - **`fn sheet_table(&self, index: usize, header: bool) -> Result<Table, Error>`**
   The used range of a sheet as a Table (from the first to the last row and column that hold
   a value); an empty sheet gives an empty Table.
+
+### `sheet_io/src/xlsx_write.rs`
+
+Source: [`lib/sheet_io/src/xlsx_write.rs`](../lib/sheet_io/src/xlsx_write.rs)
+
+```text
+xlsx_write -- typed rows as an XLSX workbook (JFDiagrammer JD19, FEATURES.md EX-12 "Shape-Bericht
+exportieren ... als Excel-Tabelle (.xlsx)", EX-16 "Daten exportieren (Inventar)"); re-exported
+as sheet_io::xlsx::{write, BookOut, SheetOut, WriteOptions, WriteError}
+
+  xlsx::write(&BookOut, &WriteOptions) -> Vec<u8>     the workbook as an OPC package
+  BookOut { sheets }                                  the sheets in tab order, the first active
+  SheetOut { name, rows, header_rows, widths, autofilter }
+  SheetOut::new(name, rows) / SheetOut::from_table(name, &Table)  (the column names as a header
+                                                      row: bold, kept in view)
+
+Values, as xlsx::Workbook reads them back:
+  Number   the shortest text that reads back (-0 as 0).  NaN and the infinities, which Excel
+           cannot store, become the error #NUM! (what Excel shows for a number out of its
+           range) instead of refusing the whole workbook for one cell
+  Text     a shared string (equal texts stored once); "" is no cell.  The characters XML
+           cannot hold (controls but TAB and LF; U+FFFE, U+FFFF) and CR are Excel's escape
+           _xHHHH_, and a "_" that would read as the start of one (_x and four hex digits) is
+           _x005F_, so Excel and the reader give back the text as it was; white space at either
+           end is kept (xml:space="preserve")
+  Bool     t="b"
+  Error    t="e" for the seven errors of ECMA-376 (#NULL! #DIV/0! #VALUE! #REF! #NAME? #NUM!
+           #N/A).  Excel stores the newer ones (#SPILL!, #CALC!, #GETTING_DATA, ...) as #VALUE!
+           with rich-value metadata, so they are written as a text of the same letters
+  Date     a serial of Excel's 1900 date system: OLE dates from 1900-01-01 to 1900-02-28 one
+           day down (Excel counts a 1900-02-29 that never was; the reader moves them up again),
+           a time of day alone (0 to below 1) as it is.  The number format is the one Excel
+           picks when a date is typed in: the viewer's short date (built-in 14) without a time
+           part, short date and h:mm (22) with one (seconds stay in the value, unshown), h:mm:ss
+           (21) for a time alone.  A date Excel cannot show (before 1900-01-01, after
+           9999-12-31) is written as its text (Value::text); NaN and infinities as #NUM!
+  Empty    no cell
+No formula is ever written: a text starting with "=" stays a text, so a workbook written here
+carries no formula injection (csv::WriteOptions::guard_formulas is CSV's matter).
+
+Excel's limits are errors (WriteError), never a file Excel has to repair: values only up to
+row 1 048 576 and column XFD (Empty past them is fine), texts up to 32 767 characters (UTF-16
+units, as Excel counts them), sheet names of 1 to 31 characters without [ ] : * ? / \ and
+control characters, not starting or ending with ', not "History" (Excel's change history),
+unique case-insensitively; at least one sheet; column widths 0 to 255.  WriteOptions bounds the
+cells and the bytes of XML, checked cell by cell, so a caller bounds the memory writing takes,
+and sets the DEFLATE level (6; 1 is several times faster on large sheets).
+
+The package: [Content_Types].xml, _rels/.rels, xl/workbook.xml (bookViews, sheets, a hidden
+_xlnm._FilterDatabase name per filter, as Excel writes them), its relationships,
+xl/worksheets/sheetN.xml (dimension, sheetViews with a frozen pane below the header rows,
+sheetFormatPr, cols, sheetData, autoFilter, pageMargins), xl/styles.xml (fonts regular and
+bold, the fills none and gray125 Excel expects first, one border, the style xf, eight cell xfs:
+general, date, date and time, time, each regular and bold; the Normal cell style),
+xl/sharedStrings.xml when there are texts, docProps/core.xml (empty: no author, no time) and
+docProps/app.xml.  Children come in the order of the schema (ECMA-376 Part 1): Excel repairs
+a part whose elements come in another.  Deterministic: no time stamps, archive's fixed ZIP
+date: the same book and options give the same bytes.
+
+Column widths: a given one as it is; else from the longest line among the column's values (an
+East Asian wide character counts twice, a header cell a tenth more for bold) plus a margin,
+from Excel's default 8.43 up to 80.
+```
+
+```rust
+/// Excel's most characters in one cell (UTF-16 units, as Excel counts them)
+MAX_TEXT: usize = 32_767
+/// Excel's most characters of a sheet name (UTF-16 units)
+MAX_SHEET_NAME: usize = 31
+```
+
+- **`struct BookOut`**
+  A workbook to write: its sheets in tab order, the first one the active tab.
+  - `sheets: Vec<SheetOut>` -- the sheets, at least one
+
+- **`struct SheetOut`**
+  One worksheet to write.
+  - `name: String` -- the tab's name: 1 to 31 characters, none of `[ ] : * ? / \` and no control character, not
+    starting or ending with `'`, not "History", unlike the other sheets' names in any case
+  - `rows: Vec<Vec<Value>>` -- the rows from row 1 on, each from column A on; rows may differ in length, Empty (and an
+    empty Text) is no cell
+  - `header_rows: u32` -- how many of the first rows are a header: bold and kept in view (a frozen pane below them)
+  - `widths: Vec<Option<f64>>` -- column widths from column A on, in characters of the default font's digits as Excel
+    counts them (0 to 255; 0 hides the column); None, or no entry, estimates the width from
+    the column's values
+  - `autofilter: bool` -- filter buttons on the last header row over the columns that hold values (needs
+    `header_rows` of 1 or more)
+
+**`impl SheetOut`**
+
+- **`fn new(name: &str, rows: Vec<Vec<Value>>) -> SheetOut`**
+  A sheet of rows without header, filter or given widths.
+- **`fn from_table(name: &str, table: &Table) -> SheetOut`**
+  A table as a sheet: a header row of its column names (bold, kept in view), then its rows;
+  no filter (set `autofilter`), the widths estimated.
+
+- **`struct WriteOptions`**
+  How a workbook is written and what writing may take.  The default: DEFLATE level 6, ten
+  million cells, 1 GiB of XML.
+  - `level: u8` -- DEFLATE level 1 (fastest) to 9 (smallest), 0: stored; 6 by default, as diagram_io's
+    vsdx::write.  For a large sheet 1 is several times faster and the file about a sixth larger
+  - `cells: usize` -- cells with a value in all sheets together
+  - `bytes: usize` -- bytes of the XML of all parts together, before compression: with the rows given, what
+    bounds the memory writing takes (the compressed package comes on top)
+
+**`impl WriteOptions`**
+
+- **`const DEFAULT: WriteOptions = WriteOptions { level: 6, cells: 10_000_000, bytes: 1 << 30 }`**
+  The default (see `WriteOptions`).
+
+- **`enum WriteError`**
+  Why a workbook was not written.
+  - `NoSheets` -- a workbook without sheets (Excel needs one)
+  - `SheetName { sheet: usize, what: &'static str, }` -- a sheet's name Excel does not take (see `SheetOut::name`)
+  - `Sheet { sheet: usize, what: &'static str, }` -- a sheet's settings: header rows past Excel's last row, a filter without a header row, a
+    width outside 0 to 255, widths past column XFD
+  - `Cell { sheet: usize, at: CellRef, what: &'static str, }` -- a value Excel cannot hold where it stands: past row 1 048 576 or column XFD, a text over
+    32 767 characters
+  - `Limit(&'static str)` -- over a limit: the name of the field of `WriteOptions`
+  - `Package(opc::Error)` -- the package (archive::opc) refused what was built: never for a workbook that passed the
+    checks above
+
+**`impl WriteError`**
+
+- **`fn text(&self) -> String`**
+  The error as a sentence in English.
+
+- **`fn write(book: &BookOut, opts: &WriteOptions) -> Result<Vec<u8>, WriteError>`**
+  Write a workbook as XLSX (see the module's head for how values, dates and widths are written
+  and what Excel's limits are).  Deterministic: the same book gives the same bytes.

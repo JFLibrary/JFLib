@@ -1,0 +1,58 @@
+# Flaggen: Stange und rechteckige Flagge, die Farbe nach der Symbolnummer (grün, gelb, orange, rot, blau).
+# Datengrafik-Element Symbolsatz (JD19, DA-07): User.msvCalloutIconNumber (-1 keins, 0 bis 4) wählt
+# das Symbol (Visios Zelle; die App schreibt dort die aus den Regeln übersetzte Formel), NoShow
+# und NoFill der Geometrieabschnitte folgen ihr.  Die Farben sind die Bedeutung der Symbole und
+# deshalb fest (begründete Ausnahme der Stilregeln); Linie dunkelgrau.  Verborgener Master.
+master: DG Flags
+name.de: Flaggen
+name.en: Flags
+name.es: Banderas
+name.it: Bandiere
+name.fr: Drapeaux
+prompt.de: Datengrafik: Flagge in fünf Farben.
+prompt.en: Data graphic: flag in five colours.
+prompt.es: Gráfico de datos: bandera en cinco colores.
+prompt.it: Grafico dati: bandiera in cinque colori.
+prompt.fr: Graphique de données : drapeau en cinq couleurs.
+hidden: true
+
+[Shape]
+Width = 6 mm
+Width.us = 0.25 in
+Height = 6 mm
+Height.us = 0.25 in
+FillForegnd = IF(User.msvCalloutIconNumber=0,RGB(58,154,74),IF(User.msvCalloutIconNumber=1,RGB(230,180,34),IF(User.msvCalloutIconNumber=2,RGB(230,126,34),IF(User.msvCalloutIconNumber=3,RGB(200,60,60),RGB(50,110,180)))))
+FillPattern = 1
+LineColor = #404040
+LineWeight = 0.5 pt
+Rounding = 0 mm
+
+[User]
+msvCalloutType:  Value = "Icon Set"
+msvCalloutIconCount:  Value = 5
+msvCalloutIconNumber:  Value = 0
+
+[Property]
+msvCalloutField:  Type = 0; Value = ""; Prompt = "String"; SortKey = "Wert"
+        Label.de = Datenfeld
+        Label.en = Data field
+        Label.es = Campo de datos
+        Label.it = Campo dati
+        Label.fr = Champ de données
+
+# die Stange
+[Geometry]
+NoFill = TRUE
+NoShow = User.msvCalloutIconNumber<0
+MoveTo  X = Width*0.2; Y = 0
+LineTo  X = Width*0.2; Y = Height
+
+# die Flagge
+[Geometry]
+NoShow = User.msvCalloutIconNumber<0
+MoveTo  X = Width*0.2; Y = Height*0.5
+LineTo  X = Width*0.9; Y = Height*0.5
+LineTo  X = Width*0.9; Y = Height
+LineTo  X = Width*0.2; Y = Height
+LineTo  X = Width*0.2; Y = Height*0.5
+

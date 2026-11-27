@@ -93,6 +93,11 @@
 //                     close (UI-12); Öffnen schreibgeschützt and als Kopie (DM-09, UI-06, UI-05)
 //   src/dlg_shape_name.rs  (JD15) the dialog Shape-Name (SP-01)
 //   src/dlg_snap.rs   (JD15) the dialog Ausrichten und Kleben
+//   src/reports*.rs   (JD19) shape reports: reports (Überprüfen › Shape-Berichte, the dialog
+//                     Berichte, running a report as a table shape, .xlsx, .csv, .html; Bericht
+//                     aktualisieren), reports_wizard (Berichtsdefinition), reports_builtin (the
+//                     predefined reports), reports_export (Datei › Exportieren › Daten
+//                     exportieren, EX-16)
 //   src/data_*.rs     (JD18) external data: data_cmds (when the commands run), data_source
 //                     (reading .xlsx/.csv), data_import (Benutzerdefinierter Import), data_pane
 //                     (Externe Daten), data_refresh (aktualisieren, Intervall, Konflikte),
@@ -104,6 +109,12 @@
 //                     entfernen, Gruppe öffnen (an isolated view on the canvas), the ungroup
 //                     warning, Verhalten, SelectMode and the other group cells on the canvas;
 //                     Start › Bearbeiten › Shape ändern
+//   src/data_graphics*.rs  (JD19) data graphics (diagram_core::datagraphic, the callout masters of
+//                     stencils/datagraphics): data_graphics (the commands, the shapes and fields
+//                     they work on, changes in one undo step), data_graphics_gallery (Daten ›
+//                     Datengrafiken and Erweiterte Datengrafiken with rendered tiles),
+//                     data_graphics_pane (Datengrafikfelder), data_graphics_dlg (Datengrafik
+//                     bearbeiten, Element bearbeiten, Umbenennen)
 //   build.rs, build_steps.rs, stencils/   (JD9) the stencil sources and their build into .vssx
 //                     when the app is built (README there; build_rs.py's derived builds for the
 //                     browser and Android run build_steps.rs too); templates/ (JD13) the
@@ -170,6 +181,11 @@ mod tools_dim;
 // (JD18) data: the register Daten, the pane Externe Daten, import, link, refresh, drawing from text
 mod data_ask;
 mod data_cmds;
+// (JD19) data graphics: the gallery, the pane Datengrafikfelder, the dialogs, the legend
+mod data_graphics;
+mod data_graphics_dlg;
+mod data_graphics_gallery;
+mod data_graphics_pane;
 mod data_import;
 mod data_link;
 mod data_pane;
@@ -224,6 +240,11 @@ mod panes;
 mod print_layout;
 mod print_ui;
 mod qat;
+// (JD19) shape reports, Daten exportieren
+mod reports;
+mod reports_builtin;
+mod reports_export;
+mod reports_wizard;
 // (JD13) equipment snaps onto the units of a rack
 mod rack;
 mod ribbon;
@@ -394,6 +415,10 @@ pub(crate) struct Diagrammer {
     pub route: route_ui::RouteState,
     /// (JD21 glue) Kleben an: Shape-Ziehpunkte, Shape-Scheitelpunkte (glue_tools.rs)
     pub glue: glue_tools::GlueState,
+    /// (JD19) data graphics: the field chosen, the tiles, the dialogs
+    pub dg: data_graphics::DgState,
+    /// (JD19) the dialog Berichte, the wizard, running reports, Daten exportieren (reports*.rs)
+    pub reports: reports::ReportsState,
 }
 
 impl Diagrammer {
@@ -474,6 +499,8 @@ impl Diagrammer {
             groups: groups_cmds::GroupsState::default(),
             route: route_ui::RouteState::default(),
             glue: glue_tools::GlueState::default(),
+            dg: data_graphics::DgState::default(),
+            reports: reports::ReportsState::default(),
             page_views: alloc::vec::Vec::new(),
             view_page: None,
         }
@@ -624,6 +651,8 @@ impl App for Diagrammer {
         structures_cff::menu_states(self, ui);
         // (JD21 jumps) Verbinder-Verhalten in a connector's menu only
         jumps_ui::menu_states(self, ui);
+        // (JD19) Bericht aktualisieren in a report table's menu only (DA-13)
+        reports::menu_states(self, ui);
         ui.tooltips_set(self.opts.get(&options::TIPS) != 2);
         stencils_panel::states(self, ui);
         shell::frame(self, ui);
@@ -671,6 +700,10 @@ impl App for Diagrammer {
         addons::dialogs(self, ui);
         // (JD21 groups) the ungroup warning, Verhalten
         groups_cmds::dialogs(self, ui);
+        // (JD19) Datengrafik bearbeiten, Element bearbeiten, Umbenennen
+        data_graphics_dlg::dialogs(self, ui);
+        // (JD19) Berichte, the wizard, Bericht ausführen, Daten exportieren
+        reports::dialog(self, ui);
     }
 
     fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {

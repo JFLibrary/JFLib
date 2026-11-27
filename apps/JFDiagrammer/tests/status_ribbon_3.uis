@@ -68,7 +68,7 @@ expect text:"Zeichnung2 – JFDiagrammer" exists
 expect tab:"Start" selected
 # RK-03: Bahn makes a cross-functional flowchart; the check boxes of its register
 cmd 5424
-click #107
+click #108
 expect checkbox:"Titelleiste anzeigen" checked
 expect checkbox:"Trennlinien anzeigen" checked
 click checkbox:"Trennlinien anzeigen"

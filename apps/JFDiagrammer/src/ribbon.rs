@@ -1,4 +1,5 @@
-// ribbon -- the registers of the ribbon: Start, Einfügen, Entwurf, (JD18) Daten, Ansicht with
+// ribbon -- the registers of the ribbon: Start, Einfügen, Entwurf, (JD18) Daten, (JD19)
+// Überprüfen, Ansicht with
 // every P1 command of FEATURES.md 3.3-3.9, the context registers Container-Tools › Format (RK-01)
 // and Textwerkzeuge › Text (RK-11), and (JD10) Funktionsübergreifendes Flussdiagramm (RK-03)
 // while the page holds one; (JD21) Ansicht › Add-Ons, Container-Tools' styles and Einfügen ›
@@ -48,6 +49,8 @@ pub(crate) enum Reg {
     Text,
     /// (JD10) the cross-functional flowchart's register
     Cff,
+    /// (JD19) Überprüfen, between Daten and Ansicht (last here: the other registers keep their ids)
+    Review,
 }
 
 // the registers' labels (German, translated where drawn)
@@ -58,6 +61,7 @@ const L_INSERT: &str = "Einfügen";
 const L_DESIGN: &str = "Entwurf";
 const L_VIEW: &str = "Ansicht";
 const L_DATA: &str = "Daten";
+const L_REVIEW: &str = "Überprüfen";
 const L_CONTAINER_SET: &str = "Container-Tools";
 const L_CONTAINER: &str = "Format|Register";
 const L_TEXT_SET: &str = "Textwerkzeuge";
@@ -66,7 +70,7 @@ const L_CFF: &str = "Funktionsübergreifendes Flussdiagramm";
 
 /// the registers shown now (the File register first)
 pub(crate) fn tabs(app: &Diagrammer) -> Vec<Reg> {
-    let mut v = alloc::vec![Reg::File, Reg::Start, Reg::Insert, Reg::Design, Reg::Data, Reg::View];
+    let mut v = alloc::vec![Reg::File, Reg::Start, Reg::Insert, Reg::Design, Reg::Data, Reg::Review, Reg::View];
     // (JD13, VL-04) also when the drawing's template brought the register
     if crate::structures::has_cff(app) || crate::templates::has_register(app, "cff") {
         v.push(Reg::Cff);
@@ -88,6 +92,7 @@ pub(crate) fn tab_descs(ui: &Ui, regs: &[Reg]) -> Vec<RibbonTab<'static>> {
             Reg::Insert => RibbonTab::new(t(L_INSERT)),
             Reg::Design => RibbonTab::new(t(L_DESIGN)),
             Reg::Data => RibbonTab::new(t(L_DATA)),
+            Reg::Review => RibbonTab::new(t(L_REVIEW)),
             Reg::View => RibbonTab::new(t(L_VIEW)),
             Reg::Container => RibbonTab::context(tc(L_CONTAINER), t(L_CONTAINER_SET), ui.color(T_OK)),
             Reg::Text => RibbonTab::context(tc(L_TEXT), t(L_TEXT_SET), ui.color(T_WARN)),
@@ -266,15 +271,27 @@ static RELAYOUT_MENU: [It; 19] = [
     C(LAYOUT_MORE),
 ];
 
-// (JD18) Daten, as Visio's register (FEATURES 3.7); the data graphics wait for JD19
+// (JD18) Daten, as Visio's register (FEATURES 3.7); (JD19) the data graphics: the gallery,
+// Position ▾, Legende einfügen ▾, Erweiterte Datengrafiken ▾ (data_graphics*.rs)
 static REFRESH_MENU: [It; 4] = [C(DATA_REFRESH_ALL), C(DATA_REFRESH), Sep, C(DATA_AUTO_LINK_REFRESH)];
+// i18n
+static DG_POS_MENU: [It; 2] = [Sub("Horizontal", &[C(DG_POS_H0), C(DG_POS_H1), C(DG_POS_H2), C(DG_POS_H3), C(DG_POS_H4), C(DG_POS_H5), C(DG_POS_H6)]), Sub("Vertikal", &[C(DG_POS_V6), C(DG_POS_V5), C(DG_POS_V4), C(DG_POS_V3), C(DG_POS_V2), C(DG_POS_V1), C(DG_POS_V0)])];
+static LEGEND_MENU: [It; 2] = [C(DG_LEGEND_H), C(DG_LEGEND_V)];
+static ADVANCED_DG_MENU: [It; 8] = [C(DG_NONE), Sep, C(DG_NEW), C(DG_EDIT_GRAPHIC), C(DG_RENAME), C(DG_DUPLICATE), C(DG_DELETE), C(DG_SELECT_SHAPES)];
 // i18n
 static DATA: [Group; 5] = [
     Group("Externe Daten", 0, &[Col::Big(DATA_QUICK_IMPORT), Col::Big(DATA_CUSTOM_IMPORT), Col::BigSplit(DATA_REFRESH_ALL, &REFRESH_MENU), Col::Big(DATA_TEXT_DRAWING)]),
-    Group("Datengrafiken", 0, &[Col::Big(DATA_GRAPHICS), Col::Small(&[Sm::Btn(DG_POSITION), Sm::Btn(DG_CONFIGURE), Sm::Btn(DG_AUTO_SPACE)])]),
-    Group("Daten anzeigen", 0, &[Col::Big(DATA_LEGEND)]),
+    Group("Datengrafiken", 0, &[Col::Gallery(DATA_GRAPHICS, 5, 0), Col::Small(&[Sm::Menu(DG_POSITION, &DG_POS_MENU), Sm::Btn(DG_CONFIGURE), Sm::Btn(DG_AUTO_SPACE)])]),
+    Group("Daten anzeigen", 0, &[Col::BigMenu(DATA_LEGEND, &LEGEND_MENU)]),
     Group("Einblenden/Ausblenden", 0, &[Col::Small(&[Sm::Check(PANE_SHAPE_DATA_WINDOW), Sm::Check(PANE_EXTERNAL_DATA), Sm::Check(PANE_DG_FIELDS)])]),
-    Group("Erweiterte Datenverknüpfung", 0, &[Col::Small(&[Sm::Btn(DATA_LINK), Sm::Btn(DATA_ADVANCED_DG)])]),
+    Group("Erweiterte Datenverknüpfung", 0, &[Col::Small(&[Sm::Btn(DATA_LINK), Sm::Menu(DATA_ADVANCED_DG, &ADVANCED_DG_MENU)])]),
+];
+
+// (JD19) Überprüfen as Visio's (A 185624): Kommentare (JD20), Berichte (RU-06)
+// i18n
+static REVIEW: [Group; 2] = [
+    Group("Kommentare", 0, &[Col::Big(COMMENT_NEW)]),
+    Group("Berichte", 0, &[Col::Big(REPORTS)]),
 ];
 
 // i18n
@@ -343,6 +360,7 @@ fn groups(reg: Reg) -> &'static [Group] {
         Reg::Insert => &INSERT,
         Reg::Design => &DESIGN,
         Reg::Data => &DATA,
+        Reg::Review => &REVIEW,
         Reg::View => &VIEW,
         Reg::Container => &CONTAINER_FORMAT,
         Reg::Text => &TEXT_TOOLS,
@@ -351,7 +369,7 @@ fn groups(reg: Reg) -> &'static [Group] {
 }
 
 // (JD8 rest) the registers with their own ribbon, in the row's order
-const RIBBONS: [Reg; 8] = [Reg::Start, Reg::Insert, Reg::Design, Reg::Data, Reg::View, Reg::Cff, Reg::Container, Reg::Text];
+const RIBBONS: [Reg; 9] = [Reg::Start, Reg::Insert, Reg::Design, Reg::Data, Reg::Review, Reg::View, Reg::Cff, Reg::Container, Reg::Text];
 
 // the menu of the button whose command is `id`: its register, its popup id, its rows
 fn menu_of(id: u32) -> Option<(Reg, u32, &'static [It])> {
@@ -387,6 +405,10 @@ pub(crate) fn menu_place(id: u32) -> Option<(Reg, u32)> {
     // (JD21 tools) Containerformatvorlagen: the gallery's list of all styles
     if id == CT_STYLES {
         return Some((Reg::Container, container_styles::ID_ALL));
+    }
+    // (JD19) Daten › Datengrafiken: the gallery's flyout with every style
+    if id == DATA_GRAPHICS {
+        return Some((Reg::Data, crate::data_graphics_gallery::ID_ALL));
     }
     menu_of(id).map(|(reg, pid, _)| (reg, pid))
 }
@@ -573,6 +595,11 @@ fn column(app: &mut Diagrammer, ui: &mut Ui, col: &Col, width: i32, tiles: u32, 
             ui.next_size(width, CONTENT_H);
             container_styles::gallery(app, ui, CONTENT_H);
         }
+        // (JD19) the data graphics' gallery
+        Col::Gallery(DATA_GRAPHICS, ..) => {
+            ui.next_size(width, CONTENT_H);
+            crate::data_graphics_gallery::gallery(app, ui, CONTENT_H);
+        }
         Col::Gallery(id, n, color) => {
             ui.next_size(width, CONTENT_H);
             ui.box_begin(0, BOX_H | BOX_FIXED, 2);
@@ -680,6 +707,10 @@ fn menu(app: &mut Diagrammer, ui: &mut Ui, pid: u32, items: &[It]) {
     }
     // (JD21 groups) Shape ändern's gallery
     if crate::change_shape::flyout(app, ui, pid) {
+        return;
+    }
+    // (JD19) Erweiterte Datengrafiken: the document's graphics as tiles above the rows
+    if crate::data_graphics_gallery::flyout(app, ui, pid) {
         return;
     }
     if ui.flyout_begin(pid, 0) {
