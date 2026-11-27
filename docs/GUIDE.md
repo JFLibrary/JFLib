@@ -1694,7 +1694,7 @@ ui.dialog_end(); // always
 * **Images** (`img_core::io`): the runtime registers PNG, JPEG, BMP, GIF and SVG (`.svg`,
   `.svgz`: drawn at their intrinsic size, section 31) at start-up and connects the file
   functions. For every other format call `img_all::use_all_codecs()` once in `App::init`
-  (TIFF, TGA, WebP, AVIF, HEIC, JPEG XL, JPEG XR, DDS, PDN, PSD).
+  (TIFF, TGA, WebP, AVIF, HEIC, JPEG XL, JPEG XR, JPEG 2000, DDS, PDN, PSD).
 
   ```rust
   match img_core::io::load_ex(path, None, None) {   // any registered format -> FMT_PARGB
@@ -2817,8 +2817,30 @@ crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)
   The chain check honours name constraints for wildcards by the names they stand for and the
   extended key usage of every CA on the path (a CA for client certificates certifies no server).
   `Trust::System(extra)` connects to public servers: TLS 1.3 or TLS 1.2 with ECDHE, the chain built and checked
-  against the system's authorities (Windows CryptoAPI, Linux CA bundle) and extra CAs;
+  by the system (Windows CryptoAPI and macOS / iOS's Security framework, with the stapled OCSP
+  response; Linux against the distribution's CA bundle, or `SSL_CERT_FILE` / `SSL_CERT_DIR`),
+  then the leaf by netio once more (`x509::check_leaf`); the system checks the extra CAs (a
+  company CA) under its own policy (Linux where the bundle gives no path), and a refusal names
+  its reason (expired, revoked, another name, unknown CA; `netio::roots::verify_system`
+  answers it as `roots::Reason`);
   `netio::trust::system_connector(extra)` gives the connector for `Client`.
+  OCSP stapling: `ServerConfig::ocsp` (`Arc<tls::Staples>`, kept current by
+  `netio::ocsp::refresh(&staples, &client, &chain, issuer)`, which says when to call it again)
+  staples the CA's response; a client checking against CAs asks for one
+  (`ClientConfig::revocation`: `Stapled` by default refuses a certificate the response calls
+  revoked, `Required` one without a good response, `Off`); a must-staple certificate (RFC 7633)
+  needs one. `x509::ocsp` checks and builds responses, `x509::CsrBuilder` / `Csr` write and read
+  certificate requests.
+* `netio::acme` -- certificates from Let's Encrypt or another ACME CA (RFC 8555):
+  `Acme::new(client, acme::LETS_ENCRYPT)`, `acme.account(key, &NewAccount { terms_agreed: true,
+  .. })`, `account.issue(&[Identifier::parse("example.org")], &cert_key, &mut solver,
+  &OrderOptions::default())` -> the chain (`Issued::identity(&cert_key)` for `ServerConfig`, or
+  `select` for one renewed while the server runs). Solvers: `acme::Http01` (its `handler(site)`
+  on port 80), `acme::TlsAlpn01` (`setup(&mut tls_cfg)` on port 443), dns-01 by the program's own
+  `Solver` for its DNS provider (`dns01_name`, `dns01_value`; wildcards need it), `Solvers` to
+  combine. When to renew: `acme.renewal_info(&cert)` (ARI), the new order with
+  `OrderOptions::replaces: acme::ari_id(&cert)`. Keep the account key (`PrivateKey::to_pkcs8`);
+  test against `acme::LETS_ENCRYPT_STAGING` first, Let's Encrypt's rate limits are strict.
 * `netio::smtp::send(&SmtpConfig, &Mail)` -- e-mail (STARTTLS, TLS, or plain to any server
   with `Security::None`, e.g. a relay on port 25 inside a network; AUTH PLAIN / LOGIN only over
   TLS, a plain connection with a user name is refused; text and HTML parts, RFC 2047 subjects).
@@ -6044,13 +6066,16 @@ for p in ui.gamepads() {
 | Platform | How | Which pads |
 | --- | --- | --- |
 | Windows | XInput (`xinput1_4.dll`, else `xinput9_1_0.dll`; the guide button through `XInputGetStateEx`), polled every 4 ms while a pad is connected, an empty slot every 250 ms | Xbox-compatible pads, at most four (`index` = XInput's slot) |
-| Linux | evdev: the `/dev/input/event*` nodes with a game pad's buttons the user may read, inotify for new ones; inside a Flatpak with `--device=input` | Xbox (xpad), PlayStation (hid-playstation, hid-sony), Nintendo, simple HID pads |
+| Linux | evdev: the `/dev/input/event*` nodes with a game pad's buttons the user may read, inotify for new ones; inside a Flatpak with `--device=input` (from the manifest's `gamepad`) | Xbox (xpad), PlayStation (hid-playstation, hid-sony), Nintendo, simple HID pads |
 | macOS | GameController: `GCController`'s `extendedGamepad`, its connect and disconnect notifications | Xbox, PlayStation, Switch Pro, MFi pads |
 | Browser | the Gamepad API, polled by the page every animation frame; a pad appears only after one of its buttons was pressed in the page | pads with the "standard" mapping; others come with `mapped` false, their buttons as the browser numbers them |
 | Android, iOS | none yet (touch controls come later): `ui.gamepads_watching()` says false | – |
 
 Pads speak only to the app that has the focus, as the keyboard does: while none of its windows is
-active every pad reports nothing held. They need no line in `PERMISSIONS`. Rumble is not built. A game
+active every pad reports nothing held. An app with a `PERMISSIONS` file needs the line `gamepad`
+(else `ui.gamepads` stays empty and stderr says `PERMDENY gamepad`; `ask gamepad` asks at the first
+call, watching starts in the frame after a yes); the pads of a test script need nothing
+([PERMISSIONS.md](PERMISSIONS.md)). Rumble is not built. A game
 without `ui` has the same at the platform's level: `plat::pad_watch(true)`, `plat::pads()` once a
 frame (it takes the edges) and the event `E_GAMEPAD`. `lib/game`'s input actions take pads as sources
 with a radial dead zone, looking at a turn rate with a curve, and pad play without the pointer lock

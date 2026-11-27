@@ -287,6 +287,7 @@ dependencies = [
  "jflib-img-gif",
  "jflib-img-heif",
  "jflib-img-hevc",
+ "jflib-img-jp2",
  "jflib-img-jpeg",
  "jflib-img-jxl",
  "jflib-img-jxl-enc",
@@ -691,6 +692,7 @@ dependencies = [
  "jflib-img-gif",
  "jflib-img-heif",
  "jflib-img-hevc",
+ "jflib-img-jp2",
  "jflib-img-jpeg",
  "jflib-img-jxl",
  "jflib-img-jxl-enc",
@@ -987,6 +989,7 @@ dependencies = [
  "jflib-img-dds",
  "jflib-img-gif",
  "jflib-img-heif",
+ "jflib-img-jp2",
  "jflib-img-jpeg",
  "jflib-img-jxl",
  "jflib-img-jxr",
@@ -1088,6 +1091,15 @@ dependencies = [
  "jflib-plat",
  "jflib-rt",
  "jflib-simd",
+]
+
+[[package]]
+name = "jflib-img-jp2"
+version = "0.2.1"
+dependencies = [
+ "jflib-gfx",
+ "jflib-img-core",
+ "jflib-rt",
 ]
 
 [[package]]
@@ -1253,8 +1265,8 @@ dependencies = [
 name = "jflib-netio"
 version = "0.2.1"
 dependencies = [
- "jflib-agent-core",
  "jflib-crypto",
+ "jflib-formats",
  "jflib-plat",
  "jflib-rt",
  "jflib-x509",
@@ -1276,6 +1288,7 @@ dependencies = [
  "jflib-crypto",
  "jflib-gfx",
  "jflib-img-core",
+ "jflib-img-jp2",
  "jflib-img-jpeg",
  "jflib-plat",
  "jflib-rt",
@@ -1493,7 +1506,7 @@ dependencies = [
 [[package]]
 name = "jfscript"
 version = "0.1.0"
-source = "git+https://github.com/JFLibrary/JFScript#3565e7f63db4bb3cd562ac5f6831b8a285585e75"
+source = "git+https://github.com/JFLibrary/JFScript#a21a0c3e2aeb4b0351dc222fcabfb882380c90f0"
 dependencies = [
  "jflib-agent-core",
 ]

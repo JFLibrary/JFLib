@@ -579,10 +579,26 @@ fn mode_tickets() -> (Option<Arc<tls::Tickets>>, u32) {
     (on.then(|| Arc::new(tls::Tickets::new())), early)
 }
 
-/// --tls-serve PORT [--mtls] [--tickets [--early N]]: answer one HTTPS request per connection
-/// (for curl / openssl)
+/// --ocsp FILE: the OCSP response (DER) the --tls-serve server staples for its certificate
+fn mode_ocsp(p: &Pki) -> Result<Option<Arc<tls::Staples>>, String> {
+    let Some(f) = plat::arg_value("--ocsp") else { return Ok(None) };
+    let der = plat::read_file(&f).ok_or_else(|| format!("cannot read {}", f))?;
+    let st = Arc::new(tls::Staples::new());
+    st.set(&p.server.chain, Some(&p.ca), der)?;
+    Ok(Some(st))
+}
+
+/// --tls-serve PORT [--mtls] [--tickets [--early N]] [--ocsp FILE]: answer one HTTPS request per
+/// connection (for curl / openssl)
 pub fn serve(port: u16, mtls: bool) -> i32 {
     let p = mode_pki();
+    let ocsp = match mode_ocsp(&p) {
+        Ok(o) => o,
+        Err(e) => {
+            plat::write_stderr(format!("--ocsp: {}\n", e).as_bytes());
+            return 1;
+        }
+    };
     // --mtls-optional: a client certificate asked for, not required
     let optional = plat::args().iter().any(|a| a == "--mtls-optional");
     let client_auth = if mtls || optional { Some(Trust::Anchors(alloc::vec![p.ca.clone()])) } else { None };
@@ -594,6 +610,7 @@ pub fn serve(port: u16, mtls: bool) -> i32 {
         identities: mode_more(),
         tickets,
         early_data,
+        ocsp,
         ..ServerConfig::new(p.server.clone())
     };
     // the answer names the client certificate and a resumption: "JFLib tls ok agent-1 resumed"
@@ -656,20 +673,30 @@ pub fn echo(port: u16) -> i32 {
     1
 }
 
-/// --tls-get HOST PORT [--mtls] [--resume N [--early]]: one HTTPS GET against an OpenSSL
-/// server -> the body on stdout.  --resume N: N connections one after another, sharing their
-/// tickets, each body after a line "--- connection I: resumed R, early E" (E: the bytes of the
-/// request the server took as 0-RTT); --early sends the request as 0-RTT when a ticket allows
+/// --tls-get HOST PORT [--mtls] [--resume N [--early]] [--revocation off|stapled|required]
+/// [--web] [--show-ocsp]: one HTTPS GET against an OpenSSL server -> the body on stdout.
+/// --resume N: N connections one after another, sharing their tickets, each body after a line
+/// "--- connection I: resumed R, early E" (E: the bytes of the request the server took as
+/// 0-RTT); --early sends the request as 0-RTT when a ticket allows.  --web: Trust::System with
+/// the CA (TLS 1.2 too); --show-ocsp: a line "--- ocsp: N bytes stapled" (0: none)
 pub fn get(host: &str, port: u16, mtls: bool) -> i32 {
     let p = mode_pki();
     let runs: usize = plat::arg_value("--resume").and_then(|n| n.parse().ok()).unwrap_or(0);
     let early = plat::args().iter().any(|a| a == "--early");
+    let show_ocsp = plat::args().iter().any(|a| a == "--show-ocsp");
     let sessions = (runs > 0).then(|| Arc::new(tls::Sessions::default()));
+    let revocation = match plat::arg_value("--revocation").as_deref() {
+        Some("off") => tls::Revocation::Off,
+        Some("required") => tls::Revocation::Required,
+        _ => tls::Revocation::Stapled,
+    };
+    let trust = if plat::args().iter().any(|a| a == "--web") { Trust::System(alloc::vec![p.ca.clone()]) } else { Trust::Anchors(alloc::vec![p.ca.clone()]) };
     let cfg = ClientConfig {
         identity: if mtls { Some(p.client.clone()) } else { None },
         alpn: mode_alpn(),
         sessions,
-        ..ClientConfig::new(Trust::Anchors(alloc::vec![p.ca.clone()]), host)
+        revocation,
+        ..ClientConfig::new(trust, host)
     };
     let req = format!("GET / HTTP/1.0\r\nHost: {}\r\n\r\n", host);
     for i in 0..runs.max(1) {
@@ -691,6 +718,9 @@ pub fn get(host: &str, port: u16, mtls: bool) -> i32 {
                 s.shutdown();
                 if runs > 0 {
                     plat::write_stdout(format!("--- connection {}: resumed {}, early {}\n", i + 1, s.resumed(), taken).as_bytes());
+                }
+                if show_ocsp {
+                    plat::write_stdout(format!("--- ocsp: {} bytes stapled, {}\n", s.ocsp_response().map_or(0, |o| o.len()), s.version().0).as_bytes());
                 }
                 plat::write_stdout(&out);
             }
@@ -744,20 +774,25 @@ pub fn web(url: &str, ca: Option<&str>) -> i32 {
         .map(|b| netio::pem::decode_all(&String::from_utf8_lossy(&b), "CERTIFICATE").iter().filter_map(|d| netio::x509::Cert::parse(d)).collect())
         .unwrap_or_default();
     let Some(u) = netio::Url::parse(url) else { return 2 };
-    let seen: Arc<plat::sync::Mutex<(&'static str, u16, u16)>> = Arc::new(plat::sync::Mutex::new(("", 0, 0)));
+    let seen: Arc<plat::sync::Mutex<(&'static str, u16, u16, usize)>> = Arc::new(plat::sync::Mutex::new(("", 0, 0, 0)));
     let s2 = seen.clone();
+    // --revocation required: a stapled OCSP response must be there and say good
+    let required = plat::arg_value("--revocation").as_deref() == Some("required");
     let connector: netio::client::Connector = Arc::new(move |url: &netio::Url, tcp: TcpStream| {
-        let cfg = ClientConfig::new(Trust::System(extra.clone()), &url.host);
+        let mut cfg = ClientConfig::new(Trust::System(extra.clone()), &url.host);
+        if required {
+            cfg.revocation = tls::Revocation::Required;
+        }
         let s = tls::connect(Box::new(tcp), cfg).map_err(|e| netio::HttpError::Tls(format!("{}", e)))?;
         let (v, suite) = s.version();
-        *s2.lock() = (v, suite, s.group());
+        *s2.lock() = (v, suite, s.group(), s.ocsp_response().map_or(0, |o| o.len()));
         Ok(Box::new(s) as Box<dyn Stream>)
     });
     let c = netio::Client::new().with_connector(connector);
     match c.get(&u, &netio::http::Headers::new()) {
         Ok(r) => {
-            let (v, suite, group) = *seen.lock();
-            plat::write_stdout(format!("{} 0x{:04X} {} {} group 0x{:04X}\n", v, suite, r.status, r.body_bytes().len(), group).as_bytes());
+            let (v, suite, group, staple) = *seen.lock();
+            plat::write_stdout(format!("{} 0x{:04X} {} {} group 0x{:04X} ocsp {}\n", v, suite, r.status, r.body_bytes().len(), group, staple).as_bytes());
             0
         }
         Err(e) => {

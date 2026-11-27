@@ -73,7 +73,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: windows, input, files, threads, network, processes, desktop services
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [web_net.rs](#platweb_netrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [pid.rs](#platpidrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [apple_power_ios.rs](#platapple_power_iosrs) · [share.rs](#platsharers) · [win_share.rs (Windows)](#platwin_sharers-windows) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_plock.rs (Windows)](#platwin_plockrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_pad.rs (Windows)](#platwin_padrs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_pad.rs (Linux)](#platlinux_padrs-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_share.rs (Apple)](#platapple_ios_sharers-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_ios_pad.rs (Apple)](#platapple_ios_padrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_pad.rs (Apple)](#platapple_mac_padrs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_share.rs (Apple)](#platapple_mac_sharers-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [android_thread.rs](#platandroid_threadrs) · [clipdrop.rs](#platclipdroprs) · [fuzz.rs](#platfuzzrs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [keycode.rs](#platkeycoders) · [plock.rs](#platplockrs) · [pad.rs](#platpadrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [web_net.rs](#platweb_netrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [pid.rs](#platpidrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [apple_power_ios.rs](#platapple_power_iosrs) · [scan.rs](#platscanrs) · [share.rs](#platsharers) · [win_share.rs (Windows)](#platwin_sharers-windows) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_plock.rs (Windows)](#platwin_plockrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_pad.rs (Windows)](#platwin_padrs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_pad.rs (Linux)](#platlinux_padrs-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_share.rs (Apple)](#platapple_ios_sharers-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_ios_pad.rs (Apple)](#platapple_ios_padrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_pad.rs (Apple)](#platapple_mac_padrs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_scan.rs (Apple)](#platapple_mac_scanrs-apple) · [apple_mac_screen.rs (Apple)](#platapple_mac_screenrs-apple) · [apple_mac_share.rs (Apple)](#platapple_mac_sharers-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [android_thread.rs](#platandroid_threadrs) · [clipdrop.rs](#platclipdroprs) · [fuzz.rs](#platfuzzrs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [keycode.rs](#platkeycoders) · [plock.rs](#platplockrs) · [pad.rs](#platpadrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [formats](#formats) -- bounded JSON with exact numbers, typed JSON records, an XML subset, the text encodings of the web
@@ -83,13 +83,13 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [crypto](#crypto) -- hashes, MACs, KDFs, Argon2id, AEAD, X25519, Ed25519, sealed boxes (no randomness inside)
   <br>[lib.rs](#crypto-crate-root) · [aead.rs](#cryptoaeadrs) · [aes.rs](#cryptoaesrs) · [argon2.rs](#cryptoargon2rs) · [b64.rs](#cryptob64rs) · [blake2b.rs](#cryptoblake2brs) · [blake3.rs](#cryptoblake3rs) · [bn.rs](#cryptobnrs) · [chacha.rs](#cryptochachars) · [ecdsa.rs](#cryptoecdsars) · [ed25519.rs](#cryptoed25519rs) · [gcm.rs](#cryptogcmrs) · [hmac.rs](#cryptohmacrs) · [p256.rs](#cryptop256rs) · [p384.rs](#cryptop384rs) · [poly1305.rs](#cryptopoly1305rs) · [rsa.rs](#cryptorsars) · [sealbox.rs](#cryptosealboxrs) · [sha2.rs](#cryptosha2rs) · [sha3.rs](#cryptosha3rs) · [x25519.rs](#cryptox25519rs) · [sha1.rs](#cryptosha1rs) · [keywrap.rs](#cryptokeywraprs) · [cmac.rs](#cryptocmacrs) · [md5.rs](#cryptomd5rs) · [mlkem.rs](#cryptomlkemrs) · [eappwd.rs](#cryptoeappwdrs)
 - [x509](#x509) -- X.509 certificates: strict parsing, path validation with name constraints, a private Ed25519 CA's builder, the DER reader and writer (netio::x509 and netpkt::x509 are this crate)
-  <br>[lib.rs](#x509-crate-root) · [der.rs](#x509derrs) · [ip.rs](#x509iprs) · [key.rs](#x509keyrs)
+  <br>[lib.rs](#x509-crate-root) · [csr.rs](#x509csrrs) · [der.rs](#x509derrs) · [ip.rs](#x509iprs) · [key.rs](#x509keyrs) · [ocsp.rs](#x509ocsprs)
 - [compress](#compress) -- DEFLATE, zlib, gzip, Brotli, LZ4, Zstandard, CRC-32, Adler-32 and xxHash, codec ids
   <br>[lib.rs](#compress-crate-root) · [brotli/mod.rs](#compressbrotlimodrs) · [brotli/enc.rs](#compressbrotliencrs) · [brotli/sdec.rs](#compressbrotlisdecrs) · [brotli/senc.rs](#compressbrotlisencrs) · [checksum.rs](#compresschecksumrs) · [deflate/mod.rs](#compressdeflatemodrs) · [deflate/dec.rs](#compressdeflatedecrs) · [deflate/enc.rs](#compressdeflateencrs) · [deflate/sdec.rs](#compressdeflatesdecrs) · [gzip.rs](#compressgziprs) · [lz4.rs](#compresslz4rs) · [stream.rs](#compressstreamrs) · [xxh.rs](#compressxxhrs) · [zlib.rs](#compresszlibrs) · [zstd/mod.rs](#compresszstdmodrs) · [zstd/dec.rs](#compresszstddecrs) · [zstd/dict.rs](#compresszstddictrs) · [zstd/enc.rs](#compresszstdencrs) · [zstd/sdec.rs](#compresszstdsdecrs) · [zstd/senc.rs](#compresszstdsencrs)
 - [datastore](#datastore) -- an embedded journal database: JSON collections, transactions, snapshots, crash recovery, secondary indexes, encryption at rest
   <br>[lib.rs](#datastore-crate-root) · [index.rs](#datastoreindexrs) · [journal.rs](#datastorejournalrs)
 - [netio](#netio) -- HTTP/1.1 server and client, TLS 1.3 subset, X.509 of a private CA, SSH-2, DNS
-  <br>[lib.rs](#netio-crate-root) · [client.rs](#netioclientrs) · [dns.rs](#netiodnsrs) · [http.rs](#netiohttprs) · [pem.rs](#netiopemrs) · [roots.rs](#netiorootsrs) · [server.rs](#netioserverrs) · [smtp.rs](#netiosmtprs) · [ssh.rs](#netiosshrs) · [tls/mod.rs](#netiotlsmodrs) · [tls/conn.rs](#netiotlsconnrs) · [tls/keysched.rs](#netiotlskeyschedrs) · [tls/kx.rs](#netiotlskxrs) · [tls/record.rs](#netiotlsrecordrs) · [tls/session.rs](#netiotlssessionrs) · [trust.rs](#netiotrustrs) · [url.rs](#netiourlrs) · [ws.rs](#netiowsrs)
+  <br>[lib.rs](#netio-crate-root) · [acme.rs](#netioacmers) · [client.rs](#netioclientrs) · [dns.rs](#netiodnsrs) · [http.rs](#netiohttprs) · [ocsp.rs](#netioocsprs) · [pem.rs](#netiopemrs) · [roots.rs](#netiorootsrs) · [server.rs](#netioserverrs) · [smtp.rs](#netiosmtprs) · [ssh.rs](#netiosshrs) · [tls/mod.rs](#netiotlsmodrs) · [tls/conn.rs](#netiotlsconnrs) · [tls/keysched.rs](#netiotlskeyschedrs) · [tls/kx.rs](#netiotlskxrs) · [tls/record.rs](#netiotlsrecordrs) · [tls/session.rs](#netiotlssessionrs) · [tls/staple.rs](#netiotlsstaplers) · [trust.rs](#netiotrustrs) · [url.rs](#netiourlrs) · [ws.rs](#netiowsrs)
 - [netpkt](#netpkt) -- network packets byte for byte: addresses, checksums, Ethernet to TCP codecs, DHCP, DNS, NTP, syslog, SNMP, SSH, TLS 1.3, EAP and IMAP without I/O, X.509, cookies, URI references, a dissector, pcapng
   <br>[lib.rs](#netpkt-crate-root) · [addr.rs](#netpktaddrrs) · [arp.rs](#netpktarprs) · [checksum.rs](#netpktchecksumrs) · [decode.rs](#netpktdecoders) · [dhcp.rs](#netpktdhcprs) · [dns.rs](#netpktdnsrs) · [eth.rs](#netpktethrs) · [icmp.rs](#netpkticmprs) · [ipv4.rs](#netpktipv4rs) · [ipv6.rs](#netpktipv6rs) · [ntp.rs](#netpktntprs) · [pcapng.rs](#netpktpcapngrs) · [pkt.rs](#netpktpktrs) · [syslog.rs](#netpktsyslogrs) · [tcp.rs](#netpkttcprs) · [udp.rs](#netpktudprs) · [http.rs](#netpkthttprs) · [stp.rs](#netpktstprs) · [rip.rs](#netpktriprs) · [nat.rs](#netpktnatrs) · [icmpv6.rs](#netpkticmpv6rs) · [ospf.rs](#netpktospfrs) · [addrsel.rs](#netpktaddrselrs) · [eapol.rs](#netpkteapolrs) · [bgp.rs](#netpktbgprs) · [tftp.rs](#netpkttftprs) · [ftp.rs](#netpktftprs) · [smtp.rs](#netpktsmtprs) · [pop3.rs](#netpktpop3rs) · [imf.rs](#netpktimfrs) · [ber.rs](#netpktberrs) · [snmp.rs](#netpktsnmprs) · [mib.rs](#netpktmibrs) · [telnet.rs](#netpkttelnetrs) · [radius.rs](#netpktradiusrs) · [uri.rs](#netpkturirs) · [ssh.rs](#netpktsshrs) · [snmpv3.rs](#netpktsnmpv3rs) · [eap.rs](#netpkteaprs) · [imap.rs](#netpktimaprs) · [cookie.rs](#netpktcookiers) · [x509.rs](#netpktx509rs) · [tls.rs](#netpkttlsrs)
 - [eapm](#eapm) -- EAP-MD5 and EAP-PWD as peer and server state machines without I/O
@@ -120,8 +120,8 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
   <br>[src/export/mod.rs](#diagram_viewsrcexportmodrs) · [src/export/pdf.rs](#diagram_viewsrcexportpdfrs) · [src/export/raster.rs](#diagram_viewsrcexportrasterrs) · [src/export/svg.rs](#diagram_viewsrcexportsvgrs) · [src/fonts.rs](#diagram_viewsrcfontsrs) · [src/image.rs](#diagram_viewsrcimagers) · [src/measure.rs](#diagram_viewsrcmeasurers) · [src/view.rs](#diagram_viewsrcviewrs)
 - [dxf](#dxf) -- DXF import (ASCII): tables, blocks and entities of model space, without a GPU
   <br>[lib.rs](#dxf-crate-root) · [src/fonts.rs](#dxfsrcfontsrs) · [src/mtext.rs](#dxfsrcmtextrs) · [src/strings.rs](#dxfsrcstringsrs)
-- [physics](#physics) -- Collision shapes, broad phase and deterministic queries for games
-  <br>[src/bvh.rs](#physicssrcbvhrs) · [src/character.rs](#physicssrccharacterrs) · [src/gjk.rs](#physicssrcgjkrs) · [src/hull.rs](#physicssrchullrs) · [src/math.rs](#physicssrcmathrs) · [src/mesh.rs](#physicssrcmeshrs) · [src/query.rs](#physicssrcqueryrs) · [src/shape.rs](#physicssrcshapers) · [src/tree.rs](#physicssrctreers) · [src/world.rs](#physicssrcworldrs)
+- [physics](#physics) -- Collision, deterministic queries and rigid bodies with joints for games
+  <br>[src/bvh.rs](#physicssrcbvhrs) · [src/character.rs](#physicssrccharacterrs) · [src/gjk.rs](#physicssrcgjkrs) · [src/hull.rs](#physicssrchullrs) · [src/joint.rs](#physicssrcjointrs) · [src/mass.rs](#physicssrcmassrs) · [src/math.rs](#physicssrcmathrs) · [src/mesh.rs](#physicssrcmeshrs) · [src/query.rs](#physicssrcqueryrs) · [src/shape.rs](#physicssrcshapers) · [src/sim.rs](#physicssrcsimrs) · [src/tree.rs](#physicssrctreers) · [src/world.rs](#physicssrcworldrs)
 - [game](#game) -- The game core: a world of entities and components, a fixed tick, input actions, cameras
   <br>[lib.rs](#game-crate-root) · [src/assets.rs](#gamesrcassetsrs) · [src/audio.rs](#gamesrcaudiors) · [src/camera.rs](#gamesrccamerars) · [src/input.rs](#gamesrcinputrs) · [src/net/arena.rs](#gamesrcnetarenars) · [src/net/bits.rs](#gamesrcnetbitsrs) · [src/net/bot.rs](#gamesrcnetbotrs) · [src/net/client.rs](#gamesrcnetclientrs) · [src/net/clock.rs](#gamesrcnetclockrs) · [src/net/event.rs](#gamesrcneteventrs) · [src/net/input.rs](#gamesrcnetinputrs) · [src/net/lagcomp.rs](#gamesrcnetlagcomprs) · [src/net/link.rs](#gamesrcnetlinkrs) · [src/net/predict.rs](#gamesrcnetpredictrs) · [src/net/proto.rs](#gamesrcnetprotors) · [src/net/quant.rs](#gamesrcnetquantrs) · [src/net/room.rs](#gamesrcnetroomrs) · [src/net/server.rs](#gamesrcnetserverrs) · [src/net/sim.rs](#gamesrcnetsimrs) · [src/net/snapshot.rs](#gamesrcnetsnapshotrs) · [src/net/walker.rs](#gamesrcnetwalkerrs) · [src/pose.rs](#gamesrcposers) · [src/sparse.rs](#gamesrcsparsers) · [src/tick.rs](#gamesrctickrs) · [src/world.rs](#gamesrcworldrs)
 - [game_render3d](#game_render3d) -- The bridge from the game core to render3d: entities with a mesh as scene instances
@@ -132,6 +132,8 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
   <br>[lib.rs](#netchan-crate-root) · [src/client.rs](#netchansrcclientrs) · [src/conn.rs](#netchansrcconnrs) · [src/endpoint.rs](#netchansrcendpointrs) · [src/packet.rs](#netchansrcpacketrs) · [src/reliable.rs](#netchansrcreliablers) · [src/seal.rs](#netchansrcsealrs) · [src/server.rs](#netchansrcserverrs) · [src/ws.rs](#netchansrcwsrs)
 - [sheet_io](#sheet_io) -- XLSX and CSV import: workbooks and delimited text as typed tables
   <br>[lib.rs](#sheet_io-crate-root) · [src/csv.rs](#sheet_iosrccsvrs) · [src/xlsx.rs](#sheet_iosrcxlsxrs) · [src/xlsx_write.rs](#sheet_iosrcxlsx_writers)
+- [img_jp2](#img_jp2) -- JPEG 2000 decoder
+  <br>[lib.rs](#img_jp2-crate-root)
 
 ## ui
 
@@ -10145,8 +10147,10 @@ does nothing):
                          back = the framebuffer byte for byte (x byte: 255), and no frame differed
                          since the last check (a canvas's scaled tiles count as GpuOutput::canvas_diff_*)
   gpu expect screen      the composed screen at the window = the framebuffer (another window on
-                         top of ours is a note, not a failure); X11: what the server holds for the
-                         window; Wayland: a note, no client can read it
+                         top of ours is a note, not a failure; Windows: also what takes no clicks,
+                         an overlay or a shadow, when the window as DWM composes it = the
+                         framebuffer); X11: what the server holds for the window; Wayland: a
+                         note, no client can read it
   gpu expect window      the window's DC = the framebuffer (the CPU path's pixels); Linux as `screen`
   gpu expect upload N    at most N bytes uploaded since the last check
   gpu expect base N      at most N bytes of them to the base texture since the last check
@@ -11278,7 +11282,8 @@ pads -- (G7a part 2) the game pads for the app and the test scripts (plat::pads)
 
   ui.gamepads()            the pads connected now with the edges of their buttons in this batch;
                            the first call starts watching (plat::pad_watch; a headless run: the
-                           script's pads only)
+                           script's pads only); refused by the manifest (no `gamepad`), it starts
+                           once an ask line is answered yes (policy::gamepad_granted)
   ui.gamepads_watching()   pads are being watched (false where the platform has none)
   pads_event(data)         (E_GAMEPAD) the pads anew, the edges added up until the batch's first
                            pass took them (pads_clear_edges); App::command(UIC_GAMEPAD, data) for a
@@ -11300,8 +11305,10 @@ the same list.  plat reports pads as nothing held while no window of the app is 
   goes gives App::command(UIC_GAMEPAD, index | PADEV_\* &lt;&lt; 8).  While none of the app's windows
   has the focus every pad reports nothing held.  Windows: XInput (Xbox-compatible pads); Linux:
   evdev; macOS: GameController; the browser: the Gamepad API (a pad appears after one of its
-  buttons was pressed in the page); Android and iOS: none.  A headless run has the pads of its
-  script (`pad ...`)
+  buttons was pressed in the page); Android and iOS: none.  An app with a PERMISSIONS file needs
+  its line `gamepad` (else no pads, PERMDENY gamepad; `ask gamepad` asks at the first call and
+  watching starts in the frame after a yes).  A headless run has the pads of its script
+  (`pad ...`, no permission: the script's own input)
 - **`fn gamepads_watching(&self) -> bool`**
   (G7a) pads are being watched: ui.gamepads was called and the platform has pads (false on
   Android and iOS, on Windows without XInput); a headless run: after ui.gamepads
@@ -15566,6 +15573,11 @@ IMGF_COUNT: u32 = 55
 /// (svg) SVG: the last slot, outside the static table until img_svg::register fills it
 /// (register_external stops before it)
 IMGF_SVG: u32 = IMGF_COUNT - 1
+/// JPEG 2000 (JP2, JPX, J2K): the slot before SVG's, outside the static table until
+/// img_all::use_all_codecs fills it with img_jp2's codec.  register_external stops before it:
+/// the external codecs keep their numbers 23 to 52; a 31st external registration, which got
+/// slot 53 before, now gets 0, and a stored 53 now names JPEG 2000
+IMGF_JP2: u32 = IMGF_COUNT - 2
 ```
 
 *limits*
@@ -16330,7 +16342,8 @@ Extended API:
                                                it does not fit into cap bytes)
   register(fmt, codec) -> 0 / ERR_UNSUPPORTED  register_dyn(name, exts, mime, props, codec)
   register_slot(IMGF_SVG, name, exts, mime, props, codec)   (svg) a built-in format without
-                                               a static entry (img_svg::register)
+                                               a static entry (img_svg::register; IMGF_JP2:
+                                               img_all::use_all_codecs)
   set_file_io(FileIo)                          the file functions of load / save (img_core
                                                does not depend on plat: the app sets them)
 Glue for the core codecs (imgcore.s):
@@ -16369,11 +16382,12 @@ metadata fields stay).
   slot is taken or name / exts is empty  [img_register_dyn]
 
 - **`fn register_external(name: &'static str, exts: &'static str, props: u32, c: &'static Codec) -> u32`**
-  Separate slots for external codec hosts, preserving the native plugin ABI's IDs (the
-  last slot, IMGF_SVG, is kept for SVG).
+  Separate slots for external codec hosts, preserving the native plugin ABI's IDs: 23 to 52, or
+  0 when they are taken (the last two slots, IMGF_JP2 and IMGF_SVG, are kept for JPEG 2000 and
+  SVG; slot 53 went to JPEG 2000, so a 31st registration gets 0).
 
 - **`fn register_slot(fmt: u32, name: &'static str, exts: &'static str, mime: &'static str, props: u32, c: Option<&'static Codec>) -> i32`**
-  (svg) a built-in format that has no entry in the static table (IMGF_SVG): its name,
+  a built-in format that has no entry in the static table (IMGF_SVG, IMGF_JP2): its name,
   extension list, MIME type, properties and codec into slot fmt (None empties the slot)
   -> 0 / ERR_UNSUPPORTED (fmt out of range, or a static / runtime format's slot)
 
@@ -17133,7 +17147,7 @@ img_all -- registration of the codec crates in the format table  [src/img/imgreg
   use_core_codecs()   PNG, JPEG, BMP, GIF (the assembly registers them statically: call it
                       once at start-up, before worker threads decode)
   use_all_codecs()    every codec of the library, the core formats included
-                      (img_use_all_codecs)
+                      (img_use_all_codecs); JPEG 2000 into its slot IMGF_JP2
 
 Each codec crate exports `pub static CODEC: img_core::Codec`; the codec agents add one
 registration line for their crate below.
@@ -28696,7 +28710,8 @@ net -- TCP, UDP and Unix domain sockets (IPv4 and IPv6) with timeouts
   TcpStream::connect(&addr, timeout_ms) / read / write / write_all / read_exact,
             set_read_timeout / set_write_timeout (ms, None = block), set_nodelay,
             shutdown_write, peer_addr / local_addr, wait_readable(ms)
-  UdpSocket::bind / send_to / recv_from(buf, timeout_ms)
+  UdpSocket::bind / send_to / recv_from(buf, timeout_ms); answers_to(addr), answer_peers()
+            (the answers a socket net.listen allows may send without net.connect, AnswerSet)
   UnixListener::bind(path) / accept() / accept_timeout(ms); connect_unix(path, timeout_ms)
             (bind removes only a socket file nobody listens on; the drop only its own)
             -> UnixStream (the stream calls of TcpStream; addresses and nodelay do not apply)
@@ -28714,7 +28729,9 @@ yet (docs/ANDROID.md).
 
 The app's permissions (policy.rs, net.connect / net.listen) are checked before connect,
 bind, send_to and a name lookup; Unix sockets follow the file rules (fs.write on the path).
-A refusal is NetErrorKind::Denied.
+A refusal is NetErrorKind::Denied.  A UDP socket whose address net.listen allows may answer
+without net.connect: send_to an address it received a datagram from in the last 60 s
+(AnswerSet, at most 1024 addresses per socket: forged sources cannot grow it).
 
 Timeouts are readiness waits (WSAPoll / poll) before each call, never SO_RCVTIMEO: after a
 timed-out blocking receive Windows leaves the connection in an undefined state.  Sockets are
@@ -28835,16 +28852,50 @@ one thread may read while another writes (Arc<TcpStream>).
 - **`fn peer_addr(&self) -> NetResult<SocketAddr>`**
 - **`fn local_addr(&self) -> NetResult<SocketAddr>`**
 
+- **`struct AnswerSet`**
+  (permissions) the peers a UDP socket that `net.listen` allows may answer without a `net.connect` rule: the
+  addresses it received a datagram from in the last [`AnswerSet::KEEP_MS`] (a datagram renews its address; sending
+  to it does not).  At most [`AnswerSet::MAX`] of them: two generations of `MAX / 2`, a full one becomes the old one
+  and the old one goes (so does a generation older than `KEEP_MS`).  Source addresses are not proven: whoever can
+  forge one can open the way to that address for this socket -- as any UDP server answers whoever writes -- but not
+  grow the set past `MAX`; a flood of forged addresses pushes older ones out, and their peers are answered again
+  after their next datagram.  `UdpSocket` keeps one when a manifest restricts the process ([`UdpSocket::bind`]);
+  the times are the caller's (ms of a monotonic clock), so tests drive it directly.
+
+**`impl AnswerSet`**
+
+- **`const MAX: usize = 1024`**
+  the most addresses kept (two generations of half)
+- **`const KEEP_MS: u64 = 60_000`**
+  how long an address may be answered after its last datagram (ms)
+- **`fn new(now_ms: u64) -> AnswerSet`**
+- **`fn heard(&mut self, from: &SocketAddr, now_ms: u64)`**
+  a datagram came from `from` (a port of 0 or an unspecified address is no peer)
+- **`fn may_answer(&mut self, to: &SocketAddr, now_ms: u64) -> bool`**
+  whether `to` sent a datagram within KEEP_MS (and is still kept)
+- **`fn len(&self) -> usize`**
+  the addresses kept now (expired ones included until their generation goes)
+- **`fn is_empty(&self) -> bool`**
+
 - **`struct UdpSocket`**
 
 **`impl UdpSocket`**
 
 - **`fn bind(addr: &SocketAddr) -> NetResult<UdpSocket>`**
-  a socket on addr; a fixed port needs net.listen, port 0 (a client's) does not
+  a socket on addr; a fixed port needs net.listen, port 0 (a client's) does not.  A socket whose address
+  net.listen allows (a fixed port through the check, port 0 when a rule covers it: checked quietly) may answer
+  the addresses it receives datagrams from without a net.connect rule (an [`AnswerSet`] per socket)
 - **`fn send_to(&self, buf: &[u8], to: &SocketAddr) -> NetResult<usize>`**
+  one datagram to `to`: an answer to an address this socket heard from (see bind), else net.connect decides
 - **`fn recv_from(&self, buf: &mut [u8], timeout_ms: u32) -> NetResult<(usize, SocketAddr)>`**
   one datagram within `timeout_ms` (0: block)
 - **`fn local_addr(&self) -> NetResult<SocketAddr>`**
+- **`fn answers_to(&self, to: &SocketAddr) -> bool`**
+  (permissions) whether a datagram to `to` is an answer this socket may send without net.connect: it heard from
+  `to` within AnswerSet::KEEP_MS, and inside a plugin's scope the plugin's net.listen covers the socket's address
+- **`fn answer_peers(&self) -> Option<usize>`**
+  (permissions, tests) the addresses this socket keeps for answers; None: it keeps none (no manifest, or its
+  address is not one net.listen allows)
 
 - **`type UnixStream = TcpStream`**
   a connected Unix domain stream socket (the stream calls of TcpStream)
@@ -29323,34 +29374,70 @@ Source: [`lib/plat/certs.rs`](../lib/plat/certs.rs)
 ```text
 certs -- the operating system's trusted certificate authorities
 
-  verify_tls_server(chain, host) -> Option<Result<(), String>>
+  verify_tls_server(chain, host, ocsp, extra, time) -> Option<Result<(), Refused>>
        Windows: CryptoAPI builds and checks the chain (leaf first, DER) for a TLS server of
-       that name, with the machine's and user's roots, enterprise policy and automatic root
-       updates; Some(Err(text)) when it refuses.  macOS and iOS: the Security framework
-       (SecTrustEvaluateWithError), likewise.  Linux: None (netio checks against the bundle).
+       that name at that time (Unix seconds), with the machine's and user's roots, enterprise
+       policy and automatic root updates (like for every program there, Windows may fetch a
+       missing intermediate or root); the leaf's revocation from the stapled OCSP response
+       (ocsp) and what Windows has cached, nothing fetched for it.  Where its roots give no
+       path, once more with the extra CAs (DER: a company CA) as its only roots, nothing
+       fetched.  macOS and iOS: the Security framework (SecTrustEvaluateWithError) with the
+       system's and the user's roots and trust settings, the extra CAs as anchors beside them,
+       and the stapled response, without network access.  Either way the system's policy
+       applies to the extra CAs as well, and its answer is the whole answer.  Some(Err) says
+       why the system refuses.  Linux: None (netio checks against the bundle, then the extra
+       CAs).
+  verify_tls_server_roots(chain, host, roots, time) -> Option<Result<(), Refused>>
+       the same with only these CAs as trust anchors (DER), not the system's: nothing
+       fetched, no revocation; the system's checks against a PKI of one's own
+       (tools/limbo_check.py --system).  An empty host: no name checked.  Linux: None.
+  Refused { reason, text }   Reason: UnknownCa, Expired, Name, Revoked, Usage, Other; text:
+       the system's own words (and its code)
   root_bundle() -> Option<Vec<u8>>
-       Linux: the PEM file of the distribution's CA bundle (Debian / Ubuntu, Fedora / RHEL,
-       openSUSE, Alpine); macOS: /etc/ssl/cert.pem.  Windows, iOS: None.
-
-Revocation is not checked (no network access during the handshake).
+       Linux: PEM -- the file SSL_CERT_FILE names, else the distribution's CA bundle (Debian /
+       Ubuntu, Fedora / RHEL, openSUSE, Alpine), and the files in the folders of SSL_CERT_DIR
+       (':' between them), as OpenSSL takes the two; macOS: /etc/ssl/cert.pem.  Windows,
+       iOS: None.
 ```
+
+- **`enum Reason`**
+  why the system refused a server's chain
+  - `UnknownCa` -- no path to a CA it trusts: a self-signed certificate, a CA of one's own, a missing
+    intermediate
+  - `Expired` -- a certificate of the chain has expired or is not valid yet
+  - `Name` -- the certificate is not for this name
+  - `Revoked` -- a certificate of the chain is revoked
+  - `Usage` -- a certificate is not for a TLS server (its extended key usage)
+  - `Other` -- another reason (the text says which)
+
+- **`struct Refused`**
+  the system's refusal: the reason and the system's own words
+  - `reason: Reason`
+  - `text: String`
+
+**`impl Refused`**
+
+- **`fn new(reason: Reason, text: impl Into<String>) -> Refused`**
 
 - **`fn root_bundle() -> Option<Vec<u8>>`** *(Linux)*
 
 - **`fn root_bundle() -> Option<Vec<u8>>`** *(Windows)*
 
-- **`fn verify_tls_server(_chain: &[&[u8]], _host: &str) -> Option<Result<(), String>>`** *(Linux)*
+- **`fn verify_tls_server(_chain: &[&[u8]], _host: &str, _ocsp: Option<&[u8]>, _extra: &[&[u8]], _time: i64) -> Option<Result<(), Refused>>`** *(Linux)*
 
-- **`fn verify_tls_server(chain: &[&[u8]], host: &str) -> Option<Result<(), String>>`** *(Windows)*
+- **`fn verify_tls_server_roots(_chain: &[&[u8]], _host: &str, _roots: &[&[u8]], _time: i64) -> Option<Result<(), Refused>>`** *(Linux)*
+
+- **`fn verify_tls_server(chain: &[&[u8]], host: &str, ocsp: Option<&[u8]>, extra: &[&[u8]], time: i64) -> Option<Result<(), Refused>>`** *(Windows)*
+
+- **`fn verify_tls_server_roots(chain: &[&[u8]], host: &str, roots: &[&[u8]], time: i64) -> Option<Result<(), Refused>>`** *(Windows)*
 
 - **`fn root_bundle() -> Option<Vec<u8>>`** *(Apple)*
   macOS: the system's PEM bundle (/etc/ssl/cert.pem, updated with the system); iOS: None.  Apple's
   own trust decision is verify_tls_server.
 
-- **`fn verify_tls_server(chain: &[&[u8]], host: &str) -> Option<Result<(), String>>`** *(Apple)*
-  macOS and iOS: the Security framework builds and checks the chain (leaf first, DER) for a TLS
-  server of that name, with the system's and the user's roots and trust settings, without network
-  access (SecTrustSetNetworkFetchAllowed false); Some(Err(text)) when it refuses.
+- **`fn verify_tls_server(chain: &[&[u8]], host: &str, ocsp: Option<&[u8]>, extra: &[&[u8]], time: i64) -> Option<Result<(), Refused>>`** *(Apple)*
+
+- **`fn verify_tls_server_roots(chain: &[&[u8]], host: &str, roots: &[&[u8]], time: i64) -> Option<Result<(), Refused>>`** *(Apple)*
 
 ### `plat/rand.rs`
 
@@ -29551,13 +29638,17 @@ start-up, then checked by the public file, process, shell, plugin and print func
   fs_allowed(path, FS_READ | FS_WRITE) / process_allowed(program) / url_allowed(url) /
   plugin_allowed(path) / print_allowed() / secrets_allowed(service) / autostart_allowed() /
   audio_allowed()                        -> bool
-  input_global_allowed() / screen_capture_allowed() / location_allowed() / sensors_allowed()
-                                         -> bool
+  input_global_allowed() / screen_capture_allowed() / location_allowed() / sensors_allowed() /
+  gamepad_allowed()                      -> bool
                                          a refusal is recorded (denials) and printed once
                                          per target to stderr: "PERMDENY kind target"
   audio_granted() -> bool                sound is allowed now, without asking or recording a
                                          refusal (ui's dialog sounds stay silent without it)
+  gamepad_granted() -> bool              game pads are allowed now, the same way (ui.gamepads
+                                         starts watching once an ask line was answered yes)
   net_connect_allowed(addr) / net_listen_allowed(addr) / net_name_allowed(host) -> bool
+  net_listen_granted(addr) -> bool       net.listen without asking or recording (a UDP socket on
+                                         port 0: may it answer its peers)
   net_host_allowed(host, port) -> bool   (G7d) a connection to a host as written, name or
                                          address (the browser's WebSocket resolves itself)
   net_resolved(host, addrs)              (resolvers) the addresses of a permitted name:
@@ -29624,6 +29715,9 @@ Manifest: one rule per line, '#' starts a comment, a key may repeat:
                         pixel's colour needs nothing: the user chooses it)
   location              plat::sensors::location_watch (where the device is)
   sensors               plat::sensors::watch (accelerometer, gyroscope, magnetometer, rotation)
+  gamepad               plat::pad_watch (game pads: XInput, evdev, GameController, the
+                        browser's Gamepad API; a Flatpak gets --device=input for it, which
+                        shows the nodes of every input device, keyboards too: tools/pkg_linux.py)
   net.connect HOST:PORT..   TCP connections and UDP datagrams to HOST (a name, *.name for
                         every name below it, an IPv4 / [IPv6] address, a block 10.0.0.0/8
                         or [fd00::]/8, localhost = the loopback addresses, * = any) on PORT
@@ -29632,7 +29726,13 @@ Manifest: one rule per line, '#' starts a comment, a key may repeat:
                         rule, port 53 (DNS) is open too
   net.listen ADDR:PORT..    TCP listeners and UDP sockets with a fixed port on ADDR (an
                         address, a block, localhost or *; 0.0.0.0 / [::] = every interface)
-                        and PORT (port 0 = any free one: the rule needs 0 or *)
+                        and PORT (port 0 = any free one: the rule needs 0 or *).  A UDP socket
+                        whose address it covers may answer: send to an address it received a
+                        datagram from in the last 60 s without a net.connect rule (net.rs
+                        AnswerSet: at most 1024 addresses per socket, so forged source
+                        addresses cannot grow it; inside a plugin's scope the plugin's
+                        net.listen must cover the socket too).  Every other datagram needs
+                        net.connect
   ask KEY ARGS.. ["reason"]   (every key but fs.user) the first access asks the user; a
                         plain rule that covers the access wins over an ask line
   agent.confirm NAME..  agent actions (glob: '*' any run) the user confirms first
@@ -29678,9 +29778,9 @@ STORE: &str = "config://permission-decisions.txt"
   one refused access
   - `kind: &'static str` -- "fs.read", "fs.write", "process", "url", "plugins", "print", "secrets", "autostart",
     "audio.output", "net.connect", "net.listen", "agent", "input.global", "screen.capture",
-    "location" or "sensors"
+    "location", "sensors" or "gamepad"
   - `target: String` -- the path, program, URL, address, the service of a secret, the agent's action, the
-    chord of a shortcut or "" (print, autostart, audio.output, screen.capture, location, sensors)
+    chord of a shortcut or "" (print, autostart, audio.output, screen.capture, location, sensors, gamepad)
   - `plugin: String` -- the plugin the call was made for ("" = the app itself)
 
 - **`enum Answer`**
@@ -29793,6 +29893,13 @@ STORE: &str = "config://permission-decisions.txt"
 
 - **`fn sensors_allowed() -> bool`**
   whether plat::sensors::watch may read the motion sensors (`sensors`)
+
+- **`fn gamepad_allowed() -> bool`**
+  whether plat::pad_watch may read game pads (`gamepad`)
+
+- **`fn gamepad_granted() -> bool`**
+  whether game pads are allowed now without a question or a recorded refusal: no manifest, a plain `gamepad`
+  line or an ask line already answered with yes (ui.gamepads tries pad_watch again once it is)
 
 - **`fn denials() -> Vec<Denial>`**
   the last refusals, oldest first
@@ -29919,6 +30026,10 @@ STORE: &str = "config://permission-decisions.txt"
 
 - **`fn net_listen_allowed(addr: &crate::net::SocketAddr) -> bool`**
   whether a TCP listener (or a UDP socket with a fixed port) may bind addr
+
+- **`fn net_listen_granted(addr: &crate::net::SocketAddr) -> bool`**
+  whether net.listen allows a socket on addr now, quietly (nothing recorded, nobody asked; an ask line only by its
+  answer): a UDP socket on port 0, which needs no rule, may answer its peers when one covers it (net.rs)
 
 - **`fn net_host_allowed(host: &str, port: u16) -> bool`**
   (G7d) whether a connection to `host` as written (a name, an IPv4 address, an IPv6 address with
@@ -30870,6 +30981,60 @@ hold still answers: the request is noted for an app that starts later in the pro
 - **`fn ios_idle_timer_off() -> bool`**
   (tests) UIApplication's idleTimerDisabled now (false outside an app)
 
+### `plat/scan.rs`
+
+Source: [`lib/plat/scan.rs`](../lib/plat/scan.rs)
+
+```text
+scan -- pictures from a scanner through the system's own dialog
+
+  scan_available() -> bool      the system has a scan dialog here (macOS; elsewhere not yet)
+  scan_start(title) -> Result<(), ScanError>   the dialog in a window titled `title`: the user
+                                 chooses the device, previews, sets the area and the resolution
+                                 and scans; Busy while one is open, Unavailable where there is
+                                 none.  Call it from the UI thread.
+  scan_poll() -> Option<Result<Scanned, ScanError>>   None while the dialog is open (or none
+                                 was), then once: the scanned file, Cancelled (the window closed
+                                 without a scan) or Failed (the device or the system)
+  scan_open() -> bool            a dialog is open (its answer not taken yet)
+
+Scanned: the file as the scanner wrote it -- its name and bytes (macOS: PNG unless the user
+chose another format in the dialog); the app decodes it like a file it opened.  The answer
+wakes the UI (plat::wake).  Scanning needs no right of the app's manifest: the user starts it
+and chooses in the system's dialog, as in the file dialog.
+
+macOS (apple_mac_scan.rs): ImageKit's device browser (local and network scanners: USB,
+AirScan / eSCL, Bonjour) beside its scanner view (IKScannerDeviceView over ImageCaptureCore,
+the dialog Preview shows), the scan written to a folder of its own in the temp folder, read
+and removed.  An app under the App Sandbox needs the USB and network entitlements for it.
+Windows (WIA) and Linux (SANE) follow; until then Unavailable there, in the browser and on
+Android and iOS.
+```
+
+- **`enum ScanError`**
+  why no picture came
+  - `Unavailable` -- no scan dialog on this system
+  - `Cancelled` -- the user closed the dialog without a scan
+  - `Busy` -- a dialog is open already
+  - `Failed(String)` -- the device or the system failed: what it said
+
+- **`struct Scanned`**
+  a scanned picture: the file as the scanner wrote it
+  - `name: String` -- its name ("Scan.png")
+  - `data: Vec<u8>` -- its bytes
+
+- **`fn scan_available() -> bool`**
+  whether the system has a scan dialog here
+
+- **`fn scan_start(title: &str) -> Result<(), ScanError>`**
+  open the system's scan dialog in a window titled `title`; the answer comes through scan_poll
+
+- **`fn scan_poll() -> Option<Result<Scanned, ScanError>>`**
+  the open dialog's answer: None while it is open (or none was), then once
+
+- **`fn scan_open() -> bool`**
+  a dialog is open (its answer not taken yet)
+
 ### `plat/share.rs`
 
 Source: [`lib/plat/share.rs`](../lib/plat/share.rs)
@@ -30890,8 +31055,9 @@ AirDrop, Nearby Share, a chat ...)
 
 Share { title, text, url, files, anchor }: `title` the subject (a mail's subject line, Windows'
 title of the data; may be empty), `text` plain text, `url` a link (http, https, mailto ...),
-`files` paths of the file system (the browser: of its virtual files) -- at least one of text, url,
-files.  `anchor` [x, y, w, h] in the window's pixels: what the sheet points at where it is a
+`files` paths of the file system or names with a scheme (data://, docs:// ...; the browser: its
+virtual files) -- at least one of text, url, files.  Windows, macOS and iOS get the path behind a
+scheme (vfs::os_path); a file without one there (mem://) is SHARE_NONE.  `anchor` [x, y, w, h] in the window's pixels: what the sheet points at where it is a
 popover (macOS, an iPad); empty: the window's middle (macOS, iPad) / its usual place.
 
 What "done" means differs (it says nothing about delivery): iOS and macOS a service was chosen
@@ -30902,7 +31068,8 @@ Windows (win_share.rs): DataTransferManager of the active window through
 IDataTransferManagerInterop (Windows 10), the data package filled in DataRequested (text, a web
 link, storage items of the files).  macOS (apple_mac_share.rs): NSSharingServicePicker at the
 anchor in the key window.  iOS (apple_ios_share.rs): UIActivityViewController over the scene's
-window, on an iPad a popover at the anchor.  Browser and Android (web_share.rs): the host --
+window, on an iPad a popover at the anchor; it offers only what takes every item ("Save to
+Files" only when all of them are files, a text or a link leaves it out).  Browser and Android (web_share.rs): the host --
 navigator.share (files as File objects; the browser asks for the user's gesture: call it while
 handling input) / Intent.ACTION_SEND(_MULTIPLE) in a chooser (files through the host's provider,
 readable by the target only).  Linux: none.
@@ -32155,7 +32322,7 @@ screen -- the monitors, the colour of any pixel on the screen, pictures of the s
   screen_take() -> Vec<ScreenEvent> the answers since the last call (each one calls wake())
   pick_test_point(Some((x, y)))     (test aid) the next pick_start answers the pixel at the
                                     desktop point x, y without asking the user (Windows,
-                                    X11; the portal and the browser ignore it)
+                                    X11, macOS; the portal and the browser ignore it)
 
 One pick and one capture at a time (else Busy).  Picking needs no right: the user chooses
 the one pixel the app gets, like a file in the file dialog.  Call pick_start and
@@ -32172,7 +32339,11 @@ a pointer grab for the pick; Wayland wl_output (+ zxdg_output_v1 for logical pos
 size; no work area, no primary: the first output); in Wayland sessions and in Flatpak the
 screenshot portal (Screenshot, PickColor: the desktop asks the user).  Browser: the host's
 window.screen (getScreenDetails when the page may), the EyeDropper API (Chromium) for the
-pick, no capture.  Android: the host's DisplayManager displays, no pick, no capture.
+pick, no capture.  Android: the host's DisplayManager displays, no pick, no capture.  macOS
+(apple_mac_screen.rs): NSScreen's screens; the pick through the system's loupe
+(NSColorSampler, no right needed); pictures through ScreenCaptureKit (macOS 15.2 and later,
+before CGWindowListCreateImage), which need the user's screen recording right for the program
+(without it: Denied, and the system's dialog once).  iOS: none of the three.
 ```
 
 - **`struct Monitor`**
@@ -32227,7 +32398,7 @@ pick, no capture.  Android: the host's DisplayManager displays, no pick, no capt
 
 - **`fn pick_test_point(p: Option<(i32, i32)>)`**
   (test aid) the next pick_start answers the pixel at the desktop point x, y at once,
-  without asking the user (Windows, X11; the portal and the browser ignore it); None: ask
+  without asking the user (Windows, X11, macOS; the portal and the browser ignore it); None: ask
   again.  With a manifest only where `screen.capture` allows pictures of the screen
 
 - **`fn capture_available() -> bool`**
@@ -34561,6 +34732,8 @@ and poke our own windows only (no input is injected into the system)
     WT_SHOW       ShowWindow(w, a[0]) (SW_SHOWMINNOACTIVE, SW_SHOWNOACTIVATE: a test that leaves the
                   keyboard and the other windows alone) -> 1
   win_test_image(w) -> (w, h, px)   the client area as the window shows it (BitBlt from its DC)
+  win_test_composed(w) -> (w, h, px)  the client area as the system composes it, without what
+                  lies on top (PrintWindow, PW_RENDERFULLCONTENT: the GPU child's swapchain too)
   win_test_screen(x, y, w, h) -> px  a part of the screen as it shows now (any thread)
   win_test_post(hwnd, msg, wp, lp)  PostMessageW by handle (any thread)
   win_test_window_at(x, y) -> HWND  the window at a screen point (any thread)
@@ -34597,6 +34770,11 @@ WT_SHOW: u32 = 18
   (test aid) what window w shows: its client area read back from the window's DC (BitBlt into
   a DIB section; under DWM the window's own surface, also where other windows cover it) ->
   (w, h, rows of w \* 4 bytes B, G, R, x)
+
+- **`fn win_test_composed(w: i32) -> Option<(i32, i32, alloc::vec::Vec<u8>)>`**
+  (test aid) window w's client area as the system composes it: PrintWindow with
+  PW_RENDERFULLCONTENT, so the swapchain of its GPU child too, and nothing of what lies on top of
+  it (other windows, overlays that take no clicks, shadows) -> (w, h, rows of w \* 4 bytes B, G, R, x)
 
 - **`fn win_test_usage() -> (u64, u64, u64)`**
   (test aid) (CPU time of this process so far in us, its working set in bytes, its private bytes)
@@ -35986,7 +36164,8 @@ controllers (ID_INPUT_JOYSTICK), never keyboards or mice: what cannot be opened 
 ours, and is not opened again until inotify reports it anew.  Nodes are opened read-only and
 without blocking; their events are read whenever the pads are polled (4 ms), not from the window
 loop's poll().  Inside a Flatpak /dev/input exists only with --device=input (Flatpak 1.15.6 and
-newer); without it no pad is found.
+newer; the manifest's `gamepad` line gives it, tools/pkg_linux.py); without it no pad is found.
+Older Flatpak refuses to build with it and ignores it in an installed app (no /dev/input).
 ```
 
 - **`struct EvdevTestNode(usize)`**
@@ -36388,6 +36567,9 @@ WT_SHOW: u32 = 18
 - **`fn win_test_image(w: i32) -> Option<(i32, i32, Vec<u8>)>`**
   (tests) what the window system holds for window w: (w, h, rows of w \* 4 bytes): X11 reads it
   back (GetImage; also a buffer on the window), Wayland has no way to: None
+
+- **`fn win_test_composed(_w: i32) -> Option<(i32, i32, Vec<u8>)>`**
+  (tests) window w as the system composes it: Windows only (PrintWindow): None
 
 - **`fn win_test_screen(_x: i32, _y: i32, _w: i32, _h: i32) -> Option<Vec<u8>>`**
   (tests) a part of the screen: no client on Linux can read it without asking the user
@@ -37321,6 +37503,9 @@ as all of AppKit; lib/gpu may use the layer on its own thread (nextDrawable, dra
   (tests) what the window system holds for window w: the view layer's picture is ours (the CPU path)
   and the GPU layer's is not readable from here: None
 
+- **`fn win_test_composed(_w: i32) -> Option<(i32, i32, Vec<u8>)>`**
+  (tests) window w as the system composes it: Windows only (PrintWindow): None
+
 - **`fn win_test_screen(_x: i32, _y: i32, _w: i32, _h: i32) -> Option<Vec<u8>>`**
   (tests) a part of the screen: macOS asks the user for that (screen recording): None
 
@@ -37329,6 +37514,67 @@ as all of AppKit; lib/gpu may use the layer on its own thread (nextDrawable, dra
 
 - **`fn gpu_test_presented() -> Vec<(u64, u64)>`**
   (bench: Wayland's presentation feedback) nothing here
+
+### `plat/apple_mac_scan.rs` (Apple)
+
+Source: [`lib/plat/apple_mac_scan.rs`](../lib/plat/apple_mac_scan.rs)
+
+```text
+apple_mac_scan -- (scan.rs) macOS's scan dialog: ImageKit over ImageCaptureCore
+
+  available() -> bool            ImageKit's scanner view is there (Quartz.framework, loaded at
+                                 the first use)
+  start(title) -> Result         a window of its own: IKDeviceBrowserView (local and network
+                                 scanners, no cameras) beside IKScannerDeviceView (the dialog
+                                 Preview shows: overview, area, resolution, format, "Scan")
+  mac_scan_shown() / mac_scan_close()   (tests) the window on screen, closed as by its close
+                                 button
+
+The device chosen in the browser goes to the scanner view (its document UTI set to PNG first;
+the view's format menu may change it).  The view scans into a folder of its own below the temp
+folder (file-based transfer); the first file it reports is read, removed and answered, and the
+window closes.  Closing the window without a scan answers Cancelled; an error of the scan
+answers Failed.  Everything runs on the main thread; the delegate is one object for the
+process.
+```
+
+- **`fn mac_scan_shown() -> bool`**
+  (tests) the scan window is on screen
+
+- **`fn mac_scan_close() -> bool`**
+  (tests) the scan window closed as by its close button -> false when none is open
+
+### `plat/apple_mac_screen.rs` (Apple)
+
+Source: [`lib/plat/apple_mac_screen.rs`](../lib/plat/apple_mac_screen.rs)
+
+```text
+apple_mac_screen -- (screen.rs) macOS: the colour pick and pictures of the screen
+
+  pick_available() -> bool         NSColorSampler is there (macOS 10.15 and later)
+  pick_start(test) -> Result       the system's loupe (NSColorSampler): the user clicks a pixel
+                                   anywhere, Esc cancels; the colour comes in sRGB.  It needs no
+                                   right: the system takes the picture, the app gets one colour.
+                                   A test point (pick_test_point) answers the pixel there from a
+                                   picture of the screen instead -- which needs the right below
+  capture_available() -> bool      true (the right is asked when taking)
+  capture_start(rect) -> Result    a picture of rect (desktop px; None: every monitor together)
+  mac_screen_access() -> bool      (tests) the process may record the screen
+
+Pictures need the user's "Screen & System Audio Recording" right (TCC) for the program (the
+app, or the terminal that started it): without it capture_start asks the system once
+(CGRequestScreenCaptureAccess shows its dialog, which leads to the System Settings) and answers
+Denied; the right counts from the next start of the program.  macOS 15.2 and later take the
+picture through ScreenCaptureKit (SCScreenshotManager captureImageInRect:, the answer on a queue
+of the system); before, CGWindowListCreateImage (looked up at run time: newer SDKs no longer
+offer it).  Desktop px are points times the screen's scale from the top left of the primary
+screen (monitors_os): a rectangle becomes points by the scale of the monitor at its corner.  The
+picture is drawn into B, G, R, x rows in sRGB (colours match what the app drew in sRGB, up to
+the conversion through the display's profile).
+```
+
+- **`fn mac_screen_access() -> bool`**
+  (tests) the process may record the screen (asks nothing)
 
 ### `plat/apple_mac_share.rs` (Apple)
 
@@ -38356,6 +38602,8 @@ WT_FROM_POINT: u32 = 0
 
 - **`fn win_test_image(_w: i32) -> Option<(i32, i32, alloc::vec::Vec<u8>)>`**
 
+- **`fn win_test_composed(_w: i32) -> Option<(i32, i32, alloc::vec::Vec<u8>)>`**
+
 - **`fn win_test_screen(_x: i32, _y: i32, _w: i32, _h: i32) -> Option<alloc::vec::Vec<u8>>`**
 
 - **`fn gpu_wait(_deadline_us: u64)`**
@@ -38437,6 +38685,8 @@ WT_FROM_POINT: u32 = 17
   -1: nothing to say about the pixel or the scale; 0 for the rest
 
 - **`fn win_test_image(_w: i32) -> Option<(i32, i32, Vec<u8>)>`**
+
+- **`fn win_test_composed(_w: i32) -> Option<(i32, i32, Vec<u8>)>`**
 
 - **`fn win_test_screen(_x: i32, _y: i32, _w: i32, _h: i32) -> Option<Vec<u8>>`**
 
@@ -38538,6 +38788,8 @@ WT_FROM_POINT: u32 = 0
 - **`fn win_test(_op: u32, _w: i32, _a: [i32; 4]) -> i64`**
 
 - **`fn win_test_image(_w: i32) -> Option<(i32, i32, alloc::vec::Vec<u8>)>`**
+
+- **`fn win_test_composed(_w: i32) -> Option<(i32, i32, alloc::vec::Vec<u8>)>`**
 
 - **`fn win_test_screen(_x: i32, _y: i32, _w: i32, _h: i32) -> Option<alloc::vec::Vec<u8>>`**
 
@@ -39722,8 +39974,10 @@ pad -- (G7a part 2) game pads: one snapshot per pad in the W3C standard layout a
 and disconnect events, the part every platform shares
 
   pad_watch(on) -> bool      start (on) or stop watching for pads -> false: this platform has none
-                             (Android, iOS: a later stage with touch controls) or the system lacks
-                             the means (Windows without an XInput DLL); nothing runs before
+                             (Android, iOS: a later stage with touch controls), the system lacks
+                             the means (Windows without an XInput DLL) or the app's manifest has
+                             no `gamepad` line (PERMDENY gamepad; docs/PERMISSIONS.md); nothing
+                             runs before
   pad_watching() -> bool     watching now
   pads() -> Vec<Gamepad>     the connected pads by index, with the buttons that went down and up
                              since the last call; takes the E_GAMEPAD that waits
@@ -39747,7 +40001,8 @@ Per platform:
            seat game controllers, not keyboards) with the buttons of a game pad (BTN_SOUTH) and
            two axes; the kernel's gamepad codes mapped to the layout, Sony's and Nintendo's
            north / west buttons the other way round than xpad's; hotplug through inotify on
-           /dev/input (linux_pad.rs).  Inside a Flatpak only with --device=input
+           /dev/input (linux_pad.rs).  Inside a Flatpak only with --device=input (the
+           manifest's `gamepad` line gives it; Flatpak 1.15.6 and newer)
   macOS    GameController: GCController's extendedGamepad, connect and disconnect
            notifications (apple_mac_pad.rs)
   browser  the Gamepad API's pads with the "standard" mapping (others pass their first buttons
@@ -39895,8 +40150,9 @@ PAD_TRIGGER_PRESS: f32 = 30.0 / 255.0
   0ce6)", Firefox's "054c-0ce6-DualSense Wireless Controller" (0: none)
 
 - **`fn pad_watch(on: bool) -> bool`**
-  start (on) or stop watching for game pads -> false: this platform has no pads (Android, iOS) or
-  the system lacks the means (Windows without an XInput DLL).  While watching, pads come and go
+  start (on) or stop watching for game pads -> false: this platform has no pads (Android, iOS), the
+  system lacks the means (Windows without an XInput DLL) or the app's manifest has no `gamepad` line
+  (docs/PERMISSIONS.md: PERMDENY gamepad; nothing is opened then).  While watching, pads come and go
   with E_GAMEPAD events and plat::pads has them; stopping lets every pad go (PADEV_DISCONNECT).
   The browser shows a pad only after one of its buttons was pressed in the page
 
@@ -43731,8 +43987,12 @@ SHA-256 / 384 / 512), parsed strictly; no I/O, no clock (the caller passes the t
   CertBuilder { .. }.sign(&issuer_cert_or_self, &issuer_key) -> DER     (Ed25519)
   CertBuilder { spki, .. }.sign_key(issuer, &PrivateKey, extra) -> DER   any key, signed by any
   PrivateKey: Ed25519, ECDSA (P-256 / P-384), RSA; PKCS #8 / SEC 1 / PKCS #1 (key.rs)
+  ocsp::check(der, &cert, &issuer, now)   an OCSP response (RFC 6960); request, CertId,
+                                          ResponseBuilder for a private CA's responder (ocsp.rs)
+  CsrBuilder { dns, .. }.sign(&key), Csr::parse   certificate requests (PKCS #10, csr.rs)
 
-Not checked: revocation (CRL / OCSP), certificate policies.  Name constraints are processed
+Not checked: CRLs, certificate policies (OCSP: the ocsp module; a certificate's responders,
+caIssuers and TLS features are read).  Name constraints are processed
 for DNS names, IP addresses, e-mail addresses (rfc822Name), URIs (their host) and directory
 names (a byte-wise prefix of the subject's RDNs); a CA that constrains another form refuses
 every certificate below it that has a name of that form (RFC 5280 4.2.1.10).  They apply to
@@ -43743,6 +44003,9 @@ the leaf and to the intermediates below the CA, self-issued ones excepted (6.1.3
 
 ```rust
 OID_ED25519: &[u64] = &[1, 3, 101, 112]
+/// the TLS feature of a certificate that must come with a stapled OCSP response (RFC 7633:
+/// status_request)
+TLS_FEATURE_STATUS_REQUEST: u16 = 5
 /// key usage bits as they appear in the first byte
 KU_DIGITAL_SIGNATURE: u8 = 0x80
 KU_KEY_CERT_SIGN: u8 = 0x04
@@ -43817,11 +44080,29 @@ KU_CRL_SIGN: u8 = 0x02
   - `other_names: Vec<u8>` -- the tags of subject alternative names of other forms (otherName 0xa0, x400Address 0xa3,
     ediPartyName 0xa5, registeredID 0x88)
   - `ski: Vec<u8>`
+  - `aki: Vec<u8>` -- the keyIdentifier of the authority key identifier (empty without one): which key of the
+    issuer signed it (ACME's renewal information names a certificate by it)
+  - `ocsp_urls: Vec<String>` -- the OCSP responders of the authority information access (URIs, RFC 5280 4.2.2.1)
+  - `ca_issuers: Vec<String>` -- where the issuer's certificate is (caIssuers URIs of the authority information access)
+  - `tls_features: Vec<u16>` -- the TLS features the certificate demands (RFC 7633): TLS_FEATURE_STATUS_REQUEST is
+    "must staple", a TLS client that asks for a stapled OCSP response refuses it without one
+    (netio: Revocation::Stapled or Required with Trust::Anchors, System or Custom; with
+    Revocation::Off, Trust::Pinned or Trust::Any it asks for none and does not look)
+  - `ocsp_nocheck: bool` -- id-pkix-ocsp-nocheck (RFC 6960 4.2.2.2.1): an OCSP responder's certificate that is not
+    checked for revocation itself
   - `unknown_critical: bool` -- a critical extension this code does not understand (such a certificate is rejected)
 
 **`impl Cert`**
 
 - **`fn parse(bytes: &[u8]) -> Option<Cert>`**
+- **`fn spki(&self) -> Vec<u8>`**
+  its SubjectPublicKeyInfo as it stands in the certificate (DER): what keys are pinned by
+  and a certificate request carries
+- **`fn ocsp_signer(&self) -> bool`**
+  whether its extended key usage allows signing OCSP responses (id-kp-OCSPSigning: a
+  responder its CA delegated to, RFC 6960 4.2.2.2)
+- **`fn must_staple(&self) -> bool`**
+  whether it must come with a stapled OCSP response (RFC 7633)
 - **`fn fingerprint_bytes(&self) -> [u8; 32]`**
   SHA-256 of the certificate
 - **`fn fingerprint_text(&self) -> String`**
@@ -43840,12 +44121,21 @@ KU_CRL_SIGN: u8 = 0x02
   whether a signature over `data` was made with this certificate's key
 - **`fn signed_by(&self, issuer: &Cert) -> bool`**
   whether `issuer` signed this certificate
+- **`fn eku_allows(&self, u: Usage) -> bool`**
+  whether the extended key usage allows this purpose (no extended key usage: every purpose)
 - **`fn names(&self, host: &str) -> bool`**
   whether the certificate names this host (DNS name, case-insensitive; IP address)
 
 - **`fn verify_chain(chain: &[Cert], anchors: &[Cert], now: i64, name: Option<&str>, usage: Usage) -> Result<(), String>`**
   check a chain (leaf first) against trusted anchors: a path from the leaf through the other
   certificates of the chain (in any order) to an anchor
+
+- **`fn check_leaf(leaf: &Cert, now: i64, name: Option<&str>, usage: Usage) -> Result<(), String>`**
+  the checks of verify_chain that concern the leaf alone: no unknown critical extension,
+  valid at `now`, for this usage (extended key usage), allowed to sign (key usage
+  digitalSignature), no CA's extensions on a certificate that is no CA (keyCertSign, name
+  constraints: RFC 5280 4.2.1.9, 4.2.1.10), and the name.  netio::roots asks them after a
+  system's verifier said yes to the path, so the leaf follows the same rules everywhere
 
 - **`struct CertBuilder`**
   what a new certificate says
@@ -43862,6 +44152,11 @@ KU_CRL_SIGN: u8 = 0x02
   - `client_auth: bool`
   - `spki: Vec<u8>` -- the subject's key as a SubjectPublicKeyInfo (PrivateKey::spki, spki_of); empty: the
     Ed25519 key `public_key`
+  - `ocsp_urls: Vec<String>` -- OCSP responders to name in the authority information access (http URIs)
+  - `must_staple: bool` -- a leaf that must come with a stapled OCSP response (the TLS feature status_request,
+    RFC 7633)
+  - `ocsp_signing: bool` -- a leaf that signs OCSP responses for its issuer (id-kp-OCSPSigning, with
+    id-pkix-ocsp-nocheck)
 
 - **`fn extension(oid: &[u64], critical: bool, value: &[u8]) -> Vec<u8>`**
   a DER Extension (oid, the critical flag, the DER value) for CertBuilder::sign_ext
@@ -43886,6 +44181,58 @@ KU_CRL_SIGN: u8 = 0x02
 - **`fn ed25519_from_pkcs8(b: &[u8]) -> Option<[u8; 32]>`**
   the seed of a PKCS#8 Ed25519 private key
 
+### `x509/csr.rs`
+
+Source: [`lib/x509/csr.rs`](../lib/x509/csr.rs)
+
+```text
+csr -- certificate requests (PKCS #10, RFC 2986): what ACME's finalize sends (RFC 8555 7.4)
+and what a private CA reads before it signs
+
+  CsrBuilder { dns, ips, cn, must_staple }.sign(&key) -> Option<DER>
+  Csr::parse(der) -> Option<Csr>     the subject, the key, the requested names; its signature
+                                     checked (the requester holds the key)
+
+The names go into an extensionRequest (PKCS #9) as a subject alternative name; the common
+name is optional (ACME's CAs take the names from the extension).
+```
+
+- **`struct CsrBuilder`**
+  a request to build
+  - `cn: String` -- the common name (empty: none; ACME takes at most 64 bytes, RFC 5280's ub-common-name)
+  - `dns: Vec<String>`
+  - `ips: Vec<IpAddr>`
+  - `must_staple: bool` -- ask for a certificate that must come with a stapled OCSP response (RFC 7633)
+
+**`impl CsrBuilder`**
+
+- **`fn for_names(names: &[&str]) -> CsrBuilder`**
+  a request for these DNS names (the first one also the common name when it fits)
+- **`fn sign(&self, key: &PrivateKey) -> Option<Vec<u8>>`**
+  the DER request, signed with `key` (ECDSA with its curve's hash, RSA PKCS #1 v1.5 with
+  SHA-256, Ed25519); None when a name is not a DNS name in the preferred syntax, or an RSA
+  key is shorter than 2048 bits or not a whole number of bytes (as Csr::parse and
+  certificates take them)
+
+- **`struct Csr`**
+  a request read and its signature checked
+  - `der: Vec<u8>`
+  - `subject: Vec<u8>` -- the subject (DER of the Name)
+  - `cn: String`
+  - `spki: Vec<u8>` -- the SubjectPublicKeyInfo (DER), for CertBuilder::spki
+  - `key: PubKey`
+  - `dns: Vec<String>` -- the names of the requested subject alternative name (DNS names lower case)
+  - `ips: Vec<IpAddr>`
+  - `tls_features: Vec<u16>` -- the requested TLS features (RFC 7633)
+  - `sig_alg: SigAlg`
+
+**`impl Csr`**
+
+- **`fn parse(b: &[u8]) -> Option<Csr>`**
+  a request: version 0, a key this crate reads, a signature by that key; the names of an
+  extensionRequest (other extensions are left to the CA, which decides what it signs).
+  None when it is malformed or the signature does not verify
+
 ### `x509/der.rs`
 
 Source: [`lib/x509/der.rs`](../lib/x509/der.rs)
@@ -43905,6 +44252,7 @@ BIT_STRING: u8 = 0x03
 OCTET_STRING: u8 = 0x04
 NULL: u8 = 0x05
 OID: u8 = 0x06
+ENUMERATED: u8 = 0x0a
 UTF8: u8 = 0x0c
 PRINTABLE: u8 = 0x13
 IA5: u8 = 0x16
@@ -44064,6 +44412,149 @@ each other in variable time, as a program does at start), then signs in constant
 
 - **`fn spki_of(key: &PubKey) -> Vec<u8>`**
   the SubjectPublicKeyInfo of a public key (empty for PubKey::Other)
+
+### `x509/ocsp.rs`
+
+Source: [`lib/x509/ocsp.rs`](../lib/x509/ocsp.rs)
+
+```text
+ocsp -- the Online Certificate Status Protocol (RFC 6960, the lightweight profile of RFC
+5019): what TLS staples (RFC 6066 8, RFC 8446 4.4.2.1) and what a private CA answers
+
+  CertId::new(&cert, &issuer)             the certificate's id (SHA-1, as RFC 5019 asks;
+                                          CertId::with_hash for SHA-256 and longer)
+  request(&[id], nonce) -> DER            an OCSPRequest (unsigned, RFC 6960 4.1)
+  Request::parse(der)                     the ids and the nonce of a request (a responder)
+  check(der, &cert, &issuer, now) -> Result<Response, String>
+                                          a response about `cert`: signed by its issuer or by
+                                          a responder the issuer delegated to, current at
+                                          `now`; Response { status, this_update, .. }
+  ResponseBuilder { status, .. }.sign(&cert, &issuer, responder, &key) -> DER
+  error_response(code) -> DER             an unsuccessful one (tryLater, unauthorized, ..)
+
+A response is current from thisUpdate (5 minutes of clock skew allowed) to nextUpdate (and
+5 minutes after it); one without nextUpdate for a day after thisUpdate, as browsers take it.
+Delegated responders (RFC 6960 4.2.2.2) must be issued directly by the issuer, carry
+id-kp-OCSPSigning (and digitalSignature, when they have a key usage) and be valid, and a
+response counts no longer than its responder's certificate; their own revocation is not
+checked (they carry id-pkix-ocsp-nocheck as a rule).  Unknown critical extensions refuse a
+response, and a request.
+```
+
+```rust
+/// the clock skew taken at either end of a response's time
+SKEW: i64 = 300
+/// how long a response without nextUpdate counts as current after its thisUpdate
+NO_NEXT_UPDATE: i64 = 86_400
+/// the response statuses of an unsuccessful OCSPResponse (RFC 6960 4.2.1)
+MALFORMED_REQUEST: u8 = 1
+INTERNAL_ERROR: u8 = 2
+TRY_LATER: u8 = 3
+SIG_REQUIRED: u8 = 5
+UNAUTHORIZED: u8 = 6
+```
+
+- **`enum IdHash`**
+  the hash of a CertID
+  - `Sha1`
+  - `Sha256`
+  - `Sha384`
+  - `Sha512`
+
+- **`struct CertId`**
+  which certificate a request or response is about (RFC 6960 4.1.1)
+  - `hash: IdHash`
+  - `name_hash: Vec<u8>` -- the hash of the issuer's name (its DER)
+  - `key_hash: Vec<u8>` -- the hash of the issuer's public key (the bytes of its subjectPublicKey)
+  - `serial: Vec<u8>` -- the certificate's serial number (the INTEGER's content)
+
+**`impl CertId`**
+
+- **`fn new(cert: &Cert, issuer: &Cert) -> Option<CertId>`**
+  the id of `cert` with SHA-1 (RFC 5019 2.1.1: what responders take); None when `issuer` is
+  not the one that names it or its key cannot be read
+- **`fn with_hash(cert: &Cert, issuer: &Cert, hash: IdHash) -> Option<CertId>`**
+- **`fn encode(&self) -> Vec<u8>`**
+  the DER CertID (a request's or a response's)
+
+- **`fn request(ids: &[CertId], nonce: Option<&[u8]>) -> Vec<u8>`**
+  an OCSPRequest for these certificates, unsigned; `nonce` (1 to 32 bytes) binds the answer
+  to it (responders of RFC 5019 answer from a cache and leave it out)
+
+- **`struct Request`**
+  what a request asks (for a responder)
+  - `ids: Vec<CertId>`
+  - `nonce: Option<Vec<u8>>`
+
+**`impl Request`**
+
+- **`fn parse(b: &[u8]) -> Option<Request>`**
+  an OCSPRequest: version 1, no requestor name, no signature (a signed one is not taken:
+  None), at most 64 certificates
+
+- **`enum Status`**
+  the status of a certificate
+  - `Good`
+  - `Revoked { time: i64, reason: Option<u8> }` -- since `time` (Unix seconds), for `reason` (CRLReason, RFC 5280 5.3.1) when given
+  - `Unknown` -- the responder does not know the certificate
+
+- **`struct Response`**
+  a checked response
+  - `status: Status`
+  - `this_update: i64` -- Unix seconds
+  - `next_update: Option<i64>`
+  - `produced_at: i64`
+  - `nonce: Option<Vec<u8>>` -- the nonce it carries (compare it with the request's)
+  - `responder_until: Option<i64>` -- the end of the delegated responder's certificate that signed it (None: the issuer
+    signed it); the response counts no longer
+
+**`impl Response`**
+
+- **`fn expires(&self) -> i64`**
+  until when it counts as current: nextUpdate (or a day after thisUpdate), at most to the
+  end of a delegated responder's certificate
+- **`fn refresh_at(&self) -> i64`**
+  when a server fetches the next one: halfway between thisUpdate and the end (as RFC 5019
+  6.2 and the CAs advise), an hour before the end where that comes earlier but not before
+  thisUpdate (a short response gets less than an hour); never after the end (a thisUpdate
+  ahead within the clock skew, a delegated responder about to expire)
+- **`fn next_fetch(&self, now: i64) -> i64`**
+  when a server that got it at `now` fetches the next one: refresh_at, a minute from now at
+  the earliest (no fetch loop), but 10 seconds before the response expires when that comes
+  first (10 seconds from now at the earliest: a response that ends sooner than that lapses
+  before the next fetch, the floor that keeps a loop away wins)
+
+- **`fn check(b: &[u8], cert: &Cert, issuer: &Cert, now: i64) -> Result<Response, String>`**
+  a response about `cert`, which `issuer` issued, at `now` (Unix seconds): its structure, its
+  signature (the issuer, or a responder certificate in it that the issuer issued for OCSP), the
+  entry for `cert`, its time.  Ok with the status (a revoked one too: the caller decides);
+  Err why it cannot be used (an unsuccessful response, tryLater among them).  That `issuer`
+  signed `cert` is the caller's to know (Cert::signed_by): the response is bound to the
+  issuer's name and key, so one for another CA's certificate does not count
+
+- **`struct ResponseBuilder`**
+  a response to build and sign (a private CA's responder, tests)
+  - `status: Status`
+  - `this_update: i64`
+  - `next_update: Option<i64>` -- None: newer information is always there (a response without nextUpdate)
+  - `produced_at: i64`
+  - `nonce: Option<Vec<u8>>` -- the request's nonce, to answer it
+  - `by_key: bool` -- the responder named by the SHA-1 of its key (byKey, RFC 5019 2.2.3) instead of its name
+  - `hash: IdHash`
+  - `extensions: Vec<Vec<u8>>` -- further responseExtensions (each from x509::extension)
+
+**`impl ResponseBuilder`**
+
+- **`fn good(now: i64) -> ResponseBuilder`**
+  good, current from `now` for four days, by key
+- **`fn sign(&self, cert: &Cert, issuer: &Cert, responder: Option<&Cert>, key: &PrivateKey) -> Option<Vec<u8>>`**
+  the DER response about `cert`, signed with `key`: the issuer's key (`responder` None), or
+  that of a responder certificate the issuer issued for OCSP (it goes into the response);
+  None when `key` is not that certificate's, or it signs nothing a certificate names
+
+- **`fn error_response(code: u8) -> Vec<u8>`**
+  an unsuccessful OCSPResponse (MALFORMED_REQUEST, INTERNAL_ERROR, TRY_LATER, SIG_REQUIRED,
+  UNAUTHORIZED): no responseBytes, nothing signed
 
 ## compress
 
@@ -45312,10 +45803,15 @@ netio -- network protocols on top of plat::net
   client     Client::request(...): blocking, timeouts, size limit
   tls        TLS 1.3 servers and clients (ChaCha20-Poly1305, AES-GCM; X25519MLKEM768,
              X25519, P-256, P-384; Ed25519, ECDSA, RSA keys; SNI, ALPN, mutual auth;
-             resumption with tickets, 0-RTT where the server allows it) and the TLS 1.2
+             resumption with tickets, 0-RTT where the server allows it, OCSP stapling) and the TLS 1.2
              fallback for public servers: connect / accept -> TlsStream (a Stream)
   x509 / der the crate jflib-x509 (re-exported): certificates (parse, build with any key,
-             verify chains) of a private CA and of the web PKI; PrivateKey (PKCS #8 ...)
+             verify chains) of a private CA and of the web PKI; PrivateKey (PKCS #8 ...);
+             OCSP responses and certificate requests
+  ocsp       a certificate's status from its CA's responder; the stapled responses of a TLS
+             server kept current (tls::Staples)
+  acme       certificates from an ACME CA (RFC 8555: Let's Encrypt, ...): accounts, orders,
+             http-01 / tls-alpn-01 / dns-01, renewal information, revocation
   pem        PEM blocks
   roots      the system's certificate authorities (Windows: CryptoAPI; Linux: the bundle)
   ssh        SSH-2 client (curve25519, ssh-ed25519, chacha20-poly1305): run commands with
@@ -45353,6 +45849,319 @@ Re-exports: `x509::der`
     after read gave Ok(0): whether the peer ended the stream in order.  TLS: only after its
     close_notify -- a TCP end without one may be an attacker cutting a body that runs to the
     end of the connection (HTTP without a length).  Plain streams: always
+
+### `netio/acme.rs`
+
+Source: [`lib/netio/acme.rs`](../lib/netio/acme.rs)
+
+```text
+acme -- certificates from a CA that speaks ACME (RFC 8555): Let's Encrypt, ZeroSSL, Google
+Trust Services, a company's step-ca.  http-01, tls-alpn-01 (RFC 8737) and dns-01 challenges,
+DNS names and IP addresses (RFC 8738), renewal information (ARI, RFC 9773), external
+account binding (RFC 8555 7.3.4), profiles, key change, revocation
+
+  Acme::new(client, directory_url) -> Result<Acme, AcmeError>     reads the CA's directory
+  acme.account(key, &NewAccount { contact, terms_agreed, eab, .. }) -> Account
+  account.issue(&ids, &cert_key, &mut solver, &OrderOptions) -> Issued { chain, pem, .. }
+      the whole issuance: an order, each authorization proved by `solver`, a certificate
+      request for `cert_key`, the chain once the CA has issued it
+  step by step: new_order, authorization, respond, wait_authorization, finalize,
+      wait_order, certificate
+  acme.renewal_info(&cert) (ARI: when to renew), account.revoke, change_key, update_contact,
+      deactivate; revoke_with_key (by the certificate's own key)
+  Solver: what proves control of a name -- Http01 (a netio Server's handler answers
+      /.well-known/acme-challenge/), TlsAlpn01 (a tls::ServerConfig that answers
+      "acme-tls/1"), a DNS provider's code of the program's own (dns01_name, dns01_value)
+
+Every request is a JWS (RFC 7515) signed with the account key: ES256 (P-256), ES384 (P-384),
+RS256 (RSA) or EdDSA (Ed25519; not every CA takes it).  The CA's URLs must be https; its
+answers are bounded (64 KiB, a certificate chain 1 MiB) and checked: the chain issued must be
+for the certificate key and every identifier ordered.  A wait for an authorization or the
+order follows Retry-After and ends after Acme::timeout_ms.
+```
+
+```rust
+/// Let's Encrypt's directory, and its staging one (for tests: higher rate limits, an untrusted
+/// root)
+LETS_ENCRYPT: &str = "https://acme-v02.api.letsencrypt.org/directory"
+LETS_ENCRYPT_STAGING: &str = "https://acme-staging-v02.api.letsencrypt.org/directory"
+/// the ALPN protocol of tls-alpn-01 (RFC 8737 6.2)
+ACME_TLS_ALPN: &str = "acme-tls/1"
+/// the longest answer of the CA (JSON), and of a certificate chain
+MAX_ANSWER: usize = 64 * 1024
+MAX_CHAIN: usize = 1 << 20
+```
+
+- **`struct Problem`**
+  a problem document of the CA (RFC 8555 6.7, RFC 7807)
+  - `status: u16` -- the HTTP status of the answer (0 inside an object: an authorization's error)
+  - `kind: String` -- "urn:ietf:params:acme:error:rateLimited", ...
+  - `detail: String`
+  - `identifier: Option<Identifier>` -- the identifier a subproblem is about (RFC 8555 6.7.1)
+  - `subproblems: Vec<Problem>`
+  - `retry_after: Option<u64>` -- seconds to wait before trying again (Retry-After), when the CA says
+
+**`impl Problem`**
+
+- **`fn is(&self, name: &str) -> bool`**
+  whether it is the ACME error `name` ("badNonce", "rateLimited", "unauthorized", ...)
+
+- **`enum AcmeError`**
+  - `Http(HttpError)` -- the request did not reach the CA, or no HTTP answer came
+  - `Problem(Problem)` -- the CA refused (its problem document)
+  - `Protocol(String)` -- an answer of the CA that does not follow RFC 8555
+  - `Invalid(String, Option<Problem>)` -- an authorization or the order ended invalid (the CA's reason, when it gave one)
+  - `Solver(String)` -- the solver could not set a challenge up
+  - `Timeout(String)` -- the CA did not decide within Acme::timeout_ms
+
+- **`enum Identifier`**
+  what a certificate is for
+  - `Dns(String)` -- a DNS name, lower case; "\*.example.com" for a wildcard (dns-01 only)
+  - `Ip(IpAddr)` -- an IP address (RFC 8738)
+
+**`impl Identifier`**
+
+- **`fn parse(s: &str) -> Identifier`**
+  a name or an address ("example.com", "\*.example.com", "192.0.2.1", "2001:db8::1")
+- **`fn value(&self) -> String`**
+  the text of the identifier (an address in its RFC 5952 form)
+- **`fn tls_name(&self) -> String`**
+  the name a validator puts in server_name for tls-alpn-01: the name, or for an address
+  its reverse DNS name (RFC 8738 6)
+
+- **`struct Directory`**
+  the CA's directory (RFC 8555 7.1.1)
+  - `new_nonce: String`
+  - `new_account: String`
+  - `new_order: String`
+  - `revoke_cert: String`
+  - `key_change: String`
+  - `new_authz: Option<String>` -- pre-authorization (most CAs have none)
+  - `renewal_info: Option<String>` -- renewal information (RFC 9773)
+  - `terms_of_service: Option<String>` -- what an account must agree to (NewAccount::terms_agreed)
+  - `website: Option<String>`
+  - `caa_identities: Vec<String>` -- the names a CAA record must name for this CA
+  - `external_account_required: bool` -- accounts need an external account binding (NewAccount::eab)
+  - `profiles: Vec<(String, String)>` -- the certificate profiles offered: (name, description)
+
+- **`fn rfc3339(s: &str) -> Option<i64>`**
+  an RFC 3339 time ("2026-11-24T08:00:00Z", fractions, an offset) -> Unix seconds
+
+- **`fn rfc3339_text(t: i64) -> String`**
+  Unix seconds -> "2026-11-24T08:00:00Z"
+
+- **`fn thumbprint(key: &PubKey) -> Option<String>`**
+  the JWK thumbprint (RFC 7638, SHA-256), base64url
+
+- **`struct Eab`**
+  an external account binding (RFC 8555 7.3.4): the key id and MAC key the CA handed out
+  - `kid: String`
+  - `hmac_key: Vec<u8>`
+
+**`impl Eab`**
+
+- **`fn new(kid: &str, hmac_key_b64: &str) -> Option<Eab>`**
+  the key id and the MAC key as the CA shows it (base64url)
+
+- **`struct NewAccount`**
+  a new (or existing) account
+  - `contact: Vec<String>` -- "mailto:admin@example.com" (some CAs need one; Let's Encrypt no longer writes to them)
+  - `terms_agreed: bool` -- the directory's terms of service agreed to
+  - `only_existing: bool` -- only find the account of the key, make none (RFC 8555 7.3.1)
+  - `eab: Option<Eab>`
+
+- **`struct OrderOptions`**
+  an order's options
+  - `not_before: Option<i64>` -- the validity asked for (Unix seconds; most CAs decide it themselves)
+  - `not_after: Option<i64>`
+  - `profile: Option<String>` -- a profile of the directory's (Directory::profiles)
+  - `replaces: Option<String>` -- the certificate this one replaces (its ARI id, ari_id): the CA can tell a renewal
+  - `must_staple: bool` -- a certificate that must come with a stapled OCSP response (RFC 7633; not every CA
+    issues them)
+
+- **`struct Order`**
+  - `url: String`
+  - `status: String` -- "pending", "ready", "processing", "valid", "invalid"
+  - `expires: Option<i64>`
+  - `identifiers: Vec<Identifier>`
+  - `authorizations: Vec<String>`
+  - `finalize: String`
+  - `certificate: Option<String>`
+  - `error: Option<Problem>`
+  - `profile: Option<String>`
+
+- **`struct Challenge`**
+  - `kind: String` -- "http-01", "tls-alpn-01", "dns-01", ...
+  - `url: String`
+  - `status: String` -- "pending", "processing", "valid", "invalid"
+  - `token: String` -- base64url (checked: only its alphabet, 16 to 256 characters)
+  - `error: Option<Problem>`
+
+- **`struct Authorization`**
+  - `url: String`
+  - `status: String` -- "pending", "valid", "invalid", "deactivated", "expired", "revoked"
+  - `identifier: Identifier`
+  - `wildcard: bool` -- for "\*." plus the identifier (dns-01 only)
+  - `expires: Option<i64>`
+  - `challenges: Vec<Challenge>`
+
+- **`struct Issued`**
+  a certificate issued
+  - `chain: Vec<Vec<u8>>` -- DER, leaf first
+  - `pem: String` -- the chain as the CA sent it (PEM): for the server's certificate file
+  - `alternates: Vec<String>` -- other chains the CA offers (Link rel="alternate"; Acme::certificate fetches them)
+  - `order: Order`
+
+**`impl Issued`**
+
+- **`fn identity(&self, key: &PrivateKey) -> Identity`**
+  the identity for a TLS server: the chain and the certificate key
+
+- **`struct RenewalInfo`**
+  when to renew a certificate (ARI, RFC 9773)
+  - `start: i64` -- the window the CA suggests (Unix seconds): renew at a random time in it
+  - `end: i64`
+  - `explanation: Option<String>`
+  - `retry_after: u64` -- when to ask again (seconds, Retry-After; 6 hours when the CA does not say)
+
+**`impl RenewalInfo`**
+
+- **`fn renew_at(&self, fraction: f64) -> i64`**
+  a time in the window to renew at: start + (end - start) \* fraction (a random fraction in
+  [0, 1) spreads the renewals out, as RFC 9773 4.2 asks)
+
+- **`fn ari_id(cert: &Cert) -> Option<String>`**
+  a certificate's id in renewal information and in an order's "replaces" (RFC 9773 4.1): the
+  key identifier of its authority key identifier and its serial number; None without the
+  former
+
+- **`struct Acme`**
+  the client of one CA (cheap to clone: the clones share the nonces)
+  - `directory: Arc<Directory>`
+  - `timeout_ms: u64` -- the longest wait for an authorization or the order to be decided (ms; 3 minutes)
+  - `poll_ms: u32` -- the pause between two looks at an authorization or the order when the CA sends no
+    Retry-After (ms; 2 seconds)
+  - `max_poll_ms: u32` -- the longest pause taken from a Retry-After (ms; 30 s); a shorter Retry-After counts as
+    at least half a second (or max_poll_ms, when that is less). No pause of either kind goes
+    past timeout_ms: the last one ends at it
+
+**`impl Acme`**
+
+- **`fn new(client: Client, directory: &str) -> Result<Acme, AcmeError>`**
+  the CA at `directory` (an https URL: LETS_ENCRYPT, ...) over `client` (with an https
+  connector: trust::system_connector for public CAs)
+- **`fn account(&self, key: PrivateKey, new: &NewAccount) -> Result<Account, AcmeError>`**
+  the account of `key` (made when there is none and new.only_existing is false)
+- **`fn renewal_info(&self, cert: &Cert) -> Result<RenewalInfo, AcmeError>`**
+  when the CA suggests renewing `cert` (ARI, RFC 9773); Err when the directory has no
+  renewalInfo or the certificate no authority key identifier
+
+- **`struct Account`**
+  an account of a CA
+  - `url: String` -- the account's URL (its key id, "kid")
+  - `status: String` -- "valid", "deactivated", "revoked"
+  - `contact: Vec<String>`
+  - `created: bool` -- the CA made it on this call (201)
+
+**`impl Account`**
+
+- **`fn acme(&self) -> &Acme`**
+- **`fn key(&self) -> &PrivateKey`**
+- **`fn key_authorization(&self, token: &str) -> String`**
+  what a challenge with this token must show (RFC 8555 8.1): token "." the thumbprint of
+  the account key
+- **`fn new_order(&self, ids: &[Identifier], opts: &OrderOptions) -> Result<Order, AcmeError>`**
+  a new order for these identifiers
+- **`fn order(&self, url: &str) -> Result<Order, AcmeError>`**
+  an order as it stands now
+- **`fn authorization(&self, url: &str) -> Result<Authorization, AcmeError>`**
+- **`fn respond(&self, ch: &Challenge) -> Result<(), AcmeError>`**
+  tell the CA a challenge is ready to be checked (RFC 8555 7.5.1)
+- **`fn wait_authorization(&self, url: &str) -> Result<Authorization, AcmeError>`**
+  wait until the authorization is decided: Ok when valid.  Acme::timeout_ms bounds the
+  waiting: no look starts after it (0: none); a request under way runs out under the
+  Client's timeouts, and what it brings counts (a valid authorization is the CA's
+  decision, however late it comes)
+- **`fn wait_order(&self, url: &str) -> Result<Order, AcmeError>`**
+  wait until the order is no longer pending or processing (Acme::timeout_ms as
+  wait_authorization)
+- **`fn finalize(&self, order: &Order, csr: &[u8]) -> Result<Order, AcmeError>`**
+  send the certificate request (DER) of a ready order
+- **`fn certificate(&self, url: &str) -> Result<(Vec<Vec<u8>>, String, Vec<String>), AcmeError>`**
+  the chain at a certificate URL (an order's, or an alternate one) -> (DER chain, PEM,
+  alternates)
+- **`fn issue(&self, ids: &[Identifier], cert_key: &PrivateKey, solver: &mut dyn Solver, opts: &OrderOptions) -> Result<Issued, AcmeError>`**
+  the whole issuance for `ids` and the key `cert_key` (not the account key): an order;
+  each pending authorization proved with the first challenge type of solver.kinds() it
+  offers (a wildcard only by dns-01), set up, answered, waited for and taken down; the
+  certificate request; the chain, checked to be for `cert_key` and every identifier
+- **`fn revoke(&self, cert_der: &[u8], reason: Option<u8>) -> Result<(), AcmeError>`**
+  revoke a certificate of this account (RFC 8555 7.6); `reason`: a CRLReason (RFC 5280
+  5.3.1: 1 keyCompromise, 4 superseded, 5 cessationOfOperation, ...)
+- **`fn change_key(&mut self, new_key: PrivateKey) -> Result<(), AcmeError>`**
+  change the account's key (RFC 8555 7.3.5)
+- **`fn update_contact(&mut self, contact: &[String]) -> Result<(), AcmeError>`**
+  replace the account's contact addresses
+- **`fn deactivate(&mut self) -> Result<(), AcmeError>`**
+  end the account (RFC 8555 7.3.6): it cannot be used again
+
+- **`fn revoke_with_key(acme: &Acme, cert_der: &[u8], cert_key: &PrivateKey, reason: Option<u8>) -> Result<(), AcmeError>`**
+  revoke a certificate by its own key (signed with it, no account: a lost account key, a
+  compromised certificate key)
+
+- **`trait Solver`**
+  what proves control of an identifier
+  - `fn kinds(&self) -> Vec<&'static str>`
+    the challenge types it sets up, the preferred first ("http-01", "tls-alpn-01",
+    "dns-01")
+  - `fn present(&mut self, id: &Identifier, ch: &Challenge, key_auth: &str) -> Result<(), String>`
+    set the challenge up for `id` ("\*.example.com" for a wildcard): `key_auth` is what it
+    must show (dns-01: dns01_value(key_auth) as TXT of dns01_name(id))
+  - `fn cleanup(&mut self, id: &Identifier, ch: &Challenge)`
+    take it down once the authorization is decided
+
+- **`fn dns01_name(id: &Identifier) -> String`**
+  the TXT record's name of dns-01 (RFC 8555 8.4): "\_acme-challenge." and the name (a
+  wildcard's without "\*.")
+
+- **`fn dns01_value(key_auth: &str) -> String`**
+  the TXT record's value of dns-01: base64url of SHA-256 of the key authorization
+
+- **`struct Http01`**
+  http-01 (RFC 8555 8.3): the key authorizations a netio HTTP server answers at
+  /.well-known/acme-challenge/&lt;token> on port 80.  Clones share the tokens: one goes to the
+  solver, one into the server (handler or answer)
+
+**`impl Http01`**
+
+- **`fn new() -> Http01`**
+- **`fn answer(&self, req: &Request) -> Option<Response>`**
+  the answer to a challenge request, None for every other request
+- **`fn handler(&self, next: Handler) -> Handler`**
+  a handler that answers challenges and hands every other request to `next`
+
+- **`struct TlsAlpn01`**
+  tls-alpn-01 (RFC 8737): a certificate for the challenge, shown on port 443 to a client that
+  offers only "acme-tls/1".  Clones share the certificates: one goes to the solver, one into
+  the server's config (setup).  A name has one challenge at a time: another one for it fails
+  to be set up until the first is cleaned up; the same challenge set up twice (two orders the
+  CA gave it to) keeps its first certificate and stays until both are cleaned up
+
+**`impl TlsAlpn01`**
+
+- **`fn new() -> TlsAlpn01`**
+- **`fn setup(&self, cfg: &mut ServerConfig)`**
+  let `cfg` answer the challenges: "acme-tls/1" among its protocols (last; to a client that
+  does not offer it alone the server's list is as if it were not there, so a server without
+  protocols of its own still answers without ALPN), and a select that shows the challenge
+  certificate for a ClientHello offering only it (before the config's own select)
+- **`fn certificate(id: &Identifier, key_auth: &str) -> Option<Identity>`**
+  the self-signed certificate of a challenge (RFC 8737 3): the identifier as its only
+  name, the critical acmeIdentifier with SHA-256 of the key authorization
+
+- **`struct Solvers(pub Vec<Box<dyn Solver + Send>>)`**
+  several solvers, each for the challenge types it sets up (a DNS provider for wildcards,
+  http-01 for the rest): the first that sets up a type the authorization offers takes it
 
 ### `netio/client.rs`
 
@@ -45659,6 +46468,46 @@ MAX_HEADERS: usize = 100
 - **`fn write_request(s: &dyn Stream, method: &str, target: &str, h: &Headers, body: &[u8]) -> bool`**
   send a request (the body as Content-Length)
 
+### `netio/ocsp.rs`
+
+Source: [`lib/netio/ocsp.rs`](../lib/netio/ocsp.rs)
+
+```text
+ocsp -- OCSP over HTTP (RFC 6960 A.1, RFC 5019): a certificate's status from its CA's
+responder, and the stapled responses a server keeps current
+
+  fetch(&client, &cert, &issuer) -> Result<(DER, Response), String>
+                                  a POST of the request to the certificate's responder (its
+                                  first http(s) OCSP URI), the answer checked
+  refresh(&staples, &client, &chain, issuer) -> Result<i64, String>
+                                  a server's staple for the leaf of `chain`: fetched when there
+                                  is none or it is due, kept in `staples` (tls::Staples) ->
+                                  when to call again (Unix seconds)
+
+A server calls refresh for each of its certificates at start and then at the times it
+returns; after an error again within the hour (the kept response serves until its
+nextUpdate).  Responders speak plain http as a rule: the response is signed, the request
+carries no secret (RFC 6960 A.1).
+```
+
+```rust
+/// the longest answer taken from a responder
+MAX_RESPONSE: usize = 64 * 1024
+/// how soon refresh asks again after a failed fetch
+RETRY_S: i64 = 3600
+```
+
+- **`fn fetch(client: &Client, cert: &Cert, issuer: &Cert) -> Result<(Vec<u8>, Response), String>`**
+  the status of `cert` from its CA's OCSP responder: the first http or https URI of its
+  authority information access gets the request by POST; the answer must be a response
+  that check takes now -> its DER (to staple) and what it says
+
+- **`fn refresh(staples: &Staples, client: &Client, chain: &[Vec<u8>], issuer: Option<&Cert>) -> Result<i64, String>`**
+  keep the staple of the leaf of `chain` (DER, leaf first) current: fetched when there is
+  none, it is due (Response::refresh_at) or out of date.  `issuer`: the leaf's issuer when the
+  chain does not hold it.  -> when to call again (Unix seconds); Err: why the fetch failed
+  (call again within RETRY_S: the kept response serves until it is out of date)
+
 ### `netio/pem.rs`
 
 Source: [`lib/netio/pem.rs`](../lib/netio/pem.rs)
@@ -45685,16 +46534,45 @@ Source: [`lib/netio/roots.rs`](../lib/netio/roots.rs)
 ```text
 roots -- the system's certificate authorities for TLS clients of public servers
 
-  verify_system(chain, host, now)   Windows: CryptoAPI checks the chain (plat::certs);
-                                    Linux: a path to one of the bundle's CAs (verify_chain)
-  system_anchors()                  Linux: the distribution's CA bundle, parsed once
+  verify_system(chain, host, extra, ocsp, now) -> Result<(), Refused>
+       Windows, macOS, iOS: the system checks the chain (plat::certs: its roots and policy,
+       the extra CAs under the same policy, the stapled OCSP response), then netio the leaf
+       once more (x509::check_leaf: its name, usage and extensions, and a key netio takes:
+       the same rules on every system); Linux: a path to one of the bundle's CAs
+       (verify_chain), else, where it finds none, to one of the extra CAs.  The stapled
+       response goes to Windows' and Apple's checks; verify_system itself does not check it
+       (Linux takes none): the TLS client does (tls/conn.rs check_staple, by
+       ClientConfig::revocation), another caller with x509::ocsp::check
+  verify_system_roots(chain, host, roots, now)
+       the same with only these CAs trusted, nothing fetched: the system's checks against a
+       PKI of one's own (tools/limbo_check.py --system); an empty host checks no name
+  system_anchors()
+       the bundle's CAs (Linux: plat::certs::root_bundle; macOS: /etc/ssl/cert.pem, where a
+       stapled response's issuer is looked for), parsed once and again when the bundle
+       changed (looked at once a minute at most); reload(): look again at the next check
+  Refused { reason, text }, Reason (UnknownCa, Expired, Name, Revoked, Usage, Other):
+       plat::certs's
 ```
 
-- **`fn system_anchors() -> Arc<Vec<Cert>>`**
-  the CA certificates of the system bundle (empty on Windows: CryptoAPI decides there)
+Re-exports: `plat::certs::{Reason, Refused}`
 
-- **`fn verify_system(chain: &[Cert], host: &str, now: i64) -> Result<(), String>`**
-  a server chain (leaf first) against the system's trust for this host name
+- **`fn reload()`**
+  read the bundle again at the next check, not only after a minute (a program that has just
+  set SSL_CERT_FILE or SSL_CERT_DIR, or updated the bundle itself)
+
+- **`fn system_anchors() -> Arc<Vec<Cert>>`**
+  the CA certificates of the system bundle (empty on Windows and iOS: the system decides there)
+
+- **`fn verify_system(chain: &[Cert], host: &str, extra: &[Cert], ocsp: Option<&[u8]>, now: i64) -> Result<(), Refused>`**
+  a server chain (leaf first) against the system's trust for this host name and the extra
+  CAs (a company CA: the system's policy holds for them too; on Linux they count where the
+  bundle gives no path), with the stapled OCSP response the server sent.  Windows and Apple
+  read that response; this function does not check it -- the TLS client does
+  (tls/conn.rs check_staple), another caller with x509::ocsp::check
+
+- **`fn verify_system_roots(chain: &[Cert], host: &str, roots: &[Cert], now: i64) -> Result<(), Refused>`**
+  a server chain against only these CAs, with the system's checks (Linux: verify_chain's);
+  an empty host checks no name
 
 ### `netio/server.rs`
 
@@ -45978,9 +46856,10 @@ tls -- TLS 1.3 servers and clients, and TLS 1.2 towards public servers (RFC 8446
   (post-quantum hybrid), X25519, P-256, P-384 · certificates and keys of Ed25519, ECDSA
   (P-256 / P-384) and RSA (the web PKI or a CA of one's own) · mutual authentication ·
   HelloRetryRequest · KeyUpdate · resumption with session tickets (psk_dhe_ke) · 0-RTT with
-  replay protection (opt-in).
+  replay protection (opt-in) · OCSP stapling (status_request, RFC 6066 8 / RFC 8446 4.4.2.1).
   Public servers (client side, Trust::System / Custom): also TLS 1.2 with ECDHE and AEAD suites.
-  Not here: external PSKs, psk_ke, TLS 1.2 resumption, renegotiation, revocation checks.
+  Not here: external PSKs, psk_ke, TLS 1.2 resumption, renegotiation, OCSP or CRLs fetched by
+  the client itself.
 
   connect(stream, ClientConfig) -> TlsStream     accept(stream, ServerConfig) -> TlsStream
   TlsStream implements Stream (HTTP runs over it unchanged); peer_certs() after the handshake
@@ -45988,10 +46867,14 @@ tls -- TLS 1.3 servers and clients, and TLS 1.2 towards public servers (RFC 8446
   (Sessions: a client's tickets per server); TlsStream::resumed()
   0-RTT: ServerConfig::early_data (bytes; 0 = none), connect_early(stream, cfg, data) ->
   (TlsStream, bytes taken), TlsStream::read_early (a server: data that may be a replay)
+  OCSP: ServerConfig::ocsp (Staples: the responses to staple, netio::ocsp::refresh fetches
+  them); ClientConfig::revocation (Revocation::Stapled by default: a stapled response is
+  checked, a revoked certificate refused); TlsStream::ocsp_response
   Identity::new(chain, key) / Identity::from_pem(certs, key): a chain and its key (PrivateKey:
   Ed25519, ECDSA, RSA; PKCS #8, SEC 1, PKCS #1)
   Trust::Anchors(CAs) / Pinned(SHA-256 of the leaf) / Any (trust on first use: the caller
-  shows the fingerprint and pins it) / System(extra CAs) (the operating system's CAs)
+  shows the fingerprint and pins it) / System(extra CAs) (the operating system's check, the
+  extra CAs under its policy)
 
 conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over a Stream.
 ```
@@ -46014,8 +46897,13 @@ conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over 
   - `Anchors(Vec<Cert>)` -- certificates issued by one of these CAs
   - `Pinned(Vec<[u8; 32]>)` -- exactly these leaf certificates (SHA-256 of the DER)
   - `Any` -- anything (only to read the fingerprint for a trust decision)
-  - `System(Vec<Cert>)` -- the operating system's certificate authorities, and these as well (a company CA);
-    allows TLS 1.2 and the public suites (crate::roots)
+  - `System(Vec<Cert>)` -- the operating system's certificate authorities, and these as well (a company CA): the
+    system checks the chain (Windows CryptoAPI, Apple's Security framework with the stapled
+    OCSP response; on Linux the distribution's bundle: crate::roots), these under its own
+    policy (Windows with them as its roots where its own give no path, Apple as anchors
+    beside its own; Linux where the bundle gives no path); the alert follows its reason
+    (expired, revoked, another name or usage, unknown CA).  Allows TLS 1.2 and the public
+    suites
   - `Custom(Verifier)` -- a check the program brings (a PKI of its own, keys pinned by their SPKI, Certificate
     Transparency, the platform's verifier, a test peer); a client offers with it what it
     offers with System (TLS 1.2, the public suites)
@@ -46038,11 +46926,24 @@ conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over 
   - `sessions: Option<Arc<Sessions>>` -- session tickets to resume with (TLS 1.3): the connection offers one of this server and
     keeps the ones it gets.  Several configs may share a cache: it keeps the tickets by
     server name, trust and client identity.  None: no resumption
+  - `revocation: Revocation` -- what a stapled OCSP response decides (with Trust::Anchors, System and Custom; a pinned
+    certificate or Trust::Any asks for none)
 
 **`impl ClientConfig`**
 
 - **`fn new(trust: Trust, server_name: &str) -> ClientConfig`**
-  this trust and server name; no client certificate, no ALPN, no resumption
+  this trust and server name; no client certificate, no ALPN, no resumption; stapled OCSP
+  responses checked (Revocation::Stapled)
+
+- **`enum Revocation`**
+  the OCSP response a client asks the server to staple (status_request): a usable one is
+  signed by the issuer of the server's certificate (in the chain or an anchor) or a responder
+  it named, about that certificate, and current (RFC 6960; x509::ocsp::check)
+  - `Off` -- none asked for
+  - `Stapled` -- asked for and checked: a certificate a usable response calls revoked is refused
+    (certificate_revoked); without a usable response the handshake goes on, unless the
+    certificate must be stapled (RFC 7633, Cert::must_staple)
+  - `Required` -- a usable response that says good is required (bad_certificate_status_response without one)
 
 - **`struct Hello`**
   what a ClientHello asks for: the program's ServerConfig::select picks the identity by it
@@ -46068,7 +46969,8 @@ conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over 
     check); for a port that consoles and agents share
   - `alpn: Vec<String>` -- the application protocols the server speaks (ALPN), in its order of preference; a
     client that offers protocols, none of them these, is refused (no_application_protocol,
-    RFC 7301 3.2).  Empty: ALPN is not answered
+    RFC 7301 3.2).  Empty: ALPN is not answered.  "acme-tls/1" (RFC 8737, acme::TlsAlpn01)
+    counts only for a client that offers it alone
   - `tickets: Option<Arc<Tickets>>` -- session tickets (TLS 1.3 resumption): sent after each handshake and taken back for a
     handshake without certificates.  A resumed connection keeps the client certificates of
     its first handshake (peer_certs) for up to 7 days, while the same client_auth trust asks
@@ -46080,6 +46982,8 @@ conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over 
     first time it comes (Tickets::replay_check), keeps it apart (TlsStream::read_early) and
     hands it to read() only once the handshake is done.  With 0-RTT taken, accept returns
     after the server's flight, before the client's Finished
+  - `ocsp: Option<Arc<Staples>>` -- the OCSP responses to staple for the certificates shown, to clients that ask for one
+    (netio::ocsp::refresh keeps them current).  None: no stapling
 
 **`impl ServerConfig`**
 
@@ -46114,6 +47018,9 @@ conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over 
   a server: the name the client asked for (SNI, lower case; empty: none)
 - **`fn resumed(&self) -> bool`**
   the handshake resumed a session (a ticket instead of certificates)
+- **`fn ocsp_response(&self) -> Option<Vec<u8>>`**
+  a client: the OCSP response the server stapled for its certificate (DER), when it sent
+  one; whether it was usable decided ClientConfig::revocation
 - **`fn read_early(&self, buf: &mut [u8]) -> NetResult<usize>`**
   a server that took 0-RTT: the client's early data as it comes, before the handshake is
   done; Ok(0) at its end (or when none was taken).  An attacker may have replayed it
@@ -46180,6 +47087,7 @@ AL_RECORD_OVERFLOW: u8 = 22
 AL_HANDSHAKE_FAILURE: u8 = 40
 AL_BAD_CERTIFICATE: u8 = 42
 AL_UNSUPPORTED_CERTIFICATE: u8 = 43
+AL_CERTIFICATE_REVOKED: u8 = 44
 AL_CERTIFICATE_EXPIRED: u8 = 45
 AL_ILLEGAL_PARAMETER: u8 = 47
 AL_UNKNOWN_CA: u8 = 48
@@ -46190,6 +47098,7 @@ AL_INTERNAL_ERROR: u8 = 80
 AL_NO_RENEGOTIATION: u8 = 100
 AL_MISSING_EXTENSION: u8 = 109
 AL_UNSUPPORTED_EXTENSION: u8 = 110
+AL_BAD_CERTIFICATE_STATUS_RESPONSE: u8 = 113
 AL_CERTIFICATE_REQUIRED: u8 = 116
 AL_NO_APPLICATION_PROTOCOL: u8 = 120
 ```
@@ -46232,6 +47141,10 @@ AL_NO_APPLICATION_PROTOCOL: u8 = 120
 - **`fn closed(&self) -> bool`**
 - **`fn peer_closed(&self) -> bool`**
   the peer sent close_notify (an orderly end, not a cut connection)
+- **`fn test_force_status(&mut self)`**
+  (tests) a server staples what it keeps even to a client that did not ask
+- **`fn ocsp_response(&self) -> Option<&[u8]>`**
+  a client: the OCSP response the server stapled for its certificate (DER)
 - **`fn peer_certs(&self) -> &[Cert]`**
   the peer's certificate chain (leaf first)
 - **`fn version(&self) -> &'static str`**
@@ -46483,8 +47396,12 @@ FRESH_WINDOW_MS: i64 = 10_000
   a client's tickets (ClientConfig::sessions): per server, a connection takes the newest and
   the server sends new ones.  The key of a server is its name, the trust of the connection and
   its client identity, so a ticket a connection with Trust::Any got is never offered by one that
-  checks certificates, nor one of a client certificate by a connection without it.  Shared by
-  threads; in memory only
+  checks certificates, nor one of a client certificate by a connection without it; and its
+  revocation check, so one of Revocation::Off is never offered by a connection that checks.
+  A ticket whose handshake checked a stapled OCSP response goes when that response does: 5
+  minutes (ocsp::SKEW) after its Response::expires, as a full handshake would still take it,
+  at the end of a delegated responder's certificate at the latest.
+  Shared by threads; in memory only
 
 **`impl Sessions`**
 
@@ -46536,6 +47453,56 @@ FRESH_WINDOW_MS: i64 = 10_000
   more lifetime, older ones no longer
 - **`fn test_shift(&self, ms: i64)`**
   (tests) move these tickets' clock by `ms`
+
+### `netio/tls/staple.rs`
+
+Source: [`lib/netio/tls/staple.rs`](../lib/netio/tls/staple.rs)
+
+```text
+staple -- the OCSP responses a server staples (RFC 6066 8, RFC 8446 4.4.2.1)
+
+  Staples::new()                    one store for all of a server's certificates
+  staples.set(&chain, issuer, der)  a response for the leaf of `chain`, checked against it and
+                                    its issuer (chain[1], or `issuer` when the chain has none)
+  staples.get(&leaf) / response(&leaf) / remove(&leaf)
+  netio::ocsp::refresh(&staples, &client, &chain, issuer)   fetches and sets when one is due
+
+A server with ServerConfig::ocsp sends a client that asks (status_request) the current
+response of the certificate it shows; one past its nextUpdate is not sent (and dropped).
+```
+
+```rust
+/// the longest response kept (responses are a few KiB; one with a responder certificate and
+/// an RSA signature under 4 KiB)
+MAX_STAPLE: usize = 32 * 1024
+```
+
+- **`struct Staples`**
+  OCSP responses by certificate (SHA-256 of the leaf's DER)
+
+**`impl Staples`**
+
+- **`fn new() -> Staples`**
+- **`fn now(&self) -> i64`**
+  Unix seconds (tests shift the clock: test_shift)
+- **`fn test_shift(&self, secs: i64)`**
+- **`fn test_insert(&self, leaf: &[u8], der: Vec<u8>)`**
+  (tests) keep any bytes for a leaf, unchecked, current for a day
+- **`fn set(&self, chain: &[Vec<u8>], issuer: Option<&Cert>, der: Vec<u8>) -> Result<Response, String>`**
+  keep `der` for the leaf of `chain` (DER, leaf first): checked against the leaf and its
+  issuer (`issuer`, which must have signed the leaf, else the certificate of the chain that
+  did) and current now.  A revoked or unknown status is kept too (the server shows what its
+  CA says).  It is stapled until it expires (Response::expires: also the end of a
+  delegated responder's certificate).  -> the response read
+- **`fn get(&self, leaf: &[u8]) -> Option<Arc<Vec<u8>>>`**
+  the response to staple for this leaf (DER): None when there is none or it is out of date
+  (it is dropped then)
+- **`fn response(&self, leaf: &[u8]) -> Option<Response>`**
+  what the kept response for this leaf says (also one out of date)
+- **`fn remove(&self, leaf: &[u8])`**
+- **`fn len(&self) -> usize`**
+- **`fn is_empty(&self) -> bool`**
+- **`fn clear(&self)`**
 
 ### `netio/trust.rs`
 
@@ -67899,7 +68866,7 @@ most Options::max_stream bytes.  Permissions are reported, not enforced: what a 
 allows its user to do with the document is its own decision.
 
 Not here: the image filters for decode_until_image (it stops before DCT, JPX, JBIG2 and
-CCITTFax; drawing decodes DCT and CCITTFax), JPX and JBIG2 images at all, the predefined CMaps
+CCITTFax; drawing decodes DCT, CCITTFax and JPX), JBIG2 images at all, the predefined CMaps
 of East Asian fonts other than Identity and the Unicode ones, verifying signatures, changing
 and saving documents.
 ```
@@ -68235,9 +69202,9 @@ stencil masks, colour-key masks, soft masks, the JPEG filter (through img_jpeg) 
 CCITTFax; shadings of every type (sh and as patterns), tiling patterns coloured and
 uncoloured; form XObjects, transparency groups and soft masks (luminosity and alpha, with
 backdrop and transfer function); the annotations' appearances; optional content (the
-default configuration, membership dictionaries).  Not here: JPXDecode and JBIG2Decode images
-(left out), knockout and non-isolated groups (drawn as isolated ones), overprint, halftones,
-transfer functions outside soft masks.
+default configuration, membership dictionaries); JPXDecode images through img_jp2.  Not here:
+JBIG2Decode images (left out), knockout and non-isolated groups (drawn as isolated ones),
+overprint, halftones, transfer functions outside soft masks.
 
   let doc = read::Document::open(bytes)?;
   let page: gfx::Surface = doc.render(0, &RenderOptions { dpi: 150.0, ..Default::default() })?;
@@ -69502,10 +70469,11 @@ version; TEXT's %% codes (specials).
 
 ## physics
 
-*Collision shapes, broad phase and deterministic queries for games* -- crate root [`lib/physics/src/lib.rs`](../lib/physics/src/lib.rs)
+*Collision, deterministic queries and rigid bodies with joints for games* -- crate root [`lib/physics/src/lib.rs`](../lib/physics/src/lib.rs)
 
 ```text
-physics -- collision for games: shapes, broad phase, queries; deterministic, the same bits on every target
+physics -- collision and rigid bodies for games: shapes, broad phase, queries, a character controller,
+bodies with contacts and joints; deterministic, the same bits on every target
 
   Shape          sphere, capsule, box, convex hull (ConvexHull::new: quickhull), static triangle mesh
                  (TriMesh: f32 vertices, a binned-SAH tree, active edges against ghost collisions)
@@ -69516,7 +70484,14 @@ physics -- collision for games: shapes, broad phase, queries; deterministic, the
   CharacterController  the kinematic figure: an upright capsule that walks, runs, jumps, crouches, takes
                  steps and ramps up to a slope limit, slides along walls, snaps down; one step a pure
                  function of (state, input, world, dt)
-  math           Vec3, Quat, Iso, Aabb in f64; sqrt correctly rounded, sin / cos / atan2 from rt's
+  Simulation     rigid bodies (RigidBody: static, kinematic, dynamic; MassProps from the shape and a
+                 density) in a World: gravity, forces, contacts with friction, restitution and rolling
+                 resistance (manifold.rs: faces clipped along the GJK / EPA normal, up to four points),
+                 joints (joint.rs: ball with cone and twist, hinge, fixed, slider, distance; limits,
+                 motors, springs), the soft step of Box2D v3 with substeps (solver.rs), speculative
+                 contacts, sweeps of fast bodies, sleeping islands, contact and sensor events; Clone is
+                 a snapshot that steps on to the same bits
+  math           Vec3, Quat, Mat3, Iso, Aabb in f64; sqrt correctly rounded, sin / cos / atan2 from rt's
                  portable math
 
 Narrow phase: GJK for distances, EPA for penetration, GJK ray casting with conservative advancement for
@@ -69785,6 +70760,137 @@ MAX_HULL_POINTS: usize = 1 << 16
 - **`fn volume(&self) -> f64`**
   the volume (for tests and mass properties later)
 
+### `physics/src/joint.rs`
+
+Source: [`lib/physics/src/joint.rs`](../lib/physics/src/joint.rs)
+
+```text
+joint -- constraints between two bodies: ball (with a swing cone and a twist range, for ragdolls),
+hinge (limits, motor, spring), fixed, slider (limits, motor, spring), distance (rope, rod, spring)
+
+Every joint has a frame on each body: its origin is the anchor, its X axis the axis (of a hinge, a
+slider, the twist of a ball joint).  The parts are solved one after the other in every pass of the solver
+(solver.rs): motor and spring first, then the limits, the locked rotations, the anchors last (what must
+hold best).  Soft as the contacts: with the bias the error goes away like a damped spring of the
+simulation's joint frequency, the relax pass removes the velocity that leaves.  Limits are one-sided and
+speculative like contacts: a hinge that is still short of its limit may turn exactly up to it in a
+substep.  The impulses are kept from step to step (warm start).
+```
+
+- **`struct JointId`**
+  a joint of a [`crate::Simulation`]: an index and a generation, like [`BodyId`]
+
+**`impl JointId`**
+
+- **`fn index(self) -> u32`**
+  the slot (used again after a remove)
+- **`fn generation(self) -> u32`**
+  how often the slot was used before
+
+- **`struct Motor`**
+  drives a hinge (rad/s) or a slider (m/s) towards a speed with at most `max_force` (N m or N)
+  - `speed: f64` -- the speed it drives towards
+  - `max_force: f64` -- the largest torque or force it uses
+
+- **`struct Spring`**
+  pulls a hinge's angle (rad), a slider's position (m) or a distance joint's length (m) towards `target`
+  like a damped spring
+  - `target: f64` -- the angle, position or length it pulls towards
+  - `hertz: f64` -- how fast it oscillates (Hz); 0 is no spring
+  - `damping_ratio: f64` -- 1 is critically damped, below oscillates, above creeps
+
+- **`enum JointKind`**
+  what a joint allows
+  - `Ball { cone: Option<f64>, twist: Option<(f64, f64)> }` -- the anchors stay together, the bodies turn freely; optionally the X axes of the two frames stay within
+    a cone of this half angle (radians, the swing) and body b turns about its X axis only within
+    (low, high) radians relative to a (the twist): a shoulder, a hip, a neck
+  - `Hinge { limits: Option<(f64, f64)>, motor: Option<Motor>, spring: Option<Spring> }` -- the anchors stay together, the bodies turn about the X axis only, by an angle that starts at 0 when the
+    frames are aligned; within (low, high) radians, driven by a motor, pulled by a spring
+  - `Fixed` -- no relative motion at all
+  - `Slider { limits: Option<(f64, f64)>, motor: Option<Motor>, spring: Option<Spring> }` -- no rotation; b's anchor moves along a's X axis only, at a position that starts at 0 on a's anchor;
+    within (low, high) metres, driven by a motor, pulled by a spring
+  - `Distance { min: f64, max: f64, spring: Option<Spring> }` -- the anchors stay between `min` and `max` apart (a rope: min 0; a rod: min = max; `max` may be
+    infinite), free otherwise, with a spring towards its target length between them
+
+**`impl JointKind`**
+
+- **`const BALL: JointKind = JointKind::Ball { cone: None, twist: None }`**
+  a ball joint without limits
+- **`const HINGE: JointKind = JointKind::Hinge { limits: None, motor: None, spring: None }`**
+  a hinge without limits, motor or spring
+- **`const SLIDER: JointKind = JointKind::Slider { limits: None, motor: None, spring: No ...`**
+  a slider without limits, motor or spring
+- **`const fn rod(length: f64) -> JointKind`**
+  a rod of length `length`
+- **`const fn rope(length: f64) -> JointKind`**
+  a rope of at most `length`
+
+- **`struct Joint`**
+  A joint between bodies `a` and `b`: its frame on each (in the body's own frame, the frame its shape is
+  in), what it allows, whether the two bodies still collide with each other.
+  - `a: BodyId` -- the first body
+  - `b: BodyId` -- the second body (limits, motors and positions are b relative to a)
+  - `frame_a: Iso` -- the joint's frame in a's frame: the origin is the anchor, X the axis
+  - `frame_b: Iso` -- the joint's frame in b's frame
+  - `kind: JointKind` -- what it allows
+  - `collide_connected: bool` -- do a and b still collide with each other (default false)
+  - `user: u64` -- free for the caller
+
+- **`enum JointError`**
+  why a joint was refused
+  - `DeadBody` -- a body id is dead
+  - `SameBody` -- both ends are the same body
+  - `NothingMoves` -- neither end is a dynamic body (nothing could move)
+  - `NotFinite` -- a frame, a limit, a motor or a spring is not finite
+  - `Range` -- a limit's low end above its high end, a negative cone, length, force, frequency or damping
+
+### `physics/src/mass.rs`
+
+Source: [`lib/physics/src/mass.rs`](../lib/physics/src/mass.rs)
+
+```text
+mass -- the mass, the centre of mass and the inertia tensor of a shape of uniform density
+
+Spheres, capsules and boxes in closed form; a convex hull from the tetrahedra between a point inside it
+and its triangles (the second moment of a tetrahedron with one corner at the origin is
+det / 120 (a a^T + b b^T + c c^T + s s^T), s = a + b + c), moved to the centre of mass with the
+parallel axis theorem.  A mesh has none: it is static.
+```
+
+- **`struct MassProps`**
+  The mass of a body: how much (kg), where its centre is (in the shape's frame) and how it resists turning
+  about that centre (the inertia tensor, kg m², in the shape's frame).
+  - `mass: f64` -- kg
+  - `center: Vec3` -- the centre of mass in the shape's frame
+  - `inertia: Mat3` -- the inertia tensor about the centre of mass, in the shape's frame
+
+**`impl MassProps`**
+
+- **`const fn new(mass: f64, center: Vec3, inertia: Mat3) -> MassProps`**
+  a mass `mass` at `center` with this inertia tensor
+- **`const fn point(mass: f64) -> MassProps`**
+  a point mass at the origin that does not turn (an infinite inertia is no number: the tensor is 0 and a
+  body reads 0 as "does not turn")
+- **`fn transformed(&self, iso: &Iso) -> MassProps`**
+  the same body seen in the frame `iso` places it in (the centre moved, the tensor turned)
+- **`fn inertia_about(&self, p: Vec3) -> Mat3`**
+  the inertia tensor about another point (the parallel axis theorem), in the same frame
+- **`fn scaled(&self, factor: f64) -> MassProps`**
+  the mass and tensor scaled by `factor` (another density)
+- **`fn is_valid(&self) -> bool`**
+  mass, centre and tensor finite, the mass positive, the tensor symmetric with principal moments that are
+  non-negative and keep the triangle inequality, in its own axes: what a solid body can have, of any size.
+  Each principal moment is below the sum of the other two plus 1e-9 times the sum of all three (so the
+  moments of a rod or a plate, which meet the inequality exactly, pass in any frame); the zero tensor of
+  [`MassProps::point`] is valid.
+
+**`impl Shape`**
+
+- **`fn mass_properties(&self, density: f64) -> Option<MassProps>`**
+  the mass properties of the shape filled with `density` (kg/m³), None for a mesh (never dynamic), for a
+  density that is not positive and finite and for sizes that are not (a radius, a box's half sizes; a
+  capsule's half height may be 0)
+
 ### `physics/src/math.rs`
 
 Source: [`lib/physics/src/math.rs`](../lib/physics/src/math.rs)
@@ -69918,6 +71024,17 @@ the same code on every target.
   the rotation as a matrix
 - **`fn is_identity(self) -> bool`**
   is this the identity, bit for bit (no rotation work needed)
+- **`fn from_scaled_axis(v: Vec3) -> Quat`**
+  the rotation by |v| radians about the direction of `v` (a rotation vector; zero gives the identity):
+  exact, so a body spinning at a constant rate turns by its rate times the time
+- **`fn to_scaled_axis(self) -> Vec3`**
+  the rotation vector of a unit quaternion: its axis times its angle in [0, pi].  The inverse of
+  [`Quat::from_scaled_axis`] for vectors up to pi long; a longer one gives the same rotation by its angle
+  in [0, pi]
+- **`fn dot(self, o: Quat) -> f64`**
+  the 4D dot product (the cosine of half the angle between two unit quaternions, up to the sign)
+- **`fn is_finite(self) -> bool`**
+  every component finite
 
 - **`struct Mat3`**
   A 3 x 3 matrix by columns (a rotation from [`Quat::to_mat3`])
@@ -69931,6 +71048,40 @@ the same code on every target.
   M v
 - **`fn mul_vec_t(&self, v: Vec3) -> Vec3`**
   M^T v (the inverse of a rotation)
+- **`const ZERO: Mat3 = Mat3 { cols: [Vec3::ZERO, Vec3::ZERO, Vec3::ZERO] }`**
+  the zero matrix
+- **`const fn diagonal(d: Vec3) -> Mat3`**
+  the matrix with `d` on the diagonal
+- **`const fn from_cols(x: Vec3, y: Vec3, z: Vec3) -> Mat3`**
+  the matrix with these columns
+- **`fn at(&self, r: usize, c: usize) -> f64`**
+  the element in row `r` and column `c`
+- **`fn transpose(&self) -> Mat3`**
+  M^T
+- **`fn mul(&self, n: &Mat3) -> Mat3`**
+  the product M N
+- **`fn add(&self, n: &Mat3) -> Mat3`**
+  M + N
+- **`fn sub(&self, n: &Mat3) -> Mat3`**
+  M - N
+- **`fn scale(&self, s: f64) -> Mat3`**
+  s M
+- **`fn determinant(&self) -> f64`**
+  the determinant
+- **`fn inverse(&self) -> Option<Mat3>`**
+  the inverse, None when the matrix is singular, not finite, or its inverse is not (and when even its
+  rows and columns brought to one size leave a determinant that under- or overflows: a condition number
+  beyond about 10^300)
+- **`fn rotated(&self, q: Quat) -> Mat3`**
+  R M R^T: a tensor of a body's frame (its inertia) in the frame rotated by `q`
+- **`fn outer(a: Vec3, b: Vec3) -> Mat3`**
+  the outer product a b^T
+- **`fn skew(v: Vec3) -> Mat3`**
+  the matrix of the cross product with `v` (skew(v) w = v x w)
+- **`fn trace(&self) -> f64`**
+  the sum of the diagonal
+- **`fn is_finite(&self) -> bool`**
+  every element finite
 
 - **`struct Iso`**
   A placement: rotate, then move (no scale).  The pose of a body and of a query shape.
@@ -70189,7 +71340,7 @@ mesh (two-sided triangles)
     total height 2 (half_height + radius)
   - `Box { half: Vec3 }` -- a box around the origin with half sizes `half`
   - `Hull(Arc<ConvexHull>)` -- a convex hull (shared)
-  - `Mesh(Arc<TriMesh>)` -- a static triangle mesh (only as a body, not as a query shape)
+  - `Mesh(Arc<TriMesh>)` -- a triangle mesh: a static or kinematic body (never dynamic), not a query shape
 
 **`impl Shape`**
 
@@ -70204,13 +71355,289 @@ mesh (two-sided triangles)
 - **`fn hull_from_points(points: &[Vec3]) -> Result<Shape, HullError>`**
   the convex hull of `points`
 - **`fn mesh(mesh: TriMesh) -> Shape`**
-  a static triangle mesh, shared
+  a triangle mesh (for a static or kinematic body), shared
 - **`fn is_convex(&self) -> bool`**
   everything but a mesh
 - **`fn margin(&self) -> f64`**
   the radius around the core (spheres and capsules), 0 for the others
 - **`fn aabb(&self, iso: &Iso) -> Aabb`**
   the box around the shape placed by `iso`
+
+### `physics/src/sim.rs`
+
+Source: [`lib/physics/src/sim.rs`](../lib/physics/src/sim.rs)
+
+```text
+sim -- rigid bodies: a world of static, kinematic and dynamic bodies that move under gravity, forces,
+contacts and joints, step by step, with the same bits on every target
+
+A step: kinematic targets become velocities; every awake body looks for others near it in the trees of
+the collision World (its box grown by how far it can move in this step), each pair gets its manifolds
+(manifold.rs) and the impulses of the last step's points that lie within 2 cm of the new ones; a sleeping
+body that an awake one would touch wakes with its island.  Then the substeps of the soft solver
+(solver.rs, joint.rs), restitution, the new poses (into the World, so queries and the character controller
+see them), a sweep of fast bodies by their translation against what does not move (they stop where they first
+touch it, so they do not pass through a wall between two steps; against moving kinematic bodies, a bullet also
+against moving dynamic ones, with the motion relative to them, and carried on with what they hit, again only
+as far as what does not move lets them) and a ray of each centre of mass along that way; the turning is
+covered only by the speculative contacts, up to about a radian a step for a long body), sleep: an island (bodies linked by contacts and joints) whose
+bodies all moved slower than `sleep_speed` for `time_to_sleep` sleeps until something touches it.
+
+Determinism: everything in slot order, pairs sorted, no hash containers, no threads; the same bits on every
+target as the queries (checked by physicstest's checksums).
+```
+
+- **`enum BodyKind`**
+  how a body moves
+  - `Static` -- never (a map, a wall); moved only by [`Simulation::set_iso`]
+  - `Kinematic` -- by its velocity, which only the caller sets (a door, a platform, a lift); pushes dynamic bodies, nothing
+    pushes it
+  - `Dynamic` -- by gravity, forces, contacts and joints
+
+- **`struct RigidBody`**
+  What [`Simulation::add`] makes a body from.  `RigidBody::dynamic(shape, iso)` and the `with_` methods
+  for the rest.
+  - `kind: BodyKind` -- how it moves
+  - `shape: Shape` -- its shape (a mesh only for a static or kinematic body)
+  - `iso: Iso` -- where the shape's frame is
+  - `linear_velocity: Vec3` -- m/s, of the centre of mass
+  - `angular_velocity: Vec3` -- rad/s, world frame
+  - `density: f64` -- kg/m³ (1000: water), for the mass from the shape
+  - `mass: Option<MassProps>` -- the mass as given instead of from the shape and density (in the shape's frame)
+  - `friction: f64` -- Coulomb friction; two bodies use the square root of the product of theirs (default 0.6)
+  - `restitution: f64` -- how much of the approach speed comes back, 0 to 1; two bodies use the larger (default 0)
+  - `rolling_resistance: f64` -- rolling resistance: the torque that brakes a rolling body is this times the normal force times its
+    smallest radius; two bodies use the larger (default 0: a ball rolls on until damping stops it)
+  - `linear_damping: f64` -- 1/s: the velocity loses this fraction per second (default 0)
+  - `angular_damping: f64` -- 1/s (default 0.05)
+  - `gravity_scale: f64` -- how much of the simulation's gravity acts on it (default 1)
+  - `layers: u32` -- the layers the body is in (also what queries filter by)
+  - `mask: u32` -- the layers it collides with: two bodies collide when each one's mask has a layer of the other
+  - `sensor: bool` -- it reports overlaps ([`ContactEvent::SensorBegin`]) and pushes nothing
+  - `bullet: bool` -- it is swept also against moving bodies that are not bullets themselves, not only against what does
+    not move (for small fast projectiles)
+  - `can_sleep: bool` -- it may fall asleep (default true)
+  - `gyroscopic: bool` -- gyroscopic forces: a body tumbling about an unstable axis flips as it does in space (Bullet's implicit
+    step; costs a little, default off)
+  - `fixed_rotation: bool` -- it never turns (a figure's capsule pushed around as a dynamic body; a kinematic body keeps its
+    rotation in `set_velocity` and `move_kinematic`)
+  - `awake: bool` -- it starts awake (default true)
+  - `user: u64` -- free for the caller (the World's body has it too)
+
+**`impl RigidBody`**
+
+- **`fn new(kind: BodyKind, shape: Shape, iso: Iso) -> RigidBody`**
+  a body of `kind` with the defaults
+- **`fn fixed(shape: Shape, iso: Iso) -> RigidBody`**
+  a body that never moves
+- **`fn dynamic(shape: Shape, iso: Iso) -> RigidBody`**
+  a body moved by gravity, forces, contacts and joints
+- **`fn kinematic(shape: Shape, iso: Iso) -> RigidBody`**
+  a body moved by its velocity only
+- **`fn with_velocity(mut self, v: Vec3) -> RigidBody`**
+  the velocity of the centre of mass at the start (m/s)
+- **`fn with_angular_velocity(mut self, w: Vec3) -> RigidBody`**
+  the angular velocity at the start (rad/s, world frame)
+- **`fn with_density(mut self, density: f64) -> RigidBody`**
+  the density the mass comes from (kg/m³)
+- **`fn with_mass(mut self, mass: MassProps) -> RigidBody`**
+  the mass as given (in the shape's frame) instead of from the density
+- **`fn with_friction(mut self, friction: f64) -> RigidBody`**
+  the friction coefficient
+- **`fn with_restitution(mut self, restitution: f64) -> RigidBody`**
+  how much of an approach speed comes back (0 to 1)
+- **`fn with_rolling_resistance(mut self, c: f64) -> RigidBody`**
+  the rolling resistance coefficient (0: none)
+- **`fn with_damping(mut self, linear: f64, angular: f64) -> RigidBody`**
+  the linear and angular damping (1/s)
+- **`fn with_gravity_scale(mut self, scale: f64) -> RigidBody`**
+  how much of the gravity acts on it
+- **`fn with_layers(mut self, layers: u32, mask: u32) -> RigidBody`**
+  the layers it is in and those it collides with
+- **`fn with_user(mut self, user: u64) -> RigidBody`**
+  a value for the caller (also the World body's `user`)
+- **`fn sensor(mut self) -> RigidBody`**
+  reports overlaps, pushes nothing
+- **`fn bullet(mut self) -> RigidBody`**
+  swept also against moving bodies that are not bullets, not only against what does not move
+- **`fn sleepless(mut self) -> RigidBody`**
+  never falls asleep
+- **`fn gyroscopic(mut self) -> RigidBody`**
+  with gyroscopic forces
+- **`fn fixed_rotation(mut self) -> RigidBody`**
+  never turns
+- **`fn asleep(mut self) -> RigidBody`**
+  starts asleep (until something touches it)
+
+- **`enum BodyError`**
+  why [`Simulation::add`] refused a body
+  - `DynamicMesh` -- a mesh can be static or kinematic, not dynamic
+  - `Mass` -- no valid mass: the density is not positive, or the given mass properties are not those of a body
+  - `NotFinite` -- the pose, a velocity or a parameter is not finite
+
+- **`struct SimParams`**
+  How the simulation steps.  The defaults suit bodies from centimetres to tens of metres at 60 steps a
+  second.
+  - `gravity: Vec3` -- m/s²
+  - `substeps: u32` -- solver substeps per step (1 to 64; default 4)
+  - `contact_hertz: f64` -- how stiff contacts push apart (Hz; at most a quarter of the substep rate; default 30)
+  - `contact_damping_ratio: f64` -- their damping ratio (default 10)
+  - `joint_hertz: f64` -- how stiff joints hold (Hz; at most half the substep rate; default 60)
+  - `joint_damping_ratio: f64` -- their damping ratio (default 2)
+  - `max_push_speed: f64` -- the fastest an overlap is pushed apart (m/s; default 3)
+  - `restitution_threshold: f64` -- slower approaches do not bounce (m/s; default 1)
+  - `linear_slop: f64` -- a contact touches when its gap is at most this (events, restitution), a sweep stops this far before a
+    surface, and contact points within four times this of the last step's keep their impulses (m; default
+    0.005).  Overlaps are pushed apart down to 0, as in Box2D v3: a slop there let stacks sink further.
+  - `speculative_distance: f64` -- contact points are made this far before touching, plus how far the bodies can move in the step
+    (m; default 0.02)
+  - `max_speed: f64` -- no dynamic body moves faster (m/s; default 1000); kinematic bodies move as they are told
+  - `sleep: bool` -- may islands fall asleep (default true)
+  - `time_to_sleep: f64` -- how long an island must be slow to fall asleep (s; default 0.5)
+  - `sleep_speed: f64` -- slow: every point of every body of the island slower than this (m/s; default 0.05)
+  - `continuous: bool` -- sweep fast bodies against what does not move (default true)
+
+- **`struct BodyState`**
+  what a body is now
+  - `kind: BodyKind` -- how it moves
+  - `iso: Iso` -- the shape's frame
+  - `center: Vec3` -- the centre of mass (world)
+  - `linear_velocity: Vec3` -- of the centre of mass (m/s)
+  - `angular_velocity: Vec3` -- rad/s, world frame
+  - `mass: f64` -- kg (0 for static and kinematic bodies)
+  - `awake: bool` -- awake (it moves in the next step)
+
+- **`struct ContactPoint`**
+  a point of a [`ContactManifold`]
+  - `point: Vec3` -- world, between the two surfaces, at the start of the last step
+  - `separation: f64` -- the gap then (negative: overlap)
+  - `normal_impulse: f64` -- the impulse along the normal in the last substep (N s; divided by the substep: the force)
+
+- **`struct ContactManifold`**
+  the contact of two bodies along one normal
+  - `a: BodyId` -- the first body (the convex one when the other is a mesh)
+  - `b: BodyId` -- the second body
+  - `normal: Vec3` -- unit, from a towards b
+  - `triangle: u32` -- with a mesh: its lowest triangle of the manifold; else [`crate::NO_TRIANGLE`]
+  - `count: usize` -- how many of `points` are used
+  - `points: [ContactPoint; MAX_POINTS]` -- the points (the first `count`)
+
+- **`enum ContactEvent`**
+  what happened between bodies in a step
+  - `Begin { a: BodyId, b: BodyId, point: Vec3, normal: Vec3, speed: f64 }` -- a and b started to touch: where, the normal from a towards b, how fast they approached (m/s, along
+    the normal: for the loudness of a sound)
+  - `End { a: BodyId, b: BodyId }` -- a and b no longer touch (also when one of them was removed: then its id is dead)
+  - `SensorBegin { sensor: BodyId, other: BodyId }` -- a body entered a sensor
+  - `SensorEnd { sensor: BodyId, other: BodyId }` -- a body left a sensor (or one of them was removed)
+
+- **`struct SimStats`**
+  counters of the last step
+  - `bodies: usize` -- all bodies
+  - `awake: usize` -- awake dynamic and moving kinematic bodies
+  - `manifolds: usize` -- manifolds (also of islands asleep)
+  - `points: usize` -- their points
+  - `joints: usize` -- joints
+  - `pairs: usize` -- pairs whose manifolds were computed
+  - `sleeping_islands: usize` -- islands asleep
+  - `swept: usize` -- bodies a sweep stopped
+
+- **`struct Simulation`**
+  The rigid bodies of a game, and the collision [`World`] they live in (for rays, casts and the character
+  controller; [`Simulation::world`]).  Bodies are added and removed here, not in the World.  A clone is a
+  snapshot: it steps on to the same bits as the original (the impulses kept for the next step and the
+  islands asleep included), for a client that rolls back and steps again.
+
+**`impl Simulation`**
+
+- **`fn new() -> Simulation`**
+  an empty simulation with the default parameters (gravity 9.81 m/s² down -Y)
+- **`fn with_params(params: SimParams) -> Simulation`**
+  an empty simulation with these parameters
+- **`fn params(&self) -> &SimParams`**
+  the parameters
+- **`fn set_params(&mut self, params: SimParams)`**
+  change the parameters (they apply from the next step)
+- **`fn world(&self) -> &World`**
+  the collision world of the bodies: rays, casts, overlaps and the character controller run on it
+- **`fn len(&self) -> usize`**
+  the number of bodies
+- **`fn is_empty(&self) -> bool`**
+  no bodies
+- **`fn add(&mut self, body: RigidBody) -> Result<BodyId, BodyError>`**
+  add a body -> its id (also its id in [`Simulation::world`])
+- **`fn remove(&mut self, id: BodyId) -> bool`**
+  remove a body, its joints and its contacts -> false when the id is dead.  Bodies it touched wake up.
+- **`fn contains(&self, id: BodyId) -> bool`**
+  is the id alive
+- **`fn state(&self, id: BodyId) -> Option<BodyState>`**
+  what the body is now
+- **`fn iso(&self, id: BodyId) -> Option<Iso>`**
+  where its shape's frame is
+- **`fn velocity(&self, id: BodyId) -> Option<(Vec3, Vec3)>`**
+  the velocity of the centre of mass (m/s) and the angular velocity (rad/s)
+- **`fn velocity_at(&self, id: BodyId, point: Vec3) -> Option<Vec3>`**
+  the velocity of the body's point that is at `point` now
+- **`fn mass(&self, id: BodyId) -> Option<MassProps>`**
+  the mass properties (in the shape's frame; mass 0 for static and kinematic bodies)
+- **`fn is_awake(&self, id: BodyId) -> bool`**
+  is it awake (a static body never is)
+- **`fn set_iso(&mut self, id: BodyId, iso: Iso) -> bool`**
+  put the body somewhere else (teleport) -> false when the id is dead.  It wakes, and so does what touched
+  it.
+- **`fn set_velocity(&mut self, id: BodyId, linear: Vec3, angular: Vec3) -> bool`**
+  set the velocities (m/s, rad/s) -> false when the id is dead; a static body has none
+- **`fn apply_impulse(&mut self, id: BodyId, impulse: Vec3, point: Vec3) -> bool`**
+  an impulse (N s) at a point (world) of a dynamic body -> false when the id is dead
+- **`fn apply_angular_impulse(&mut self, id: BodyId, impulse: Vec3) -> bool`**
+  an angular impulse (N m s) on a dynamic body
+- **`fn apply_force(&mut self, id: BodyId, force: Vec3, point: Vec3) -> bool`**
+  a force (N) at a point (world) of a dynamic body during the next step (forces add up; a step clears
+  them)
+- **`fn apply_torque(&mut self, id: BodyId, torque: Vec3) -> bool`**
+  a torque (N m) on a dynamic body during the next step
+- **`fn move_kinematic(&mut self, id: BodyId, target: Iso, dt: f64) -> bool`**
+  move a kinematic body to `target` over the next step of `dt` seconds (positive and finite): its
+  velocities are set so it gets there (what it touches on the way is pushed), and it ends exactly there
+  (one with `fixed_rotation` keeps its rotation).  After that step it keeps
+  those velocities until they are set again.
+- **`fn wake(&mut self, id: BodyId) -> bool`**
+  wake a body and its island
+- **`fn set_material(&mut self, id: BodyId, friction: f64, restitution: f64, rolling_resistance: f64) -> bool`**
+  set friction, restitution and rolling resistance
+- **`fn set_layers(&mut self, id: BodyId, layers: u32, mask: u32) -> bool`**
+  set the layers the body is in and those it collides with
+- **`fn set_gravity_scale(&mut self, id: BodyId, scale: f64) -> bool`**
+  set the gravity scale
+- **`fn add_joint(&mut self, a: BodyId, b: BodyId, frame: Iso, kind: JointKind) -> Result<JointId, JointError>`**
+  a joint between a and b whose frame is `frame` (world) at their poses now -> its id
+- **`fn add_distance_joint(&mut self, a: BodyId, b: BodyId, pa: Vec3, pb: Vec3, kind: JointKind) -> Result<JointId, JointError>`**
+  a distance joint between a's point `pa` and b's point `pb` (world, now) -> its id
+- **`fn add_joint_local(&mut self, joint: Joint) -> Result<JointId, JointError>`**
+  a joint with its frames given in the bodies' own frames -> its id
+- **`fn remove_joint(&mut self, id: JointId) -> bool`**
+  remove a joint -> false when the id is dead.  Its bodies wake.
+- **`fn joint(&self, id: JointId) -> Option<&Joint>`**
+  the joint
+- **`fn set_joint(&mut self, id: JointId, kind: JointKind, collide_connected: bool) -> bool`**
+  change a joint's kind (limits, motor, spring) or whether its bodies collide -> false when the id is
+  dead or the new joint is not valid; its bodies wake
+- **`fn joints(&self) -> impl Iterator<Item = (JointId, &Joint)> + '_`**
+  every joint with its id, by index
+- **`fn joint_position(&self, id: JointId) -> Option<f64>`**
+  a hinge's angle (rad), a slider's position (m), a distance joint's length (m), a ball joint's twist
+  (rad), now
+- **`fn joint_force(&self, id: JointId) -> Option<(Vec3, Vec3)>`**
+  the force (N) and torque (N m) the joint applied to b in the last step (world; a got the opposite):
+  for breakable joints and for measuring
+- **`fn step(&mut self, dt: f64)`**
+  advance the simulation by `dt` seconds (a fixed step, 1/60 s for example); the events of the step are
+  in [`Simulation::events`] afterwards
+- **`fn events(&self) -> &[ContactEvent]`**
+  the events of the last step (contacts that began and ended, sensors entered and left)
+- **`fn stats(&self) -> SimStats`**
+  the counters of the last step
+- **`fn manifolds(&self) -> impl Iterator<Item = ContactManifold> + '_`**
+  the manifolds of the last step (also of islands asleep), by body
 
 ### `physics/src/tree.rs`
 
@@ -70310,7 +71737,7 @@ bodies gets the same answer from them, as long as the bodies have the same ids.
 
 - **`struct World`**
   A set of bodies and the queries over them.  Bodies move with [`World::set_iso`]; nothing moves by itself
-  (no dynamics in this stage).
+  here (a [`crate::Simulation`] moves the bodies of its World).  A clone answers every query as the original.
 
 **`impl World`**
 
@@ -76021,3 +77448,92 @@ MAX_SHEET_NAME: usize = 31
 - **`fn write(book: &BookOut, opts: &WriteOptions) -> Result<Vec<u8>, WriteError>`**
   Write a workbook as XLSX (see the module's head for how values, dates and widths are written
   and what Excel's limits are).  Deterministic: the same book gives the same bytes.
+
+## img_jp2
+
+*JPEG 2000 decoder* -- crate root [`lib/img_jp2/src/lib.rs`](../lib/img_jp2/src/lib.rs)
+
+```text
+img_jp2 -- JPEG 2000 decoder (ITU-T T.800 | ISO/IEC 15444-1, the JP2 file format and the parts
+of JPX that JP2 readers meet)
+
+  decode(data, &Options) -> Result<Image, Error>   a JP2 / JPX file or a raw codestream (J2K, J2C)
+  probe(data) -> bool                         the JP2 signature or the start of a codestream
+  Image { width, height, components, color, alpha, premultiplied }
+  Component { width, height, dx, dy, precision, signed, data }   samples, row by row
+  CODEC                                       img_core's codec (8-bit ARGB surfaces) for img_all;
+                                              CIELab files are ERR_UNSUPPORTED there
+
+Modules: boxes (the JP2 boxes), codestream (the markers), tile (geometry, packets, progression,
+dequantisation, assembly), t1 (the code-blocks), mq (the arithmetic decoder), dwt (the wavelets).
+
+What it decodes: every progression order and POC, tiles and tile-parts in any order, precincts,
+layers, SOP / EPH, PPM / PPT, every code-block style (bypass, reset, terminate-all, vertically
+causal, predictable termination, segmentation symbols), ROI max-shift, the 5/3 and 9/7 wavelets
+with any image and tile offsets, RCT and ICT, sub-sampled components, precision 1 to 24 bits,
+signed and unsigned.  From the JP2 header: the colour space (enumerated sRGB, greyscale, sYCC,
+CMYK, CIELab; an ICC profile), the palette with its component mapping (applied here) and the
+channel definitions (colour channels in their order, the opacity channel).  sYCC is converted to
+RGB here (unless `Options::convert_sycc` is false).  `Options::reduce` decodes a lower
+resolution (each level halves the size).
+
+Not here: Part 2 (other wavelets, multiple-component transforms beyond RCT / ICT, trellis
+quantisation), precision above 24 bits.  A file that is cut short gives what was decoded up to
+there (like the common readers); limits (`Options::max_pixels` also for the channels a palette
+makes, tiles times components, code-blocks, precincts, the packets the progression looks at)
+refuse hostile files before they cost memory or time.
+```
+
+### `img_jp2` crate root
+
+- **`enum Error`**
+  why a file could not be decoded
+  - `NotJpeg2000` -- neither a JP2 file nor a codestream
+  - `Truncated` -- the headers end early
+  - `Corrupt` -- a header that breaks the standard
+  - `Unsupported` -- valid, but not decoded here (Part 2, more than 24 bits)
+  - `Limit` -- larger than the limits allow
+
+- **`struct Options`**
+  what to decode
+  - `reduce: u8` -- resolution levels to leave out (each halves width and height)
+  - `max_pixels: u64` -- the largest width \* height (the default: img_core's IMG_MAXPX_DEF)
+  - `convert_sycc: bool` -- convert sYCC to sRGB (the default); false leaves the components as they are coded, with
+    `Color::Unknown` (a reader that takes the colour space from elsewhere, like PDF)
+
+- **`enum Color`**
+  the colour space the JP2 header names (Unknown for a raw codestream)
+  - `Unknown`
+  - `Gray`
+  - `Srgb` -- sRGB (also sYCC after the conversion here)
+  - `Cmyk`
+  - `Lab` -- CIELab (the enumerated space of JPX)
+  - `Icc(Vec<u8>)` -- an ICC profile
+
+- **`struct Component`**
+  one component (channel) of the image
+  - `width: u32`
+  - `height: u32`
+  - `dx: u32` -- its sub-sampling on the image grid
+  - `dy: u32`
+  - `precision: u8`
+  - `signed: bool`
+  - `data: Vec<i32>` -- width \* height samples, row by row (unsigned: 0 .. 2^precision - 1)
+
+- **`struct Image`**
+  a decoded image: the colour channels first, in their order, then the opacity channel
+  - `width: u32`
+  - `height: u32`
+  - `components: Vec<Component>`
+  - `color: Color`
+  - `alpha: Option<usize>` -- the index of the opacity channel
+  - `premultiplied: bool` -- the colour channels are premultiplied by the opacity
+
+- **`fn probe(d: &[u8]) -> bool`**
+  a JP2 file or a raw codestream
+
+- **`fn decode(d: &[u8], opt: &Options) -> Result<Image, Error>`**
+  decode a JP2 / JPX file or a raw codestream
+
+- **`static CODEC: Codec`**
+  jp2_codec: JP2, JPX and raw codestreams as 8-bit ARGB

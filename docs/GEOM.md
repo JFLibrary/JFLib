@@ -15,7 +15,13 @@ Stand: G7g Teil 2 (2026-11-20). Teil 1 brachte den Kern, das Werkzeug und die f�
 Prädikaten, das [Abschrägen](#abschrägen) von Kanten und Ecken, den [Beobachtungsmodus](#der-beobachtungsmodus)
 (`modeltool --watch`), [Importe nur aus dem Ordner des Skripts](#importe-nur-aus-dem-ordner-des-skripts), Befunde
 mit ihrem Ort und den [Bewertungslauf](#der-bewertungslauf): fünf Bezugsobjekte, die ein Agent aus Beschreibungen
-gebaut hat, mit Bildern und Bericht als einziger Sicht.
+gebaut hat, mit Bildern und Bericht als einziger Sicht. Mit Stufe S1 von JFScript (2026-11-24, JFScript c970852) sind
+die Namen der Skript-API englisch, auch die der Parameter ([Namen englisch, Texte deutsch](#die-skriptseite)), und
+`modeltool` gibt [Warnungen mit ihrer Zeile](#warnungen) aus; eine fehlgeschlagene Regel (`model.expect_size`,
+`model.budget`) nennt die Zeile, in der sie steht. Mit Stufe S2 (2026-11-25, JFScript a21a0c3) sind Meshes und
+Vektoren Objekte des Hosts: ein Mesh ist keine Map mehr, sondern ein `mesh`, das der Host freigibt, sobald das Skript
+es nicht mehr hält; ein Vektor ist ein `vec` mit `+ − × ÷`; eine Beschreibung (`host::api()`) liefert `--api` und den
+Sprachdiensten ihren Blick auf den Host, deren Warnungen `modeltool` jetzt mit ausgibt.
 
 Dazu (JD21, 2026-11-24): [Boolesche Operationen auf ebenen Regionen](#ebene-regionen-snap-rounding-exakt-entschieden)
 mit Löchern und beliebig vielen Operanden, und die Zerlegung einer Überlagerung in ihre Flächen. Sie sind nicht für
@@ -95,45 +101,48 @@ let mesh = render3d::MeshData { positions: &tisch.positions_f32(), normals: &tis
 
 ## Die Skript-API
 
-`modeltool --api` druckt dieselbe Liste. Längen in Metern, Winkel in Grad, Y oben, vorn ist +Z. **Jeder Grundkörper
-steht auf y = 0, mittig über dem Ursprung** (das ist die Regel, auf die sich ein Skript beim Stapeln verlässt). Ein
-Mesh ändert sich nie: Jede Operation gibt ein neues. Punkte und Vektoren sind Listen `[x, y, z]`, Profile Listen von
-`[x, y]`.
+`modeltool --api` druckt dieselbe Liste mit Typen (aus `host::api()`, siehe [Die Skriptseite](#die-skriptseite)).
+Längen in Metern, Winkel in Grad, Y oben, vorn ist +Z. **Jeder Grundkörper steht auf y = 0, mittig über dem
+Ursprung** (das ist die Regel, auf die sich ein Skript beim Stapeln verlässt). Ein Mesh ändert sich nie: Jede
+Operation gibt ein neues. Punkte und Vektoren sind `vec`s oder Listen `[x, y, z]` (jede Funktion nimmt beides),
+Profile Listen von `[x, y]`.
 
 | Funktion | Was sie tut |
 | --- | --- |
-| `geom.box(b, h, t)` | Quader b × h × t (x, y, z) |
-| `geom.cylinder(r, h, segmente = 32)` | Zylinder um die Y-Achse; glatte Seite, flache Deckel |
-| `geom.cone(r, h, segmente = 32, r_oben = 0)` | Kegel, mit `r_oben` > 0 ein Kegelstumpf |
-| `geom.sphere(r, segmente = 32, ringe = segmente / 2)` | Kugel, Mitte bei y = r |
-| `geom.torus(R, r, segmente = 32, seiten = 16)` | Torus, flach auf y = 0 |
-| `geom.stairs(b, h, t, stufen)` | Treppe als Block, erste Stufe vorn (z = t/2), steigt nach hinten |
-| `geom.arch(b, h, t, staerke, segmente = 16)` | Torbogen: zwei Pfeiler, Öffnung mit Halbkreis, darüber die Stärke |
-| `geom.extrude(profil, tiefe)` | Profil `[[x, y], ...]` (Ansicht von vorn) entlang Z, mittig um z = 0 |
-| `geom.prism(grundriss, h)` | Grundriss `[[x, z], ...]` (Ansicht von oben) von y = 0 nach oben |
-| `geom.sweep(profil, pfad, geschlossen = false, glatt = 30)` | Profil entlang eines Pfads `[[x, y, z], ...]`, Ecken auf Gehrung; Profil-x rechts des Pfads, Profil-y oben (bei senkrechtem Pfad: x ist X, y ist Z) |
-| `geom.lathe(profil, segmente = 32, glatt = 30)` | Drehkörper: Profil `[[radius, y], ...]` um die Y-Achse |
+| `geom.box(w, h, d)` | Quader w × h × d (x, y, z) |
+| `geom.cylinder(r, h, segments = 32)` | Zylinder um die Y-Achse; glatte Seite, flache Deckel |
+| `geom.cone(r, h, segments = 32, r_top = 0)` | Kegel, mit `r_top` > 0 ein Kegelstumpf |
+| `geom.sphere(r, segments = 32, rings = segments / 2)` | Kugel, Mitte bei y = r |
+| `geom.torus(R, r, segments = 32, sides = 16)` | Torus, flach auf y = 0 |
+| `geom.stairs(w, h, d, steps)` | Treppe als Block, erste Stufe vorn (z = d/2), steigt nach hinten |
+| `geom.arch(w, h, d, thickness, segments = 16)` | Torbogen: zwei Pfeiler, Öffnung mit Halbkreis, darüber die Stärke `thickness` |
+| `geom.extrude(profile, depth)` | Profil `[[x, y], ...]` (Ansicht von vorn) entlang Z, mittig um z = 0 |
+| `geom.prism(footprint, h)` | Grundriss `[[x, z], ...]` (Ansicht von oben) von y = 0 nach oben |
+| `geom.sweep(profile, path, closed = false, smooth = 30)` | Profil entlang eines Pfads `[[x, y, z], ...]`, Ecken auf Gehrung; Profil-x rechts des Pfads, Profil-y oben (bei senkrechtem Pfad: x ist X, y ist Z) |
+| `geom.lathe(profile, segments = 32, smooth = 30)` | Drehkörper: Profil `[[radius, y], ...]` um die Y-Achse |
 | `geom.merge(m1, m2, ...)` oder `geom.merge([m1, ...])` | zu einem Mesh (die Teile bleiben getrennt, auch wo sie sich durchdringen) |
 | `geom.union(m1, m2, ...)` oder `geom.union([m1, ...])` | Vereinigung zu einem geschlossenen Körper: überlappende Ecken, Podest und Rampen, Turm und Kranz |
-| `geom.difference(m, abzug1, abzug2, ...)` oder `geom.difference([m, ...])` | `m` ohne die Abzüge: ein Fenster aus einer Wand, eine Vertiefung, Zinnen |
+| `geom.difference(m, cut1, cut2, ...)` oder `geom.difference([m, ...])` | `m` ohne die Abzüge: ein Fenster aus einer Wand, eine Vertiefung, Zinnen |
 | `geom.intersection(m1, m2, ...)` | was in allen liegt |
-| `m.move(x, y, z)`, `m.place(x, y, z)`, `m.center()` | verschieben; die Mitte der Unterseite der Box nach (x, y, z); die Mitte der Box in den Ursprung |
-| `m.rotate_x(grad)`, `rotate_y`, `rotate_z`, `m.rotate(grad, [ax, ay, az])` | drehen um eine Achse durch den Ursprung (rechtshändig; Vielfache von 90° exakt) |
-| `m.scale(s)`, `m.scale(sx, sy, sz)` | skalieren um den Ursprung |
+| `m.move(x, y, z)` oder `m.move(v)`, `m.place(x, y, z)`, `m.center()` | verschieben; die Mitte der Unterseite der Box nach (x, y, z); die Mitte der Box in den Ursprung |
+| `m.rotate_x(deg)`, `rotate_y`, `rotate_z`, `m.rotate(deg, axis)` | drehen um eine Achse durch den Ursprung (rechtshändig; Vielfache von 90° exakt) |
+| `m.scale(s)`, `m.scale(sx, sy, sz)`, `m.scale(v)` | skalieren um den Ursprung |
 | `m.mirror("x")`, `"y"`, `"z"` | spiegeln an der Ebene durch den Ursprung; die Flächen bleiben außen |
 | `m.flip()` | innen nach außen |
-| `m.weld(toleranz = 0)` | Ecken an derselben Stelle zu einem Punkt verbinden (eine Hälfte und ihr Spiegelbild zu einer Fläche) |
-| `m.array(anzahl, dx, dy, dz)`, `m.radial(anzahl, schritt = 360 / anzahl)` | Kopien in einer Reihe; um die Y-Achse |
-| `m.flat()`, `m.smooth(grad = 30)` | flache Normalen; glatte über Kanten flacher als `grad` |
-| `m.bevel(breite, segmente = 1, achse = nil)` | Kanten und Ecken abgeschrägt (`segmente` 1) oder gerundet (so viele Flächen je Viertelkreis), `breite` ist der Radius; `achse` `"x"`, `"y"`, `"z"`: nur die Kanten entlang dieser Achse; nur für konvexe Körper |
-| `m.bounds()`, `m.area()`, `m.volume()`, `m.check()`, `m.tris` | `{min, max, size, center}`; m²; m³; `{ok, closed, outward, ...}`; die Zahl der Dreiecke |
-| `profile.rect(b, h)`, `circle(r, n = 32)`, `rounded(b, h, r, n = 4)`, `arc(r, von, bis, n = 16)` | Profile um den Ursprung (`arc`: ein offener Linienzug, beide Enden dabei) |
-| `profile.move(p, dx, dy)`, `scale(p, sx, sy)`, `rotate(p, grad)`, `area(p)` | Profile ändern und messen |
-| `vec.add`, `sub`, `mul`, `dot`, `cross`, `len`, `dist`, `norm`, `lerp` | Vektoren als Listen aus 2 oder 3 Zahlen |
+| `m.weld(tolerance = 0)` | Ecken an derselben Stelle zu einem Punkt verbinden (eine Hälfte und ihr Spiegelbild zu einer Fläche) |
+| `m.array(count, dx, dy, dz)`, `m.radial(count, step = 360 / count)` | Kopien in einer Reihe; um die Y-Achse |
+| `m.flat()`, `m.smooth(deg = 30)` | flache Normalen; glatte über Kanten flacher als `deg` Grad |
+| `m.bevel(width, segments = 1, axis = nil)` | Kanten und Ecken abgeschrägt (`segments` 1) oder gerundet (so viele Flächen je Viertelkreis), `width` ist der Radius; `axis` `"x"`, `"y"`, `"z"`: nur die Kanten entlang dieser Achse; nur für konvexe Körper |
+| `m.bounds()`, `m.area()`, `m.volume()`, `m.check()`, `m.tris` | `{min, max, size, center}` (je ein `vec`); m²; m³; `{ok, closed, outward, ...}`; die Zahl der Dreiecke (eine Eigenschaft, nur lesbar) |
+| `profile.rect(w, h)`, `circle(r, n = 32)`, `rounded(w, h, r, n = 4)`, `arc(r, start, end, n = 16)` | Profile um den Ursprung (`arc`: ein offener Linienzug von `start` bis `end` Grad, beide Enden dabei) |
+| `profile.move(p, dx, dy)`, `scale(p, sx, sy)`, `rotate(p, deg)`, `area(p)` | Profile ändern und messen |
+| `vec(x, y, z)`, `vec([x, y, z])`; `v.x`, `v.y`, `v.z` | ein Vektor oder Punkt: unveränderlich, `+` und `-` zwischen Vektoren, `*` und `/` mit einer Zahl (auch `2 * v`), `-v`, `==` vergleicht die Zahlen genau |
+| `v.length()`, `dot(w)`, `cross(w)`, `normalized()`, `distance(w)`, `lerp(w, t)` | Länge, Skalar- und Kreuzprodukt, Einheitsvektor, Abstand, `v + (w − v) · t` |
+| `vec.add`, `sub`, `mul`, `dot`, `cross`, `len`, `dist`, `norm`, `lerp` | dasselbe als Funktionen, auf `vec`s und Listen aus 3 Zahlen (das Ergebnis ein `vec`) oder 2 Zahlen (eine Liste) |
 | `model.add(m, material = "grau", name)` | ein Teil des Modells; das Material als Name oder `{color, roughness, metallic}` |
 | `model.material(name, {color: "#rrggbb" oder [r, g, b], roughness = 0.8, metallic = 0})` | ein Material (Farben in sRGB, 0 bis 1) |
-| `model.name(text)`, `model.budget(dreiecke)`, `model.expect_size(x, y, z, toleranz = 0.001)` | Name; Budget; erwartete Maße (`nil` für eine Achse, die nicht zählt) |
-| `model.uv_scale(meter = 1)` | Meter je UV-Einheit der Box-Projektion |
+| `model.name(text)`, `model.budget(triangles)`, `model.expect_size(x, y, z, tolerance = 0.001)` | Name; Budget; erwartete Maße (`nil` für eine Achse, die nicht zählt); ein Befund und der Bericht nennen die Zeile der Regel |
+| `model.uv_scale(meters = 1)` | Meter je UV-Einheit der Box-Projektion |
 | `params` | die Parameter von `--param NAME=WERT` (Zahlen, `true`/`false`, sonst Text): `params.get("b", 0.8)` |
 
 Eingebaute Materialien: grau, weiss, schwarz, holz, dunkelholz, stein, beton, ziegel, dach, metall, rot, gruen, blau,
@@ -145,7 +154,7 @@ konvexer Profile, auch gedreht und verschoben) oder Ergebnisse früherer Boolesc
 behält seine konvexen Zellen, auch nach `move`, `place`, `center`, `rotate*`, `scale` und `mirror` (`smooth`, `flat`,
 `weld` ändern die Form nicht und behalten sie auch). `merge`, `array`, `radial` und `flip` geben ein Mesh ohne Zellen:
 Es geht nur als konvexer Körper in eine weitere Operation (ein zusammengefügtes ist es nicht, die Meldung schlägt
-`geom.union` vor). Das Ergebnis hat glatte Normalen bis 30 Grad (`.flat()` oder `.smooth(grad)` danach ändern das).
+`geom.union` vor). Das Ergebnis hat glatte Normalen bis 30 Grad (`.flat()` oder `.smooth(deg)` danach ändern das).
 [`turm.jfs`](../apps/modeltool/examples/turm.jfs) zeigt alle drei Bausteine:
 
 ```js
@@ -163,7 +172,7 @@ in den Ordner (ohne `--out`: der Name des Skripts mit `.out`):
 
 | Datei | Inhalt |
 | --- | --- |
-| `report.json` | `ok`, `errors` (Datei, Zeile, Spalte, Text, Aufrufe), `findings` (was nicht passt, deutsch, ein Satz je Fund), `params`, `model` (Teile, Materialien, Ecken, Dreiecke, Budget, Box, Maße, Mitte, Fläche, Volumen), `checks` (der Bericht von `lib/geom` über das ganze Modell), `parts` (je Teil Material, Prüfung, Dreiecke, Box, Fläche, Volumen), `expect` (die erwarteten Maße und die gemessenen), `materials`, `fingerprint` (FNV-1a über die Bits aller Teile), `output` (was das Skript gedruckt hat), `imports` (Module mit SHA-256), `files`, `views` (Größe, Gitterabstand, Kameras, GPU), `timing` (Skript, Geometrie, Prüfungen, Zeichnen, Export in ms; der Brennstoff des Skripts) |
+| `report.json` | `ok`, `errors` (Datei, Zeile, Spalte, Text, Aufrufe), `warnings` (Datei, Zeile, Spalte, Text; dazu `warnings_dropped`, wenn mehr als 1000 nicht aufgehoben wurden), `findings` (was nicht passt, deutsch, ein Satz je Fund; ein Fund über eine Regel des Skripts mit `datei:zeile: ` davor), `params`, `model` (Teile, Materialien, Ecken, Dreiecke, Budget, Box, Maße, Mitte, Fläche, Volumen), `checks` (der Bericht von `lib/geom` über das ganze Modell), `parts` (je Teil Material, Prüfung, Dreiecke, Box, Fläche, Volumen), `expect` (die Regeln des Skripts mit Datei und Zeile: `size` mit den erwarteten Maßen und den gemessenen, `budget` mit dem Budget und den Dreiecken), `materials`, `fingerprint` (FNV-1a über die Bits aller Teile), `output` (was das Skript gedruckt hat), `imports` (Module mit SHA-256), `files`, `views` (Größe, Gitterabstand, Kameras, GPU), `timing` (Skript, Geometrie, Prüfungen, Zeichnen, Export in ms; der Brennstoff des Skripts; seit S2 die Meshes des Laufs und wie viele höchstens zugleich lebten) |
 | `front.png`, `side.png`, `top.png` | von vorn (+Z), von rechts (+X), von oben (vorn unten im Bild); alle drei im selben Maßstab, mit einem Gitter dahinter |
 | `iso.png` | von vorn rechts oben, mit einem Gitter am Boden |
 | `sheet.png` | die vier in einem Bild: vorn und rechts oben, von oben und schräg unten |
@@ -173,7 +182,48 @@ Exit-Code 0: gebaut und alle Prüfungen bestanden; 1: Fehler im Skript; 3: gebau
 falscher Aufruf. `--report DATEI.jfs` gibt nur den Bericht auf stdout, `--api` die Funktionen. Ein Befund über die
 Oberfläche nennt den ersten Ort und das Teil: `1 Kanten mit mehr als zwei Dreiecken, zuerst bei (0, 4.278199262, 0) in
 Teil "dach"` (`Report::problem_at`: die Mitte der ersten offenen, nicht mannigfaltigen oder gedrehten Kante, sonst ein
-eingeklemmter Punkt, die Mitte des ersten entarteten Dreiecks oder eine Ecke mit falscher Normale).
+eingeklemmter Punkt, die Mitte des ersten entarteten Dreiecks oder eine Ecke mit falscher Normale). Ein Befund über eine
+Regel des Skripts nennt die Zeile, in der sie steht: `haus.jfs:71: Maße 9 x beliebig x 7 m erwartet (Toleranz 0.001),
+sind …` (in einem Modul dessen Pfad, so wie Fehler ihn nennen).
+
+### Warnungen
+
+Was der Host annimmt, was aber sehr wahrscheinlich ein Versehen ist, meldet er als Warnung an der Stelle des Aufrufs
+(JFScripts `cx.warn`, seit S1); das Skript läuft weiter, der Exit-Code bleibt. Davor stehen seit S2 die Warnungen der
+Sprachdienste über das Skript und jedes Modul, das es lädt (`ls::check` mit der Beschreibung `host::api()`, ohne es
+laufen zu lassen, also auch für Zeilen, die nie laufen). Die Konsole zeigt sie vor dem Ergebnis wie Fehler, mit der
+Zeile der Quelle (bei `--report` auf stderr), die ersten zehn ganz, dann wie viele noch folgen; `report.json` hat alle
+unter `warnings` (Datei, Zeile, Spalte, Text; zusammen höchstens 1000), der Beobachtungsmodus zeigt sie in einem
+eigenen Balken. Die Sprachdienste warnen bei:
+
+| Warnung | Beispiel |
+| --- | --- |
+| eine Eigenschaft oder Methode, die ein Mesh oder ein `vec` nicht hat, mit dem nächsten Namen | `mesh hat keine Methode mov – meinst du move?`, `vec hat keine Eigenschaft q` |
+| eine Methode ohne Klammern gelesen oder eine Eigenschaft gerufen, eine nur lesbare gesetzt | `tris ist eine Eigenschaft von mesh, keine Methode – ohne Klammern: .tris`, `mesh.tris ist nur lesbar` |
+| ein Name in `geom`, `profile`, `vec` oder `model`, den es nicht gibt | `Unbekannter Name vec.ad – meinst du vec.add?` |
+| eine Division zweier Ganzzahlen | `Ganzzahlige Division: 7 / 2 schneidet ab (7 / 2 ist 3) – …` |
+
+Der Typ eines Ausdrucks ist ihnen nur bekannt, wo die Beschreibung ihn sagt (`geom.box(..)` ist ein `mesh`, eine
+Variable, der nur Meshes zugewiesen werden, auch); bei Parametern einer Funktion schweigen sie. Der Host warnt bei
+vier Dingen:
+
+| Warnung | Warum |
+| --- | --- |
+| mehr Argumente, als die Funktion liest (`geom.cylinder(0.3, 1.2, 32, 0.1)`) | die übrigen werden nicht angesehen; oft ist eine andere Funktion gemeint (`geom.cone`) oder ein Argument verrutscht |
+| `closed` von `geom.sweep` ist weder `true` noch `false` noch `nil` | jeder andere Wert gilt als wahr, auch `0`; eine Zahl dort ist meist der Glättungswinkel eine Stelle zu früh |
+| ein zweites `model.name`, `model.budget` oder `model.uv_scale` mit einem anderen Wert | der erste gilt nicht mehr (bei `uv_scale` bekommen alle Teile den letzten Wert); die Meldung nennt die Zeile des ersten |
+| `model.material` legt einen Namen anders fest, den das Skript schon festgelegt hat oder den Teile schon benutzen | Teile davor behalten das alte Material, das Modell hat dann zwei Materialien eines Namens |
+
+```text
+tisch.jfs:12:7: Warnung: model.name: "Tisch 2" ersetzt den Namen "Tisch" aus tisch.jfs:2
+  12 | model.name("Tisch 2")
+     |       ^
+```
+
+Ein eingebautes Material neu festzulegen, das noch kein Teil benutzt, ist gewollt und keine Warnung; ebenso ein zweiter
+Aufruf mit demselben Wert. `compile_with` meldet die Warnungen der Sprachdienste nicht, darum ruft `modeltool`
+`ls::check` nach dem Übersetzen selbst: 0,1 bis 0,5 ms je Beispiel (das Haus mit seinem Modul am meisten), die
+Beschreibung zu bauen rund 0,05 ms je Lauf.
 
 ### Der Beobachtungsmodus
 
@@ -186,7 +236,8 @@ die Mitte des Modells, das Rad bringt die Kamera näher oder weiter (beides wech
 von der gewählten). „Gitter" schaltet das Gitter, „Neu bauen" oder F5 baut von Hand, Strg+Q beendet. Ein Fehler im
 Skript steht über der Ansicht (Ort und Meldung wie in der Konsole, die Zeile der Quelle, die Aufrufe); zu sehen
 bleibt das Modell des letzten Baus, der lief. Ein fehlgeschlagener Befund (Maße, Budget, offen) steht als Warnung
-dort. Die Statusleiste: Name und Zustand, Teile, Dreiecke, Maße, die Ansicht, die Nummer des Baus, seine Dauer.
+dort, die [Warnungen](#warnungen) des Hosts in einem eigenen Balken darunter, jede mit Ort und Zeile. Die
+Statusleiste: Name und Zustand, Teile, Dreiecke, Maße, die Ansicht, die Nummer des Baus, seine Dauer.
 Der Kern ([`watch.rs`](../apps/modeltool/src/watch.rs)) hat kein Fenster und wird mit echten Dateien geprüft
 (Gruppe `watch`), das Fenster headless mit [`tests/watch.uis`](../apps/modeltool/tests/watch.uis) und
 [`tests/watch_fehler.uis`](../apps/modeltool/tests/watch_fehler.uis). Im Browser gibt es ihn nicht (keine Dateien).
@@ -405,17 +456,17 @@ Herkunft der Kanten. `region.rs` ist deshalb ein eigenes Modul für Mengen aus K
 
 ### Abschrägen
 
-`m.bevel(breite, segmente, achse)` (Rust: `geom::bevel`, `Solid::bevel`) auf einem konvexen Körper fügt Ebenen hinzu:
-längs jeder Kante `segmente` Ebenen durch Punkte eines Kreisbogens mit dem Radius `breite`, dessen Achse um den Radius
-in beiden Flächen liegt (eine Kante, die um φ knickt, bekommt `round(segmente · φ / 90°)` davon, mindestens eine:
+`m.bevel(width, segments, axis)` (Rust: `geom::bevel`, `Solid::bevel`) auf einem konvexen Körper fügt Ebenen hinzu:
+längs jeder Kante `segments` Ebenen durch Punkte eines Kreisbogens mit dem Radius `width`, dessen Achse um den Radius
+in beiden Flächen liegt (eine Kante, die um φ knickt, bekommt `round(segments · φ / 90°)` davon, mindestens eine:
 die Zahl gilt je Viertelkreis, die Seiten eines 32-eckigen Zylinders werden nicht zerstückelt), an jeder Ecke von drei
 Flächen die Dreiecke eines Kugelflickens mit demselben Radius (bei drei gleichen Kanten das Raster normalize(i n₁ + j n₂
 + (k − i − j) n₃), sonst Reihen von der Fläche gegenüber der Kante mit den wenigsten Segmenten). Der abgeschrägte
 Quader ist die Minkowski-Summe des um den Radius geschrumpften Quaders und des Polytops dieser Richtungen; daraus ist
-die Referenz der Tests gerechnet. `segmente` 1 ist eine Fase (eine Fläche je Kante, ein Dreieck je Ecke); flache
+die Referenz der Tests gerechnet. `segments` 1 ist eine Fase (eine Fläche je Kante, ein Dreieck je Ecke); flache
 Normalen. Ab 2 sind die Rundungen glatt: Eine Ecke einer Rundung bekommt die Normale der ursprünglichen Fläche, auf der
 sie liegt, wo der Bogen in sie übergeht (dort ist die Fläche tangential: keine Kante, und die große Fläche bleibt
-gleichmäßig hell), sonst den nach Winkeln gewichteten Mittelwert der Rundungsflächen um sie. `achse`: nur Kanten
+gleichmäßig hell), sonst den nach Winkeln gewichteten Mittelwert der Rundungsflächen um sie. `axis`: nur Kanten
 entlang dieser Achse (auf ein Grad), die Ecken bleiben (eine Tischplatte mit runden senkrechten Kanten). Zu breit (die
 nach innen versetzten Flächen schließen kein Volumen mehr ein) ist ein Fehler. Ecken mit mehr als drei Flächen (die
 Spitze eines Kegels) bekommen keinen Flicken; nicht konvexe Körper gehen nicht (abschrägen vor der Booleschen
@@ -459,20 +510,49 @@ Teile sind bei 384 px kaum zu sehen (`--size 1024` hilft). Die Reihenfolge der W
 
 ### Die Skriptseite
 
-- **Ein Mesh ist im Skript eine Map** `{mesh: id, tris: n}`, weil JFScript keine Host-Objekte hat. Methoden wie
-  `m.move(..)` erreichen den Host als `map.move`, weil die Map kein Feld `move` hat und die Bibliothek keine
-  Map-Methode dieses Namens. Darum heißt das Zusammenfügen `geom.merge` und nicht `m.merge` (das ist `map.merge` der
-  Bibliothek). Meshes ändern sich nie; alle eines Laufs bleiben bis zu seinem Ende im Host (höchstens 4 Mio. Dreiecke
-  zusammen, auch Zwischenstände: eine Grenze mit einer Meldung statt eines vollen Speichers).
+- **Ein Mesh ist ein Objekt des Hosts** (seit S2; bis dahin die Map `{mesh: id, tris: n}`, weil JFScript keine
+  Host-Objekte hatte, und ihre Methoden kamen als `map.move` an). Das Skript kann es nicht öffnen und nicht ändern,
+  `type(m)` ist `"mesh"`, `print` zeigt `mesh(12 Dreiecke)`, `==` ist dasselbe Mesh; `m.tris` liest der Host
+  (`Host::get`), die Methoden gehen an `Host::method`. Ein Name, den ein Mesh nicht hat, wirft eine Meldung mit allen,
+  die es hat. Meshes ändern sich nie. Gibt der Sammler eines frei, das das Skript nicht mehr hält, erfährt es der Host
+  (`Host::drop`) und gibt Ecken und konvexe Zellen frei; die Id nimmt das nächste neue Mesh. Ein Teil des Modells hat
+  seine eigene Kopie (`model.add`), ihm schadet das nie. Die Grenze von 4 Mio. Dreiecken zählt weiter jedes Mesh des
+  Laufs, auch freigegebene Zwischenstände: Sie begrenzt die Arbeit eines Laufs, und sie hängt nicht davon ab, wann der
+  Sammler läuft (seine Schwellen sind Sache von JFScript). Im Bericht steht in der letzten Zeile, wie viele Meshes ein
+  Lauf gemacht hat und wie viele es höchstens zugleich waren (`meshes`, `meshes_peak`).
+- **Ein Vektor ist ein Werttyp des Hosts** `vec` (seit S2): drei Zahlen, unveränderlich, `==` vergleicht die Zahlen
+  genau (ohne Toleranz). Die Operatoren `+ −` zwischen Vektoren, `× ÷` mit einer Zahl und das Minus rechnet der Host
+  mit den Grundrechenarten von `f64`, wie `vec.*`; sie geben dieselben Bits wie JFScripts Rechnung in Software. Jede
+  Funktion, die einen Punkt oder Vektor nimmt, nimmt einen `vec` wie eine Liste `[x, y, z]` (oder drei Zahlen, wo
+  sie das schon tat); Funktionen, die einen Punkt in 3D geben (`m.bounds()`, `vec.*`), geben einen `vec`, damit die
+  Operatoren gehen (`v[0]` heißt jetzt `v.x`). `vec.*` mit Listen aus zwei Zahlen gibt weiter eine Liste: Profile
+  bleiben Listen von `[x, y]`. Der Konstruktor heißt wie der Typ, `vec(x, y, z)`, neben dem Namensraum `vec.*`: Für
+  die VM sind `vec` und `vec.add` zwei Namen des Hosts, für die Sprachdienste ist `vec` eine Funktion und zugleich
+  der Namensraum der Namen mit Punkt.
+- **Eine Beschreibung** (seit S2): `host::api()` ist ein `script::Api` mit allen Funktionen, dem Wert `params`, den
+  Typen `mesh` und `vec` mit Eigenschaften, Methoden und Operatoren, die Signaturen in der Schreibweise von
+  TypeScript (`geom.cone(r: float, h: float, segments: int = 32, r_top: float = 0): mesh`), die Texte deutsch.
+  Daraus kommen `--api`, die Namen für `compile_with`, die Warnungen der Sprachdienste, die höchste Zahl der Argumente
+  je Funktion (für die Warnung über weitere) und die Meldungen über fehlende Eigenschaften und Methoden. Eine Signatur
+  nennt die längste Form (`m.move(x, y, z)`), die kürzeren (`m.move(v)`) stehen in ihrem Text: Eine Signatur hat
+  keine Überladungen und `Api::validate` keine Vereinigungstypen.
+- **Namen englisch, Texte deutsch** (Entscheidung G9.3 in JFScripts `docs/RICHTUNG.md`): Funktionen und ihre
+  Parameter heißen englisch wie die Sprache und ihre Bibliothek (`m.bevel(width, segments, axis)`, `list.range(start,
+  end, step)`); mit benannten Argumenten werden auch die Namen der Parameter Teil der Schnittstelle. Bis S1 hießen sie
+  deutsch (`breite`, `segmente`, `achse`); Skripte ändert das nicht, sie übergeben Argumente nach ihrer Stelle.
+  Beschreibungen (`--api`) und Meldungen bleiben deutsch, Schlüsselwörter werden nie übersetzt. Die Namen eines Skripts
+  (Variablen, `--param`) wählt sein Autor.
 - **Fehler auf Deutsch**, mit dem Namen der Funktion und des Parameters (`geom.box: die Höhe muss eine Zahl größer 0
-  sein, nicht -2`), wie JFScripts eigene. JFScript setzt Datei, Zeile und Spalte des Aufrufs dazu; `modeltool` zeigt die
-  Zeile mit einem Pfeil und die Aufrufe. `compile_with` mit den Namen des Hosts macht einen Tippfehler (`boks`) schon
-  vor dem Lauf zum Fehler, mit Vorschlag.
+  sein, nicht -2`, `geom.box: w muss eine Zahl sein, nicht str "x"`), wie JFScripts eigene. JFScript setzt Datei,
+  Zeile und Spalte des Aufrufs dazu; `modeltool` zeigt die Zeile mit einem Pfeil und die Aufrufe. `compile_with` mit
+  den Namen des Hosts macht einen Tippfehler (`boks`) schon vor dem Lauf zum Fehler, mit Vorschlag.
 - **Grenzen**: 64 MiB Heap, 200 Mio. Schritte (eine Endlosschleife endet nach rund 2 s), Brennstoff der
   Host-Funktionen nach der Arbeit (je 64 Dreiecke einer).
 - **Cache-Schlüssel**: SHA-256 (die ersten 128 Bit) über die Version des Werkzeugs und von JFLib, das Skript, die
   sortierten Parameter und jedes importierte Modul mit Pfad und Inhalt, Zeilenenden als LF. Ein Lauf mit gleichem
-  Schlüssel, gleichen Bildoptionen und vorhandenen Dateien baut nicht neu.
+  Schlüssel, gleichen Bildoptionen und vorhandenen Dateien baut nicht neu. Seit S1 beginnt der Text mit
+  `modeltool-key-2` (der Bericht hat Warnungen und die Zeilen der Regeln), seit S2 mit `modeltool-key-3` (Meshes und
+  Vektoren sind Objekte, der Bericht hat die Warnungen der Sprachdienste): ein Bericht von vorher wird neu gebaut.
 
 ### Die Bilder
 
@@ -490,40 +570,57 @@ Teile sind bei 384 px kaum zu sehen (`--size 1024` hilft). Die Reihenfolge der W
 ## Was JFScript braucht
 
 Was in Teil 1 fehlte und wie `modeltool` sich behilft. Gebaut wird es im Repository von JFScript, nach einem Ja des
-Nutzers (E7); JFScript ist in Teil 2 unverändert. Der [Bewertungslauf](#der-bewertungslauf) ordnet die Wünsche so:
-**1. Vektoren mit Operatoren** (die Lage-Rechnungen waren der größte Aufwand: die Dachplatte, die Linie der
-Stufenkanten), **5. mehr Mathematik in Grad** (tan für das Dach), **4. benannte Argumente** (`bevel(breite, segmente,
-achse)`), neu **10. ein Bedingungsausdruck** (`a ? b : c` fehlt; die Meldung hilft, kostet aber eine Runde), dann
+Nutzers (E7); JFScript ist in Teil 2 unverändert. Die Richtung und die Stufen stehen seit 2026-11-23 in JFScripts
+`docs/RICHTUNG.md`; Stufe S1 (JFScript c970852, 2026-11-24) brachte 3, 5 und 7 und für 6 die Warnung der
+Sprachdienste, `modeltool` nutzt davon die Stelle des Aufrufs und die Warnungen. Stufe S2 (JFScript a21a0c3,
+2026-11-25) brachte 2 und 9 und damit 1 als Werttyp des Hosts; `modeltool` zeigt seitdem auch die Warnungen der
+Sprachdienste (6). Offen sind 4, 8 und 10 (S3). Der
+[Bewertungslauf](#der-bewertungslauf) ordnet die Wünsche so: **1. Vektoren mit Operatoren** (die Lage-Rechnungen waren der größte Aufwand: die Dachplatte, die Linie der
+Stufenkanten), **5. mehr Mathematik in Grad** (tan für das Dach), **4. benannte Argumente** (`bevel(width, segments,
+axis)`), neu **10. ein Bedingungsausdruck** (`a ? b : c` fehlt; die Meldung hilft, kostet aber eine Runde), dann
 **2./3. Host-Objekte und die Stelle des Aufrufs** (Warnungen mit Zeile, etwa „dieser Abzug trifft nichts").
 
 1. **Vektoren mit Operatoren.** Heute: `let b2 = vec.add(b, vec.mul(richtung, 0.1))`. Gewünscht: `let b2 = b +
    richtung * 0.1` mit `b.x`, `b.y`, `b.z`. Ein Typ `vec` (2 und 3 Komponenten, `f64`, unveränderlich) mit `+ − ×
    ÷` (Skalar), `==`, Feldern und Methoden (`len`, `norm`, `dot`, `cross`); Listen von Zahlen als Punkte müssten
-   weiter gehen. Behelf: Listen und `vec.*`.
+   weiter gehen. Behelf: Listen und `vec.*`. **Seit S2 da**, als Werttyp des Hosts statt als Typ der Sprache:
+   `vec(x, y, z)` mit `v.x`, `+ −` zwischen Vektoren, `× ÷` mit einer Zahl, `-v`, `==` nach den Zahlen,
+   `length`, `dot`, `cross`, `normalized`, `distance`, `lerp`; Listen gehen weiter als Punkte, `vec.*` auch. Nur in
+   3D (Profile bleiben Listen von `[x, y]`). `treppe.jfs` rechnet so: `let b2 = b + richtung * 0.1`.
 2. **Host-Objekte.** Heute ist ein Mesh die Map `{mesh: 3, tris: 12}`: Das Skript kann sie ändern (`m.mesh = 7`),
    `type(m)` sagt `map`, `m.len()` ist 2, Methodennamen der Map-Bibliothek (`merge`, `get`, `has`, `keys`, `values`,
    `len`, `delete`, `entries`) sind für Meshes verloren, und der Host kann nichts freigeben, weil er nicht erfährt, wann
    ein Mesh unerreichbar wird. Gewünscht: ein Wert `Host(typ, id)`, den das Skript nicht öffnen kann; `obj.m(..)` geht
    an `Host::call("mesh.m", ..)`; `type()` und `print` fragen den Host; der Sammler meldet freigegebene Ids
-   (`Host::drop`).
+   (`Host::drop`). **Seit S2 da** (`Host::get`, `set`, `method`, `op`, `to_str`, `drop`): ein Mesh ist ein `mesh`,
+   `m.tris` eine Eigenschaft, freigegebene Meshes gibt der Host während des Laufs frei ([Die Skriptseite](#die-skriptseite)).
 3. **Die Stelle des Aufrufs für den Host.** `Cx` sagt nicht, in welcher Zeile die Host-Funktion gerufen wurde. So kann
    `model.expect_size` im Bericht nicht sagen, wo die Regel steht, und der Host kann keine Warnung mit Zeile geben
    („das Teil schwebt 2 cm über dem Boden"). Gewünscht: `cx.position() -> (datei, zeile, spalte)`, dazu Warnungen
-   (`cx.warn(text)`), die nicht abbrechen.
+   (`cx.warn(text)`), die nicht abbrechen. **Seit S1 da**: `modeltool` gibt [Warnungen](#warnungen) aus, und
+   `model.expect_size` und `model.budget` merken sich ihre Zeile.
 4. **Benannte Argumente.** `geom.cylinder(0.3, 1.2, 32)` ist für eine KI fehleranfällig (was ist r, was h?).
    Gewünscht: `geom.cylinder(r: 0.3, h: 1.2)` als letzte Map übergeben, oder Standardwerte in der Signatur. Behelf:
-   Positionsargumente mit Namen in den Fehlermeldungen und in `--api`.
+   Positionsargumente mit Namen in den Fehlermeldungen und in `--api` (seit S1 englisch, so wie sie als benannte
+   Argumente heißen würden).
 5. **Mehr Mathematik.** Es fehlen `tan`, `asin`, `acos`, `atan`, `atan2`, `hypot` und Winkel in Grad, die bei 90° exakt
    sind (`math.sin_deg`). `haus_teile.jfs` rechnet `tan` als `math.sin(a) / math.cos(a)` mit `a = neigung * math.pi / 180`.
+   **Seit S1 da**: `math.tan`, `asin`, `acos`, `atan`, `atan2`, `hypot`, `sin_deg`, `cos_deg`, `tan_deg`. Die Beispiele
+   rechnen weiter wie vorher, damit ihre Eingaben und die [Prüfsumme](#prüfsummen) gleich bleiben.
 6. **Ganzzahl-Division.** `1 / 3` ist 0 und `(stufen + 2) / 3` schneidet ab: In Geometrie-Code ein leiser Fehler
    (die Säule braucht `i / 12.0`). Vorschlag: eine Warnung der Sprachdienste, wo zwei Ganzzahlen geteilt werden, oder
-   `//` für die ganzzahlige Division.
+   `//` für die ganzzahlige Division. **Seit S1**: `check` warnt bei `int / int`; seit S2 zeigt `modeltool` die
+   Warnungen der Sprachdienste ([Warnungen](#warnungen)).
 7. **Bereiche mit Schritt und Zerlegen.** `for i in 0..n` nur ganzzahlig mit Schritt 1; eine Kurve abtasten heißt
-   `t = i / 12.0` von Hand. Gewünscht: `range(a, b, schritt)`, `linspace(a, b, n)`.
+   `t = i / 12.0` von Hand. Gewünscht: `range(a, b, schritt)`, `linspace(a, b, n)`. **Seit S1 da**:
+   `list.range(start, end, step)`, `list.linspace(start, end, n)`.
 8. **Zerlegen beim Zuweisen.** `let {rahmen, glas, bank} = teile.fenster(b, h)` und `let [x, y, z] = p` statt
    `f.rahmen` und `p[0]`.
 9. **Beschreibungen der Host-Funktionen für die Sprachdienste.** `script::ls` kennt `HostItem`; `modeltool` hat die
-   Liste in `host::API`. Für den Beobachtungsmodus und die IDE (G7o) gehören beide zusammen.
+   Liste in `host::API`. Für den Beobachtungsmodus und die IDE (G7o) gehören beide zusammen. **Seit S2 da**:
+   `script::Api` mit Typen und Signaturen; `host::api()` ersetzt `host::API` und dient `--api`, `compile_with` und
+   `ls::check`. Offen bleibt: `compile_with` gibt die Warnungen der Sprachdienste nicht mit zurück; `modeltool` ruft
+   dafür `ls::check`, das das Skript ein zweites Mal liest.
 10. **Ein Bedingungsausdruck** (neu aus dem Bewertungslauf). `"drücker ${seite > 0 ? "vorn" : "hinten"}"` geht nicht;
     Behelf: eine Variable und `if` davor. Ebenso fehlt ein Ausdruck für eine Liste aus einer Schleife (`[for i in
     0..n: ...]`); Behelf: `push` in der Schleife, was bei `geom.union(teile)` und `geom.difference(liste)` oft vorkommt.
@@ -559,14 +656,14 @@ ihren Rasterdreiecken).
 | `csg` | 300 Paare achsparalleler Quader (ein Drittel auf einem Raster von 1/64 m bündig, berührend, eins im anderen): Vereinigung, Differenz, Schnitt geschlossen, außen, nichts entartet, ein oder zwei Teile, Euler, Volumen gegen die Überlappung auf 10⁻¹¹, Grenzen exakt; 120 Paare gedrehter Quader, Zylinder, Kegel und Stümpfe, Kugeln und Prismen: die Volumen-Gleichungen auf 10⁻⁹, je 40 gestreute Punkte auf der richtigen Seite; 80 Prismen mit 3 bis 48 Ecken durch Platten (Euler 0, Volumen); 30 Wände mit bis zu vier Öffnungen nacheinander (Euler 2 − 2k); 20 Körper gedreht und weiter geschnitten gegen dasselbe aus gedrehten Eingaben; A ∪ A, A − A, A ∩ A, zwei Hälften, eine Reihe gedrehter Kisten; was verweigert wird (nicht konvex, offen, zwei Teile, leer) | 6 090 Prüfungen, 0 falsch |
 | `bevel` | 120 Quader mit 1 bis 6 Segmenten: geschlossen, Euler 2, Volumen gegen die Minkowski-Summe auf 10⁻¹¹, Grenzen exakt, die flache Fläche flach und so groß wie erwartet, keine Naht am Übergang; 40 nur entlang Y (Querschnitt: Rechteck mit runden Ecken); 60 Zylinder, Stümpfe, gedrehte Quader; ein abgeschrägter Block mit Loch; was verweigert wird | 1 287 Prüfungen, 0 falsch |
 | `gltf` | die sechs Beispiele geschrieben und gelesen: Meshes, Materialien, Knoten, Szenen gleich, keine Notizen; ein Knoten mit Matrix und Kind, ein Material mit allen Faktoren, MASK und doppelseitig; was verweigert wird (Textur, Index außerhalb, NaN) | 42 Prüfungen, 0 falsch |
-| `script` | ein gutes Skript; zwölf kaputte: falsche Werte, falsche Typen, unbekannte Namen, Methoden, Materialien, sich schneidende Profile, nichts hinzugefügt, fehlende und kaputte Module, Endlosschleife, zu viele Dreiecke, falsche Achse: jede Meldung mit Datei, Zeile und Text; Pfeil unter der Spalte; Parameter, Module, Funden statt Fehlern, Abfragen; der Cache-Schlüssel (CRLF = LF); Boolesche Operationen und Abschrägen aus dem Skript (eine Wand mit Fenster: Euler 0, gedreht und weiter geschnitten) und ihre Meldungen; ein Befund mit Ort und Teil; Importe: zwölf Pfade für `import_allowed`, drei Skripte, die hinaus wollen, ein Skript im Unterordner | 51 Prüfungen, 0 falsch |
-| `watch` | der Kern des Beobachtungsmodus mit echten Dateien in einem temporären Ordner: der erste Bau, unverändert, gespeichert, ein Fehler (das alte Modell bleibt), ein Modul geändert und gelöscht, ein Import aus dem Ordner darüber, ein Skript, das fehlt (im Browser: keine Dateien, keine Prüfung) | 16 Prüfungen, 0 falsch |
+| `script` | ein gutes Skript; zwölf kaputte: falsche Werte, falsche Typen, unbekannte Namen, Methoden, Materialien, sich schneidende Profile, nichts hinzugefügt, fehlende und kaputte Module, Endlosschleife, zu viele Dreiecke, falsche Achse: jede Meldung mit Datei, Zeile und Text; Pfeil unter der Spalte; Parameter, Module, Funden statt Fehlern, Abfragen; der Cache-Schlüssel (CRLF = LF); Boolesche Operationen und Abschrägen aus dem Skript (eine Wand mit Fenster: Euler 0, gedreht und weiter geschnitten) und ihre Meldungen; ein Befund mit Ort und Teil; Importe: zwölf Pfade für `import_allowed`, drei Skripte, die hinaus wollen, ein Skript im Unterordner; seit S1: Befunde und Regeln mit ihrer Zeile (auch aus einem Modul), sieben Warnungen mit Datei, Zeile, Spalte und Text, in der Konsole und im Bericht, eine Warnung vor einem Fehler, mehr als 1000 Warnungen; die Namen von `--api` englisch, `max_args` für jede Funktion; seit S2: die Beschreibung ganz (`Api::validate`), ein Mesh als Objekt (Typ, Text, `tris`, Gleichheit, fünf falsche Zugriffe mit ihren Meldungen und den Warnungen der Sprachdienste), ein `vec` (Konstruktor, Komponenten, Operatoren, `==`, Methoden, `vec.*` auf `vec`s und Listen, Punkte als `vec` in sieben Funktionen, elf Fehler mit ihren Meldungen), 40 401 Meshes mit höchstens 8191 zugleich (die Teile und ein gehaltenes Mesh bleiben heil), sechs Warnungen aus Sprachdiensten, Modul und Host in ihrer Reihenfolge; die Vervollständigung nach `m.`, `v.` und `vec.` und die Signatur von `vec(` mit der Beschreibung | 221 Prüfungen, 0 falsch |
+| `watch` | der Kern des Beobachtungsmodus mit echten Dateien in einem temporären Ordner: der erste Bau, unverändert, gespeichert, ein Fehler (das alte Modell bleibt), ein Modul geändert und gelöscht, ein Import aus dem Ordner darüber, ein Skript, das fehlt (im Browser: keine Dateien, keine Prüfung); eine Warnung mit Ort und Zeile | 18 Prüfungen, 0 falsch |
 | `examples` | die sechs Beispiele: laufen, bestehen alle Prüfungen, ihr Bericht gleich dem in `examples/out` (ohne Dateien, Ansichten, Zeiten) | 24 Prüfungen, 0 falsch |
 
-Zusammen 38 773 Prüfungen in rund 11 s (Entwicklungs-Build, Ryzen 5 3600, ohne Last; `bevel` und `csg` sind die
-längsten Gruppen). Dazu headless: `watch.uis` (die Kiste im Fenster, die vier Ansichten, ziehen und Rad in der
+Zusammen 38 945 Prüfungen in rund 9 s (Entwicklungs-Build, Ryzen 5 3600; `bevel` und `csg` sind die längsten
+Gruppen). Dazu headless: `watch.uis` (die Kiste im Fenster, die vier Ansichten, ziehen und Rad in der
 freien Ansicht, Gitter aus, Neu bauen und F5) und `watch_fehler.uis` (ein Skript mit Fehler: der Balken, Ort und
-Meldung, die Zeile; kein Modell).
+Meldung, die Zeile; kein Modell; die Warnung davor in ihrem Balken).
 
 ## Prüfsummen
 
@@ -584,18 +681,28 @@ neuen Operationen. Der alte Teil ist unverändert: `8d93441afd1b79d7` mit 183 30
 nach allen Änderungen an `lib/geom` (Booleans, Abschrägen, `problem_at`) und vor dem neuen Beispiel; die alten
 Beispiele geben denselben Bericht wie in `examples/out`.
 
+**Die Zahl hat sich mit S2 geändert**, nur durch den Brennstoff: `treppe.jfs` rechnet den Handlauf mit Operatoren
+statt mit `vec.*` (`b + richtung * 0.1`) und braucht 265 Schritte statt 275; die anderen Beispiele brauchen gleich
+viele, auch mit Meshes als Objekten. Die Bits aller Meshes sind gleich: Ohne den Brennstoff gefaltet ergibt sich vor
+und nach S2 `d9c23e8f809f620b` mit 109 751 Werten, und die Berichte in `examples/out` unterscheiden sich nur im
+Schlüssel. Bis S2 war die Zahl `0fae175a31a0f15e` (S1 und `modeltool` vor S2 auch gegen JFScript a21a0c3).
+
 | Ziel | Build | Prüfsumme | `--check` |
 | --- | --- | --- | --- |
-| Windows x86-64 (Ryzen 5 3600), Rust 1.100 | Entwicklung | `0fae175a31a0f15e` | 38 773 bestanden |
-| Linux x86-64 gegen glibc, in WSL Ubuntu 24.04 | Entwicklung | `0fae175a31a0f15e` | 38 773 bestanden |
-| macOS ARM64 (Mac mini M2, macOS 27.2), Rust 1.98.1 | Entwicklung | `0fae175a31a0f15e` | 38 773 bestanden, die fünf Skripte auch (Metal) |
-| WebAssembly in Node 22 (V8): einfach, SIMD, Threads | Entwicklung | `0fae175a31a0f15e` | 38 757 bestanden (alle drei; ohne die 16 der Gruppe `watch`) |
+| Windows x86-64 (Ryzen 5 3600), Rust 1.100 | Entwicklung | `ff9e060c8233c600` | 38 945 bestanden (S2) |
+| Linux x86-64 gegen glibc, in WSL Ubuntu 24.04 | Entwicklung | `ff9e060c8233c600` | 38 945 bestanden (S2) |
+| macOS ARM64 (Mac mini M2, macOS 27.2), Rust 1.98.1 | Entwicklung | `0fae175a31a0f15e` | 38 906 bestanden (S1; S2 noch nicht geprüft; die fünf Skripte mit Metal: Stand Teil 2) |
+| WebAssembly in Node 22 (V8): einfach, SIMD, Threads | Entwicklung | `ff9e060c8233c600` | 38 927 bestanden (S2; alle drei, ohne die 18 der Gruppe `watch`) |
 
-Zusammen 234 941 Werte. Auf x86-64 und ARM64 rechnet die Wurzel der Prozessor, im Browser `sqrt_portable`; JFScript
-rechnet überall in Software, die exakte Arithmetik der Booleschen Operationen nur mit `+ − ×`. `--check` dauert im
-Entwicklungs-Build rund 11 s unter Windows (unter Last bis 20 s), 11 s in WSL, 6 s auf dem M2 und 19 bis 25 s in
-Node. Gezeichnet haben die RTX 2070 SUPER (Vulkan) und der M2 (Metal); die Release-Builds sind in Teil 2 nicht
-verglichen.
+Zusammen 234 941 Werte. Mit JFScript S1 (c970852) und den Warnungen war die Zahl auf Windows, Linux und in Node
+dieselbe geblieben, auch die Zahl der Werte: Die Warnungen kosten keinen Brennstoff, und die Beispiele waren
+unverändert. Auf x86-64 und ARM64 rechnet die Wurzel der Prozessor, im Browser `sqrt_portable`; JFScript
+rechnet überall in Software, die exakte Arithmetik der Booleschen Operationen nur mit `+ − ×`; die Operatoren eines
+`vec` rechnet der Host in `f64` mit denselben Bits. `--check` dauert im Entwicklungs-Build rund 11 s unter Windows
+(unter Last bis 20 s), 11 s in WSL, 6 s auf dem M2 und 19 bis 25 s in Node (S1); am 2026-11-25 nacheinander auf
+demselben Rechner 8,0 s mit S1 und 8,7 s mit S2 unter Windows (die 39 neuen Prüfungen, darunter 40 401 Meshes), 10 s
+in WSL und 12 bis 15 s in Node. Gezeichnet haben die RTX 2070 SUPER (Vulkan) und der M2 (Metal); die Release-Builds
+sind in Teil 2 nicht verglichen.
 
 ## Messwerte
 
@@ -628,6 +735,14 @@ deckt genau die Vereinigung und je Operand seine Fläche ab, gestreute Punkte au
 und im richtigen Stück, keine zwei Ausgabekanten kreuzen sich, jede Marke liegt auf ihrer Eingabekante; 40 Runden mit
 vier Vielecken von 32 bis 95 Ecken.
 
+Was die Objekte von S2 kosten (Entwicklungs-Build unter Windows, je 5 Läufe der drei Stände abwechselnd, Median;
+Skript und Geometrie einer Schleife): 100 000-mal `m.tris` 9,7 ms als Eigenschaft eines `mesh` gegen 4,9 ms als Feld
+der Map vor S2 (der Host wird über einen kalten Weg der VM gefragt); 20 000-mal `m.flip()` 29 ms gegen 44 ms (die
+Methode geht direkt an den Host statt über `map.flip`); 100 000-mal `v = v + d` 18 ms, `v = vec.add(v, d)` mit
+Listen 37 bis 41 ms. `--checksum` (0,31 s) und die Beispiele (rund 220 ms) sind gleich schnell wie vorher; eine
+Schleife ohne Host (3 Mio. `s += i`) braucht mit S2 116 bis 126 ms, mit S1 107 bis 119 ms (Minimum bis Median,
+auch zwischen zwei Builds desselben Stands um einige Prozent verschieden).
+
 ## Was nicht getestet ist
 
 - Android und iOS (`cargo check -p jflib` für `aarch64-linux-android` geht mit und ohne `std`; `modeltool` steht nicht
@@ -657,7 +772,6 @@ vier Vielecken von 32 bis 95 Ecken.
   Detailstufen (G7j), Löcher in Profilen (ein Fenster entsteht jetzt als Abzug), Teil-Drehkörper (unter 360°),
   Texturen, Farben je Ecke, Instanzen im glTF (jedes Teil ist ein eigenes Mesh).
 - Beschriftungen in den Bildern und im Beobachtungsmodus (Maße, Achsen, Himmelsrichtungen).
-- Freigeben von Meshes während eines Laufs (wartet auf Host-Objekte in JFScript).
 
 ## Danach
 

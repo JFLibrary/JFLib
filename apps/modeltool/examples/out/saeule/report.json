@@ -1,9 +1,10 @@
 {
   "tool": "modeltool 0.1.0",
   "script": "saeule.jfs",
-  "key": "2a5b88473ff4f46c06416606de5c2bbc",
+  "key": "20536982996f4c7fb5b9964d2d805ff7",
   "ok": true,
   "errors": [],
+  "warnings": [],
   "findings": [],
   "params": {},
   "model": {
@@ -49,7 +50,8 @@
     {"name": "abakus", "material": "marmor", "ok": true, "closed": true, "outward": true, "triangles": 12, "vertices": 24, "min": [-0.36, 3.44, -0.36], "size": [0.72, 0.1, 0.72], "area": 1.3248, "volume": 0.05184, "degenerate": 0}
   ],
   "expect": [
-    {"rule": "size", "expected": [0.78, 3.54, 0.78], "actual": [0.78, 3.54, 0.78], "tolerance": 0.001, "ok": true}
+    {"rule": "size", "file": "saeule.jfs", "line": 44, "expected": [0.78, 3.54, 0.78], "actual": [0.78, 3.54, 0.78], "tolerance": 0.001, "ok": true},
+    {"rule": "budget", "file": "saeule.jfs", "line": 43, "expected": 6000, "actual": 3304, "ok": true}
   ],
   "materials": [
     {"name": "marmor", "color": "#e9e5db", "roughness": 0.55, "metallic": 0}
@@ -59,5 +61,5 @@
   "imports": [],
   "files": {"report": "report.json", "glb": "model.glb", "sheet": "sheet.png", "front": "front.png", "side": "side.png", "top": "top.png", "iso": "iso.png"},
   "views": {"images": true, "size": 512, "grid_on": true, "grid": 0.5, "sheet": "front | side over top | iso", "cameras": "front: from +Z; side: from +X; top: from +Y, front at the bottom; the three at one scale; iso: from front right above", "adapter": "NVIDIA GeForce RTX 2070 SUPER"},
-  "timing": {"script_ms": 1.328, "geometry_ms": 4.079, "checks_ms": 3.173, "render_ms": 3192.704, "export_ms": 0.268, "total_ms": 3230.283, "fuel": 787}
+  "timing": {"script_ms": 1.038, "geometry_ms": 3.137, "checks_ms": 2.294, "render_ms": 183.402, "export_ms": 0.503, "total_ms": 209.008, "fuel": 787, "meshes": 4, "meshes_peak": 4}
 }

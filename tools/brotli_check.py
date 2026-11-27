@@ -11,7 +11,17 @@ Files of several shapes, the guide among them (text with the words of the static
   - libbrotli -> ours: BrotliEncoderCompress at qualities 0 to 11, windows of 10, 16, 22 and
     24 bits, the modes generic, text and font; coretest --stream brotli d1 (decompress()) and
     d (the stream decoder) must restore them.
-Prints our sizes next to libbrotli's at the same level."""
+Prints our sizes next to libbrotli's at the same level.
+
+    python tools/brotli_check.py --vectors [--target linux|win|mac]   (no libbrotli needed)
+
+google/brotli's own test data (tests/testdata at a pinned commit, 3.4 MB without bb.binast, an
+encoder's input of 12 MB that has no stream beside it; tools/suite_fetch.py into build/vectors,
+read as data only): every *.compressed* stream -- the reference encoder's at every quality and
+window, empty streams of every window size, metadata blocks, the 64 KiB backward reference,
+streams of the static dictionary's transforms -- must decode with decompress() (d1) and the
+stream decoder (d) to its original; every original must come back through compress() at levels
+0, 5, 9 and 11 and the stream encoder at 5 (c1, c)."""
 import ctypes
 import ctypes.util
 import os
@@ -57,7 +67,68 @@ def shapes():
     }
 
 
+VECTORS_REPO = "google/brotli"
+VECTORS_COMMIT = "717514a67b3f8abf53365d4471a102a60fff8ef5"
+VECTORS = ['10x10y', '10x10y.compressed', '64x', '64x.compressed', 'alice29.txt', 'alice29.txt.compressed', 'asyoulik.txt', 'asyoulik.txt.compressed', 'backward65536', 'backward65536.compressed', 'compressed_file', 'compressed_file.compressed', 'compressed_repeated', 'compressed_repeated.compressed', 'cp1251-utf16le', 'cp1251-utf16le.compressed', 'cp852-utf8', 'cp852-utf8.compressed', 'empty', 'empty.compressed', 'empty.compressed.00', 'empty.compressed.01', 'empty.compressed.02', 'empty.compressed.03', 'empty.compressed.04', 'empty.compressed.05', 'empty.compressed.06', 'empty.compressed.07', 'empty.compressed.08', 'empty.compressed.09', 'empty.compressed.10', 'empty.compressed.11', 'empty.compressed.12', 'empty.compressed.13', 'empty.compressed.14', 'empty.compressed.15', 'empty.compressed.16', 'empty.compressed.17', 'empty.compressed.18', 'lcet10.txt', 'lcet10.txt.compressed', 'mapsdatazrh', 'mapsdatazrh.compressed', 'monkey', 'monkey.compressed', 'plrabn12.txt', 'plrabn12.txt.compressed', 'quickfox', 'quickfox.compressed', 'quickfox_repeated', 'quickfox_repeated.compressed', 'random_chunks', 'random_org_10k.bin', 'random_org_10k.bin.compressed', 'ukkonooa', 'ukkonooa.compressed', 'x', 'x.compressed', 'x.compressed.00', 'x.compressed.01', 'x.compressed.02', 'x.compressed.03', 'xyzzy', 'xyzzy.compressed', 'zeros', 'zeros.compressed', 'zerosukkanooa', 'zerosukkanooa.compressed']
+
+
+def original_of(name):
+    """the original a test stream is of: x.compressed.07 -> x"""
+    return name.split(".compressed", 1)[0] if ".compressed" in name else None
+
+
+def vectors(target):
+    """google/brotli's test streams through our decoders, their originals through our encoders"""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from suite_fetch import fetch
+    exe = ROOT / "build" / target / ("coretest.exe" if target == "win" else "coretest")
+    if not exe.exists():
+        print(f"brotli_check: {exe.relative_to(ROOT)} is missing (python build_rs.py app coretest --target {target})")
+        return 2
+    folder = fetch(VECTORS_REPO, VECTORS_COMMIT, ["tests/testdata/" + f for f in VECTORS]) / "tests" / "testdata"
+
+    def ours(op, src, dst, level=None):
+        return subprocess.run([str(exe), "--stream", "brotli", op, str(src), str(dst)] + ([str(level)] if level is not None else [])).returncode == 0
+
+    bad, streams, originals = 0, 0, 0
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        for name in VECTORS:
+            orig = original_of(name)
+            if orig is None:
+                continue
+            want = (folder / orig).read_bytes()
+            fails = []
+            for op in ("d1", "d"):
+                back = d / "back"
+                if not ours(op, folder / name, back) or back.read_bytes() != want:
+                    fails.append(op)
+            streams += 1
+            bad += bool(fails)
+            if fails:
+                print(f"FAIL {name}: {', '.join(fails)} does not give {orig} ({len(want)} bytes)")
+        for name in VECTORS:
+            if original_of(name) is not None:
+                continue
+            data = (folder / name).read_bytes()
+            fails = []
+            for op, level in (("c1", 0), ("c1", 5), ("c1", 9), ("c1", 11), ("c", 5)):
+                o, back = d / "o.br", d / "back"
+                if not ours(op, folder / name, o, level) or not ours("d1", o, back) or back.read_bytes() != data:
+                    fails.append(f"{op} {level}")
+            originals += 1
+            bad += bool(fails)
+            if fails:
+                print(f"FAIL {name}: {', '.join(fails)} does not come back")
+    print(f"brotli_check --vectors: {VECTORS_REPO} @ {VECTORS_COMMIT[:12]}: {streams} streams decoded, {originals} originals encoded:",
+          "all ok" if not bad else f"{bad} failures")
+    return 1 if bad else 0
+
+
 def main():
+    if "--vectors" in sys.argv:
+        i = sys.argv.index("--target") + 1 if "--target" in sys.argv else 0
+        return vectors(sys.argv[i] if i else "win" if os.name == "nt" else "mac" if sys.platform == "darwin" else "linux")
     if os.name == "nt":
         wsl = "/mnt/" + str(ROOT)[0].lower() + str(ROOT)[2:].replace("\\", "/")
         return subprocess.run(["wsl.exe", "-d", "Ubuntu-24.04", "-e", "sh", "-c", f"cd '{wsl}' && python3 tools/brotli_check.py"]).returncode

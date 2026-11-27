@@ -130,12 +130,16 @@ fn frame(src: &[u8], out: &mut Vec<u8>, max_out: usize, dict: Option<&Dictionary
     let single = fhd & 0x20 != 0;
     let checksum = fhd & 0x04 != 0;
     let mut p = 5;
+    let mut window = 0u64;
     if !single {
         let wd = *src.get(p)?;
         p += 1;
-        if (wd >> 3) + 10 > 41 {
+        let exp = (wd >> 3) as u32 + 10;
+        if exp > 41 {
             return None;
         }
+        let base = 1u64 << exp;
+        window = base + (base / 8) * (wd & 7) as u64;
     }
     let did_size = [0, 1, 2, 4][(fhd & 3) as usize];
     let id = rd_le(src.get(p..p + did_size)?) as u32;
@@ -157,6 +161,16 @@ fn frame(src: &[u8], out: &mut Vec<u8>, max_out: usize, dict: Option<&Dictionary
     } else {
         None
     };
+    // the frame's window: its Window_Size, the content size when that is smaller (a single
+    // segment: the content size); a match reaches no farther back than it and the dictionary's
+    // content, as in the stream decoder (sdec.rs) and the zstd tool
+    if single {
+        window = fcs.unwrap_or(0);
+    }
+    if let Some(n) = fcs {
+        window = window.min(n);
+    }
+    let reach = usize::try_from(window).unwrap_or(usize::MAX).saturating_add(dict.map_or(0, |d| d.content.len()));
     // the dictionary's content stands before the frame's output while it is decoded
     let hist = out.len();
     if let Some(d) = dict {
@@ -195,7 +209,7 @@ fn frame(src: &[u8], out: &mut Vec<u8>, max_out: usize, dict: Option<&Dictionary
             }
             2 => {
                 let b = src.get(p..p + size)?;
-                block(&mut st, b, out, hist, max_out, usize::MAX)?;
+                block(&mut st, b, out, hist, max_out, reach)?;
                 p += size;
             }
             _ => return None,

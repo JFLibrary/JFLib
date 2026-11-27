@@ -631,6 +631,21 @@ fn parse_too_deep_nesting() {
     assert_eq!(parse(&ok).unwrap().constant(), Some(1.0));
 }
 
+#[test]
+fn parse_too_long_chain() {
+    use ParseErrorKind::*;
+    // a chain nests nothing, but each operator makes the tree one higher, and evaluation
+    // recursed that deep: 20 000 of them overflowed the stack (third review)
+    assert_eq!(perr(&format!("1{}", "+1".repeat(20_000))).1, TooComplex);
+    assert_eq!(perr(&format!("\"a\"{}", "&\"a\"".repeat(20_000))).1, TooComplex);
+    assert_eq!(perr(&format!("1{}", "%".repeat(20_000))).1, TooComplex);
+    // nesting and chain add up: 150 calls deep (within MAX_DEPTH), then 400 operators on top
+    assert_eq!(perr(&format!("{}1{}{}", "ABS(".repeat(150), ")".repeat(150), "+1".repeat(400))).1, TooComplex);
+    // a long sum within the limit evaluates
+    let (doc, sheet) = one(&[]);
+    assert_eq!(eval_in(&doc, sheet, &format!("1{}", "+1".repeat(400))), Val::Num(401.0));
+}
+
 
 #[test]
 fn cell_part_and_unit_code() {
@@ -1792,6 +1807,17 @@ fn user_set_setatref_with_expression() {
     let mut tx = doc.transaction("Eingabe");
     eng.user_set(&mut tx, sh, &proxy, Input::Value(Value::Num(5.0), None)).unwrap();
     assert_eq!(number(tx.doc(), sh, &target), 10.0);
+}
+
+#[test]
+fn user_set_setatref_without_reference() {
+    // SETATREF() parses; a change of its cell redirected to args[0] and panicked (third review)
+    let (mut doc, sh) = one(&[("Target", "", 1.0), ("Proxy", "SETATREF()", 1.0)]);
+    let (proxy, target) = (user_addr(&doc, "Proxy"), user_addr(&doc, "Target"));
+    let mut eng = Engine::new();
+    let mut tx = doc.transaction("Eingabe");
+    assert!(eng.user_set(&mut tx, sh, &proxy, Input::Value(Value::Num(5.0), None)).is_ok());
+    assert_eq!(number(tx.doc(), sh, &target), 1.0);
 }
 
 #[test]

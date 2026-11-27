@@ -4,9 +4,10 @@
 //   (post-quantum hybrid), X25519, P-256, P-384 · certificates and keys of Ed25519, ECDSA
 //   (P-256 / P-384) and RSA (the web PKI or a CA of one's own) · mutual authentication ·
 //   HelloRetryRequest · KeyUpdate · resumption with session tickets (psk_dhe_ke) · 0-RTT with
-//   replay protection (opt-in).
+//   replay protection (opt-in) · OCSP stapling (status_request, RFC 6066 8 / RFC 8446 4.4.2.1).
 //   Public servers (client side, Trust::System / Custom): also TLS 1.2 with ECDHE and AEAD suites.
-//   Not here: external PSKs, psk_ke, TLS 1.2 resumption, renegotiation, revocation checks.
+//   Not here: external PSKs, psk_ke, TLS 1.2 resumption, renegotiation, OCSP or CRLs fetched by
+//   the client itself.
 //
 //   connect(stream, ClientConfig) -> TlsStream     accept(stream, ServerConfig) -> TlsStream
 //   TlsStream implements Stream (HTTP runs over it unchanged); peer_certs() after the handshake
@@ -14,10 +15,14 @@
 //   (Sessions: a client's tickets per server); TlsStream::resumed()
 //   0-RTT: ServerConfig::early_data (bytes; 0 = none), connect_early(stream, cfg, data) ->
 //   (TlsStream, bytes taken), TlsStream::read_early (a server: data that may be a replay)
+//   OCSP: ServerConfig::ocsp (Staples: the responses to staple, netio::ocsp::refresh fetches
+//   them); ClientConfig::revocation (Revocation::Stapled by default: a stapled response is
+//   checked, a revoked certificate refused); TlsStream::ocsp_response
 //   Identity::new(chain, key) / Identity::from_pem(certs, key): a chain and its key (PrivateKey:
 //   Ed25519, ECDSA, RSA; PKCS #8, SEC 1, PKCS #1)
 //   Trust::Anchors(CAs) / Pinned(SHA-256 of the leaf) / Any (trust on first use: the caller
-//   shows the fingerprint and pins it) / System(extra CAs) (the operating system's CAs)
+//   shows the fingerprint and pins it) / System(extra CAs) (the operating system's check, the
+//   extra CAs under its policy)
 //
 // conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over a Stream.
 
@@ -26,6 +31,7 @@ pub mod keysched;
 pub mod kx;
 pub mod record;
 pub mod session;
+pub mod staple;
 
 use alloc::boxed::Box;
 use alloc::sync::Arc;
@@ -41,6 +47,7 @@ use crate::Stream;
 
 pub use conn::Conn;
 pub use session::{ReplayCheck, Sessions, Tickets};
+pub use staple::Staples;
 
 /// a certificate chain (DER, leaf first) and the leaf's private key (Ed25519, ECDSA, RSA)
 #[derive(Clone)]
@@ -84,8 +91,13 @@ pub enum Trust {
     Pinned(Vec<[u8; 32]>),
     /// anything (only to read the fingerprint for a trust decision)
     Any,
-    /// the operating system's certificate authorities, and these as well (a company CA);
-    /// allows TLS 1.2 and the public suites (crate::roots)
+    /// the operating system's certificate authorities, and these as well (a company CA): the
+    /// system checks the chain (Windows CryptoAPI, Apple's Security framework with the stapled
+    /// OCSP response; on Linux the distribution's bundle: crate::roots), these under its own
+    /// policy (Windows with them as its roots where its own give no path, Apple as anchors
+    /// beside its own; Linux where the bundle gives no path); the alert follows its reason
+    /// (expired, revoked, another name or usage, unknown CA).  Allows TLS 1.2 and the public
+    /// suites
     System(Vec<Cert>),
     /// a check the program brings (a PKI of its own, keys pinned by their SPKI, Certificate
     /// Transparency, the platform's verifier, a test peer); a client offers with it what it
@@ -115,13 +127,33 @@ pub struct ClientConfig {
     /// keeps the ones it gets.  Several configs may share a cache: it keeps the tickets by
     /// server name, trust and client identity.  None: no resumption
     pub sessions: Option<Arc<Sessions>>,
+    /// what a stapled OCSP response decides (with Trust::Anchors, System and Custom; a pinned
+    /// certificate or Trust::Any asks for none)
+    pub revocation: Revocation,
 }
 
 impl ClientConfig {
-    /// this trust and server name; no client certificate, no ALPN, no resumption
+    /// this trust and server name; no client certificate, no ALPN, no resumption; stapled OCSP
+    /// responses checked (Revocation::Stapled)
     pub fn new(trust: Trust, server_name: &str) -> ClientConfig {
-        ClientConfig { trust, identity: None, server_name: String::from(server_name), alpn: Vec::new(), sessions: None }
+        ClientConfig { trust, identity: None, server_name: String::from(server_name), alpn: Vec::new(), sessions: None, revocation: Revocation::Stapled }
     }
+}
+
+/// the OCSP response a client asks the server to staple (status_request): a usable one is
+/// signed by the issuer of the server's certificate (in the chain or an anchor) or a responder
+/// it named, about that certificate, and current (RFC 6960; x509::ocsp::check)
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Revocation {
+    /// none asked for
+    Off,
+    /// asked for and checked: a certificate a usable response calls revoked is refused
+    /// (certificate_revoked); without a usable response the handshake goes on, unless the
+    /// certificate must be stapled (RFC 7633, Cert::must_staple)
+    Stapled,
+    /// a usable response that says good is required (bad_certificate_status_response without one)
+    Required,
 }
 
 /// what a ClientHello asks for: the program's ServerConfig::select picks the identity by it
@@ -158,7 +190,8 @@ pub struct ServerConfig {
     pub client_auth_optional: bool,
     /// the application protocols the server speaks (ALPN), in its order of preference; a
     /// client that offers protocols, none of them these, is refused (no_application_protocol,
-    /// RFC 7301 3.2).  Empty: ALPN is not answered
+    /// RFC 7301 3.2).  Empty: ALPN is not answered.  "acme-tls/1" (RFC 8737, acme::TlsAlpn01)
+    /// counts only for a client that offers it alone
     pub alpn: Vec<String>,
     /// session tickets (TLS 1.3 resumption): sent after each handshake and taken back for a
     /// handshake without certificates.  A resumed connection keeps the client certificates of
@@ -173,6 +206,9 @@ pub struct ServerConfig {
     /// hands it to read() only once the handshake is done.  With 0-RTT taken, accept returns
     /// after the server's flight, before the client's Finished
     pub early_data: u32,
+    /// the OCSP responses to staple for the certificates shown, to clients that ask for one
+    /// (netio::ocsp::refresh keeps them current).  None: no stapling
+    pub ocsp: Option<Arc<Staples>>,
 }
 
 impl ServerConfig {
@@ -187,6 +223,7 @@ impl ServerConfig {
             alpn: Vec::new(),
             tickets: None,
             early_data: 0,
+            ocsp: None,
         }
     }
 }
@@ -334,6 +371,12 @@ impl TlsStream {
     /// the handshake resumed a session (a ticket instead of certificates)
     pub fn resumed(&self) -> bool {
         self.conn.lock().resumed()
+    }
+
+    /// a client: the OCSP response the server stapled for its certificate (DER), when it sent
+    /// one; whether it was usable decided ClientConfig::revocation
+    pub fn ocsp_response(&self) -> Option<Vec<u8>> {
+        self.conn.lock().ocsp_response().map(Vec::from)
     }
 
     /// a server that took 0-RTT: the client's early data as it comes, before the handshake is

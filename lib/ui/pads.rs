@@ -2,7 +2,8 @@
 //
 //   ui.gamepads()            the pads connected now with the edges of their buttons in this batch;
 //                            the first call starts watching (plat::pad_watch; a headless run: the
-//                            script's pads only)
+//                            script's pads only); refused by the manifest (no `gamepad`), it starts
+//                            once an ask line is answered yes (policy::gamepad_granted)
 //   ui.gamepads_watching()   pads are being watched (false where the platform has none)
 //   pads_event(data)         (E_GAMEPAD) the pads anew, the edges added up until the batch's first
 //                            pass took them (pads_clear_edges); App::command(UIC_GAMEPAD, data) for a
@@ -29,14 +30,20 @@ impl Ui {
     /// goes gives App::command(UIC_GAMEPAD, index | PADEV_* << 8).  While none of the app's windows
     /// has the focus every pad reports nothing held.  Windows: XInput (Xbox-compatible pads); Linux:
     /// evdev; macOS: GameController; the browser: the Gamepad API (a pad appears after one of its
-    /// buttons was pressed in the page); Android and iOS: none.  A headless run has the pads of its
-    /// script (`pad ...`)
+    /// buttons was pressed in the page); Android and iOS: none.  An app with a PERMISSIONS file needs
+    /// its line `gamepad` (else no pads, PERMDENY gamepad; `ask gamepad` asks at the first call and
+    /// watching starts in the frame after a yes).  A headless run has the pads of its script
+    /// (`pad ...`, no permission: the script's own input)
     pub fn gamepads(&mut self) -> &[Gamepad] {
         if !self.pads_on {
             self.pads_on = true;
             if !self.headless {
-                plat::pad_watch(true);
+                self.pads_refused = !plat::pad_watch(true) && !plat::policy::gamepad_granted();
             }
+        } else if self.pads_refused && plat::policy::gamepad_granted() {
+            // (an ask line answered yes since)
+            self.pads_refused = false;
+            plat::pad_watch(true);
         }
         &self.pads
     }

@@ -171,6 +171,12 @@ fn relationships_parse_and_write() {
     assert_eq!(groups, alloc::vec![(1, alloc::vec![566, 565]), (4, alloc::vec![7])]);
     assert_eq!(rel::parse("SUM(DEPENDSON(4))"), alloc::vec![(4, Vec::new())]);
     assert!(rel::parse("0").is_empty());
+    // cut off: an open quote ran the scan one past the end, an open call cut its last letter
+    // in two (both panicked, third review); what is there still counts
+    assert_eq!(rel::parse("DEPENDSON(1,\""), alloc::vec![(1, Vec::new())]);
+    assert_eq!(rel::parse("DEPENDSON(1,\"ä"), alloc::vec![(1, Vec::new())]);
+    assert_eq!(rel::parse("DEPENDSON(1,ä"), alloc::vec![(1, Vec::new())]);
+    assert_eq!(rel::parse("DEPENDSON(1,Sheet.3!SheetRef()"), alloc::vec![(1, alloc::vec![3])]);
 
     let mut f = fx();
     let c = f.container([0.0, 0.0, 4.0, 3.0], "Container", 0.0, 1.0);

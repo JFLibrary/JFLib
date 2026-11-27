@@ -139,12 +139,15 @@ def probe():
     the installed runtimes and SDKs ("org.freedesktop.Platform/26.08", the machine's own processor),
     "flatpak_refs_arch" with the processor ("org.freedesktop.Platform/aarch64/26.08"), "machine"
     (x86_64, aarch64), "binfmt_<cpu>": the flags of QEMU's binfmt_misc entry of another processor
-    (an F lets a sandbox start its programs; missing: no entry)"""
+    (an F lets a sandbox start its programs; missing: no entry), "flatpak_version" ("1.14.6")"""
     import platform
     out = {t: shutil.which(t) or '' for t in TOOLS}
     refs, refs_arch = [], []
     machine = {'arm64': 'aarch64', 'amd64': 'x86_64'}.get(platform.machine().lower(), platform.machine().lower())
     if out['flatpak']:
+        # "Flatpak 1.14.6" (tools/pkg_linux.py: --device=input needs 1.15.6)
+        r = subprocess.run(['flatpak', '--version'], capture_output=True, text=True)
+        out['flatpak_version'] = r.stdout.split()[-1] if r.returncode == 0 and r.stdout.split() else ''
         r = subprocess.run(['flatpak', 'list', '--runtime', '--columns=application,branch'],
                            capture_output=True, text=True)
         refs = sorted({'/'.join(line.split()[:2]) for line in r.stdout.splitlines() if len(line.split()) >= 2})

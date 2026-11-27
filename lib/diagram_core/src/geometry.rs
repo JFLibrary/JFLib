@@ -610,8 +610,12 @@ impl Spline {
         let deg = self.degree as usize;
         let mut knots = self.knots;
         knots.push(self.last);
-        while knots.len() < self.points.len() + deg + 1 {
-            knots.push(self.last);
+        // (the degree comes from the document: past DEGREE_MAX the curve is not drawn, and no
+        // knots are made for it -- 1e12 would have asked for 8 TB)
+        if (1..=DEGREE_MAX).contains(&deg) {
+            while knots.len() < self.points.len() + deg + 1 {
+                knots.push(self.last);
+            }
         }
         let n = Nurbs { degree: deg, weights: alloc::vec![1.0; self.points.len()], points: self.points, knots };
         if n.valid() {
@@ -845,6 +849,9 @@ pub fn parse_args(text: &str, name: &str) -> Option<Vec<f64>> {
     Some(out)
 }
 
+/// the highest degree of a spline or NURBS that is drawn
+const DEGREE_MAX: usize = 9;
+
 /// a B-spline (rational where the weights differ) on a full knot vector
 #[derive(Clone, Debug, PartialEq)]
 pub struct Nurbs {
@@ -860,7 +867,11 @@ impl Nurbs {
     fn from_row(args: &[f64], from: [f64; 2], to: [f64; 2], a: Option<f64>, b: Option<f64>, c: Option<f64>, d: Option<f64>, w: f64, h: f64) -> Option<Nurbs> {
         let (&last, rest) = args.split_first()?;
         let degree = *rest.first()? as usize;
-        let rel = (rest.get(1).copied().unwrap_or(1.0) == 0.0, rest.get(2).copied().unwrap_or(1.0) == 0.0);
+        // checked before the knots are filled up to it (valid() checks it again)
+        if !(1..=DEGREE_MAX).contains(&degree) {
+            return None;
+        }
+        let rel =(rest.get(1).copied().unwrap_or(1.0) == 0.0, rest.get(2).copied().unwrap_or(1.0) == 0.0);
         let quads = rest.get(3..).unwrap_or(&[]);
         let mut points = alloc::vec![from];
         let mut knots = alloc::vec![c.unwrap_or(0.0)];
@@ -884,7 +895,7 @@ impl Nurbs {
     /// degree 1 to 9, a positive weight per point, n + degree + 1 knots that do not fall
     pub fn valid(&self) -> bool {
         let n = self.points.len();
-        (1..=9).contains(&self.degree)
+        (1..=DEGREE_MAX).contains(&self.degree)
             && n > self.degree
             && n <= 100_000
             && self.weights.len() == n
@@ -1278,6 +1289,22 @@ mod tests {
 
     fn dist(a: [f64; 2], b: [f64; 2]) -> f64 {
         sqrt((a[0] - b[0]) * (a[0] - b[0]) + (a[1] - b[1]) * (a[1] - b[1]))
+    }
+
+    #[test]
+    fn spline_degree_from_the_file_is_checked_first() {
+        // NURBSTo's E and SplineStart's D name the degree: the knots were filled up to it before
+        // valid() looked at it (1e12 asked for 8 TB, third review); now such a curve is not
+        // drawn and the row ends in a straight line
+        for d in [1e12, f64::INFINITY, f64::NAN, 0.0, 10.0] {
+            assert!(Nurbs::from_row(&[1.0, d, 0.0, 0.0], [0.0, 0.0], [1.0, 1.0], None, None, None, None, 1.0, 1.0).is_none(), "{d}");
+            let mut path = Path::default();
+            let mut b = Builder::new(&mut path);
+            b.move_to([0.0, 0.0]);
+            Spline { degree: d, points: alloc::vec![[0.0, 0.0], [1.0, 1.0]], knots: alloc::vec![0.0], last: 1.0 }.finish(&mut b);
+            b.finish();
+            assert!(!path.subs.is_empty(), "{d}");
+        }
     }
 
     #[test]

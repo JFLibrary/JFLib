@@ -78,19 +78,19 @@
         let ek = (fl >> 2u) & 3u;
         let jk = (fl >> 8u) & 15u;
         let own = i.par.zw;
-        // a pixel near a join is the nearer segment's (the incoming one's when equal): see the head
+        // a pixel near a join is the nearer segment's (the incoming one's when equal, up to JOIN_TIE): see the head
         var dprev = 3.4e38;
         var dnext = 3.4e38;
         if sk == JOIN {
             dprev = dist_seg(q - s, i.nb.xy);
-            if !(dist_seg(q - s, own) < dprev) {
+            if !(dist_seg(q - s, own) < dprev - JOIN_TIE * max(dprev, 1.0)) {
                 discard;
                 return vec4f(0.0);
             }
         }
         if ek == JOIN {
             dnext = dist_seg(q - e, i.nb.zw);
-            if !(dist_seg(q - e, -own) <= dnext) {
+            if !(dist_seg(q - e, -own) <= dnext + JOIN_TIE * max(dnext, 1.0)) {
                 discard;
                 return vec4f(0.0);
             }

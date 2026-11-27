@@ -10,10 +10,12 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ### Added
 
+- Flatpak: the permission key `gamepad` becomes `--device=input` (every input device in `/dev/input`, keyboards too; Flatpak 1.15.6 and newer, an older one refuses to build it), with a note.
 - The setup manifest carries the styles' names and descriptions in other languages: styles/S/INFO's further lines name.<lang>= and desc.<lang>= become label_<style>.<lang>= and desc_<style>.<lang>= (cargo jflib package, tools/package.py)
 
 ### Changed
 
+- The browser host it carries ticks by the app's next deadline (web/loader.js, worker.js): a view that draws through `ui.timer(id, 1)` runs at the display's rate instead of 30 frames/s; an app at rest or with a slow timer is woken as often as before
 - Compresses with jflib-compress instead of its own DEFLATE and LZ4: the .deb's archives, the update channel and the source tarball with gzip at level 9, the setup's payload and the PNGs with zlib at level 9, the AppImage's SquashFS with lz4::compress_hc; its PNG reader with zlib::decompress, CRC-32 from compress. The bytes of the packages change, they get 0.2 to 0.3 % smaller
 
 ### Fixed

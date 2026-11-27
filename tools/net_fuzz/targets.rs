@@ -173,6 +173,54 @@ fn server_flight() -> Vec<Vec<u8>> {
     vec![s.take_out()]
 }
 
+/// a CA, a leaf of it, and OCSP responses about the leaf (good, revoked with a reason, by a
+/// delegated responder, with a nonce, SHA-256 ids) and requests for it
+fn ocsp_seeds() -> (netio::x509::Cert, netio::x509::Cert, Vec<Vec<u8>>) {
+    use netio::x509::ocsp::{IdHash, ResponseBuilder, Status};
+    use netio::x509::{Cert, CertBuilder, PrivateKey};
+    let ck = crypto::ed25519::Keypair::from_seed(&[11; 32]);
+    let ca_der = CertBuilder { serial: [1; 16], cn: "OCSP CA".into(), not_before: 0, not_after: 4_000_000_000, public_key: ck.public, is_ca: true, ..Default::default() }.sign(None, &ck);
+    let ca = Cert::parse(&ca_der).unwrap_or_default();
+    let lk = crypto::ed25519::Keypair::from_seed(&[12; 32]);
+    let leaf_der = CertBuilder { serial: [2; 16], cn: "a.lab".into(), not_before: 0, not_after: 4_000_000_000, public_key: lk.public, dns: vec!["a.lab".into()], server_auth: true, ocsp_urls: vec!["http://ocsp.lab/".into()], ..Default::default() }.sign(Some(&ca), &ck);
+    let leaf = Cert::parse(&leaf_der).unwrap_or_default();
+    let rk = crypto::ed25519::Keypair::from_seed(&[13; 32]);
+    let resp_der = CertBuilder { serial: [3; 16], cn: "responder".into(), not_before: 0, not_after: 4_000_000_000, public_key: rk.public, ocsp_signing: true, ..Default::default() }.sign(Some(&ca), &ck);
+    let responder = Cert::parse(&resp_der).unwrap_or_default();
+    let (cak, rkk) = (PrivateKey::from(ck), PrivateKey::from(rk));
+    let t = 1_800_000_000 - 3600;
+    let good = ResponseBuilder::good(t);
+    let mut out: Vec<Vec<u8>> = Vec::new();
+    out.extend(good.sign(&leaf, &ca, None, &cak));
+    out.extend(ResponseBuilder { status: Status::Revoked { time: t - 60, reason: Some(1) }, by_key: false, ..good.clone() }.sign(&leaf, &ca, None, &cak));
+    out.extend(ResponseBuilder { nonce: Some(vec![7; 16]), hash: IdHash::Sha256, next_update: None, ..good.clone() }.sign(&leaf, &ca, None, &cak));
+    out.extend(good.sign(&leaf, &ca, Some(&responder), &rkk));
+    out.push(netio::x509::ocsp::error_response(netio::x509::ocsp::TRY_LATER));
+    if let Some(id) = netio::x509::ocsp::CertId::new(&leaf, &ca) {
+        out.push(netio::x509::ocsp::request(std::slice::from_ref(&id), Some(&[5; 20])));
+        out.push(netio::x509::ocsp::request(&[id.clone(), id], None));
+    }
+    (leaf, ca, out)
+}
+
+/// certificate requests of each key kind, with names, addresses and must-staple
+fn csr_seeds() -> Vec<Vec<u8>> {
+    use netio::x509::{CsrBuilder, IpAddr, PrivateKey};
+    let mut r = Rng(0x5eed);
+    let mut rand = |b: &mut [u8]| b.iter_mut().for_each(|x| *x = r.next() as u8);
+    let keys = vec![
+        PrivateKey::from(crypto::ed25519::Keypair::from_seed(&[14; 32])),
+        PrivateKey::generate_ecdsa(crypto::ecdsa::Curve::P256, &mut rand),
+        PrivateKey::generate_ecdsa(crypto::ecdsa::Curve::P384, &mut rand),
+    ];
+    let mut out = Vec::new();
+    for k in &keys {
+        out.extend(CsrBuilder::for_names(&["a.lab", "*.b.lab"]).sign(k));
+        out.extend(CsrBuilder { ips: vec![IpAddr::LOCALHOST_V4], must_staple: true, ..CsrBuilder::default() }.sign(k));
+    }
+    out
+}
+
 fn frame(eth_type: u16, l3: &[u8]) -> Vec<u8> {
     let mut f = vec![0x02, 0, 0, 0, 0, 1, 0x02, 0, 0, 0, 0, 2];
     f.extend_from_slice(&eth_type.to_be_bytes());
@@ -326,6 +374,19 @@ fn plain_texts() -> Vec<Vec<u8>> {
     mixed.extend_from_slice(&rnd[..1000]);
     mixed.extend(std::iter::repeat_n(0u8, 40000)); // long matches, a window past 32 KiB
     vec![text, rnd, mixed, b"a".to_vec(), Vec::new()]
+}
+
+/// the reference encoder's Brotli streams of coretest, and google/brotli's test streams the
+/// seed folder holds (*.br: tools/net_fuzz.py copies them when tools/brotli_check.py --vectors
+/// fetched them)
+fn brotli_seeds(dir: &str) -> Vec<Vec<u8>> {
+    let mut out: Vec<Vec<u8>> = BROTLI_STREAMS.iter().map(|s| s.to_vec()).collect();
+    if let Ok(rd) = std::fs::read_dir(dir) {
+        let mut files: Vec<_> = rd.flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "br")).collect();
+        files.sort();
+        out.extend(files.iter().filter_map(|p| std::fs::read(p).ok()));
+    }
+    out
 }
 
 /// DEFLATE, zlib or gzip streams at the levels of each strategy (gzip: also two members)
@@ -607,6 +668,153 @@ fn linux_targets() -> Vec<(&'static str, Vec<Vec<u8>>, Fun)> {
     Vec::new()
 }
 
+// ------------------------------------------------------------------ compress in pieces
+
+/// the output limit of the decoders (one-shot and in pieces alike)
+const DECODE_LIMIT: usize = 1 << 22;
+
+/// the sizes of a piece: 1 byte, a few, a block, more (the schedule's rng picks)
+fn piece(r: &mut Rng) -> usize {
+    let k = [1, 8, 300, 5000][r.below(4)];
+    1 + r.below(k)
+}
+
+/// why pump_pieces stopped without the stream: the decoder refused it (or, for a format of one
+/// stream, the input after it), or the output grew past DECODE_LIMIT -- the pump's own limit,
+/// kept apart from a decoder's Error::Limit (zstd's window)
+#[derive(Debug, PartialEq)]
+enum Stop {
+    Dec(compress::stream::Error),
+    Over,
+}
+
+/// a stream decoder fed in pieces of the schedule's sizes, with output buffers of 1 byte to 4
+/// KiB, the way stream::decode_all pumps it (input after a stream goes on with the next
+/// member or frame; a format of one stream refuses it) -> the output, or why it stopped
+fn pump_pieces(dec: &mut dyn compress::stream::Decode, d: &[u8], r: &mut Rng) -> Result<Vec<u8>, Stop> {
+    use compress::stream::{Error, Status};
+    let (mut out, mut buf, mut off) = (Vec::new(), vec![0u8; 4096], 0usize);
+    for _ in 0..(16 * d.len() + (1 << 16)) {
+        let n = piece(r).min(d.len() - off);
+        let ob = piece(r).min(buf.len());
+        let s = dec.decode(&d[off..off + n], &mut buf[..ob]).map_err(Stop::Dec)?;
+        assert!(s.read <= n && s.written <= ob, "a decoder took or wrote more than it was given: {s:?} of {n} / {ob}");
+        off += s.read;
+        out.extend_from_slice(&buf[..s.written]);
+        if out.len() > DECODE_LIMIT {
+            return Err(Stop::Over);
+        }
+        let eof = off == d.len();
+        match s.status {
+            Status::Output => assert!(s.written == ob, "Status::Output with room left: {s:?} of {ob}"),
+            Status::Input => {
+                assert!(s.read == n, "Status::Input with input left: {s:?} of {n}");
+                if eof {
+                    dec.finish().map_err(Stop::Dec)?;
+                    return Ok(out);
+                }
+            }
+            Status::End if eof => return Ok(out),
+            Status::End if s.read == 0 && s.written == 0 => return Err(Stop::Dec(Error::Corrupt)),
+            Status::End => {}
+        }
+    }
+    panic!("a stream decoder makes no progress ({} of {} bytes taken)", off, d.len());
+}
+
+/// a fuzz target: the stream decoder in two schedules of pieces against the one-shot decoder
+/// -- the same output where one-shot decodes the input (or, in pieces, an error), and the two
+/// schedules alike.  `window_limit`: the stream decoder refuses a window above its memory
+/// limit (zstd: Error::Limit, as the zstd tool does), which one-shot, holding the whole output
+/// anyway, does not need to.  Output past DECODE_LIMIT in pieces where one-shot decodes within
+/// it is a finding, like any other difference
+fn stream_target(new: fn() -> Box<dyn compress::stream::Decode>, oneshot: fn(&[u8], usize) -> Option<Vec<u8>>, window_limit: bool) -> Fun {
+    Box::new(move |d: &[u8]| {
+        let seed = 0x9E37_79B9_7F4A_7C15 ^ (d.len() as u64) ^ d.iter().take(16).fold(0u64, |h, &b| h.rotate_left(8) ^ b as u64);
+        let one = oneshot(d, DECODE_LIMIT);
+        let a = pump_pieces(&mut *new(), d, &mut Rng(seed | 1));
+        let b = pump_pieces(&mut *new(), d, &mut Rng(seed.rotate_left(17) | 1));
+        let window = Err(Stop::Dec(compress::stream::Error::Limit));
+        if window_limit && one.is_some() && a == window {
+            assert!(b == window, "the window limit in one schedule only");
+            return;
+        }
+        assert!(a.as_ref().ok() == one.as_ref(), "in pieces {:?} bytes, one-shot {:?} bytes", a.as_ref().map(|v| v.len()), one.as_ref().map(|v| v.len()));
+        assert!(a.as_ref().ok() == b.as_ref().ok(), "two schedules of pieces differ: {:?} / {:?}", a.as_ref().map(|v| v.len()), b.as_ref().map(|v| v.len()));
+    })
+}
+
+/// a stream encoder fed in pieces (Flush::Sync at some of them when `sync`), ended with
+/// Flush::Finish, output buffers of 1 byte to 4 KiB -> the compressed bytes
+fn encode_pieces(enc: &mut dyn compress::stream::Encode, data: &[u8], r: &mut Rng, sync: bool) -> Vec<u8> {
+    use compress::stream::{Flush, Status};
+    let (mut out, mut buf, mut off) = (Vec::new(), vec![0u8; 4096], 0usize);
+    let mut rounds = 0usize;
+    loop {
+        let n = piece(r).min(data.len() - off);
+        let last = off + n == data.len();
+        let flush = if last { Flush::Finish } else if sync && r.below(6) == 0 { Flush::Sync } else { Flush::None };
+        let mut input = &data[off..off + n];
+        loop {
+            rounds += 1;
+            assert!(rounds < 64 * data.len() + (1 << 16), "a stream encoder makes no progress ({off} of {} bytes)", data.len());
+            let ob = piece(r).min(buf.len());
+            let s = enc.encode(input, &mut buf[..ob], flush).unwrap_or_else(|e| panic!("encode: {e:?}"));
+            assert!(s.read <= input.len() && s.written <= ob, "an encoder took or wrote more than it was given: {s:?}");
+            out.extend_from_slice(&buf[..s.written]);
+            input = &input[s.read..];
+            match s.status {
+                Status::Output => assert!(s.written == ob, "Status::Output with room left: {s:?} of {ob}"),
+                Status::Input if flush == Flush::Finish => {}
+                Status::Input => {
+                    assert!(input.is_empty(), "Status::Input with input left");
+                    break;
+                }
+                Status::End => {
+                    assert!(last && input.is_empty() && flush == Flush::Finish, "Status::End before the end");
+                    return out;
+                }
+            }
+        }
+        off += n;
+    }
+}
+
+/// a fuzz target: the first byte picks a format, a level and Sync flushes, the rest is the data
+/// -> compress() and the stream encoder (in pieces) give streams the one-shot decoder turns back
+/// into the data; without Sync the encoder writes compress()'s bytes where the format says so
+/// (DEFLATE, zlib, gzip up to 256 KiB; Brotli, zstd and LZ4 frames given the size)
+fn roundtrip(d: &[u8]) {
+    let Some((&sel, data)) = d.split_first() else { return };
+    let (fmt, lv, sync) = (sel % 6, (sel / 6) as i32 % 21, sel & 0x80 != 0);
+    let data = &data[..data.len().min(if fmt == 3 && lv > 9 { 4096 } else { 32 << 10 })];
+    let mut r = Rng(0x5DEE_CE66_D ^ data.len() as u64 ^ (sel as u64) << 32);
+    let back = |c: &[u8]| -> Option<Vec<u8>> {
+        match fmt {
+            0 => compress::deflate::decompress(c, data.len()),
+            1 => compress::zlib::decompress(c, data.len()),
+            2 => compress::gzip::decompress(c, data.len()),
+            3 => compress::brotli::decompress(c, data.len()),
+            4 => compress::zstd::decompress(c, data.len()),
+            _ => compress::lz4::frame_decompress(c, data.len()),
+        }
+    };
+    let (once, mut enc): (Vec<u8>, Box<dyn compress::stream::Encode>) = match fmt {
+        0 => (compress::deflate::compress(data, lv % 10), Box::new(compress::deflate::Encoder::new(lv % 10))),
+        1 => (compress::zlib::compress(data, lv % 10), Box::new(compress::zlib::Encoder::new(lv % 10))),
+        2 => (compress::gzip::compress(data, lv % 10), Box::new(compress::gzip::Encoder::new(lv % 10))),
+        3 => (compress::brotli::compress(data, lv % 12), Box::new(compress::brotli::Encoder::new(lv % 12).with_size(data.len() as u64))),
+        4 => (compress::zstd::compress(data, 1 + lv % 19), Box::new(compress::zstd::Encoder::new(1 + lv % 19).with_size(data.len() as u64))),
+        _ => (compress::lz4::frame_compress(data), Box::new(compress::lz4::FrameEncoder::new().with_size(data.len() as u64))),
+    };
+    assert!(back(&once).as_deref() == Some(data), "format {fmt} level {lv}: compress() does not come back");
+    let pieces = encode_pieces(&mut *enc, data, &mut r, sync);
+    assert!(back(&pieces).as_deref() == Some(data), "format {fmt} level {lv} sync {sync}: the stream encoder's bytes do not come back");
+    if !sync {
+        assert!(pieces == once, "format {fmt} level {lv}: the stream encoder writes other bytes than compress() ({} / {})", pieces.len(), once.len());
+    }
+}
+
 // ------------------------------------------------------------------ targets
 
 pub type Fun = Box<dyn Fn(&[u8]) + Send + Sync>;
@@ -618,6 +826,7 @@ pub fn targets(seed_dir: &str) -> Vec<(&'static str, Vec<Vec<u8>>, Fun)> {
     let id = tls_ids();
     let tk = psk_tickets();
     let pcfg = psk_server(&tk);
+    let (ocsp_leaf, ocsp_ca, ocsp) = ocsp_seeds();
     vec![
         // a deliberate panic on inputs that start with 0xEE: the run must find it (net_fuzz.py)
         ("selftest_panic", vec![b"seed".to_vec()], Box::new(|d: &[u8]| {
@@ -647,6 +856,16 @@ pub fn targets(seed_dir: &str) -> Vec<(&'static str, Vec<Vec<u8>>, Fun)> {
             if let Some(c) = netpkt::x509::Cert::parse(d) {
                 let _ = netpkt::x509::check_chain(&[c.clone()], &[c.clone()], "a.lab", 1_800_000_000);
                 let _ = netpkt::x509::check_chain(&[c.clone(), c.clone()], &[], "www.example.org", 1_800_000_000);
+            }
+        })),
+        // OCSP responses checked against a certificate and its CA; requests read as a responder does
+        ("ocsp", ocsp, Box::new(move |d: &[u8]| {
+            let _ = netio::x509::ocsp::check(d, &ocsp_leaf, &ocsp_ca, 1_800_000_000);
+            let _ = netio::x509::ocsp::Request::parse(d);
+        })),
+        ("csr", csr_seeds(), Box::new(|d: &[u8]| {
+            if let Some(c) = netio::x509::Csr::parse(d) {
+                let _ = (c.dns.len(), c.ips.len(), c.tls_features.len());
             }
         })),
         ("dns", vec![dm.clone()], Box::new(move |d: &[u8]| {
@@ -756,10 +975,23 @@ pub fn targets(seed_dir: &str) -> Vec<(&'static str, Vec<Vec<u8>>, Fun)> {
             let mut dst = [0u8; 4096];
             let _ = compress::gzip::decompress_member_into(None, d, &mut dst);
         })),
-        ("brotli", BROTLI_STREAMS.iter().map(|s| s.to_vec()).collect(), Box::new(|d: &[u8]| {
+        ("brotli", brotli_seeds(seed_dir), Box::new(|d: &[u8]| {
             let _ = compress::brotli::decompress(d, 1 << 22);
             let _ = compress::brotli::decompress_prefix(d, 1000);
         })),
+        // the stream decoders in pieces against the one-shot ones (stream_target)
+        ("stream_deflate", deflate_seeds("deflate"), stream_target(|| Box::new(compress::deflate::Decoder::new()), compress::deflate::decompress, false)),
+        ("stream_zlib", deflate_seeds("zlib"), stream_target(|| Box::new(compress::zlib::Decoder::new()), compress::zlib::decompress, false)),
+        ("stream_gzip", deflate_seeds("gzip"), stream_target(|| Box::new(compress::gzip::Decoder::new()), compress::gzip::decompress, false)),
+        ("stream_brotli", brotli_seeds(seed_dir), stream_target(|| Box::new(compress::brotli::Decoder::new()), compress::brotli::decompress, false)),
+        ("stream_zstd", zstd_seeds(seed_dir), stream_target(|| Box::new(compress::zstd::Decoder::new()), compress::zstd::decompress, true)),
+        ("stream_lz4", plain_texts().iter().map(|t| compress::lz4::frame_compress(t)).collect(), stream_target(|| Box::new(compress::lz4::FrameDecoder::new()), compress::lz4::frame_decompress, false)),
+        // compress() and the stream encoders: back to the data, the same bytes (roundtrip)
+        ("roundtrip", plain_texts().iter().enumerate().flat_map(|(i, t)| (0u8..6).map(move |f| {
+            let mut v = vec![f + 6 * (3 * i as u8) + if i % 2 == 1 { 0x80 } else { 0 }];
+            v.extend_from_slice(&t[..t.len().min(6000)]);
+            v
+        })).collect(), Box::new(roundtrip)),
         ("json", json_seeds(), Box::new(|d: &[u8]| {
             let _ = formats::json::parse_with_limits(d, formats::json::Limits::default());
             let tight = formats::json::Limits { bytes: 4096, depth: 8, values: 64, string_bytes: 256, members: 16 };

@@ -190,6 +190,9 @@ pub fn win_test(_op: u32, _w: i32, _a: [i32; 4]) -> i64 {
 pub fn win_test_image(_w: i32) -> Option<(i32, i32, alloc::vec::Vec<u8>)> {
     None
 }
+pub fn win_test_composed(_w: i32) -> Option<(i32, i32, alloc::vec::Vec<u8>)> {
+    None
+}
 pub fn win_test_screen(_x: i32, _y: i32, _w: i32, _h: i32) -> Option<alloc::vec::Vec<u8>> {
     None
 }

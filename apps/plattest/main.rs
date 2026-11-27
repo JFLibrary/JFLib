@@ -97,6 +97,9 @@
 //   plattest --test share / share-ui       (t_share.rs) the system's share sheet: the contract and
 //                                          CAP_SHARE; share-ui (Windows, macOS) a real window opens
 //                                          the sheet and closes it again -> SHARE_CANCELLED
+//   plattest --test scan / scan-ui         (t_scan.rs) the system's scan dialog: the contract;
+//                                          scan-ui (macOS) its window opened and closed ->
+//                                          Cancelled, by hand (jfgui_SCAN_HAND=1) a page scanned
 //   plattest --test ios                    (t_ios.rs, iOS under UIKit: tools/apple.py simapp) the screen
 //                                          kept on (the idle timer), the system's text size followed,
 //                                          turning (with jfgui_GPU=1 on the GPU's layer)
@@ -127,6 +130,9 @@
 //                                          browser's record; the backend of the platform through
 //                                          a test hook (Windows XINPUT_STATE records, Linux a pipe
 //                                          as a pad's node, macOS controllerWithExtendedGamepad)
+//   plattest --test pad-policy / pad-ask   (t_pad.rs) a manifest without `gamepad`: pad_watch
+//                                          refused (PERMDENY gamepad); `ask gamepad`: refused while
+//                                          nobody answers, watching after a yes
 //   plattest --test a11y-rich / uia-rich / a11y-rich-bus   (t_a11y_rich.rs) a web page's
 //                                          accessibility tree (apps/a11ytest's page): headless
 //                                          model, requests, live regions, the rich update format;
@@ -246,6 +252,7 @@ mod t_bookmarks;
 // iOS under UIKit: screen on, text size, turning
 mod t_ios;
 // the system's share sheet
+mod t_scan;
 mod t_share;
 // a web page's accessibility tree (apps/a11ytest's page)
 mod t_a11y_rich;
@@ -597,6 +604,8 @@ fn plattest() -> i32 {
         Some("keychar") => t_keychar::t_keychar,       // the layout's character of a key event
         Some("input") => t_input::t_input,             // (G7a) key positions, raw motion, the pointer lock
         Some("pad") => t_pad::t_pad,                   // (G7a part 2) game pads without real input
+        Some("pad-policy") => t_pad::t_pad_policy,     // without `gamepad` (not in "all")
+        Some("pad-ask") => t_pad::t_pad_ask,           // `ask gamepad` (not in "all")
         Some("settings-bus") => t_settings::t_settings_bus, // Linux: against tools/platshared/settings_bus.py
         Some("settings-bus-files") => t_settings::t_settings_bus_files, // Linux: the same, a portal without appearance keys
         Some("a11y-rich") => t_a11y_rich::t_a11y_rich, // a web page's accessibility tree, headless
@@ -616,6 +625,8 @@ fn plattest() -> i32 {
         Some("ios") => t_ios::t_ios,                  // iOS under UIKit (simapp): screen on, text size, turning
         Some("share") => t_share::t_share,            // plat::share: the contract, CAP_SHARE
         Some("share-ui") => t_share::t_share_ui,      // Windows, macOS, a real window: the sheet opened and closed
+        Some("scan") => t_scan::t_scan,               // plat::scan: the contract
+        Some("scan-ui") => t_scan::t_scan_ui,         // macOS, a real window: the scan dialog opened and closed
         Some("secret") => t_secret::t_secret,          // the system's secret store (not in "all")
         Some("secret-bus") => t_secret::t_secret_bus,  // Linux: against tools/platshared/secret_bus.py
         Some("power") => t_power::t_power,             // plat::inhibit (Windows: real power requests)

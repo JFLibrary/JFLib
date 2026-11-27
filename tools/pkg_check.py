@@ -749,6 +749,11 @@ def meta_checks(d):
     a6, n6 = pkg_linux.finish_args([("fs.user", []), ("location", []), ("sensors", [])])
     check(a6 == ["--share=ipc", "--socket=wayland", "--socket=fallback-x11"] and any(n.startswith("location") for n in n6)
           and any(n.startswith("sensors") for n in n6), "flatpak: location, sensors: no hole yet, noted")
+    a7, n7 = pkg_linux.finish_args([("fs.user", []), ("gamepad", []), ("gamepad", [])])
+    check(a7 == ["--share=ipc", "--socket=wayland", "--socket=fallback-x11", "--device=input"] and any(n.startswith("gamepad") for n in n7),
+          "flatpak: gamepad: --device=input once, with a note")
+    check("--device=input" not in pkg_linux.finish_args(None)[0] and "--device=input" not in a3,
+          "flatpak: no --device=input without gamepad (no manifest either)")
     a5, n5 = pkg_linux.finish_args([("fs.user", []), ("recent", []), ("recent", [])])
     check(a5 == ["--share=ipc", "--socket=wayland", "--socket=fallback-x11", "--filesystem=xdg-data/recently-used.xbel"]
           and any(n.startswith("recent") for n in n5), "flatpak: recent: the host's recently-used.xbel once, with a note")
@@ -814,6 +819,8 @@ def meta_checks(d):
     t_arch(d)
     caps, cnotes = pkg_msix.capabilities([("fs.user", []), ("audio.output", [])])
     check(caps == [] and any(n.startswith("audio.output") for n in cnotes), "msix: audio.output needs no capability (noted)")
+    caps, cnotes = pkg_msix.capabilities([("fs.user", []), ("gamepad", [])])
+    check(caps == [] and any(n.startswith("gamepad") for n in cnotes), "msix: gamepad needs no capability (noted)")
     caps, cnotes = pkg_msix.capabilities([("location", []), ("sensors", [])])
     check(caps == [] and any(n.startswith("location") for n in cnotes) and any(n.startswith("sensors") for n in cnotes),
           "msix: location, sensors: nothing declared while plat has no Windows version (noted)")

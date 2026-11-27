@@ -117,6 +117,11 @@ pub const IMGF_COUNT: u32 = 55;
 /// (svg) SVG: the last slot, outside the static table until img_svg::register fills it
 /// (register_external stops before it)
 pub const IMGF_SVG: u32 = IMGF_COUNT - 1;
+/// JPEG 2000 (JP2, JPX, J2K): the slot before SVG's, outside the static table until
+/// img_all::use_all_codecs fills it with img_jp2's codec.  register_external stops before it:
+/// the external codecs keep their numbers 23 to 52; a 31st external registration, which got
+/// slot 53 before, now gets 0, and a stored 53 now names JPEG 2000
+pub const IMGF_JP2: u32 = IMGF_COUNT - 2;
 
 // ------------------------------------------------------------------ limits
 pub const IMG_MAXDIM: u32 = 65535; // largest width / height (ERR_DIMS)

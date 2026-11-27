@@ -21,7 +21,8 @@
 //                                                it does not fit into cap bytes)
 //   register(fmt, codec) -> 0 / ERR_UNSUPPORTED  register_dyn(name, exts, mime, props, codec)
 //   register_slot(IMGF_SVG, name, exts, mime, props, codec)   (svg) a built-in format without
-//                                                a static entry (img_svg::register)
+//                                                a static entry (img_svg::register; IMGF_JP2:
+//                                                img_all::use_all_codecs)
 //   set_file_io(FileIo)                          the file functions of load / save (img_core
 //                                                does not depend on plat: the app sets them)
 // Glue for the core codecs (imgcore.s):
@@ -149,17 +150,18 @@ pub fn register_dyn(name: &'static str, exts: &'static str, mime: &'static str, 
     register_range(IMG_DYN0..IMG_DYN_END, name, exts, mime, props, c)
 }
 
-/// Separate slots for external codec hosts, preserving the native plugin ABI's IDs (the
-/// last slot, IMGF_SVG, is kept for SVG).
+/// Separate slots for external codec hosts, preserving the native plugin ABI's IDs: 23 to 52, or
+/// 0 when they are taken (the last two slots, IMGF_JP2 and IMGF_SVG, are kept for JPEG 2000 and
+/// SVG; slot 53 went to JPEG 2000, so a 31st registration gets 0).
 pub fn register_external(name: &'static str, exts: &'static str, props: u32, c: &'static Codec) -> u32 {
-    register_range(IMG_EXTERNAL0..IMGF_SVG, name, exts, "application/octet-stream", props, c)
+    register_range(IMG_EXTERNAL0..IMGF_JP2, name, exts, "application/octet-stream", props, c)
 }
 
-/// (svg) a built-in format that has no entry in the static table (IMGF_SVG): its name,
+/// a built-in format that has no entry in the static table (IMGF_SVG, IMGF_JP2): its name,
 /// extension list, MIME type, properties and codec into slot fmt (None empties the slot)
 /// -> 0 / ERR_UNSUPPORTED (fmt out of range, or a static / runtime format's slot)
 pub fn register_slot(fmt: u32, name: &'static str, exts: &'static str, mime: &'static str, props: u32, c: Option<&'static Codec>) -> i32 {
-    if fmt != IMGF_SVG {
+    if fmt != IMGF_SVG && fmt != IMGF_JP2 {
         return ERR_UNSUPPORTED;
     }
     let mut t = FMTS.lock();

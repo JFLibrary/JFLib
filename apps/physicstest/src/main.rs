@@ -2,13 +2,16 @@
 //
 //   physicstest --check [--quick]   every test group (tests/check.uis); exit code 1 when a check fails
 //   physicstest --test NAME         one group: math hull ray distance cast tunnel seams bvh world fuzz edge
-//                                   character charfuzz
+//                                   character charfuzz, the rigid bodies: mass motion contact stack joint ccd
+//                                   events dynfuzz
 //   physicstest --checksum          the determinism harness: "physicstest checksum=HEX" over the bits of every
 //                                   result of a fixed set of scenarios, "physicstest controller checksum=HEX"
-//                                   over figures moved by the character controller; the same on every target
-//   physicstest --bench [PART] [--runs N]  PART sqrt, map or controller (default all): the square roots,
-//                                   the BVH build of a 50 000-triangle map, rays and capsule casts per second,
-//                                   bytes per triangle, controllers stepped per ms (medians of N runs, default 3)
+//                                   over figures moved by the character controller, "physicstest dynamics
+//                                   checksum=HEX" over rigid bodies and joints; the same on every target
+//   physicstest --bench [PART] [--runs N]  PART sqrt, map, controller or dynamics (default all): the square
+//                                   roots, the BVH build of a 50 000-triangle map, rays and capsule casts per
+//                                   second, bytes per triangle, controllers stepped per ms, the time of a step
+//                                   of rigid bodies (medians of N runs, default 3)
 //   physicstest --version | --help
 //
 // The references (refs.rs) share no code with lib/physics: closest points by projection and edge
@@ -24,6 +27,7 @@ extern crate alloc;
 mod bench;
 mod character;
 mod checksum;
+mod dynamics;
 mod refs;
 mod scene;
 mod tests;
@@ -130,7 +134,7 @@ impl Ctx {
 }
 
 fn usage() -> i32 {
-    out("Aufruf: physicstest --check [--quick] | --test NAME | --checksum | --bench [sqrt|map|controller] [--runs N] | --version | --help\n");
+    out("Aufruf: physicstest --check [--quick] | --test NAME | --checksum | --bench [sqrt|map|controller|dynamics] [--runs N] | --version | --help\n");
     0
 }
 
@@ -150,6 +154,8 @@ fn run() -> i32 {
         out(&format!("physicstest checksum={:016x} results={}\n", sum, n));
         let (sum, n) = checksum::controller();
         out(&format!("physicstest controller checksum={:016x} results={}\n", sum, n));
+        let (sum, n) = checksum::dynamics();
+        out(&format!("physicstest dynamics checksum={:016x} results={}\n", sum, n));
         return 0;
     }
     if args.iter().any(|a| a == "--bench") {

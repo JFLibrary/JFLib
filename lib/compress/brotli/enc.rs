@@ -1431,6 +1431,12 @@ impl Core {
                     }
                     let nb = T::SIZE_BITS[l];
                     for &(t, cut, suf) in fam {
+                        // OmitLast5..9 on a word of 4..8 letters leaves nothing (l - cut was
+                        // an overflow: a panic where overflow checks are on, as in the apps'
+                        // debug builds)
+                        if cut as usize >= l {
+                            continue;
+                        }
                         let wl = l - cut as usize;
                         if c < wl {
                             continue;

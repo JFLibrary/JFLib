@@ -367,7 +367,10 @@ Tick des Hosts (bis 250 ms). Ohne nice 10 für die Arbeiter lagen die längsten 
   `/etc/resolv.conf` gibt es nicht. `netio::dns` bleibt für eigene Anfragen an genannte Server.
 - Die Schnittstellen des Geräts: was ohne Netlink geht (`SIOCGIFCONF`, `/sys/class/net`), ohne MAC-Adressen.
 - `certs`: die CA-Ordner des Systems, zuerst `/apex/com.android.conscrypt/cacerts` (ab Android 14), dann
-  `/system/etc/security/cacerts`; dort liegt ein PEM pro Datei.
+  `/system/etc/security/cacerts`; dort liegt ein PEM pro Datei. `root_bundle` liefert sie,
+  `verify_tls_server` und `verify_tls_server_roots` antworten `None` wie auf Linux (netio prüft gegen
+  die Ordner; Schnittstelle seit Phase 2c des Sicherheitsplans, `lib/plat/certs.rs`). Die Gruppe
+  `systrust` von `coretest` und `tools/tls_web_check.py --internet-only` bekommen dann einen Android-Weg.
 - `netio` in der Fassade auch für Android, `docs.rs` baut es für `aarch64-linux-android`.
 - Manifest nach Entscheidung 5, in `cargo jflib android` und `tools/android.py`.
 - Ohne `INTERNET` scheitert `socket()` mit EACCES. Das wird ein klarer `NetError` mit Hinweis auf das Manifest.

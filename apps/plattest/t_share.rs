@@ -1,6 +1,7 @@
 // t_share -- the system's share sheet (lib/plat/share.rs)
 //
-//   plattest --test share      the contract: nothing to share, an empty or missing file -> SHARE_NONE,
+//   plattest --test share      the contract: nothing to share, an empty or missing file, a mem:// file
+//                              where the system's sheet needs a path (Windows, macOS, iOS) -> SHARE_NONE,
 //                              no answer without a sheet, nothing open; CAP_SHARE where the system
 //                              has a sheet (Windows, macOS; iOS only under UIKit's host; Linux none)
 //   plattest --test share-ui   (by hand, Windows and macOS: a real window that takes the front) the
@@ -12,6 +13,8 @@
 //                              closes when it loses the focus, which another app in front can keep
 //                              from happening; macOS: the picker closed) -> SHARE_CANCELLED, then a
 //                              new one opens and closes the same way.  Elsewhere it says so.
+//                              jfgui_SHARE_HAND=1: one sheet left open for the user, who chooses a
+//                              target within 60 s -> SHARE_DONE.
 
 use alloc::format;
 
@@ -24,6 +27,13 @@ pub fn t_share(t: &mut T) {
     t.check(share(&Share { files: alloc::vec![alloc::string::String::new()], ..Share::default() }) == SHARE_NONE, "share: an empty path -> SHARE_NONE");
     let missing = format!("{}/plattest-share-missing-{}.txt", plat::temp_dir().unwrap_or_default().trim_end_matches('/'), plat::time_us());
     t.check(share(&Share::files(&[&missing])) == SHARE_NONE, "share: a missing file -> SHARE_NONE");
+    // the system's sheets get the path behind a scheme (data://); a file without one cannot go
+    if cfg!(any(windows, target_os = "macos", target_os = "ios")) {
+        let mem = "mem://plattest-share.txt";
+        let there = plat::write_file(mem, b"nur im Speicher") && plat::file_exists(mem) == 1;
+        t.check(there && share(&Share::files(&[mem])) == SHARE_NONE, "share: a mem:// file (no path of the system) -> SHARE_NONE");
+        let _ = plat::delete(mem);
+    }
     t.check(share_poll().is_none() && !share_open(), "share: no answer, nothing open");
     let cap = capabilities().supports(CAP_SHARE);
     let want = cfg!(any(windows, target_os = "macos"));
@@ -52,7 +62,7 @@ mod ui_test {
     use alloc::string::String;
     use core::sync::atomic::{AtomicI32, AtomicU32, Ordering::SeqCst};
 
-    use plat::{SHARE_CANCELLED, SHARE_NONE, SHARE_PENDING, Share, share, share_open, share_poll};
+    use plat::{SHARE_CANCELLED, SHARE_DONE, SHARE_NONE, SHARE_PENDING, Share, share, share_open, share_poll};
     use ui::{App, AppDesc, Ui};
 
     use super::*;
@@ -109,7 +119,8 @@ mod ui_test {
     }
 
     pub fn t_share_ui(t: &mut T) {
-        let file = format!("{}/plattest-share.txt", plat::temp_dir().unwrap_or_default().trim_end_matches('/'));
+        // a name with a scheme: the sheet gets the path behind it
+        let file = String::from("data://plattest-share.txt");
         t.check(plat::write_file(&file, "Eine Datei aus plattest\n".as_bytes()), "share-ui: the file to share");
         let code = ui::launch(&DESC, Sharer { file: file.clone() }, &style::STYLE);
         t.expect_i(code as i64, 0, "share-ui: the window ran");
@@ -170,10 +181,25 @@ mod ui_test {
         record(!share_open(), &format!("share-ui: round {k}: nothing open after the answer"));
     }
 
+    /// jfgui_SHARE_HAND=1: the sheet stays open for the user, who chooses a target (-> SHARE_DONE)
+    fn hand() {
+        OPENED.store(i32::MIN, SeqCst);
+        ANSWER.store(i32::MIN, SeqCst);
+        ASK.store(1, SeqCst);
+        plat::wake();
+        wait(3000, || OPENED.load(SeqCst) != i32::MIN);
+        record(OPENED.load(SeqCst) == SHARE_PENDING, "share-ui: by hand: the sheet opens (choose a target within 60 s)");
+        let got = wait(60_000, || ANSWER.load(SeqCst) != i32::MIN);
+        let a = ANSWER.load(SeqCst);
+        record(got && a == SHARE_DONE, &format!("share-ui: by hand: a target chosen -> SHARE_DONE ({a})"));
+    }
+
     fn client() {
         plat::wake();
         if !wait(10_000, || FRAMES.load(SeqCst) > 0) {
             record(false, "share-ui: the window shows within 10 s");
+        } else if plat::env("jfgui_SHARE_HAND").is_some() {
+            hand();
         } else {
             round(1);
             round(2);

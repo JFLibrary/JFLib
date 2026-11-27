@@ -734,6 +734,8 @@ pub struct Ui {
     /// (G7a part 2) the pads of this batch (pads.rs) and whether the app asked for them
     pub(crate) pads: Vec<plat::Gamepad>,
     pub(crate) pads_on: bool,
+    /// the manifest refused the pads (no `gamepad`, an ask line not answered yes yet): try again once it allows them
+    pub(crate) pads_refused: bool,
     pub(crate) mpts: Vec<[i32; 2]>,
     pub(crate) mprs: Vec<u32>,
     pub(crate) mtilt: [i32; 2],

@@ -974,13 +974,15 @@ impl Engine {
         let mut targets = Vec::new();
         for (s, k) in calls {
             let args: Vec<u32> = p.args[s as usize..(s + k) as usize].to_vec();
+            // SETATREF() without its reference parses (it is #VALUE! when evaluated): no target
+            let Some(&first) = args.first() else { continue };
             let mut run = self.run(Some(BTreeSet::new()));
             run.set_value = Some(new_val.clone());
             run.reads.push((NodeKey::new(sheet, addr), Vec::new()));
             let (target, value) = {
                 let doc = tx.doc();
                 let mut ev = Ev { doc, run: &mut run, sheet, cell: addr.cell, addr: *addr, axis: Axis::of(doc.str(addr.cell)), p: p.clone(), src: sheet, keep: None };
-                let t = super::eval::target_of(&mut ev, args[0]);
+                let t = super::eval::target_of(&mut ev, first);
                 let v = match args.get(1) {
                     Some(&x) if ev.node(x) != Node::Missing => ev.eval(x),
                     _ => Ok(new_val.clone()),

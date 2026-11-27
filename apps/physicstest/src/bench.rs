@@ -13,7 +13,7 @@ fn median(v: &mut [f64]) -> f64 {
     v[v.len() / 2]
 }
 
-/// PART: sqrt, map, controller or all
+/// PART: sqrt, map, controller, dynamics or all
 pub fn run(runs: usize, part: &str) {
     if part == "all" || part == "sqrt" {
         sqrt_bench(runs);
@@ -23,6 +23,9 @@ pub fn run(runs: usize, part: &str) {
     }
     if part == "all" || part == "controller" {
         crate::character::bench(runs);
+    }
+    if part == "all" || part == "dynamics" {
+        crate::dynamics::bench(runs);
     }
 }
 

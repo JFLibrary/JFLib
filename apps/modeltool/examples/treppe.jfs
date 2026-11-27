@@ -23,21 +23,21 @@ model.add(wange.rotate_y(90).move(-breite / 2 - 0.02, 0, 0), "beton", "wange")
 
 // Pfosten rechts auf jeder dritten Stufe, 90 cm hoch
 let px = breite / 2 - 0.05
-let erste = [px, steig, tiefe / 2 - auftritt / 2]           // Mitte des ersten Auftritts
+let erste = vec(px, steig, tiefe / 2 - auftritt / 2)       // Mitte des ersten Auftritts
 let anzahl = (stufen + 2) / 3                               // ganzzahlige Division
 let pfosten = geom.cylinder(0.02, 0.9, 16).move(erste)
 model.add(pfosten.array(anzahl, 0, 3 * steig, -3 * auftritt), "handlauf", "pfosten")
 
 // der Handlauf: ein Rohr über den Pfosten, an beiden Enden 10 cm länger, mit Kugeln als Abschluss
-let a = vec.add(erste, [0, 0.9, 0])
-let b = vec.add(a, [0, 3 * steig * (anzahl - 1), -3 * auftritt * (anzahl - 1)])
-let richtung = vec.norm(vec.sub(b, a))
-let a2 = vec.sub(a, vec.mul(richtung, 0.1))
-let b2 = vec.add(b, vec.mul(richtung, 0.1))
+let a = erste + vec(0, 0.9, 0)
+let b = a + vec(0, 3 * steig * (anzahl - 1), -3 * auftritt * (anzahl - 1))
+let richtung = (b - a).normalized()
+let a2 = a - richtung * 0.1
+let b2 = b + richtung * 0.1
 model.add(geom.sweep(profile.circle(0.025, 16), [a2, b2]), "handlauf", "rohr")
 let kugel = geom.sphere(0.03, 16)
-model.add(kugel.move(a2[0], a2[1] - 0.03, a2[2]), "handlauf", "kugel unten")
-model.add(kugel.move(b2[0], b2[1] - 0.03, b2[2]), "handlauf", "kugel oben")
+model.add(kugel.move(a2 - vec(0, 0.03, 0)), "handlauf", "kugel unten")
+model.add(kugel.move(b2 - vec(0, 0.03, 0)), "handlauf", "kugel oben")
 
 model.budget(3000)
 model.expect_size(breite + 0.04, nil, tiefe, 0.001)

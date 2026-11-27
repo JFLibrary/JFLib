@@ -1,14 +1,19 @@
 // run -- a script from source to a checked model: compile (an unknown name is an error before the run), run in
 // a VM with limits, finish the parts (box UV in metres), measure them (geom's checks per part and for the whole
 // model, the script's expectations, the budget) and write the report.  Errors carry the file, line and
-// column, the source line with a caret and the calls, because an AI reads them and has to find the place.
+// column, the source line with a caret and the calls, because an AI reads them and has to find the place;
+// the warnings carry the same, and a failed rule of the script (model.expect_size, model.budget) names the line
+// that states it.  The warnings are first those of JFScript's language services on the script and each module it
+// imported (ls::check with the host's description, host::api(): a member a mesh or a vec does not have, a name
+// of a namespace that is not there, a division of two ints), then the host's in the order they came (cx.warn:
+// the script went on).
 
 use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use geom::{Fnv, Mesh, Report, Vec3};
-use script::{Limits, Status, Value, Vm};
+use script::{Api, Limits, Status, Value, Vm, Warning};
 
 use crate::host::{self, Model, ModelHost};
 use crate::json::J;
@@ -32,6 +37,11 @@ pub struct Run {
     pub file: String,
     pub model: Model,
     pub problems: Vec<Problem>,
+    /// the language services' warnings on the script and its modules, then the host's (cx.warn) in the order they
+    /// came; at most script::MAX_WARNINGS
+    pub warnings: Vec<Warning>,
+    /// how many more there were (not kept)
+    pub warnings_dropped: u64,
     /// what the script printed
     pub output: String,
     /// (path, source) of the modules it imported
@@ -42,6 +52,9 @@ pub struct Run {
     pub fuel: u64,
     pub script_us: u64,
     pub host_us: u64,
+    /// how many meshes the run made, and the most the script held at once (the others were freed)
+    pub meshes: u64,
+    pub meshes_peak: usize,
 }
 
 impl Run {
@@ -75,7 +88,9 @@ pub fn lf(s: &str) -> String {
 /// the cache key of a script, its parameters and its modules
 pub fn cache_key(src: &str, params: &[(String, String)], imports: &[(String, String)]) -> String {
     let mut text = String::new();
-    text.push_str("modeltool-key-1\n");
+    // (2: the report has warnings and the rules' places since JFScript S1; 3: meshes and vectors are host objects
+    // since S2, and the language services' warnings are in the report; a report of before is built again)
+    text.push_str("modeltool-key-3\n");
     text.push_str(crate::APP_VERSION);
     text.push('\n');
     text.push_str(rt::VERSION);
@@ -178,6 +193,18 @@ pub fn file_loader(dir: &str, path: &str) -> Result<String, String> {
     }
 }
 
+/// The warnings of JFScript's language services on a script or module (ls::check with the host's description):
+/// a member a mesh or a vec does not have, a name of a namespace that is not there (with the closest one), a
+/// division of two ints, a top-level let read before it ran.  Its errors are compile_with's and stop the run
+/// before.
+pub fn ls_warnings(api: &Api, file: &str, src: &str) -> Vec<Warning> {
+    script::ls::check(src, api)
+        .into_iter()
+        .filter(|d| !d.error)
+        .map(|d| Warning { file: String::from(file), line: d.line, col: d.col, msg: d.msg })
+        .collect()
+}
+
 /// Compile and run the script `src` (named `file` in messages) with its parameters; `loader` reads a module
 /// for import(path) (the path relative to the script).  A module outside the script's folder is refused
 /// before the loader sees it (import_allowed).
@@ -187,6 +214,8 @@ pub fn run_script(file: &str, src: &str, params: &[(String, String)], loader: &m
         file: String::from(file),
         model: Model::default(),
         problems: Vec::new(),
+        warnings: Vec::new(),
+        warnings_dropped: 0,
         output: String::new(),
         imports: Vec::new(),
         params: params.to_vec(),
@@ -194,8 +223,11 @@ pub fn run_script(file: &str, src: &str, params: &[(String, String)], loader: &m
         fuel: 0,
         script_us: 0,
         host_us: 0,
+        meshes: 0,
+        meshes_peak: 0,
     };
-    let prog = match script::compile_with(file, src, host::GLOBALS) {
+    let api = host::api();
+    let prog = match script::compile_with(file, src, &api.names()) {
         Ok(p) => p,
         Err(diags) => {
             for d in diags {
@@ -221,7 +253,7 @@ pub fn run_script(file: &str, src: &str, params: &[(String, String)], loader: &m
         import_allowed(&dir, path)?;
         loader(path)
     };
-    let mut host = ModelHost::new(&mut guarded);
+    let mut host = ModelHost::new(&api, &mut guarded);
     loop {
         match vm.run(&mut host, 10_000_000) {
             Status::Done(_) => break,
@@ -247,7 +279,28 @@ pub fn run_script(file: &str, src: &str, params: &[(String, String)], loader: &m
     run.host_us = host.host_us;
     run.imports = core::mem::take(&mut host.imports);
     run.model = core::mem::take(&mut host.model);
+    (run.meshes, run.meshes_peak) = (host.made, host.peak);
     drop(host);
+    // the language services' warnings on the script and its modules, then the host's up to the end or the error,
+    // at most script::MAX_WARNINGS together; the places of the rules; each with the file named as errors name it
+    let mut warnings = ls_warnings(&api, file, src);
+    for (path, s) in &run.imports {
+        warnings.extend(ls_warnings(&api, path, s));
+    }
+    warnings.extend(vm.take_warnings());
+    run.warnings_dropped = vm.warnings_dropped();
+    if warnings.len() > script::MAX_WARNINGS {
+        run.warnings_dropped += (warnings.len() - script::MAX_WARNINGS) as u64;
+        warnings.truncate(script::MAX_WARNINGS);
+    }
+    run.warnings = warnings;
+    for w in run.warnings.iter_mut().filter(|w| w.file.is_empty()) {
+        w.file = String::from(file);
+    }
+    let rules = run.model.expects.iter_mut().map(|e| &mut e.at).chain(core::iter::once(&mut run.model.budget_at));
+    for at in rules.filter(|at| at.file.is_empty() && at.line > 0) {
+        at.file = String::from(file);
+    }
     if run.problems.is_empty() && run.model.parts.is_empty() {
         run.problems.push(Problem {
             file: String::from(file),
@@ -267,24 +320,48 @@ pub fn run_script(file: &str, src: &str, params: &[(String, String)], loader: &m
     run
 }
 
-/// a problem as the console shows it: "file:line:col: Fehler: message", the source line with a caret, the calls
-pub fn format_problem(p: &Problem, sources: &[(String, String)]) -> String {
-    let mut s = if p.line > 0 { format!("{}:{}:{}: Fehler: {}\n", p.file, p.line, p.col, p.message) } else { format!("{}: Fehler: {}\n", p.file, p.message) };
-    if p.line > 0 {
-        if let Some((_, src)) = sources.iter().find(|(f, _)| *f == p.file) {
-            if let Some(text) = src.lines().nth(p.line as usize - 1) {
+/// "file:line:col: KIND: message" (without a line: "file: KIND: message"), then the source line with a caret
+/// under the column when `sources` has the file
+fn format_place(kind: &str, file: &str, line: u32, col: u32, message: &str, sources: &[(String, String)]) -> String {
+    let mut s = if line > 0 { format!("{}:{}:{}: {}: {}\n", file, line, col, kind, message) } else { format!("{}: {}: {}\n", file, kind, message) };
+    if line > 0 {
+        if let Some((_, src)) = sources.iter().find(|(f, _)| *f == file) {
+            if let Some(text) = src.lines().nth(line as usize - 1) {
                 let text = text.replace('\t', " ");
-                let no = format!("{}", p.line);
+                let no = format!("{}", line);
                 s.push_str(&format!("  {} | {}\n", no, text.trim_end()));
-                let caret: String = core::iter::repeat_n(' ', (p.col as usize).saturating_sub(1)).collect();
+                let caret: String = core::iter::repeat_n(' ', (col as usize).saturating_sub(1)).collect();
                 s.push_str(&format!("  {} | {}^\n", " ".repeat(no.len()), caret));
             }
         }
     }
+    s
+}
+
+/// a problem as the console shows it: "file:line:col: Fehler: message", the source line with a caret, the calls
+pub fn format_problem(p: &Problem, sources: &[(String, String)]) -> String {
+    let mut s = format_place("Fehler", &p.file, p.line, p.col, &p.message, sources);
     for t in &p.trace {
         s.push_str(&format!("  {}\n", t));
     }
     s
+}
+
+/// how many warnings the console and the window show in full (the report has all)
+pub const WARNINGS_SHOWN: usize = 10;
+
+/// The warnings as the console shows them, each like an error ("file:line:col: Warnung: message", the source
+/// line with a caret), at most WARNINGS_SHOWN; then one line with how many more there are.
+pub fn format_warnings(run: &Run, sources: &[(String, String)]) -> Vec<String> {
+    let mut out: Vec<String> = run.warnings.iter().take(WARNINGS_SHOWN).map(|w| format_place("Warnung", &w.file, w.line, w.col, &w.msg, sources)).collect();
+    let more = (run.warnings.len() - out.len()) as u64;
+    let lost = run.warnings_dropped;
+    if lost > 0 {
+        out.push(format!("  ... und {} weitere Warnungen ({} im Bericht; {} nicht aufgehoben, höchstens {} je Lauf)\n", more + lost, more, lost, script::MAX_WARNINGS));
+    } else if more > 0 {
+        out.push(format!("  ... und {} weitere Warnungen (alle im Bericht)\n", more));
+    }
+    out
 }
 
 /// the measurements of a model
@@ -378,16 +455,21 @@ pub fn findings(model: &Model, a: &Analysis) -> Vec<String> {
         if !ok {
             let want = |v: f64| if v.is_nan() { String::from("beliebig") } else { geom::fnum(v) };
             out.push(format!(
-                "Maße {} x {} x {} m erwartet (Toleranz {}), sind {} x {} x {} m",
-                want(e.size[0]), want(e.size[1]), want(e.size[2]), geom::fnum(e.tolerance),
+                "{}Maße {} x {} x {} m erwartet (Toleranz {}), sind {} x {} x {} m",
+                rule_at(&e.at), want(e.size[0]), want(e.size[1]), want(e.size[2]), geom::fnum(e.tolerance),
                 geom::fnum(size.x), geom::fnum(size.y), geom::fnum(size.z)
             ));
         }
     }
     if a.within_budget == Some(false) {
-        out.push(format!("über dem Budget: {} Dreiecke, erlaubt {}", w.triangles, model.budget.unwrap_or(0)));
+        out.push(format!("{}über dem Budget: {} Dreiecke, erlaubt {}", rule_at(&model.budget_at), w.triangles, model.budget.unwrap_or(0)));
     }
     out
+}
+
+/// "haus.jfs:71: " before a finding about a rule of the script (nothing when its place is not known)
+fn rule_at(at: &script::Position) -> String {
+    if at.line > 0 { format!("{}: ", host::place(at)) } else { String::new() }
 }
 
 /// "#rrggbb" of an sRGB colour
@@ -428,9 +510,9 @@ pub struct Outputs {
     pub views: J,
 }
 
-/// The report: the part every run of the same script gives (tool, key, script, ok, errors, findings, params,
-/// model, checks, parts, expectations, materials, output, imports, fingerprint) and, when given, the files,
-/// the views and the timing, each on one line at the end.
+/// The report: the part every run of the same script gives (tool, key, script, ok, errors, warnings, findings,
+/// params, model, checks, parts, the rules with their places and results, materials, output, imports,
+/// fingerprint) and, when given, the files, the views and the timing, each on one line at the end.
 pub fn report(run: &Run, a: Option<&Analysis>, outputs: Option<&Outputs>, timing: Option<J>) -> J {
     let mut f: Vec<(&str, J)> = Vec::new();
     f.push(("tool", J::Str(format!("modeltool {}", crate::APP_VERSION))));
@@ -453,6 +535,17 @@ pub fn report(run: &Run, a: Option<&Analysis>, outputs: Option<&Outputs>, timing
         })
         .collect();
     f.push(("errors", J::Arr(errors)));
+    let warnings: Vec<J> = run
+        .warnings
+        .iter()
+        .map(|w| {
+            J::obj(alloc::vec![("file", J::str(&w.file)), ("line", J::Int(w.line as i64)), ("col", J::Int(w.col as i64)), ("message", J::str(&w.msg))]).compact()
+        })
+        .collect();
+    f.push(("warnings", J::Arr(warnings)));
+    if run.warnings_dropped > 0 {
+        f.push(("warnings_dropped", J::Int(run.warnings_dropped as i64)));
+    }
     let fnd = a.map(|a| findings(&run.model, a)).unwrap_or_default();
     f.push(("findings", J::Arr(fnd.iter().map(|s| J::str(s)).collect())));
     f.push(("params", J::Obj(run.params.iter().map(|(k, v)| (k.clone(), J::str(v))).collect())));
@@ -504,13 +597,16 @@ pub fn report(run: &Run, a: Option<&Analysis>, outputs: Option<&Outputs>, timing
             })
             .collect();
         f.push(("parts", J::Arr(parts)));
-        let expects: Vec<J> = m
+        // the rules of the script, each with where it states it: the sizes, then the budget
+        let mut expects: Vec<J> = m
             .expects
             .iter()
             .zip(&a.expects)
             .map(|(e, (ok, size))| {
                 J::obj(alloc::vec![
                     ("rule", J::str("size")),
+                    ("file", J::str(&e.at.file)),
+                    ("line", J::Int(e.at.line as i64)),
                     ("expected", J::nums(&e.size)),
                     ("actual", J::vec3(*size)),
                     ("tolerance", J::Num(e.tolerance)),
@@ -519,6 +615,19 @@ pub fn report(run: &Run, a: Option<&Analysis>, outputs: Option<&Outputs>, timing
                 .compact()
             })
             .collect();
+        if let (Some(b), Some(ok)) = (m.budget, a.within_budget) {
+            expects.push(
+                J::obj(alloc::vec![
+                    ("rule", J::str("budget")),
+                    ("file", J::str(&m.budget_at.file)),
+                    ("line", J::Int(m.budget_at.line as i64)),
+                    ("expected", J::Int(b as i64)),
+                    ("actual", J::Int(w.triangles as i64)),
+                    ("ok", J::Bool(ok)),
+                ])
+                .compact(),
+            );
+        }
         f.push(("expect", J::Arr(expects)));
         let mats: Vec<J> = m
             .materials

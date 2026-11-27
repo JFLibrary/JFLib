@@ -1,6 +1,6 @@
 """limbo_check.py -- netio::x509::verify_chain against x509-limbo (C2SP/x509-limbo).
 
-    python tools/limbo_check.py [--target linux|win] [--id SUBSTRING] [--show ID] [--list]
+    python tools/limbo_check.py [--target linux|win|mac] [--system] [--id SUBSTRING] [--show ID] [--list]
 
 Fetches limbo.json of the pinned commit into build/vectors (tools/suite_fetch.py; nothing in
 git), hands each testcase to `coretest --vectors` (x509chain, apps/coretest/src/suitevec.rs) the
@@ -13,11 +13,22 @@ more than 20 certificates is judged by verify_chain and marked: tls/conn.rs refu
 Certificate message that long.
 
 Skipped, with the reason: testcases whose features netio states it lacks (lib/x509/lib.rs,
-header: revocation / CRLs, certificate policies; also ML-DSA keys,
+header: CRLs, certificate policies; also ML-DSA keys,
 a caller-chosen chain depth, e-mail peer names, extended key usages other than serverAuth /
 clientAuth).  Optional behaviour (the pedantic-* features, rfc5280-incompatible-with-webpki) is
 run, and its failures are counted apart.  PASS / FAIL / SKIP per testcase id with --list;
-exit code 1 on a failure that is not optional."""
+exit code 1 on a failure that is not optional.
+
+--system: the same testcases through the system's checks (`coretest --vectors`, x509system:
+netio::roots::verify_system_roots -- Windows CryptoAPI with the testcase's trusted certificates
+as its only roots, Apple's Security framework with them as its only anchors, on Linux
+verify_chain), as Trust::System decides on these machines: the system's answer, then netio's
+check of the leaf's name.  A server's chains only (the system checks those).  Each answer is
+held against limbo's and against netio's own (x509chain): "same" where the system and netio
+answer alike, otherwise than limbo (netio's differences, docs/EXTERNAL_SUITES.md); where the
+system answers otherwise than both, SYSTEM_KNOWN says why (a test of the testcase and the
+system's message), and a difference not listed there is a failure.  The reason of each refusal (unknown CA, expired, name, usage,
+another) is shown with --list."""
 import argparse
 import base64
 import collections
@@ -38,16 +49,74 @@ ROOT = Path(__file__).resolve().parent.parent
 REPO = "C2SP/x509-limbo"
 COMMIT = "b12423782a88abead01141fa6582254e3eb49e74"
 
-# features netio does not have (lib/x509/lib.rs: "Not checked: revocation (CRL / OCSP),
+# features netio does not have (lib/x509/lib.rs: "Not checked: CRLs,
 # certificate policies"); name constraints on directory names it processes
 LACKS = {
-    "has-crl": "revocation (CRL / OCSP) is not checked (lib/x509/lib.rs header)",
+    "has-crl": "CRLs are not checked (lib/x509/lib.rs header; OCSP is x509::ocsp, which limbo does not test)",
     "has-policy-constraints": "certificate policies are not checked (lib/x509/lib.rs header)",
     "has-cert-policies": "certificate policies are not checked (lib/x509/lib.rs header)",
     "no-cert-policies": "certificate policies are not checked (lib/x509/lib.rs header)",
     "has-mldsa": "ML-DSA keys: netio knows Ed25519, RSA, P-256 and P-384",
     "max-chain-depth": "no chain depth of the caller's choosing (verify_chain has its own limit)",
 }
+def ids(*names):
+    """a SYSTEM_KNOWN test: one of these testcases"""
+    return lambda t, msg: t["id"] in names
+
+
+def win_cn_constraints(t, msg):
+    """bettertls's name constraints with an IP address as the peer name, refused for the name"""
+    p = t["expected_peer_name"]
+    return t["id"].startswith("bettertls::nameconstraints::") and bool(p) and p["kind"] == "IP" and "0x800B010F" in msg
+
+
+# where a system answers otherwise than limbo and netio's own check, and why: target ->
+# [(reason, test(testcase, the system's message))]; --system --list shows each answer.  What
+# the leaf alone decides, netio checks after the system's yes (x509::check_leaf): a CA's
+# certificate as the server's, keyCertSign or name constraints in a leaf, a key netio does not
+# read are refused everywhere and need no entry.
+SYSTEM_KNOWN = {
+    "linux": [],
+    "win": [
+        ("CryptoAPI holds a CA's DNS name constraints against the subject's CN when the leaf names "
+         "only an IP address (CN test.localhost outside them: CERT_E_CN_NO_MATCH); RFC 5280 leaves the "
+         "CN of such a leaf alone -- stricter, refused", win_cn_constraints),
+        ("CryptoAPI takes SHA-1 signatures below a root of one's own (it refuses them for the roots of "
+         "Microsoft's program, the public web); bettertls's paths whose every way has a SHA-1 signature",
+         ids("bettertls::pathbuilding::tc8", "bettertls::pathbuilding::tc15", "bettertls::pathbuilding::tc41",
+             "bettertls::pathbuilding::tc47", "bettertls::pathbuilding::tc74", "bettertls::pathbuilding::tc80")),
+        ("CryptoAPI does not hold an excluded name against a wildcard (*.example.com below a CA that "
+         "excludes bar.example.com, asked for bar.example.com): CVE-2025-61727's ambiguity of RFC 5280 "
+         "and RFC 9525", ids("cve::cve-2025-61727", "rfc5280::nc::nc-forbids-dnsname-wildcard-san")),
+        ("CryptoAPI does not judge the trust anchor it was given: a root without basicConstraints, with "
+         "an empty subject (and a leaf with that empty issuer), a P-192 key, an RSA key under 2048 bits "
+         "or of a length not divisible by 8",
+         ids("rfc5280::root-missing-basic-constraints", "rfc5280::ca-empty-subject", "rfc5280::ee-empty-issuer",
+             "webpki::forbidden-p192-root", "webpki::forbidden-weak-rsa-key-in-root",
+             "webpki::forbidden-rsa-not-divisible-by-8-in-root")),
+    ],
+    "mac": [
+        ("Apple's Security framework refuses limbo's saved chains of public servers, with their real "
+         "public roots given as the only anchors, as 'not standards compliant' (Security -67825), "
+         "probably its policy for publicly trusted certificates (Certificate Transparency) in this "
+         "setting; live through Trust::System the same kind of chain passes (tools/tls_web_check.py: "
+         "google.com, github.com, badssl.com)",
+         lambda t, msg: (t["id"].startswith("online::") or t["id"] == "webpki::cryptographydotio-chain") and "-67825" in msg),
+        ("Apple's Security framework refuses name constraints of forms it does not take -- a "
+         "directory name, an otherName -- also where they do not apply (Security -67689)",
+         ids("rfc5280::nc::permitted-dn-match", "rfc5280::nc::nc-forbids-othername-noop")),
+        ("Apple's Security framework refuses limbo's leaf with an Authority Information Access "
+         "extension (caIssuers) as not standards compliant (Security -67618)", ids("rfc5280::ee-aia")),
+        ("Apple's Security framework does not hold an excluded name against a wildcard (*.example.com "
+         "below a CA that excludes bar.example.com, asked for bar.example.com): CVE-2025-61727's "
+         "ambiguity of RFC 5280 and RFC 9525", ids("cve::cve-2025-61727", "rfc5280::nc::nc-forbids-dnsname-wildcard-san")),
+        ("Apple's Security framework does not judge the trust anchor it was given: a root with an "
+         "unknown critical extension, an RSA key of a length not divisible by 8",
+         ids("rfc5280::unknown-critical-extension-root", "webpki::forbidden-rsa-not-divisible-by-8-in-root")),
+    ],
+}
+REASONS = {0: "another reason", 1: "unknown CA", 2: "expired", 3: "name", 4: "revoked", 5: "usage"}
+
 OPTIONAL = {"pedantic-public-suffix-wildcard", "pedantic-webpki-subscriber-key", "pedantic-webpki-eku",
             "pedantic-serial-number", "pedantic-rfc5280", "rfc5280-incompatible-with-webpki"}
 
@@ -80,8 +149,8 @@ def skip_reason(t):
     return None
 
 
-def line(t):
-    """the x509chain line of a testcase (suitevec.rs)"""
+def line(t, op="x509chain"):
+    """the x509chain (or x509system) line of a testcase (suitevec.rs)"""
     usage = b"\x01" if t["validation_kind"] == "CLIENT" else b"\x00"
     vt = t["validation_time"]
     now = int(datetime.datetime.fromisoformat(vt).timestamp()) if vt else int(time.time())
@@ -91,7 +160,7 @@ def line(t):
     inter = [d for x in t["untrusted_intermediates"] for d in pem_ders(x)]
     trust = [d for x in t["trusted_certs"] for d in pem_ders(x)]
     args = [usage, now.to_bytes(8, "big", signed=True), name, len(inter).to_bytes(2, "big")] + leaf[:1] + inter + trust
-    return "x509chain " + " ".join(a.hex() for a in args)
+    return op + " " + " ".join(a.hex() for a in args)
 
 
 def verdict(out):
@@ -105,7 +174,24 @@ def verdict(out):
         return False, "verify_chain: " + b[1:].decode("utf-8", "replace")
     if b[0] == 2:
         return False, ("leaf" if b[1] == 0 else f"intermediate {b[1]}") + " unreadable (Cert::parse)"
+    if b[0] == 3 and len(b) > 1:
+        return False, f"system ({REASONS.get(b[1], b[1])}): " + b[2:].decode("utf-8", "replace")
     return False, out
+
+
+def system_skip(t):
+    """why --system leaves a testcase out (beside skip_reason)"""
+    if t["validation_kind"] != "SERVER":
+        return "the system checks a server's chain (Trust::System), not a client's"
+    return None
+
+
+def known(target, t, msg):
+    """the reason a system's other answer is listed with, or None"""
+    for why, test in SYSTEM_KNOWN.get(target, []):
+        if test(t, msg):
+            return why
+    return None
 
 
 def run_batch(exe, lines, timeout):
@@ -133,13 +219,93 @@ def run_all(exe, lines, timeout):
         return run_all(exe, lines[:h], timeout) + run_all(exe, lines[h:], timeout)
 
 
+def answers(exe, run, op, timeout):
+    """testcase id -> (accepted, why) for these testcases through op (x509chain / x509system)"""
+    outs = []
+    for i in range(0, len(run), 500):
+        outs += run_all(exe, [line(t, op) for t in run[i:i + 500]], timeout)
+    return {t["id"]: verdict(o) if not o.startswith(("timeout", "crash")) else (None, o) for t, o in zip(run, outs)}
+
+
+def optional(t):
+    return bool(OPTIONAL & set(t["features"]))
+
+
+def system_main(opt, exe, tcs):
+    """--system: the system's answer against limbo's, beside netio's own (x509chain)"""
+    def skip(t):
+        return skip_reason(t) or system_skip(t)
+    run = [t for t in tcs if not skip(t)]
+    sysg = answers(exe, run, "x509system", opt.timeout)
+    own = answers(exe, run, "x509chain", opt.timeout)
+    rows = []
+    for t in tcs:
+        why = skip(t)
+        if why:
+            rows.append((t, "SKIP", why))
+            continue
+        want = t["expected_result"] == "SUCCESS"
+        acc, msg = sysg[t["id"]]
+        if acc is None or own[t["id"]][0] is None:
+            # no answer from either run (a crash, a timeout): a failure, whatever the other said
+            rows.append((t, "FAIL", msg if acc is None else "netio's own check: " + own[t["id"]][1]))
+        elif acc == want:
+            rows.append((t, "PASS", msg))
+        elif acc is not None and own[t["id"]][0] == acc:
+            # netio's own check answers the same: one of its differences (docs/EXTERNAL_SUITES.md)
+            rows.append((t, "SAME", msg))
+        elif acc is not None and known(opt.target, t, msg):
+            rows.append((t, "KNOWN", msg + ("; " if msg else "") + "listed: " + known(opt.target, t, msg)))
+        else:
+            rows.append((t, "FAIL", msg))
+    if opt.show:
+        for t, st, msg in rows:
+            print(f"{t['id']} [{', '.join(t['features']) or 'no features'}] expected {t['expected_result']}: {st} {msg}\n")
+            print(t["description"])
+        return 0
+    if opt.list:
+        for t, st, msg in rows:
+            print(f"{st} {t['id']}" + (f"  ({msg})" if msg and st != "PASS" else ""))
+        print()
+    print(f"limbo_check --system: C2SP/x509-limbo @ {COMMIT[:12]}, {len(tcs)} testcases ({opt.target}, through the system's checks)\n")
+    print("  same: the system and netio's own check answer alike, otherwise than limbo (docs/EXTERNAL_SUITES.md)")
+    print("  known: the system answers otherwise than netio, listed in SYSTEM_KNOWN with the reason\n")
+    cols = ["PASS", "SAME", "KNOWN", "FAIL", "SKIP"]
+    print(f"  {'group':14} " + " ".join(f"{c.lower():>5}" for c in cols))
+    by = collections.OrderedDict()
+    for t, st, _ in sorted(rows, key=lambda r: r[0]["id"]):
+        by.setdefault(t["id"].split("::")[0], collections.Counter())[st] += 1
+    tot = collections.Counter(st for _, st, _ in rows)
+    for g, n in list(by.items()) + [("total", tot)]:
+        print(f"  {g:14} " + " ".join(f"{n[c]:5}" for c in cols))
+    # a crash or a timeout (no answer) is a failure of the run, optional testcase or not
+    unanswered = {i for i, (acc, _) in sysg.items() if acc is None} | {i for i, (acc, _) in own.items() if acc is None}
+    hard = [(t, m) for t, st, m in rows if st == "FAIL" and (not optional(t) or t["id"] in unanswered)]
+    soft = [(t, m) for t, st, m in rows if st == "FAIL" and optional(t) and t["id"] not in unanswered]
+    for title, lst in (("the system answers otherwise than netio and limbo, not listed (FAILURES)", hard),
+                       ("the same in optional behaviour (pedantic / RFC 5280 beyond the web PKI)", soft)):
+        if lst:
+            print(f"\n{title} ({len(lst)}):")
+            for t, m in lst:
+                got_ = "no answer" if t["id"] in unanswered else "the system " + ("SUCCESS" if t["expected_result"] == "FAILURE" else "FAILURE")
+                feats = f" [{', '.join(t['features'])}]" if t["features"] else ""
+                print(f"  {t['id']}{feats}: expected {t['expected_result']}, {got_}" + (f" ({m})" if m else ""))
+    kn = collections.Counter(m.split("listed: ", 1)[1] for _, st, m in rows if st == "KNOWN")
+    if kn:
+        print("\nknown differences of the system:")
+        for m, k in kn.most_common():
+            print(f"  {k:5}  {m}")
+    return 1 if hard else 0
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--target", default="win" if os.name == "nt" else "linux")
+    ap.add_argument("--target", default="win" if os.name == "nt" else "mac" if sys.platform == "darwin" else "linux")
     ap.add_argument("--id", default="", help="testcases whose id contains this")
     ap.add_argument("--show", help="print one testcase's description and what netio said")
     ap.add_argument("--list", action="store_true", help="PASS / FAIL / SKIP for every testcase id")
     ap.add_argument("--timeout", type=float, default=120, help="seconds per batch of testcases")
+    ap.add_argument("--system", action="store_true", help="through the system's checks (netio::roots::verify_system_roots)")
     opt = ap.parse_args()
     exe = ROOT / "build" / opt.target / ("coretest.exe" if opt.target == "win" else "coretest")
     if not exe.exists():
@@ -150,11 +316,10 @@ def main():
         tcs = [t for t in tcs if t["id"] == opt.show]
     elif opt.id:
         tcs = [t for t in tcs if opt.id in t["id"]]
+    if opt.system:
+        return system_main(opt, exe, tcs)
     run = [t for t in tcs if not skip_reason(t)]
-    outs = []
-    for i in range(0, len(run), 500):
-        outs += run_all(exe, [line(t) for t in run[i:i + 500]], opt.timeout)
-    got = {t["id"]: verdict(o) if not o.startswith(("timeout", "crash")) else (None, o) for t, o in zip(run, outs)}
+    got = answers(exe, run, "x509chain", opt.timeout)
 
     rows = []
     for t in tcs:
@@ -179,8 +344,6 @@ def main():
             print(f"{st} {t['id']}" + (f"  ({msg})" if msg and (st != "PASS" or "tls/conn.rs" in msg) else ""))
         print()
 
-    def optional(t):
-        return bool(OPTIONAL & set(t["features"]))
     print(f"limbo_check: C2SP/x509-limbo @ {COMMIT[:12]}, {len(tcs)} testcases ({opt.target})\n")
     print(f"  {'group':14} {'pass':>5} {'fail':>5} {'skip':>5}")
     by = collections.OrderedDict()
@@ -191,13 +354,15 @@ def main():
     tot = collections.Counter(st for _, st, _ in rows)
     print(f"  {'total':14} {tot['PASS']:5} {tot['FAIL']:5} {tot['SKIP']:5}")
 
-    hard = [(t, m) for t, st, m in rows if st == "FAIL" and not optional(t)]
-    soft = [(t, m) for t, st, m in rows if st == "FAIL" and optional(t)]
+    # a crash or a timeout (no answer) is a failure of the run, optional testcase or not
+    unanswered = {i for i, (acc, _) in got.items() if acc is None}
+    hard = [(t, m) for t, st, m in rows if st == "FAIL" and (not optional(t) or t["id"] in unanswered)]
+    soft = [(t, m) for t, st, m in rows if st == "FAIL" and optional(t) and t["id"] not in unanswered]
     for title, lst in (("FAILURES", hard), ("failures of optional behaviour (pedantic / RFC 5280 beyond the web PKI)", soft)):
         if lst:
             print(f"\n{title} ({len(lst)}):")
             for t, m in lst:
-                got_ = "SUCCESS" if t["expected_result"] == "FAILURE" else "FAILURE"
+                got_ = "no answer" if t["id"] in unanswered else "SUCCESS" if t["expected_result"] == "FAILURE" else "FAILURE"
                 feats = f" [{', '.join(t['features'])}]" if t["features"] else ""
                 print(f"  {t['id']}{feats}: expected {t['expected_result']}, netio {got_}" + (f" ({m})" if m else ""))
     sk = collections.Counter(m for _, st, m in rows if st == "SKIP")

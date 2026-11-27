@@ -44,7 +44,7 @@ impl Kind {
 }
 
 /// a xorshift stream of bytes from `seed` (test keys only)
-fn xorshift(seed: u8) -> impl FnMut(&mut [u8]) {
+pub fn xorshift(seed: u8) -> impl FnMut(&mut [u8]) {
     let mut st = 0x9e37_79b9_7f4a_7c15u64 ^ ((seed as u64) << 32) | 1;
     move |b: &mut [u8]| {
         for x in b.iter_mut() {
