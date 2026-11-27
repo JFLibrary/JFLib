@@ -51,8 +51,9 @@ image beyond the pixel budget, 268 million pixels unless you set another, is ref
 Each codec crate exports a descriptor, `CODEC`, and enters it into the table with
 `io::register`. The table has an entry for PNG, JPEG, BMP, GIF, TIFF, TGA, DDS, WebP, AVIF, HEIC,
 JPEG XL, JPEG XR, Paint.NET and Photoshop, each with its extensions, MIME type and what it can
-hold (alpha, layers, pages, animation, HDR, ICC, EXIF, XMP); SVG takes a slot of its own when
-[`jflib-img-svg`](https://crates.io/crates/jflib-img-svg) registers it. A plugin can add a format
+hold (alpha, layers, pages, animation, HDR, ICC, EXIF, XMP); SVG and JPEG 2000 take a slot of their
+own when [`jflib-img-svg`](https://crates.io/crates/jflib-img-svg) and
+[`jflib-img-all`](https://crates.io/crates/jflib-img-all) register them. A plugin can add a format
 at run time (`io::register_dyn`), and `io::filter_list` turns the table into the list a file
 dialog shows.
 
@@ -98,8 +99,8 @@ Like all of JFLib, the crate comes through the one dependency
 version and are released together.
 
 An app with a window needs no set-up: its runtime connects the file functions and registers PNG,
-JPEG, BMP, GIF and SVG at start-up. For TIFF, TGA, WebP, AVIF, HEIC, JPEG XL, JPEG XR, DDS,
-Paint.NET and Photoshop files, call `img_all::use_all_codecs()` of
+JPEG, BMP, GIF and SVG at start-up. For TIFF, TGA, WebP, AVIF, HEIC, JPEG XL, JPEG XR, JPEG 2000,
+DDS, Paint.NET and Photoshop files, call `img_all::use_all_codecs()` of
 [`jflib-img-all`](https://crates.io/crates/jflib-img-all) once in `App::init`. img_core does not
 depend on the platform layer, so a command-line program connects it itself:
 

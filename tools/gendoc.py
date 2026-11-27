@@ -167,6 +167,7 @@ CRATES = [
     ("geom", "Deterministic modelling kernel: meshes from primitives, profiles and operations, with checks", "full"),
     ("netchan", "Message channels for games: UDP with sequence numbers and acks, WebSocket, the browser's network", "full"),
     ("sheet_io", "XLSX and CSV import: workbooks and delimited text as typed tables", "full"),
+    ("img_jp2", "JPEG 2000 decoder", "full"),
 ]
 SKIP_FILES = {"rt": {"os.rs", "mem.rs"}}            # rt::os: the OS calls plat is built on
 # codec crates: further items to show, per module ("*" = all public items of the module)

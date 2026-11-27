@@ -9,7 +9,7 @@ them, and it holds a reader and writer for Photoshop files.
 ## Registering the codecs
 
 `img_all::use_all_codecs()` registers PNG, JPEG, BMP, GIF, TIFF, TGA, DDS, WebP, AVIF, HEIC,
-JPEG XL, JPEG XR, Paint.NET and Photoshop. From then on the functions of `img_core::io` open and
+JPEG XL, JPEG XR, JPEG 2000 (reading: JP2, JPX, J2K), Paint.NET and Photoshop. From then on the functions of `img_core::io` open and
 save those files, and the file dialog's list of formats (`io::filter_list`) shows them. Call it
 once at start-up, before other threads decode images; in an app with a window, `App::init` is the
 place:

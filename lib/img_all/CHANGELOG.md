@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Added
+
+- JPEG 2000: `use_all_codecs` registers img_jp2's codec as `IMGF_JP2` (`jp2;j2k;j2c;jpx;jpf`, image/jp2), so the functions of `img_core::io` open JP2, JPX and J2K files
+
 ## [0.2.1] - 2026-11-16
 
 No changes in this crate. It was released with the others because all of JFLib's crates move together.
