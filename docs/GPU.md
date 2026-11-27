@@ -366,7 +366,11 @@ Hit-Test mit dem Größenrand des Fensters läuft weiter im Elternfenster). Das 
 sein Leben lang der CPU-Pfad: Kindfenster verborgen = sofort, was GDI zuletzt gezeichnet hat.
 Ein Kindfenster, das gezeigt wird, bevor sein `present` den Bildschirm erreicht, zeigt das
 Elternfenster durch: dieselben Pixel, kein Blitzen. `gpu expect screen` und die Prüfungen von
-`uigputest` lesen dafür den zusammengesetzten Bildschirm.
+`uigputest` lesen dafür den zusammengesetzten Bildschirm. Was darüber liegt und keine Klicks
+nimmt, findet der Hit-Test nicht: ein Overlay wie das von Discord oder des Grafiktreibers (ganz
+oben, über dem ganzen Bildschirm, zeichnet, wo es will), ein Schatten. Weicht der Bildschirm ab und
+gleicht das Fenster, wie DWM es zusammensetzt (`PrintWindow` mit `PW_RENDERFULLCONTENT`, die
+Swapchain des Kindfensters eingeschlossen), dem Framebuffer, ist das deshalb ein Hinweis, kein Fehler.
 
 **Größe ändern.** Jedes Bild einer Größenänderung ist ein CPU-Bild, auch in der modalen Schleife:
 GDI zeichnet, bevor `SetWindowPos` zurückkehrt, also hinkt nichts dem Rahmen hinterher (eine

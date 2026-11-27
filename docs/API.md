@@ -10059,8 +10059,10 @@ does nothing):
                          back = the framebuffer byte for byte (x byte: 255), and no frame differed
                          since the last check (a canvas's scaled tiles count as GpuOutput::canvas_diff_*)
   gpu expect screen      the composed screen at the window = the framebuffer (another window on
-                         top of ours is a note, not a failure); X11: what the server holds for the
-                         window; Wayland: a note, no client can read it
+                         top of ours is a note, not a failure; Windows: also what takes no clicks,
+                         an overlay or a shadow, when the window as DWM composes it = the
+                         framebuffer); X11: what the server holds for the window; Wayland: a
+                         note, no client can read it
   gpu expect window      the window's DC = the framebuffer (the CPU path's pixels); Linux as `screen`
   gpu expect upload N    at most N bytes uploaded since the last check
   gpu expect base N      at most N bytes of them to the base texture since the last check
@@ -30909,8 +30911,9 @@ AirDrop, Nearby Share, a chat ...)
 
 Share { title, text, url, files, anchor }: `title` the subject (a mail's subject line, Windows'
 title of the data; may be empty), `text` plain text, `url` a link (http, https, mailto ...),
-`files` paths of the file system (the browser: of its virtual files) -- at least one of text, url,
-files.  `anchor` [x, y, w, h] in the window's pixels: what the sheet points at where it is a
+`files` paths of the file system or names with a scheme (data://, docs:// ...; the browser: its
+virtual files) -- at least one of text, url, files.  Windows, macOS and iOS get the path behind a
+scheme (vfs::os_path); a file without one there (mem://) is SHARE_NONE.  `anchor` [x, y, w, h] in the window's pixels: what the sheet points at where it is a
 popover (macOS, an iPad); empty: the window's middle (macOS, iPad) / its usual place.
 
 What "done" means differs (it says nothing about delivery): iOS and macOS a service was chosen
@@ -30921,7 +30924,8 @@ Windows (win_share.rs): DataTransferManager of the active window through
 IDataTransferManagerInterop (Windows 10), the data package filled in DataRequested (text, a web
 link, storage items of the files).  macOS (apple_mac_share.rs): NSSharingServicePicker at the
 anchor in the key window.  iOS (apple_ios_share.rs): UIActivityViewController over the scene's
-window, on an iPad a popover at the anchor.  Browser and Android (web_share.rs): the host --
+window, on an iPad a popover at the anchor; it offers only what takes every item ("Save to
+Files" only when all of them are files, a text or a link leaves it out).  Browser and Android (web_share.rs): the host --
 navigator.share (files as File objects; the browser asks for the user's gesture: call it while
 handling input) / Intent.ACTION_SEND(_MULTIPLE) in a chooser (files through the host's provider,
 readable by the target only).  Linux: none.
@@ -34580,6 +34584,8 @@ and poke our own windows only (no input is injected into the system)
     WT_SHOW       ShowWindow(w, a[0]) (SW_SHOWMINNOACTIVE, SW_SHOWNOACTIVATE: a test that leaves the
                   keyboard and the other windows alone) -> 1
   win_test_image(w) -> (w, h, px)   the client area as the window shows it (BitBlt from its DC)
+  win_test_composed(w) -> (w, h, px)  the client area as the system composes it, without what
+                  lies on top (PrintWindow, PW_RENDERFULLCONTENT: the GPU child's swapchain too)
   win_test_screen(x, y, w, h) -> px  a part of the screen as it shows now (any thread)
   win_test_post(hwnd, msg, wp, lp)  PostMessageW by handle (any thread)
   win_test_window_at(x, y) -> HWND  the window at a screen point (any thread)
@@ -34616,6 +34622,11 @@ WT_SHOW: u32 = 18
   (test aid) what window w shows: its client area read back from the window's DC (BitBlt into
   a DIB section; under DWM the window's own surface, also where other windows cover it) ->
   (w, h, rows of w \* 4 bytes B, G, R, x)
+
+- **`fn win_test_composed(w: i32) -> Option<(i32, i32, alloc::vec::Vec<u8>)>`**
+  (test aid) window w's client area as the system composes it: PrintWindow with
+  PW_RENDERFULLCONTENT, so the swapchain of its GPU child too, and nothing of what lies on top of
+  it (other windows, overlays that take no clicks, shadows) -> (w, h, rows of w \* 4 bytes B, G, R, x)
 
 - **`fn win_test_usage() -> (u64, u64, u64)`**
   (test aid) (CPU time of this process so far in us, its working set in bytes, its private bytes)
@@ -36409,6 +36420,9 @@ WT_SHOW: u32 = 18
   (tests) what the window system holds for window w: (w, h, rows of w \* 4 bytes): X11 reads it
   back (GetImage; also a buffer on the window), Wayland has no way to: None
 
+- **`fn win_test_composed(_w: i32) -> Option<(i32, i32, Vec<u8>)>`**
+  (tests) window w as the system composes it: Windows only (PrintWindow): None
+
 - **`fn win_test_screen(_x: i32, _y: i32, _w: i32, _h: i32) -> Option<Vec<u8>>`**
   (tests) a part of the screen: no client on Linux can read it without asking the user
 
@@ -37340,6 +37354,9 @@ as all of AppKit; lib/gpu may use the layer on its own thread (nextDrawable, dra
 - **`fn win_test_image(_w: i32) -> Option<(i32, i32, Vec<u8>)>`**
   (tests) what the window system holds for window w: the view layer's picture is ours (the CPU path)
   and the GPU layer's is not readable from here: None
+
+- **`fn win_test_composed(_w: i32) -> Option<(i32, i32, Vec<u8>)>`**
+  (tests) window w as the system composes it: Windows only (PrintWindow): None
 
 - **`fn win_test_screen(_x: i32, _y: i32, _w: i32, _h: i32) -> Option<Vec<u8>>`**
   (tests) a part of the screen: macOS asks the user for that (screen recording): None
@@ -38376,6 +38393,8 @@ WT_FROM_POINT: u32 = 0
 
 - **`fn win_test_image(_w: i32) -> Option<(i32, i32, alloc::vec::Vec<u8>)>`**
 
+- **`fn win_test_composed(_w: i32) -> Option<(i32, i32, alloc::vec::Vec<u8>)>`**
+
 - **`fn win_test_screen(_x: i32, _y: i32, _w: i32, _h: i32) -> Option<alloc::vec::Vec<u8>>`**
 
 - **`fn gpu_wait(_deadline_us: u64)`**
@@ -38457,6 +38476,8 @@ WT_FROM_POINT: u32 = 17
   -1: nothing to say about the pixel or the scale; 0 for the rest
 
 - **`fn win_test_image(_w: i32) -> Option<(i32, i32, Vec<u8>)>`**
+
+- **`fn win_test_composed(_w: i32) -> Option<(i32, i32, Vec<u8>)>`**
 
 - **`fn win_test_screen(_x: i32, _y: i32, _w: i32, _h: i32) -> Option<Vec<u8>>`**
 
@@ -38558,6 +38579,8 @@ WT_FROM_POINT: u32 = 0
 - **`fn win_test(_op: u32, _w: i32, _a: [i32; 4]) -> i64`**
 
 - **`fn win_test_image(_w: i32) -> Option<(i32, i32, alloc::vec::Vec<u8>)>`**
+
+- **`fn win_test_composed(_w: i32) -> Option<(i32, i32, alloc::vec::Vec<u8>)>`**
 
 - **`fn win_test_screen(_x: i32, _y: i32, _w: i32, _h: i32) -> Option<alloc::vec::Vec<u8>>`**
 
