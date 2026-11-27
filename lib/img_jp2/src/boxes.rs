@@ -58,7 +58,8 @@ fn boxes(d: &[u8]) -> impl Iterator<Item = ([u8; 4], &[u8])> {
         if len < head {
             return None;
         }
-        let end = (p as u64 + len).min(d.len() as u64) as usize;
+        // len >= head >= 8 and p + 8 <= d.len(): the end moves forward, also for huge lengths
+        let end = (p as u64).saturating_add(len).min(d.len() as u64) as usize;
         let body = &d[(p + head as usize).min(end)..end];
         p = end;
         Some((ty, body))

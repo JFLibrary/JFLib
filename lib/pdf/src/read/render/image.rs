@@ -110,16 +110,37 @@ struct Jpx {
     bpc: usize,
     /// the colour space of the JP2 header (when the dictionary names none)
     cs: Option<Rc<Cs>>,
-    /// the opacity channel (8 bits) and whether the colours are premultiplied by it
-    alpha: Option<(Vec<u8>, bool)>,
+    /// the opacity channel (8 bits; the colours are straight)
+    alpha: Option<Vec<u8>>,
+    /// per colour component (empty: none was scaled): its samples went from 0..=.0 to 0..=.1, the
+    /// ranges of a colour-key mask follow them
+    scaled: Vec<(u32, u32)>,
 }
 
-/// decode a JPEG 2000 image: `named` is the component count of the dictionary's colour space (None:
-/// the JP2 header's counts); the colour components at 8 bits, or 16 when one has more than 8, the
-/// sub-sampled ones brought to the image's size; a stencil mask as 1 bit (a sample at least half
-/// the range is 1)
-fn jpx(data: &[u8], named: Option<usize>, max_pixels: u64, stencil: bool) -> Option<Jpx> {
-    let img = img_jp2::decode(data, &img_jp2::Options { reduce: 0, max_pixels }).ok()?;
+/// v of 0..=max as 0..=to
+fn scale_sample(v: u32, max: u32, to: u32) -> u32 {
+    ((v.min(max) as u64 * to as u64 + max as u64 / 2) / max.max(1) as u64) as u32
+}
+
+/// a colour-key range of samples 0..=max as a range of the samples scaled to 0..=to (the scaling
+/// only grows the range of values, so a sample is in the range exactly when its scaled value is)
+fn scale_range(lo: i64, hi: i64, max: u32, to: u32) -> (i64, i64) {
+    if lo > hi || lo > max as i64 || hi < 0 {
+        return (1, 0);
+    }
+    (scale_sample(lo.max(0) as u32, max, to) as i64, scale_sample(hi.min(max as i64) as u32, max, to) as i64)
+}
+
+/// decode a JPEG 2000 image.  `named`: the component count of the dictionary's colour space (None:
+/// the JP2 header's colour space, sYCC converted to RGB); `indexed`: the samples are indices;
+/// `alpha`: the opacity channel is wanted (true: the dictionary says the colours are premultiplied
+/// by it, SMaskInData 2).  The colour components keep their precision when it is 1, 2, 4, 8 or 16
+/// bits for each, else they become 8 bits (16 when one has more than 8), scaled (indices are not);
+/// sub-sampled ones are brought to the image's size, premultiplied colours made straight on the
+/// samples.  A stencil mask comes as 1 bit (a sample at least half the range is 1).
+fn jpx(data: &[u8], named: Option<usize>, indexed: bool, alpha: Option<bool>, max_pixels: u64, stencil: bool) -> Option<Jpx> {
+    let opt = img_jp2::Options { max_pixels, convert_sycc: named.is_none(), ..Default::default() };
+    let img = img_jp2::decode(data, &opt).ok()?;
     let (w, h) = (img.width as usize, img.height as usize);
     if w == 0 || h == 0 {
         return None;
@@ -142,22 +163,23 @@ fn jpx(data: &[u8], named: Option<usize>, max_pixels: u64, stencil: bool) -> Opt
     if colour.len() < n || n == 0 {
         return None;
     }
-    // component c at image pixel (x, y), and its maximum
+    // component c at image pixel (x, y) (unsigned), and its maximum
     let at = |c: &img_jp2::Component, x: usize, y: usize| -> (u32, u32) {
-        let (cw, ch) = (c.width as usize, c.height as usize);
+        let (cw, ch) = (c.width as u64, c.height as u64);
         if cw == 0 || ch == 0 {
             return (0, 1);
         }
-        let v = c.data[(y * ch / h).min(ch - 1) * cw + (x * cw / w).min(cw - 1)] as i64;
+        let sy = (y as u64 * ch / h as u64).min(ch - 1);
+        let sx = (x as u64 * cw / w as u64).min(cw - 1);
+        let v = c.data[(sy * cw + sx) as usize] as i64;
         let p = c.precision.clamp(1, 24) as u32;
         let v = if c.signed { v + (1i64 << (p - 1)) } else { v };
         let max = (1i64 << p) - 1;
         (v.clamp(0, max) as u32, max as u32)
     };
-    let scale = |(v, max): (u32, u32), to: u32| -> u32 { ((v as u64 * to as u64 + max as u64 / 2) / max as u64) as u32 };
     if stencil {
         let stride = w.div_ceil(8);
-        let mut s = vec![0u8; stride * h];
+        let mut s = vec![0u8; stride.checked_mul(h)?];
         for y in 0..h {
             for x in 0..w {
                 let (v, max) = at(colour[0], x, y);
@@ -166,32 +188,51 @@ fn jpx(data: &[u8], named: Option<usize>, max_pixels: u64, stencil: bool) -> Opt
                 }
             }
         }
-        return Some(Jpx { samples: s, w, h, bpc: 1, cs: None, alpha: None });
+        return Some(Jpx { samples: s, w, h, bpc: 1, cs: None, alpha: None, scaled: Vec::new() });
     }
-    let wide = colour[..n].iter().any(|c| c.precision > 8);
-    let mut s = Vec::with_capacity(w.checked_mul(h)?.checked_mul(n)?.checked_mul(1 + wide as usize)?);
+    let cols = &colour[..n];
+    let opacity = alpha.and_then(|pdf_pre| img.alpha.and_then(|i| img.components.get(i)).map(|c| (c, pdf_pre || img.premultiplied)));
+    let p0 = cols[0].precision.clamp(1, 24) as usize;
+    let native = [1, 2, 4, 8, 16].contains(&p0) && cols.iter().all(|c| c.precision as usize == p0);
+    let wide = cols.iter().any(|c| c.precision > 8);
+    let bpc = if native { p0 } else if wide { 16 } else { 8 };
+    let scaled: Vec<(u32, u32)> = if native || indexed { Vec::new() } else { cols.iter().map(|c| ((1u32 << c.precision.clamp(1, 24)) - 1, (1u32 << bpc) - 1)).collect() };
+    let stride = w.checked_mul(n)?.checked_mul(bpc)?.div_ceil(8);
+    let mut s = vec![0u8; stride.checked_mul(h)?];
+    let top = (1u32 << bpc) - 1;
     for y in 0..h {
+        let row = &mut s[y * stride..][..stride];
         for x in 0..w {
-            for c in &colour[..n] {
-                if wide {
-                    let v = scale(at(c, x, y), 65535);
-                    s.extend_from_slice(&(v as u16).to_be_bytes());
-                } else {
-                    s.push(scale(at(c, x, y), 255) as u8);
+            let a = opacity.filter(|o| o.1).map(|o| at(o.0, x, y));
+            for (ci, c) in cols.iter().enumerate() {
+                let (mut v, max) = at(c, x, y);
+                // premultiplied: straight again, on the samples before any colour conversion
+                if let Some((a, amax)) = a {
+                    if a > 0 && a < amax {
+                        v = ((v as u64 * amax as u64 + a as u64 / 2) / a as u64).min(max as u64) as u32;
+                    }
+                }
+                let v = if scaled.is_empty() { v.min(top) } else { scale_sample(v, max, top) };
+                let bit = (x * n + ci) * bpc;
+                match bpc {
+                    16 => row[bit / 8..][..2].copy_from_slice(&(v as u16).to_be_bytes()),
+                    8 => row[bit / 8] = v as u8,
+                    b => row[bit / 8] |= (v as u8) << (8 - b - bit % 8),
                 }
             }
         }
     }
-    let alpha = img.alpha.and_then(|i| img.components.get(i)).map(|c| {
+    let alpha = opacity.map(|(c, _)| {
         let mut a = Vec::with_capacity(w * h);
         for y in 0..h {
             for x in 0..w {
-                a.push(scale(at(c, x, y), 255) as u8);
+                let (v, max) = at(c, x, y);
+                a.push(scale_sample(v, max, 255) as u8);
             }
         }
-        (a, img.premultiplied)
+        a
     });
-    Some(Jpx { samples: s, w, h, bpc: if wide { 16 } else { 8 }, cs, alpha })
+    Some(Jpx { samples: s, w, h, bpc, cs, alpha, scaled })
 }
 
 impl Img {
@@ -238,9 +279,10 @@ impl Img {
         let mut n = cs.n();
         // the samples: decoded by an image filter, else as they are
         let mut rgb_direct: Option<Vec<u8>> = None;
-        // a JPEG 2000 image's own opacity channel (SMaskInData), 8 bits, and whether the colours
-        // are premultiplied by it
-        let mut jpx_alpha: Option<(Vec<u8>, bool)> = None;
+        // a JPEG 2000 image's own opacity channel (SMaskInData), 8 bits, and how its samples were
+        // scaled (for a colour-key mask)
+        let mut jpx_alpha: Option<Vec<u8>> = None;
+        let mut jpx_scaled: Vec<(u32, u32)> = Vec::new();
         let mut samples = data;
         if let Some((f, parms)) = &image_filter {
             match f.0.as_slice() {
@@ -314,10 +356,16 @@ impl Img {
                     bpc = 1;
                 }
                 b"JPXDecode" => {
+                    // with a colour space in the dictionary the JP2 header's counts for nothing
                     let named = (d.get("ColorSpace").is_some() || stencil).then_some(n);
-                    let j = jpx(&samples, named, run.opt.max_pixels.min(1 << 28), stencil)?;
+                    let indexed = named.is_some() && matches!(&*cs, Cs::Indexed { .. });
+                    let smask_in_data = doc.key(d, "SMaskInData").as_int().unwrap_or(0);
+                    let alpha = (smask_in_data > 0 && d.get("SMask").is_none()).then_some(smask_in_data == 2);
+                    let j = jpx(&samples, named, indexed, alpha, run.opt.max_pixels.min(1 << 28), stencil)?;
                     samples = j.samples;
                     (w, h, bpc) = (j.w, j.h, j.bpc);
+                    jpx_alpha = j.alpha;
+                    jpx_scaled = j.scaled;
                     if let Some(c) = j.cs {
                         cs = c;
                         n = cs.n();
@@ -325,10 +373,6 @@ impl Img {
                     // Decode counts only for a stencil mask (ISO 32000-1, 8.9.5.3)
                     if !stencil {
                         decode_arr.clear();
-                    }
-                    let smask_in_data = doc.key(d, "SMaskInData").as_int().unwrap_or(0);
-                    if smask_in_data > 0 && d.get("SMask").is_none() {
-                        jpx_alpha = j.alpha.map(|(a, pre)| (a, pre || smask_in_data == 2));
                     }
                 }
                 _ => return None, // JBIG2Decode
@@ -426,17 +470,7 @@ impl Img {
             }
         }
         let mut img = Img { w, h, px, stencil: false, interpolate, oc: d.get("OC").cloned() };
-        if let Some((a, pre)) = jpx_alpha {
-            if pre {
-                // premultiplied colours back to straight ones before the alpha multiplies them
-                for (p, &a) in img.px.chunks_exact_mut(4).zip(&a) {
-                    if a > 0 && a < 255 {
-                        for c in &mut p[..3] {
-                            *c = ((*c as u32 * 255 + a as u32 / 2) / a as u32).min(255) as u8;
-                        }
-                    }
-                }
-            }
+        if let Some(a) = jpx_alpha {
             let mut mpx = vec![0u8; w * h * 4];
             for (m, &a) in mpx.chunks_exact_mut(4).zip(&a) {
                 m.fill(a);
@@ -446,8 +480,12 @@ impl Img {
         // masks
         match doc.key(d, "Mask") {
             Object::Array(ranges) if rgb_direct.is_none() => {
-                let r: Vec<i64> = ranges.iter().filter_map(|v| doc.resolve(v).as_int()).collect();
+                let mut r: Vec<i64> = ranges.iter().filter_map(|v| doc.resolve(v).as_int()).collect();
                 if r.len() >= 2 * n {
+                    // the ranges name the samples of a JPEG 2000 image before they were scaled
+                    for (c, &(max, to)) in jpx_scaled.iter().enumerate().take(n) {
+                        (r[2 * c], r[2 * c + 1]) = scale_range(r[2 * c], r[2 * c + 1], max, to);
+                    }
                     for y in 0..h {
                         for x in 0..w {
                             if (0..n).all(|c| {

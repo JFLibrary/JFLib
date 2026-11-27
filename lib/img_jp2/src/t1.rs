@@ -182,6 +182,11 @@ fn pass_kind(idx: u32) -> Pass {
     }
 }
 
+/// pass `idx` is coded raw (the bypass mode, D.6)
+pub(crate) fn raw_pass(style: u8, idx: u32) -> bool {
+    style & BYPASS != 0 && idx >= 10 && pass_kind(idx) != Pass::Clean
+}
+
 /// the most passes a segment that starts with pass `first` can hold (B.10.7.1)
 pub(crate) fn seg_max_passes(style: u8, first: u32) -> u32 {
     if style & TERMALL != 0 {
@@ -242,10 +247,14 @@ impl Bits for RawBits<'_> {
     }
 }
 
+/// the highest first bit-plane: 1.5 * 2^p in half units stays within i64
+pub(crate) const MAX_P0: i32 = 60;
+
 /// the scratch of the code-block decoder (kept between code-blocks)
 pub(crate) struct T1 {
     flags: Vec<u16>,
-    pub coef: Vec<i32>,
+    /// 64 bits: with an ROI shift the bit-planes reach above 30 (`MAX_P0`)
+    pub coef: Vec<i64>,
     w: usize,
     h: usize,
     stride: usize,
@@ -258,8 +267,9 @@ impl T1 {
         T1 { flags: Vec::new(), coef: Vec::new(), w: 0, h: 0, stride: 0, orient: 0, vsc: false }
     }
 
-    /// decode a code-block of w x h samples whose first bit-plane is `p0` (the cleanup pass of
-    /// `p0` comes first) from its segments into `self.coef` (w * h, row by row, half units)
+    /// decode a code-block of w x h samples whose first bit-plane is `p0` (at most `MAX_P0`; the
+    /// cleanup pass of `p0` comes first) from its segments into `self.coef` (w * h, row by row,
+    /// half units)
     pub fn decode(&mut self, segs: &[Seg], w: usize, h: usize, orient: u8, style: u8, p0: i32) {
         self.w = w;
         self.h = h;
@@ -270,7 +280,7 @@ impl T1 {
         self.flags.resize(self.stride * (h + 2), 0);
         self.coef.clear();
         self.coef.resize(w * h, 0);
-        if w == 0 || h == 0 || p0 < 0 {
+        if w == 0 || h == 0 || !(0..=MAX_P0).contains(&p0) {
             return;
         }
         let mut cx = init_cx();
@@ -279,8 +289,7 @@ impl T1 {
             if seg.passes == 0 {
                 continue;
             }
-            let raw = style & BYPASS != 0 && idx >= 10 && pass_kind(idx) != Pass::Clean;
-            if raw {
+            if raw_pass(style, idx) {
                 let mut b = RawBits(Raw::new(seg.data));
                 for _ in 0..seg.passes {
                     let p = p0 - ((idx + 2) / 3) as i32;
@@ -357,7 +366,7 @@ impl T1 {
         f[i - st + 1] |= SW;
         f[i + st - 1] |= NE;
         f[i + st + 1] |= NW;
-        let v = 3i32 << p;
+        let v = 3i64 << p;
         self.coef[coef] = if neg { -v } else { v };
     }
 
@@ -399,7 +408,7 @@ impl T1 {
 
     fn ref_pass<B: Bits>(&mut self, b: &mut B, p: i32) {
         let (w, h, st) = (self.w, self.h, self.stride);
-        let d = 1i32 << p;
+        let d = 1i64 << p;
         let mut y0 = 0;
         while y0 < h {
             let rows = (h - y0).min(4);

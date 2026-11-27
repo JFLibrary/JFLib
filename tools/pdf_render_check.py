@@ -356,38 +356,43 @@ q 192 0 0 80 150 90 cm /C3 Do Q
 q 48 0 0 20 20 100 cm /C4 Do Q
 """
         doc.page(c, res)
-        # JPEG 2000 (JPXDecode) through Pillow's OpenJPEG: lossless and lossy, with and without a
-        # colour space (then the JP2 header's), 16-bit grey, an opacity channel (SMaskInData),
-        # a tiled raw codestream
-        def jp2(img, **opt):
-            b = BytesIO()
-            img.save(b, "JPEG2000", **opt)
-            return b.getvalue()
-        rgba = pim.convert("RGBA")
-        for y in range(48):
-            for x in range(64):
-                r, g, b, _ = rgba.getpixel((x, y))
-                rgba.putpixel((x, y), (r, g, b, 255 if (x // 16 + y // 12) % 2 else 70))
-        g16 = Image.new("I;16", (64, 48))
-        for y in range(48):
-            for x in range(64):
-                g16.putpixel((x, y), (x * 1000 + y * 300) % 65536)
-        x = {}
-        x[b"X0"] = doc.stream(b"/Type /XObject /Subtype /Image /Width 64 /Height 48 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /JPXDecode", jp2(pim), compress=False)
-        x[b"X1"] = doc.stream(b"/Type /XObject /Subtype /Image /Width 64 /Height 48 /Filter /JPXDecode", jp2(pim, irreversible=True, quality_layers=[12], quality_mode="rates"), compress=False)
-        x[b"X2"] = doc.stream(b"/Type /XObject /Subtype /Image /Width 64 /Height 48 /Filter /JPXDecode", jp2(g16), compress=False)
-        x[b"X3"] = doc.stream(b"/Type /XObject /Subtype /Image /Width 64 /Height 48 /Filter /JPXDecode /SMaskInData 1", jp2(rgba), compress=False)
-        x[b"X4"] = doc.stream(b"/Type /XObject /Subtype /Image /Width 64 /Height 48 /ColorSpace /DeviceRGB /Filter /JPXDecode", jp2(pim, no_jp2=True, tile_size=(24, 20), num_resolutions=3, progression="RPCL"), compress=False)
-        res = b"/XObject << " + b" ".join(b"/" + k + b" %d 0 R" % v for k, v in x.items()) + b" >>"
-        c = b"""0.9 0.5 0.1 rg 0 0 400 400 re f
-q 128 0 0 96 10 290 cm /X0 Do Q
-q 128 0 0 96 150 290 cm /X1 Do Q
-q 128 0 0 96 10 180 cm /X2 Do Q
-q 192 0 0 144 10 20 cm /X4 Do Q
-"""
-        doc.page(c, res)
-        # (a page of its own: Poppler draws it differently, see KNOWN)
-        doc.page(b"0.9 0.5 0.1 rg 0 0 400 400 re f q 256 0 0 192 70 100 cm /X3 Do Q\n", res)
+        # (left out when Pillow was built without OpenJPEG)
+        from PIL import features
+        if not features.check_codec("jpg_2000"):
+            print("draw_images: Pillow has no JPEG 2000 codec, the JPXDecode pages are left out")
+        else:
+            # JPEG 2000 (JPXDecode) through Pillow's OpenJPEG: lossless and lossy, with and without a
+            # colour space (then the JP2 header's), 16-bit grey, an opacity channel (SMaskInData),
+            # a tiled raw codestream
+            def jp2(img, **opt):
+                b = BytesIO()
+                img.save(b, "JPEG2000", **opt)
+                return b.getvalue()
+            rgba = pim.convert("RGBA")
+            for y in range(48):
+                for x in range(64):
+                    r, g, b, _ = rgba.getpixel((x, y))
+                    rgba.putpixel((x, y), (r, g, b, 255 if (x // 16 + y // 12) % 2 else 70))
+            g16 = Image.new("I;16", (64, 48))
+            for y in range(48):
+                for x in range(64):
+                    g16.putpixel((x, y), (x * 1000 + y * 300) % 65536)
+            x = {}
+            x[b"X0"] = doc.stream(b"/Type /XObject /Subtype /Image /Width 64 /Height 48 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /JPXDecode", jp2(pim), compress=False)
+            x[b"X1"] = doc.stream(b"/Type /XObject /Subtype /Image /Width 64 /Height 48 /Filter /JPXDecode", jp2(pim, irreversible=True, quality_layers=[12], quality_mode="rates"), compress=False)
+            x[b"X2"] = doc.stream(b"/Type /XObject /Subtype /Image /Width 64 /Height 48 /Filter /JPXDecode", jp2(g16), compress=False)
+            x[b"X3"] = doc.stream(b"/Type /XObject /Subtype /Image /Width 64 /Height 48 /Filter /JPXDecode /SMaskInData 1", jp2(rgba), compress=False)
+            x[b"X4"] = doc.stream(b"/Type /XObject /Subtype /Image /Width 64 /Height 48 /ColorSpace /DeviceRGB /Filter /JPXDecode", jp2(pim, no_jp2=True, tile_size=(24, 20), num_resolutions=3, progression="RPCL"), compress=False)
+            res = b"/XObject << " + b" ".join(b"/" + k + b" %d 0 R" % v for k, v in x.items()) + b" >>"
+            c = b"""0.9 0.5 0.1 rg 0 0 400 400 re f
+    q 128 0 0 96 10 290 cm /X0 Do Q
+    q 128 0 0 96 150 290 cm /X1 Do Q
+    q 128 0 0 96 10 180 cm /X2 Do Q
+    q 192 0 0 144 10 20 cm /X4 Do Q
+    """
+            doc.page(c, res)
+            # (a page of its own: Poppler draws it differently, see KNOWN)
+            doc.page(b"0.9 0.5 0.1 rg 0 0 400 400 re f q 256 0 0 192 70 100 cm /X3 Do Q\n", res)
     return doc.write()
 
 

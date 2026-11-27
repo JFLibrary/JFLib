@@ -27,8 +27,8 @@ without a line of `unsafe` code. It reads JP2 files, the JPX files JP2 readers m
   - sub-sampled components
   - 1 to 24 bits per sample, signed and unsigned
 - **From the JP2 header:**
-  - the colour space: sRGB, greyscale, sYCC (converted to RGB here), CMYK, CIELab, or an ICC
-    profile, which is handed over
+  - the colour space: sRGB, greyscale, sYCC (converted to RGB here unless
+    `Options::convert_sycc` is false), CMYK, CIELab, or an ICC profile, which is handed over
   - the palette with its component mapping (applied here)
   - the channel definitions: colour channels in their order and the opacity channel, also a
     premultiplied one
@@ -37,7 +37,8 @@ without a line of `unsafe` code. It reads JP2 files, the JPX files JP2 readers m
 a preview or a small rendering of a large page much cheaper.
 
 A file that is cut short gives what was decoded up to there, as the common readers do. Limits on
-the pixels, code-blocks and precincts refuse a hostile file before it costs memory. Every target
+the pixels, the tiles and components, code-blocks, precincts and the packets looked at refuse a
+hostile file before it costs memory or time. Every target
 gets the same bits: the 9/7 wavelet runs in `f32` with each step written out.
 
 Not decoded: Part 2 of the standard (other wavelets, multiple-component transforms beyond RCT and
@@ -55,7 +56,8 @@ for c in &img.components {
 
 Through [`jflib-img-all`](https://crates.io/crates/jflib-img-all), `img_jp2::CODEC` opens JP2,
 JPX and J2K files with the image functions of
-[`jflib-img-core`](https://crates.io/crates/jflib-img-core), as 8-bit ARGB surfaces.
+[`jflib-img-core`](https://crates.io/crates/jflib-img-core), as 8-bit ARGB surfaces (CIELab files
+are `ERR_UNSUPPORTED` there: no conversion to RGB yet; `decode` gives their components).
 [`jflib-pdf`](https://crates.io/crates/jflib-pdf) draws a PDF's `JPXDecode` images with it.
 
 ## How to get it
