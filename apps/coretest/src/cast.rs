@@ -193,6 +193,10 @@ pub fn run(t: &mut T) {
     chunking(t);
     let dir = tmp("repo");
     store(t, "folder", &|| Box::new(cas::Folder::new(&dir)));
+    // a pack named by the public Store API with a letter of more than one byte first: its
+    // folder (the first two bytes) cut the letter in two and panicked (third review)
+    let f = cas::Folder::new(&dir);
+    t.check("folder: a pack name with a multi-byte letter first is refused", f.get(Kind::Pack, "€a").is_err() && f.put(Kind::Pack, "a€", b"x").is_err() && f.get(Kind::Pack, "ab").is_ok());
     rm(&dir);
     let mem = Mem::new();
     store(t, "mem", &|| Box::new(mem.clone()));

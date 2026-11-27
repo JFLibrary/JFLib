@@ -4,13 +4,19 @@
 // segments are skipped), then the tile-parts: SOT, their headers (COD, COC, QCD, QCC, RGN, POC,
 // PPT; PLT, COM skipped), SOD and the data up to the next tile-part (Psot 0: up to EOC).  The
 // data of a tile's parts is kept in order of appearance; packet headers given in PPM (one series
-// per tile-part, in codestream order) or PPT (per tile, in Zppt order) are joined per tile.
+// per tile-part, in codestream order) or PPT (in Zppt order within each tile-part header, the
+// tile-parts in order) are joined per tile.  Each marker segment is read within its own length;
+// per-component overrides are kept only for the components that have one, and the tiles present
+// times the components are limited (`MAX_TILE_COMPS`).
 
 use crate::Error;
-use alloc::vec;
+use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
 pub(crate) const MAX_COMPONENTS: usize = 16384;
+/// the tiles that have data times the components: each costs a little work and memory even when
+/// it holds no sample
+pub(crate) const MAX_TILE_COMPS: u64 = 1 << 22;
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct CompSiz {
@@ -102,17 +108,13 @@ pub(crate) struct Poc {
 pub(crate) struct Params {
     pub global: Option<Global>,
     pub cod: Option<Style>,
-    pub coc: Vec<Option<Style>>,
+    /// the overrides of single components (COC, QCC, RGN), by component
+    pub coc: BTreeMap<usize, Style>,
     pub qcd: Option<Quant>,
-    pub qcc: Vec<Option<Quant>>,
-    pub rgn: Vec<Option<u8>>,
+    pub qcc: BTreeMap<usize, Quant>,
+    pub rgn: BTreeMap<usize, u8>,
+    /// the progression volumes, in the order of the headers (tile-parts in order)
     pub poc: Vec<Poc>,
-}
-
-impl Params {
-    fn new(n: usize) -> Params {
-        Params { coc: vec![None; n], qcc: vec![None; n], rgn: vec![None; n], ..Params::default() }
-    }
 }
 
 #[derive(Default)]
@@ -122,7 +124,8 @@ pub(crate) struct TileData<'a> {
     pub parts: Vec<&'a [u8]>,
     /// the packet headers from PPM or PPT, joined (None: they are in the data)
     pub headers: Option<Vec<u8>>,
-    ppt: Vec<(u8, Vec<u8>)>,
+    /// the packet headers from the PPT segments, in order
+    ppt: Vec<u8>,
 }
 
 pub(crate) struct Codestream<'a> {
@@ -195,13 +198,14 @@ fn read_siz(r: &mut Rd) -> Result<Siz, Error> {
 
 fn read_style(r: &mut Rd, precincts: bool) -> Result<Style, Error> {
     let levels = r.u8()?;
-    let xcb = r.u8()? + 2;
-    let ycb = r.u8()? + 2;
+    let (xe, ye) = (r.u8()?, r.u8()?);
     let cbstyle = r.u8()?;
     let transform = r.u8()?;
-    if levels > 32 || xcb > 10 || ycb > 10 || xcb + ycb > 12 {
+    // the exponents are stored less 2: 8 at most (blocks of 1024 samples at most, A.6.1)
+    if levels > 32 || xe > 8 || ye > 8 || xe + ye > 8 {
         return Err(Error::Corrupt);
     }
+    let (xcb, ycb) = (xe + 2, ye + 2);
     if transform > 1 {
         // a wavelet of Part 2
         return Err(Error::Unsupported);
@@ -243,9 +247,10 @@ fn read_quant(r: &mut Rd, end: usize) -> Result<Quant, Error> {
     Ok(Quant { style, guard, steps })
 }
 
-/// one marker segment of a header (main or tile-part) into `p`; false when the marker does not
-/// belong into a header
-fn header_segment<'a>(m: u16, r: &mut Rd<'a>, end: usize, p: &mut Params, n: usize, ppm: &mut Vec<(u8, &'a [u8])>, ppt: Option<&mut Vec<(u8, Vec<u8>)>>) -> Result<(), Error> {
+/// one marker segment of a header (main or tile-part) into `p`; `r` reads the segment only (its
+/// data ends at `end`, the end of the segment)
+fn header_segment<'a>(m: u16, r: &mut Rd<'a>, p: &mut Params, n: usize, ppm: &mut Vec<(u8, &'a [u8])>, ppt: Option<&mut Vec<(u8, Vec<u8>)>>) -> Result<(), Error> {
+    let end = r.d.len();
     match m {
         0xFF52 => {
             let scod = r.u8()?;
@@ -263,7 +268,7 @@ fn header_segment<'a>(m: u16, r: &mut Rd<'a>, end: usize, p: &mut Params, n: usi
             let s = r.u8()?;
             let st = read_style(r, s & 1 != 0)?;
             if c < n {
-                p.coc[c] = Some(st);
+                p.coc.insert(c, st);
             }
         }
         0xFF5C => p.qcd = Some(read_quant(r, end)?),
@@ -271,7 +276,7 @@ fn header_segment<'a>(m: u16, r: &mut Rd<'a>, end: usize, p: &mut Params, n: usi
             let c = comp_index(r, n)?;
             let q = read_quant(r, end)?;
             if c < n {
-                p.qcc[c] = Some(q);
+                p.qcc.insert(c, q);
             }
         }
         0xFF5E => {
@@ -279,13 +284,14 @@ fn header_segment<'a>(m: u16, r: &mut Rd<'a>, end: usize, p: &mut Params, n: usi
             let srgn = r.u8()?;
             let shift = r.u8()?;
             if srgn == 0 && c < n {
-                p.rgn[c] = Some(shift.min(37));
+                p.rgn.insert(c, shift.min(37));
             }
         }
         0xFF5F => {
-            let mut v = Vec::new();
+            // the volumes of later segments and tile-parts follow the earlier ones (B.12.3)
+            let v = &mut p.poc;
             let wide = n >= 257;
-            while r.left() > 0 && r.p + if wide { 9 } else { 7 } <= end {
+            while r.p + if wide { 9 } else { 7 } <= end {
                 let rs = r.u8()?;
                 let cs = if wide { r.u16()? } else { r.u8()? as u16 };
                 let lye = r.u16()?;
@@ -295,7 +301,6 @@ fn header_segment<'a>(m: u16, r: &mut Rd<'a>, end: usize, p: &mut Params, n: usi
                 let ce = if ce == 0 { if wide { 16384 } else { 256 } } else { ce };
                 v.push(Poc { rs, cs, lye, re, ce, prog: prog.min(4) });
             }
-            p.poc = v;
         }
         0xFF60 => {
             let z = r.u8()?;
@@ -323,7 +328,7 @@ pub(crate) fn parse(d: &[u8]) -> Result<Codestream<'_>, Error> {
     let siz = read_siz(&mut r)?;
     r.p = siz_end.max(r.p);
     let n = siz.comps.len();
-    let mut main = Params::new(n);
+    let mut main = Params::default();
     let mut ppm: Vec<(u8, &[u8])> = Vec::new();
     // the main header
     loop {
@@ -346,10 +351,11 @@ pub(crate) fn parse(d: &[u8]) -> Result<Codestream<'_>, Error> {
             return Err(Error::Truncated);
         }
         let end = r.p + len - 2;
-        header_segment(m, &mut r, end, &mut main, n, &mut ppm, None)?;
+        let mut seg = Rd { d: &d[..end], p: r.p };
+        header_segment(m, &mut seg, &mut main, n, &mut ppm, None)?;
         r.p = end;
     }
-    if main.cod.is_none() || main.qcd.is_none() && main.qcc.iter().any(|q| q.is_none()) {
+    if main.cod.is_none() || main.qcd.is_none() && (0..n).any(|c| !main.qcc.contains_key(&c)) {
         return Err(Error::Corrupt);
     }
     let ntiles = (siz.tiles_x() * siz.tiles_y()) as usize;
@@ -364,12 +370,13 @@ pub(crate) fn parse(d: &[u8]) -> Result<Codestream<'_>, Error> {
     while q + 4 <= ppm_all.len() {
         let l = u32::from_be_bytes([ppm_all[q], ppm_all[q + 1], ppm_all[q + 2], ppm_all[q + 3]]) as usize;
         q += 4;
-        let e = (q + l).min(ppm_all.len());
+        let e = q.saturating_add(l).min(ppm_all.len());
         ppm_spans.push((q, e));
         q = e;
     }
     // the tile-parts
     let mut part_no = 0usize;
+    let mut present = 0u64;
     loop {
         if r.left() < 2 {
             break;
@@ -394,7 +401,9 @@ pub(crate) fn parse(d: &[u8]) -> Result<Codestream<'_>, Error> {
                 d.len()
             }
         } else {
-            (sot + psot).min(d.len())
+            // (on 32 bits sot + psot could wrap in front of the part: the parts went round
+            // forever; never behind what was read)
+            sot.saturating_add(psot).min(d.len()).max(r.p)
         };
         if isot >= ntiles {
             // a tile that is not there: skip its part
@@ -405,9 +414,16 @@ pub(crate) fn parse(d: &[u8]) -> Result<Codestream<'_>, Error> {
             }
             continue;
         }
-        let tile = tiles[isot].get_or_insert_with(|| TileData { params: Params::new(n), ..TileData::default() });
+        if tiles[isot].is_none() {
+            present += 1;
+            if present * n as u64 > MAX_TILE_COMPS {
+                return Err(Error::Limit);
+            }
+        }
+        let tile = tiles[isot].get_or_insert_with(TileData::default);
         // the tile-part header
         let mut body = end;
+        let mut part_ppt: Vec<(u8, Vec<u8>)> = Vec::new();
         while r.p + 2 <= end {
             let m = r.u16()?;
             if m == 0xFF93 {
@@ -423,9 +439,13 @@ pub(crate) fn parse(d: &[u8]) -> Result<Codestream<'_>, Error> {
             }
             let e = r.p + len - 2;
             let mut no_ppm = Vec::new();
-            header_segment(m, &mut r, e, &mut tile.params, n, &mut no_ppm, Some(&mut tile.ppt))?;
+            let mut seg = Rd { d: &d[..e], p: r.p };
+            header_segment(m, &mut seg, &mut tile.params, n, &mut no_ppm, Some(&mut part_ppt))?;
             r.p = e;
         }
+        // Zppt numbers the segments of this tile-part header only (A.7.5)
+        part_ppt.sort_by_key(|x| x.0);
+        tile.ppt.extend(part_ppt.drain(..).flat_map(|x| x.1));
         tile.parts.push(&d[body.min(end)..end]);
         if use_ppm {
             let h = tile.headers.get_or_insert_with(Vec::new);
@@ -441,8 +461,7 @@ pub(crate) fn parse(d: &[u8]) -> Result<Codestream<'_>, Error> {
     }
     for t in tiles.iter_mut().flatten() {
         if !use_ppm && !t.ppt.is_empty() {
-            t.ppt.sort_by_key(|x| x.0);
-            t.headers = Some(t.ppt.iter().flat_map(|x| x.1.iter().copied()).collect());
+            t.headers = Some(core::mem::take(&mut t.ppt));
         }
     }
     Ok(Codestream { siz, main, tiles })

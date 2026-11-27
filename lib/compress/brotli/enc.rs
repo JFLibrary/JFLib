@@ -1431,9 +1431,13 @@ impl Core {
                     }
                     let nb = T::SIZE_BITS[l];
                     for &(t, cut, suf) in fam {
-                        // a transform that cuts more than the word gives no match (a release
-                        // build wrapped it into a length no match reaches; a debug build panicked)
-                        let Some(wl) = l.checked_sub(cut as usize) else { continue };
+                        // OmitLast5..9 on a word of 4..8 letters leaves nothing (l - cut was
+                        // an overflow: a panic where overflow checks are on, as in the apps'
+                        // debug builds)
+                        if cut as usize >= l {
+                            continue;
+                        }
+                        let wl = l - cut as usize;
                         if c < wl {
                             continue;
                         }

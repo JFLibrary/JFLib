@@ -467,6 +467,9 @@ enum Tok {
 
 const MAX_NODES: usize = 1 << 20;
 const MAX_DEPTH: u32 = 200;
+// the height of the tree: MAX_DEPTH counts nesting, but a chain like 1+1+1+... grows the
+// tree by one per operator without nesting, and evaluation recurses as deep as the tree is
+const MAX_HEIGHT: u32 = 512;
 
 struct Lexer<'a> {
     s: &'a str,
@@ -727,6 +730,8 @@ struct Parser<'a> {
     pos: usize,
     out: Parsed,
     depth: u32,
+    // the height of each node's subtree (beside out.nodes)
+    height: Vec<u32>,
 }
 
 /// parse a formula in the universal syntax
@@ -734,7 +739,7 @@ pub fn parse(text: &str) -> Result<Parsed, ParseError> {
     let mut lex = Lexer { s: text, b: text.as_bytes(), i: 0 };
     let (pos, tok) = lex.next()?;
     let out = Parsed { nodes: Vec::new(), args: Vec::new(), refs: Vec::new(), strs: Vec::new(), names: Vec::new(), root: 0, addrs: Vec::new() };
-    let mut p = Parser { lex, tok, pos, out, depth: 0 };
+    let mut p = Parser { lex, tok, pos, out, depth: 0, height: Vec::new() };
     if p.tok == Tok::End {
         return Err(p.err(ParseErrorKind::UnexpectedEnd));
     }
@@ -783,8 +788,34 @@ impl Parser<'_> {
         if self.out.nodes.len() >= MAX_NODES {
             return Err(self.err(ParseErrorKind::TooComplex));
         }
+        let h = 1 + self.below(&n);
+        if h > MAX_HEIGHT {
+            return Err(self.err(ParseErrorKind::TooComplex));
+        }
         self.out.nodes.push(n);
+        self.height.push(h);
         Ok(self.out.nodes.len() as u32 - 1)
+    }
+
+    // the height of the highest child of a node about to be pushed (its children are pushed)
+    fn below(&self, n: &Node) -> u32 {
+        let h = |i: u32| self.height.get(i as usize).copied().unwrap_or(0);
+        // a reference whose sheet a call gives (CONTAINERSHEETREF(1)!Width): that call's height
+        let by_ref = |r: u32| match self.out.refs.get(r as usize).map(|r| &r.sheet) {
+            Some(SheetName::Call(c)) => h(*c),
+            _ => 0,
+        };
+        match *n {
+            Node::Neg(x) | Node::Pct(x) => h(x),
+            Node::Bin(_, l, r) => h(l).max(h(r)),
+            // (the last field: the reference of a sheet in front of the call, u32::MAX: none)
+            Node::Call(_, s, k, r) => {
+                let args = self.out.args.get(s as usize..(s as usize).saturating_add(k as usize)).unwrap_or(&[]);
+                args.iter().map(|&a| h(a)).max().unwrap_or(0).max(by_ref(r))
+            }
+            Node::Ref(r) => by_ref(r),
+            Node::Num(_) | Node::Str(_) | Node::Bool(_) | Node::Err(_) | Node::Missing => 0,
+        }
     }
 
     fn expr(&mut self, min_bp: u8) -> Result<u32, ParseError> {

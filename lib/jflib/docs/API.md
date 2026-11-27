@@ -15486,8 +15486,9 @@ IMGF_COUNT: u32 = 55
 /// (register_external stops before it)
 IMGF_SVG: u32 = IMGF_COUNT - 1
 /// JPEG 2000 (JP2, JPX, J2K): the slot before SVG's, outside the static table until
-/// img_all::use_all_codecs fills it with img_jp2's codec (register_external stops before it, so
-/// the external codecs keep their numbers)
+/// img_all::use_all_codecs fills it with img_jp2's codec.  register_external stops before it:
+/// the external codecs keep their numbers 23 to 52; a 31st external registration, which got
+/// slot 53 before, now gets 0, and a stored 53 now names JPEG 2000
 IMGF_JP2: u32 = IMGF_COUNT - 2
 ```
 
@@ -16293,8 +16294,9 @@ metadata fields stay).
   slot is taken or name / exts is empty  [img_register_dyn]
 
 - **`fn register_external(name: &'static str, exts: &'static str, props: u32, c: &'static Codec) -> u32`**
-  Separate slots for external codec hosts, preserving the native plugin ABI's IDs (the
-  last two slots, IMGF_JP2 and IMGF_SVG, are kept for JPEG 2000 and SVG).
+  Separate slots for external codec hosts, preserving the native plugin ABI's IDs: 23 to 52, or
+  0 when they are taken (the last two slots, IMGF_JP2 and IMGF_SVG, are kept for JPEG 2000 and
+  SVG; slot 53 went to JPEG 2000, so a 31st registration gets 0).
 
 - **`fn register_slot(fmt: u32, name: &'static str, exts: &'static str, mime: &'static str, props: u32, c: Option<&'static Codec>) -> i32`**
   a built-in format that has no entry in the static table (IMGF_SVG, IMGF_JP2): its name,
@@ -74041,11 +74043,12 @@ never read; a shared-string index out of range is Invalid.
 img_jp2 -- JPEG 2000 decoder (ITU-T T.800 | ISO/IEC 15444-1, the JP2 file format and the parts
 of JPX that JP2 readers meet)
 
-  decode(data, &Options) -> Image / Error     a JP2 / JPX file or a raw codestream (J2K, J2C)
+  decode(data, &Options) -> Result<Image, Error>   a JP2 / JPX file or a raw codestream (J2K, J2C)
   probe(data) -> bool                         the JP2 signature or the start of a codestream
   Image { width, height, components, color, alpha, premultiplied }
   Component { width, height, dx, dy, precision, signed, data }   samples, row by row
-  CODEC                                       img_core's codec (8-bit ARGB surfaces) for img_all
+  CODEC                                       img_core's codec (8-bit ARGB surfaces) for img_all;
+                                              CIELab files are ERR_UNSUPPORTED there
 
 Modules: boxes (the JP2 boxes), codestream (the markers), tile (geometry, packets, progression,
 dequantisation, assembly), t1 (the code-blocks), mq (the arithmetic decoder), dwt (the wavelets).
@@ -74057,12 +74060,14 @@ with any image and tile offsets, RCT and ICT, sub-sampled components, precision 
 signed and unsigned.  From the JP2 header: the colour space (enumerated sRGB, greyscale, sYCC,
 CMYK, CIELab; an ICC profile), the palette with its component mapping (applied here) and the
 channel definitions (colour channels in their order, the opacity channel).  sYCC is converted to
-RGB here.  `Options::reduce` decodes a lower resolution (each level halves the size).
+RGB here (unless `Options::convert_sycc` is false).  `Options::reduce` decodes a lower
+resolution (each level halves the size).
 
 Not here: Part 2 (other wavelets, multiple-component transforms beyond RCT / ICT, trellis
 quantisation), precision above 24 bits.  A file that is cut short gives what was decoded up to
-there (like the common readers); limits (`Options::max_pixels`, code-blocks, precincts) refuse
-hostile files before they cost memory.
+there (like the common readers); limits (`Options::max_pixels` also for the channels a palette
+makes, tiles times components, code-blocks, precincts, the packets the progression looks at)
+refuse hostile files before they cost memory or time.
 ```
 
 ### `img_jp2` crate root
@@ -74079,6 +74084,8 @@ hostile files before they cost memory.
   what to decode
   - `reduce: u8` -- resolution levels to leave out (each halves width and height)
   - `max_pixels: u64` -- the largest width \* height (the default: img_core's IMG_MAXPX_DEF)
+  - `convert_sycc: bool` -- convert sYCC to sRGB (the default); false leaves the components as they are coded, with
+    `Color::Unknown` (a reader that takes the colour space from elsewhere, like PDF)
 
 - **`enum Color`**
   the colour space the JP2 header names (Unknown for a raw codestream)

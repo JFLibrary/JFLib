@@ -1,11 +1,12 @@
 // img_jp2 -- JPEG 2000 decoder (ITU-T T.800 | ISO/IEC 15444-1, the JP2 file format and the parts
 // of JPX that JP2 readers meet)
 //
-//   decode(data, &Options) -> Image / Error     a JP2 / JPX file or a raw codestream (J2K, J2C)
+//   decode(data, &Options) -> Result<Image, Error>   a JP2 / JPX file or a raw codestream (J2K, J2C)
 //   probe(data) -> bool                         the JP2 signature or the start of a codestream
 //   Image { width, height, components, color, alpha, premultiplied }
 //   Component { width, height, dx, dy, precision, signed, data }   samples, row by row
-//   CODEC                                       img_core's codec (8-bit ARGB surfaces) for img_all
+//   CODEC                                       img_core's codec (8-bit ARGB surfaces) for img_all;
+//                                               CIELab files are ERR_UNSUPPORTED there
 //
 // Modules: boxes (the JP2 boxes), codestream (the markers), tile (geometry, packets, progression,
 // dequantisation, assembly), t1 (the code-blocks), mq (the arithmetic decoder), dwt (the wavelets).
@@ -17,12 +18,14 @@
 // signed and unsigned.  From the JP2 header: the colour space (enumerated sRGB, greyscale, sYCC,
 // CMYK, CIELab; an ICC profile), the palette with its component mapping (applied here) and the
 // channel definitions (colour channels in their order, the opacity channel).  sYCC is converted to
-// RGB here.  `Options::reduce` decodes a lower resolution (each level halves the size).
+// RGB here (unless `Options::convert_sycc` is false).  `Options::reduce` decodes a lower
+// resolution (each level halves the size).
 //
 // Not here: Part 2 (other wavelets, multiple-component transforms beyond RCT / ICT, trellis
 // quantisation), precision above 24 bits.  A file that is cut short gives what was decoded up to
-// there (like the common readers); limits (`Options::max_pixels`, code-blocks, precincts) refuse
-// hostile files before they cost memory.
+// there (like the common readers); limits (`Options::max_pixels` also for the channels a palette
+// makes, tiles times components, code-blocks, precincts, the packets the progression looks at)
+// refuse hostile files before they cost memory or time.
 #![no_std]
 #![forbid(unsafe_code)]
 
@@ -63,11 +66,14 @@ pub struct Options {
     pub reduce: u8,
     /// the largest width * height (the default: img_core's IMG_MAXPX_DEF)
     pub max_pixels: u64,
+    /// convert sYCC to sRGB (the default); false leaves the components as they are coded, with
+    /// `Color::Unknown` (a reader that takes the colour space from elsewhere, like PDF)
+    pub convert_sycc: bool,
 }
 
 impl Default for Options {
     fn default() -> Options {
-        Options { reduce: 0, max_pixels: IMG_MAXPX_DEF }
+        Options { reduce: 0, max_pixels: IMG_MAXPX_DEF, convert_sycc: true }
     }
 }
 
@@ -151,7 +157,7 @@ pub fn decode(d: &[u8], opt: &Options) -> Result<Image, Error> {
             tile::OutComp { w: x1 - x0, h: y1 - y0, x0, y0, data: vec![0; (x1 - x0) as usize * (y1 - y0) as usize] }
         })
         .collect();
-    let mut budget = tile::Budget { cblks: 0, precincts: 0 };
+    let mut budget = tile::Budget::default();
     let mut t1 = t1::T1::new();
     for t in 0..cs.tiles.len() {
         tile::decode(&cs, t, red, &mut budget, &mut out, &mut t1)?;
@@ -171,6 +177,11 @@ pub fn decode(d: &[u8], opt: &Options) -> Result<Image, Error> {
     // the palette: each channel of the component mapping, directly or through a column
     if let Some(pal) = &jp2.palette {
         if !jp2.cmap.is_empty() {
+            // each channel is a copy as large as its component: the same budget as the samples
+            let total: u64 = jp2.cmap.iter().map(|e| comps.get(e.0 as usize).map_or(0, |c| c.data.len() as u64)).sum();
+            if total > opt.max_pixels.saturating_mul(4) {
+                return Err(Error::Limit);
+            }
             let mut mapped = Vec::with_capacity(jp2.cmap.len());
             for &(cmp, through, col) in &jp2.cmap {
                 let src = comps.get(cmp as usize).ok_or(Error::Corrupt)?;
@@ -218,7 +229,7 @@ pub fn decode(d: &[u8], opt: &Options) -> Result<Image, Error> {
         Some(boxes::Colr::Enum(12)) => Color::Cmyk,
         Some(boxes::Colr::Enum(14)) => Color::Lab,
         Some(boxes::Colr::Enum(18)) => {
-            if comps.len() >= 3 {
+            if comps.len() >= 3 && opt.convert_sycc {
                 sycc_to_rgb(&mut comps);
                 Color::Srgb
             } else {
@@ -241,9 +252,9 @@ fn sycc_to_rgb(c: &mut [Component]) {
         }
         let mut v = Vec::with_capacity(w * h);
         for y in 0..h {
-            let sy = (y * s.height as usize / h.max(1)).min(s.height as usize - 1);
+            let sy = (y as u64 * s.height as u64 / h.max(1) as u64).min(s.height as u64 - 1) as usize;
             for x in 0..w {
-                let sx = (x * s.width as usize / w.max(1)).min(s.width as usize - 1);
+                let sx = (x as u64 * s.width as u64 / w.max(1) as u64).min(s.width as u64 - 1) as usize;
                 v.push(s.data[sy * s.width as usize + sx]);
             }
         }
@@ -304,13 +315,17 @@ fn codec_probe(d: &[u8], m: &mut ImgMeta) -> bool {
 }
 
 fn codec_decode(d: &[u8], sf: &mut Surface, dec: &ImgDec, m: &mut ImgMeta) -> i32 {
-    let img = match decode(d, &Options { reduce: 0, max_pixels: dec.max_pixels() }) {
+    let img = match decode(d, &Options { max_pixels: dec.max_pixels(), ..Options::default() }) {
         Ok(i) => i,
         Err(Error::NotJpeg2000) | Err(Error::Corrupt) => return ERR_HDR,
         Err(Error::Truncated) => return ERR_TRUNC,
         Err(Error::Unsupported) => return ERR_UNSUPPORTED,
         Err(Error::Limit) => return ERR_LIMIT,
     };
+    if img.color == Color::Lab {
+        // no conversion of CIELab (with the parameters of its colr box) to RGB here
+        return ERR_UNSUPPORTED;
+    }
     let (w, h) = (img.width, img.height);
     *sf = match surf_alloc(w, h, FMT_ARGB, dec) {
         Ok(s) => s,
@@ -320,7 +335,6 @@ fn codec_decode(d: &[u8], sf: &mut Surface, dec: &ImgDec, m: &mut ImgMeta) -> i3
     let ncol = if let Some(a) = img.alpha { a } else { n };
     let model = match (&img.color, ncol) {
         (Color::Cmyk, _) if ncol >= 4 => IMM_CMYK,
-        (Color::Lab, _) => IMM_LAB,
         (_, 1 | 2) => IMM_GRAY,
         _ => IMM_RGB,
     };
@@ -344,7 +358,7 @@ fn codec_decode(d: &[u8], sf: &mut Surface, dec: &ImgDec, m: &mut ImgMeta) -> i3
         }
         let sx = (x / c.dx.max(1)).min(c.width - 1);
         let sy = (y / c.dy.max(1)).min(c.height - 1);
-        let v = c.data[(sy * c.width + sx) as usize] as i64;
+        let v = c.data[sy as usize * c.width as usize + sx as usize] as i64;
         let p = c.precision.clamp(1, 24) as u32;
         let v = if c.signed { v + (1i64 << (p - 1)) } else { v };
         let max = (1i64 << p) - 1;
@@ -360,7 +374,7 @@ fn codec_decode(d: &[u8], sf: &mut Surface, dec: &ImgDec, m: &mut ImgMeta) -> i3
                     let k = 255 - ch(3);
                     ((255 - ch(0)) * k / 255, (255 - ch(1)) * k / 255, (255 - ch(2)) * k / 255)
                 }
-                IMM_GRAY | IMM_LAB => (ch(0), ch(0), ch(0)),
+                IMM_GRAY => (ch(0), ch(0), ch(0)),
                 _ => (ch(0), ch(1), ch(2)),
             };
             let a = img.alpha.map_or(255, &ch);

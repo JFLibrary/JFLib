@@ -161,7 +161,14 @@ struct Watch {
     edge: AtomicU32,
     /// samples that show the bands scaled about the window's centre by 95 to 100 % (a note: Windows opening the window)
     scaled: AtomicU32,
+    /// wrong samples before the first right one, in the first EARLY_US of the watch (a note: the window not on the
+    /// screen yet)
+    early: AtomicU32,
 }
+
+/// how long after the watcher starts a wrong sample before the first right one is the window not shown yet (the
+/// Surface Go 3 after a cold start: the first sample, 60 ms after the window's first frame, showed what lay behind it)
+const EARLY_US: u64 = 300_000;
 
 /// what a test or a bench draws beside the picture: panels on the layers above the base, images
 #[derive(Default)]
@@ -415,10 +422,13 @@ impl Test {
         let (x0, y0, w) = (r[0], r[1] + fb.h - 40, fb.w);
         let want: Vec<u32> = (0..w).map(|x| bgr(band_of(x, w))).collect();
         let watch = Arc::new(Watch { stop: AtomicBool::new(false), samples: AtomicU32::new(0), bad: AtomicU32::new(0), covered: AtomicU32::new(0), last_bad: AtomicU32::new(0),
-                                     edge: AtomicU32::new(0), scaled: AtomicU32::new(0) });
+                                     edge: AtomicU32::new(0), scaled: AtomicU32::new(0), early: AtomicU32::new(0) });
         let w2 = watch.clone();
         let ours = plat::win_native(0).map_or(0, |n| n.hwnd);
         let th = plat::thread_spawn(0, Box::new(move || {
+            let t0 = plat::time_us();
+            // a sample showed the bands (also scaled, also with wrong outermost columns): the window is on the screen
+            let mut seen = false;
             while !w2.stop.load(Ordering::Relaxed) {
                 let Some(px) = plat::win_test_screen(x0, y0, w, 1) else { continue };
                 w2.samples.fetch_add(1, Ordering::Relaxed);
@@ -455,10 +465,19 @@ impl Test {
                     w2.scaled.fetch_add(1, Ordering::Relaxed);
                     wrong = None;
                 }
+                if wrong.is_none() {
+                    seen = true;
+                }
                 if let Some(i) = wrong {
                     let (v, c) = (rgb(i), want[i]);
                     if plat::win_test_window_at(x0 + i as i32, y0) != ours {
                         w2.covered.fetch_add(1, Ordering::Relaxed); // another window on top of ours
+                        continue;
+                    }
+                    // (the hit test finds a window before Windows shows it; once it was right, every wrong sample
+                    // counts, and so does one after EARLY_US: a frame that never shows is not this)
+                    if !seen && plat::time_us() < t0 + EARLY_US {
+                        w2.early.fetch_add(1, Ordering::Relaxed);
                         continue;
                     }
                     if w2.bad.fetch_add(1, Ordering::Relaxed) < 6 {
@@ -487,6 +506,10 @@ impl Test {
         let s = w.scaled.load(Ordering::Relaxed);
         if s != 0 {
             out(&format!("note: {what}: the bands scaled about the window's centre (the window opening) in {s} of {n} samples"));
+        }
+        let e = w.early.load(Ordering::Relaxed);
+        if e != 0 {
+            out(&format!("note: {what}: the window not on the screen yet in {e} of {n} samples (before the first right one, in the first {} ms)", EARLY_US / 1000));
         }
         self.ok(b == 0, &format!("{what}: {n} screen samples, {b} wrong (last {:06x})", w.last_bad.load(Ordering::Relaxed)));
     }

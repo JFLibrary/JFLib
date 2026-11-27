@@ -378,6 +378,9 @@ def suite_codec(exe, work):
         ref = Image.open(d / name)
         ref.load()
         ref = ref.convert(mode)
+        if ours.size != ref.size:
+            fail("codec %s: size %s, Pillow %s" % (name, ours.size, ref.size))
+            continue
         diff = sum(1 for x, y in zip(ours.get_flattened_data(), ref.get_flattened_data()) if x != y)
         if diff:
             fail("codec %s: %d pixels differ from Pillow" % (name, diff))
@@ -411,6 +414,9 @@ def suite_bench(exe, work):
     im.save(path, irreversible=True, quality_layers=[20], quality_mode="rates", num_resolutions=6)
     r = subprocess.run(exe.cmd("--jp2-bench", path, "--reps", 3), capture_output=True, text=True, timeout=900, env=dict(os.environ, WINEDEBUG="-all"))
     ours = r.stdout.strip()
+    if r.returncode != 0 or not ours:
+        fail("bench: --jp2-bench exit %d %s" % (r.returncode, (r.stderr or "")[-200:]))
+        return
     best = None
     for _ in range(3):
         t = time.perf_counter()
@@ -451,6 +457,22 @@ def print_fixtures():
         "JP2_RGBA": enc(halves("RGBA"), num_resolutions=2),
         "JP2_LOSSY": enc(halves("RGB", 16, 16), num_resolutions=3, irreversible=True, quality_layers=[8], quality_mode="rates"),
     }
+    # 4-bit samples, which Pillow does not write: 8-bit grey of 121 (top) and 125 (bottom), whose
+    # SIZ then says 4 bits (Ssiz, byte 42), so that the samples are 121 - 120 = 1 and 5 (lossless:
+    # the coded values are the samples less 128, and 4 bits add 8 back)
+    g4 = halves("L")
+    g4.putdata([121 if i < 32 else 125 for i in range(64)])
+    g4 = bytearray(enc(g4, no_jp2=True, num_resolutions=2))
+    assert g4[42] == 7
+    g4[42] = 3
+    out["J2K_GRAY4"] = bytes(g4)
+    # 2-bit grey under 8-bit opacity: grey 127 (2 bits: 127 - 128 + 2 = 1) at opacity 192, the
+    # first component's Ssiz then set to 2 bits
+    la = bytearray(enc(Image.new("LA", (8, 8), (127, 192)), num_resolutions=2))
+    cs = la.find(b"\xff\x4f\xff\x51")
+    assert la[cs + 42] == 7 and la[cs + 45] == 7
+    la[cs + 42] = 1
+    out["JP2_GRAY2_ALPHA"] = bytes(la)
     for k, v in out.items():
         print("const %s: &[u8] = &[%s];  // %d bytes" % (k, ", ".join("0x%02X" % b for b in v), len(v)))
 

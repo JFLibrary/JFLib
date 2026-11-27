@@ -95,7 +95,8 @@ region of it (tiles for a viewer), over paper of any colour or none:
 Pages agree with Poppler's `pdftoppm` (tools/pdf_render_check.py), and drawing takes about as
 long. JPEG 2000 images (`JPXDecode`) are decoded by
 [`jflib-img-jp2`](https://crates.io/crates/jflib-img-jp2): their own size and bit depth, the colour
-space of the JP2 header when the dictionary names none, `SMaskInData`. Not drawn: JBIG2 images,
+space of the JP2 header when the dictionary names none (an ICC profile there counts by its
+channels only), `SMaskInData`. Not drawn: JBIG2 images,
 knockout groups and groups that are not isolated (drawn as isolated ones), overprint. The work of a page is bounded: a hostile page gives
 `Error::Limit`, never a hang.
 

@@ -150,8 +150,9 @@ pub fn register_dyn(name: &'static str, exts: &'static str, mime: &'static str, 
     register_range(IMG_DYN0..IMG_DYN_END, name, exts, mime, props, c)
 }
 
-/// Separate slots for external codec hosts, preserving the native plugin ABI's IDs (the
-/// last two slots, IMGF_JP2 and IMGF_SVG, are kept for JPEG 2000 and SVG).
+/// Separate slots for external codec hosts, preserving the native plugin ABI's IDs: 23 to 52, or
+/// 0 when they are taken (the last two slots, IMGF_JP2 and IMGF_SVG, are kept for JPEG 2000 and
+/// SVG; slot 53 went to JPEG 2000, so a 31st registration gets 0).
 pub fn register_external(name: &'static str, exts: &'static str, props: u32, c: &'static Codec) -> u32 {
     register_range(IMG_EXTERNAL0..IMGF_JP2, name, exts, "application/octet-stream", props, c)
 }
