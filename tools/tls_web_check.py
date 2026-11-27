@@ -22,8 +22,11 @@ bundle on Linux; the Windows build too when run from Windows): www.google.com, g
 badssl.com's TLS 1.2-only, RSA-2048/4096, P-256/384 hosts (must work) and its expired /
 wrong-host / self-signed / untrusted-root hosts (must fail, each with its reason: expired,
 another name, not trusted); revoked and incomplete-chain are shown, not counted (what a system
-knows of revocation or fetches differs).  --internet-only runs just these with build/TARGET/coretest (.github/workflows/
-system-trust.yml).  (Hosts of a public test service: a failure there can also mean it changed.)"""
+knows of revocation or fetches differs).  A host the network does not let through (a reset, a
+timeout) is tried again up to four times; one still out of reach then is shown as unreachable
+and not counted, unless more than half of them are.  --internet-only runs just these with
+build/TARGET/coretest (.github/workflows/system-trust.yml).  (Hosts of a public test service:
+a failure there can also mean it changed.)"""
 import os
 import re
 import socket
@@ -218,10 +221,11 @@ def internet_checks(cmd, tag):
     # network access, Linux the staple only), a missing intermediate (Windows may fetch it)
     info_hosts = ["https://revoked.badssl.com/", "https://incomplete-chain.badssl.com/"]
     bad = 0
+    unreachable = 0
     for u in ok_hosts + list(bad_hosts) + info_hosts:
-        # the network's failures (a reset, a timeout: badssl.com drops connections now and
-        # then) are tried again, up to three times; a TLS answer never is
-        for pause in (2, 5, 10, None):
+        # the network's failures (a reset, a timeout: badssl.com drops connections in streaks
+        # from GitHub's runners) are tried again, up to four times; a TLS answer never is
+        for pause in (3, 8, 15, 30, None):
             try:
                 out = subprocess.run(cmd + ["--tls-web", u], capture_output=True, text=True, timeout=40).stdout.strip()
             except subprocess.TimeoutExpired:
@@ -233,11 +237,20 @@ def internet_checks(cmd, tag):
         if u in info_hosts:
             print(f"info [{tag}] {u:42} {out[:110]}")
             continue
+        if NET_FAILURE.search(out):
+            # still the network after the last try: nothing was checked (counted apart below)
+            unreachable += 1
+            print(f"unreachable [{tag}] {u:35} {out[:110]}")
+            continue
         ok = out.startswith("TLS") if u in ok_hosts else out.startswith("error TLS: " + bad_hosts[u])
         bad += not ok
         want = "" if ok or u in ok_hosts else f"  (wanted: {bad_hosts[u]})"
         print(f"{'ok  ' if ok else 'FAIL'} [{tag}] {u:42} {out[:110]}{want}")
-    return bad
+    counted = len(ok_hosts) + len(bad_hosts)
+    if unreachable:
+        print(f"[{tag}] {unreachable} of {counted} hosts unreachable after every try: not counted")
+    # more than half unreachable: too little was checked to call it a pass
+    return bad + (1 if unreachable * 2 > counted else 0)
 
 
 if __name__ == "__main__":
