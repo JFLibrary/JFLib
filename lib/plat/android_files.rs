@@ -4,9 +4,13 @@
 //
 //   /cache/..  -> <cacheDir>/cache/..   (the system may clear it when storage runs low)
 //   /tmp/..    -> <cacheDir>/tmp/..     (emptied when the app starts)
+//   /system/.., /product/.., /proc/.. and the other folders of the system's own (SYSTEM): the
+//              real paths (fonts, certificates, /proc; read only for an app)
 //   /..        -> <filesDir>/fs/..      (config, data, documents, imports and anything else)
 // GalleryActivity passes filesDir / cacheDir before the start (jfgui_ANDROID_FILES,
-// jfgui_ANDROID_CACHE); without them every file call fails.
+// jfgui_ANDROID_CACHE); without them every file call fails but those of the system's folders.
+// The app's storage has no real name here: /data is a virtual name (docs/ANDROID.md AN3).
+// plat::fs and plat::watch take the same names (os_z: the kernel's calls on the real path).
 //
 // write_file and AtomicFile write a sibling "NAME.tmp-PID-SEQ-TIME", fsync it and rename it
 // over the target (readers see the old or the new file, also after a crash).  FileLock is
@@ -38,6 +42,7 @@ unsafe extern "C" {
     fn readdir(dir: *mut c_void) -> *const u8;
     fn closedir(dir: *mut c_void) -> i32;
     fn stat(path: *const u8, st: *mut u8) -> i32;
+    fn fcntl(fd: i32, cmd: i32, ...) -> i32;
     fn getpid() -> i32;
     fn __errno() -> *mut i32;
 }
@@ -51,6 +56,8 @@ const O_EXCL: i32 = 0o200;
 const O_TRUNC: i32 = 0o1000;
 const O_CLOEXEC: i32 = 0o2000000;
 const SEEK_END: i32 = 2;
+const F_GETFL: i32 = 3;
+const O_ACCMODE: i32 = 3;
 const LOCK_EX: i32 = 2;
 const LOCK_NB: i32 = 4;
 const ENOENT: i32 = 2;
@@ -72,6 +79,8 @@ const D_TYPE: usize = 18;
 const D_NAME: usize = 19;
 
 const BUILTIN: [&str; 6] = ["/tmp", "/config", "/data", "/cache", "/documents", "/imports"];
+// the first folders of the system's own real paths (never names of the app's storage)
+const SYSTEM: [&str; 12] = ["system", "system_ext", "product", "vendor", "odm", "apex", "proc", "sys", "dev", "storage", "sdcard", "mnt"];
 static ROOTS: SpinLock<Option<(String, String)>> = SpinLock::new(None);
 static TEMP: AtomicU32 = AtomicU32::new(1);
 
@@ -122,15 +131,24 @@ fn builtin(path: &str) -> bool {
     path == "/" || BUILTIN.contains(&path)
 }
 
-// mkdir -p of a real folder
+// a normalized virtual path in one of the system's own folders (a real path)
+fn system(v: &str) -> bool {
+    SYSTEM.contains(&v[1..].split('/').next().unwrap_or(""))
+}
+
+// mkdir -p of a real folder; the folder itself must be one at the end (a file of that name: false)
 fn mkdirs(real: &str) -> bool {
     let mut at = 1;
     while at <= real.len() {
         let end = real[at..].find('/').map_or(real.len(), |k| at + k);
         let p = z(&real[..end]);
         // SAFETY: NUL-terminated path.
-        if unsafe { mkdir(p.as_ptr(), 0o700) } != 0 && errno() != EEXIST {
-            return false;
+        if unsafe { mkdir(p.as_ptr(), 0o700) } != 0 {
+            // a name on the way that exists: a file there fails the next step (ENOTDIR); only the
+            // last one is looked at (the folders above the app's storage are not the app's to stat)
+            if errno() != EEXIST || end == real.len() && !stat_z(&p).is_ok_and(|(m, _, _)| m & S_IFMT == S_IFDIR) {
+                return false;
+            }
         }
         at = end + 1;
     }
@@ -176,6 +194,9 @@ fn roots() -> Option<(String, String)> {
 
 // the real path of a normalized virtual one
 fn real(v: &str) -> Option<String> {
+    if system(v) {
+        return Some(String::from(v));
+    }
     let (files, cache) = roots()?;
     let under = |root: &str| v == root || v.starts_with(root) && v.as_bytes().get(root.len()) == Some(&b'/');
     Some(if under("/cache") || under("/tmp") {
@@ -192,6 +213,46 @@ fn resolve(name: &str) -> Option<(String, Vec<u8>)> {
     let v = path(name)?;
     let r = real(&v)?;
     Some((v, z(&r)))
+}
+
+/// (fs.rs, watch.rs: plat::fs and plat::watch, docs/ANDROID.md AN3) the real path behind a name,
+/// NUL-terminated, for the kernel's calls: a virtual name its file in the app's storage, a folder of
+/// the system's own as it is ('\' separates, ".." goes up, as in every name here)
+pub(crate) fn os_z(name: &str) -> Option<Vec<u8>> {
+    resolve(name).map(|(_, r)| r)
+}
+
+/// (fs.rs) whether a name is the virtual root "/" (its listing has cache and tmp beside filesDir)
+pub(crate) fn os_root(name: &str) -> bool {
+    path(name).is_some_and(|v| v == "/")
+}
+
+/// (fs.rs) a link's target as the kernel keeps it: an absolute name its real path (links are
+/// resolved on real paths), a relative one as it is
+pub(crate) fn link_out(target: &str) -> Option<String> {
+    if !target.starts_with(['/', '\\']) {
+        return Some(String::from(target));
+    }
+    real(&path(target)?)
+}
+
+/// (fs.rs) a link's target as plat names it: a real path into the app's storage its virtual name,
+/// anything else as it is (link_out's way back)
+pub(crate) fn link_in(target: String) -> String {
+    if !target.starts_with('/') {
+        return target;
+    }
+    let Some((files, cache)) = roots() else { return target };
+    let below = |root: &str| target.strip_prefix(root).filter(|r| r.is_empty() || r.starts_with('/')).map(String::from);
+    if let Some(r) = below(&format!("{files}/fs")) {
+        return if r.is_empty() { String::from("/") } else { r };
+    }
+    for d in ["/cache", "/tmp"] {
+        if let Some(r) = below(&format!("{cache}{d}")) {
+            return format!("{d}{r}");
+        }
+    }
+    target
 }
 
 fn list_real(real: &str, f: &mut dyn FnMut(&str, bool, u64)) -> bool {
@@ -423,6 +484,30 @@ pub(crate) struct OsFile {
     writable: bool,
 }
 impl OsFile {
+    /// (fs.rs: Dir) an OS file of a descriptor opened there, which it now owns (writable as it was
+    /// opened)
+    pub(crate) fn from_raw(raw: i32) -> OsFile {
+        // SAFETY: F_GETFL only reads the descriptor's flags.
+        let fl = unsafe { fcntl(raw, F_GETFL) };
+        OsFile { fd: raw, writable: fl >= 0 && fl & O_ACCMODE != O_RDONLY }
+    }
+
+    /// (fs.rs: set_file_times / set_file_mode) its descriptor
+    pub(crate) fn raw(&self) -> i32 {
+        self.fd
+    }
+
+    /// A new file (0600), read and write; never an existing name, also not a link (File::create_new).
+    pub(crate) fn create_new_raw(name: &str) -> Option<Self> {
+        let (v, r) = resolve(name)?;
+        if builtin(&v) {
+            return None;
+        }
+        // SAFETY: NUL-terminated path; O_EXCL never opens an existing entry (nor follows a link).
+        let fd = unsafe { open(r.as_ptr().cast(), O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, 0o600u32) };
+        (fd >= 0).then_some(Self { fd, writable: true })
+    }
+
     /// FO_READ (existing), FO_WRITE (create / truncate), FO_RW (open or create).
     pub(crate) fn open_raw(name: &str, mode: u32) -> Option<Self> {
         let (v, r) = resolve(name)?;

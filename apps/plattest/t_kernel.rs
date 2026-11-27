@@ -7,15 +7,19 @@
 //   tools/kernel_table_check.py.  plat::fs::Dir on the kernel's *at calls and openat2: no link on
 //   the way below an open folder, also none swapped in after it was opened.
 //
+//   Android (docs/ANDROID.md AN3): the same without fork, clone and dup2 (rt::os has them on Linux
+//   only); plat names the scratch folder /tmp/.. (android_files.rs), the raw calls its real path
+//   below jfgui_ANDROID_CACHE; Dir never tries openat2 there.
+//
 //   Windows: plat::fs::Dir on NtCreateFile relative to the folders' handles -- a folder another
 //   handle holds open with delete access (so nothing can lock it against renaming) renamed and
 //   replaced by a junction after it was opened: what is done in it stays in the real folder; the
 //   links it makes carry the same reparse data as CreateSymbolicLinkW's (when this account may
 //   make links: the developer mode or the privilege).
 
-#[cfg(not(any(target_os = "linux", windows)))]
+#[cfg(not(any(target_os = "linux", target_os = "android", windows)))]
 pub fn t_kernel(t: &mut crate::T) {
-    t.info("kernel: Linux and Windows only\n");
+    t.info("kernel: Linux, Android and Windows only\n");
 }
 
 #[cfg(windows)]
@@ -241,24 +245,27 @@ mod win {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub use lnx::t_kernel;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 #[allow(unsafe_code)]
 mod lnx {
     use alloc::format;
     use alloc::vec::Vec;
 
+    #[cfg(target_os = "linux")]
+    use rt::os::{clone, dup2, fork, SYS_EXIT_GROUP, SYS_GETTID, SYS_READ, SYS_WAIT4};
     use rt::os::{
-        clone, dup2, fork, poll, rename, syscall3, syscall6, AT_FDCWD, O_CLOEXEC, O_CREAT, O_DIRECTORY, O_EXCL, O_NOFOLLOW, O_PATH, O_RDONLY, O_RDWR, O_TMPFILE,
-        O_WRONLY, SYS_CLOSE, SYS_EXIT_GROUP, SYS_FCHMODAT, SYS_FSTAT, SYS_GETTID, SYS_GETUID, SYS_MKDIRAT, SYS_NEWFSTATAT, SYS_OPENAT, SYS_PIPE2, SYS_READ,
-        SYS_READLINKAT, SYS_SYMLINKAT, SYS_UNLINKAT, SYS_WAIT4, SYS_WRITE, Stat,
+        poll, rename, syscall3, syscall6, AT_FDCWD, O_CLOEXEC, O_CREAT, O_DIRECTORY, O_EXCL, O_NOFOLLOW, O_PATH, O_RDONLY, O_RDWR, O_TMPFILE,
+        O_WRONLY, SYS_CLOSE, SYS_FCHMODAT, SYS_FSTAT, SYS_GETUID, SYS_MKDIRAT, SYS_NEWFSTATAT, SYS_OPENAT, SYS_PIPE2,
+        SYS_READLINKAT, SYS_SYMLINKAT, SYS_UNLINKAT, SYS_WRITE, Stat,
     };
 
     use crate::T;
 
     const ENOENT: isize = -2;
+    #[cfg(target_os = "linux")]
     const EBADF: isize = -9;
     const EEXIST: isize = -17;
     const ENOTDIR: isize = -20;
@@ -266,8 +273,11 @@ mod lnx {
     const ELOOP: isize = -40;
     const EOPNOTSUPP: isize = -95;
     const AT_REMOVEDIR: usize = 0x200;
+    #[cfg(target_os = "linux")]
     const SIGCHLD: usize = 17;
+    #[cfg(target_os = "linux")]
     const CLONE_PARENT_SETTID: usize = 0x10_0000;
+    #[cfg(target_os = "linux")]
     const CLONE_CHILD_SETTID: usize = 0x100_0000;
     const S_IFMT: u32 = 0o170000;
     const S_IFREG: u32 = 0o100000;
@@ -275,7 +285,14 @@ mod lnx {
     const S_IFLNK: u32 = 0o120000;
     const POLLIN: u64 = 1;
 
+    // a path for the raw calls, NUL-terminated (Android: plat's /tmp/.. is the real folder tmp below
+    // the app's cache folder, android_files.rs)
     fn z(s: &str) -> Vec<u8> {
+        #[cfg(target_os = "android")]
+        let s = &match (s.strip_prefix("/tmp/"), plat::env("jfgui_ANDROID_CACHE")) {
+            (Some(rest), Some(c)) => format!("{}/tmp/{rest}", c.trim_end_matches('/')),
+            _ => alloc::string::String::from(s),
+        };
         let mut v = s.as_bytes().to_vec();
         v.push(0);
         v
@@ -319,6 +336,7 @@ mod lnx {
     }
 
     // the child's exit code, -1 when a signal ended it
+    #[cfg(target_os = "linux")]
     fn reap(pid: isize) -> i32 {
         let mut status = 0i32;
         // SAFETY: status is a plain out-parameter.
@@ -326,6 +344,7 @@ mod lnx {
         if status & 0x7f == 0 { (status >> 8) & 0xff } else { -1 }
     }
 
+    #[cfg(target_os = "linux")]
     fn exit_child(code: usize) -> ! {
         // SAFETY: ends the child.
         unsafe { syscall3(SYS_EXIT_GROUP, code, 0, 0) };
@@ -335,14 +354,23 @@ mod lnx {
     pub fn t_kernel(t: &mut T) {
         // the temp folder: a real Linux file system (the repository under WSL is drvfs)
         let dir = format!("{}/plattest-kernel-{:x}", plat::temp_dir().unwrap_or_default(), plat::time_us() as u32);
+        // (Android: android_files.rs makes its folders at its first use and empties /tmp then --
+        // before the raw calls make anything there)
+        #[cfg(target_os = "android")]
+        let _ = plat::file_exists(&dir);
         let d = z(&dir);
         // SAFETY: a NUL-terminated path.
         t.check(unsafe { syscall3(SYS_MKDIRAT, AT_FDCWD, d.as_ptr() as usize, 0o755) } == 0, "kernel: mkdirat");
         flags(t, &dir);
         stats(t, &dir);
         polls(t);
-        forks(t);
-        dups(t);
+        #[cfg(target_os = "linux")]
+        {
+            forks(t);
+            dups(t);
+        }
+        #[cfg(target_os = "android")]
+        t.info("  kernel: fork, clone and dup2 are rt::os helpers of Linux only (not tested on Android)\n");
         renames(t, &dir);
         dirs(t, &dir);
         unlink(&dir, AT_REMOVEDIR);
@@ -462,6 +490,7 @@ mod lnx {
         close(wr);
     }
 
+    #[cfg(target_os = "linux")]
     fn forks(t: &mut T) {
         // SAFETY: the child only ends itself.
         let pid = unsafe { fork() };
@@ -488,6 +517,7 @@ mod lnx {
         t.check(reap(pid) == 0, "kernel: clone: child_tid holds the child in its copy");
     }
 
+    #[cfg(target_os = "linux")]
     fn dups(t: &mut T) {
         let fd = open("/dev/null", O_RDONLY, 0);
         t.check(fd > 2, "kernel: dup2: a descriptor");

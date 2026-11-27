@@ -11,6 +11,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 ### Added
 
 - The storage is a trait: cas::Store (lib/cas/store.rs) keeps a repository's objects by kind (store::Kind: Config, Pack, Index, Snapshot) and name, the way S3, SFTP or WebDAV keep files -- location, init (a new repository; NotEmpty), lock (one holder; InUse, a StoreLock guard), get, get_range (with a default that reads the whole object), put, delete, list with sizes; implemented for Box and Arc of a store. Its rules: a put is atomic and durable, a delete stays done, reads see every put before them, the lock keeps out holders of other processes and machines. cas::Folder is the store in a folder (the layout as before, also on vfs mounts such as mem://); Repo::create_in, Repo::open_in, Repo::store and peek_id_in take any store, Repo::create, Repo::open and peek_id a folder as before. store::name_ok says which names a store is asked for
+- On Android too: `jflib` takes the crate there now that `plat::fs` has the files (docs/ANDROID.md, AN3); docs.rs builds it for `aarch64-linux-android`
 
 ### Changed
 

@@ -10,6 +10,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Added
+
+- `jflib::cas` and `jflib::datastore` on Android too (`plat::fs` there since AN3, docs/ANDROID.md); docs.rs builds them for `aarch64-linux-android`
+
 ## [0.2.1] - 2026-11-16
 
 ### Changed

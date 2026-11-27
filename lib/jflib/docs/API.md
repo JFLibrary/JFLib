@@ -28975,6 +28975,14 @@ fs -- file system access for backup and restore
   fd_path(File) (Linux)                        a name of the open file itself for a program
                                                this one starts (/proc/<pid>/fd/<n>)
 
+Android (docs/ANDROID.md AN3): the Linux code (the kernel's calls through rt::os) on the names of
+android_files.rs -- /config, /data, /cache, /tmp, /documents, /imports and the rest of "/" are the
+app's storage, /system, /product, /proc and the other folders of the system's own their real
+paths --, '\' separates as in those names; Dir opens component by component (never openat2:
+SIGSYS); an absolute link target is kept as its real path and read back as its name; no hard
+links (SELinux refuses apps every one: hard_link is false); local_zone_id from the property
+persist.sys.timezone.
+
 Windows: reparse points count as links only for symbolic links and junctions; other tags
 (deduplication, cloud placeholders) are ordinary files whose data is read.  Files are
 opened with backup semantics (directories, and backup privileges when the process holds
@@ -29020,7 +29028,8 @@ modes or free space.
   - `kind: FileKind`
 
 - **`fn join(dir: &str, name: &str) -> String`**
-  "a/b" + "c" with the platform separator (Linux, macOS: a '\\' is part of a name)
+  "a/b" + "c" with the platform separator (Linux, macOS: a '\\' is part of a name; Android: '/',
+  a '\\' separates there too)
 
 - **`fn parent(path: &str) -> &str`**
   the parent directory of a path ("" for a bare name; Linux, macOS: a '\\' is part of a name)
@@ -29047,7 +29056,8 @@ modes or free space.
 
 - **`fn hard_link(existing: &str, new: &str) -> bool`**
   a second name new for the file existing (both OS paths or folder mounts); with a manifest
-  the app needs write access to both (writing through new changes existing)
+  the app needs write access to both (writing through new changes existing); Android: false
+  (SELinux allows an app no hard links)
 
 - **`fn set_times(path: &str, atime_ns: i64, mtime_ns: i64) -> bool`**
   access and modification times (ns since 1970), on a link itself, never its target; a
@@ -29094,7 +29104,8 @@ modes or free space.
                                     link on the way: Linux openat2 (RESOLVE_BENEATH |
                                     RESOLVE_NO_SYMLINKS | RESOLVE_NO_MAGICLINKS), else openat
                                     with O_NOFOLLOW for every component (kernels before 5.6,
-                                    a seccomp filter that refuses openat2)
+                                    a seccomp filter that refuses openat2; Android always:
+                                    its filter may end the app on openat2)
   names                             one component: no separator, not "." or ".." (Windows:
                                     no ':' either); "" is the folder itself where noted
   lstat / read_link / read_dir      links are reported, never followed
@@ -29257,6 +29268,8 @@ folders).  A folder that could not be watched or listed for a passing reason (th
 limit, no descriptors left) is tried again every second; a root moved or deleted ends its
 watches (their events would name the old paths) and is watched again once a folder is at
 its path.  Until then watching() is false.
+Android (docs/ANDROID.md AN3): the Linux way, on the app's names (android_files.rs: /data,
+/documents ...; the watches on the real paths behind them); changes come back under those names.
 macOS: FSEvents with file events (dropped events report an overflow); iOS: none.
 Paths are absolute, in the form of the platform; the folder of a change is enough for a
 caller that walks the tree again.
@@ -37927,9 +37940,13 @@ layout) on real files of the app's internal storage, through Bionic.  They survi
 
   /cache/..  -> <cacheDir>/cache/..   (the system may clear it when storage runs low)
   /tmp/..    -> <cacheDir>/tmp/..     (emptied when the app starts)
+  /system/.., /product/.., /proc/.. and the other folders of the system's own (SYSTEM): the
+             real paths (fonts, certificates, /proc; read only for an app)
   /..        -> <filesDir>/fs/..      (config, data, documents, imports and anything else)
 GalleryActivity passes filesDir / cacheDir before the start (jfgui_ANDROID_FILES,
-jfgui_ANDROID_CACHE); without them every file call fails.
+jfgui_ANDROID_CACHE); without them every file call fails but those of the system's folders.
+The app's storage has no real name here: /data is a virtual name (docs/ANDROID.md AN3).
+plat::fs and plat::watch take the same names (os_z: the kernel's calls on the real path).
 
 write_file and AtomicFile write a sibling "NAME.tmp-PID-SEQ-TIME", fsync it and rename it
 over the target (readers see the old or the new file, also after a crash).  FileLock is

@@ -21,8 +21,8 @@
 //                                     tools/wycheproof_check.py, tools/limbo_check.py)
 //   (build_rs.py test runs it through tests/all.uis; --script is ignored)
 //   Android (docs/ANDROID.md, AN0): a program without a UI, python tools/android_console.py coretest;
-//   the groups and parts that need what plat lacks there so far (fs, net: AN2, AN3) say "not on
-//   Android yet" instead
+//   the groups and parts that need what plat lacks there so far (net: AN2) say "not on Android
+//   yet" instead (fs, watch, datastore and cas since AN3)
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
@@ -32,7 +32,6 @@ extern crate alloc;
 use alloc::format;
 use alloc::string::String;
 
-#[cfg(not(target_os = "android"))]
 mod cast;
 mod crypto;
 mod dhcpt;
@@ -54,7 +53,6 @@ mod platx;
 mod rngt;
 #[cfg(not(target_os = "android"))]
 mod sshd;
-#[cfg(not(target_os = "android"))]
 mod store;
 #[cfg(not(target_os = "android"))]
 mod tlst;
@@ -96,8 +94,8 @@ mod patternt;
 mod eapt;
 mod imapt;
 
-/// a group that needs what plat lacks on Android so far: fs, net (docs/ANDROID.md, AN2, AN3) ->
-/// (name, None) there
+/// a group that needs what plat lacks on Android so far: net (docs/ANDROID.md, AN2) -> (name,
+/// None) there
 #[cfg(not(target_os = "android"))]
 macro_rules! native {
     ($name:literal, $f:path) => {
@@ -188,10 +186,10 @@ fn run() -> i32 {
         ("crypto", Some(crypto::run)),
         ("compress", Some(lz::run)),
         ("stream", Some(lzs::run)),
-        ("plat", Some(platx::run)), // (Android: sync and rand, AN1)
-        native!("datastore", store::run),
+        ("plat", Some(platx::run)), // (Android: no net yet, AN2)
+        ("datastore", Some(store::run)),
         native!("http", httpt::run),
-        native!("cas", cast::run),
+        ("cas", Some(cast::run)),
         native!("tls", tlst::run),
         native!("tlsweb", tlsweb::run),
         native!("systrust", systrust::run),
