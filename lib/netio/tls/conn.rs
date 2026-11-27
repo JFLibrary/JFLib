@@ -2633,17 +2633,15 @@ fn check_trust(trust: &Trust, chain: &[Cert], name: Option<&String>, usage: Usag
             if expired {
                 return Err(fail(AL_CERTIFICATE_EXPIRED, "certificate expired"));
             }
-            // the system's CAs are for servers; a server's client_auth with System takes the
-            // extra CAs only
-            let system = match usage {
-                Usage::Server => crate::roots::verify_system(chain, name, ocsp, now),
-                _ => Err(Refused::new(Reason::UnknownCa, "the system's CAs are for servers")),
-            };
-            // the extra CAs only where the system finds no path to a CA it trusts (UnknownCa):
-            // a refusal for a revoked or expired certificate, a wrong name or usage stands
-            let r = match system {
-                Err(e) if e.reason == Reason::UnknownCa && !extra.is_empty() => verify_chain(chain, extra, now, Some(name).filter(|n| !n.is_empty()), usage).map_err(|_| e),
-                r => r,
+            // a server's chain: the system with the extra CAs (Windows and Apple check those
+            // under their own policy; Linux takes them where the bundle gives no path: a
+            // refusal for a revoked or expired certificate, a wrong name or usage stands); a
+            // server's client_auth with System takes the extra CAs only (the system's CAs are
+            // for servers)
+            let r = match usage {
+                Usage::Server => crate::roots::verify_system(chain, name, extra, ocsp, now),
+                _ if extra.is_empty() => Err(Refused::new(Reason::UnknownCa, "the system's CAs are for servers")),
+                _ => verify_chain(chain, extra, now, Some(name).filter(|n| !n.is_empty()), usage).map_err(|t| Refused::new(Reason::UnknownCa, t)),
             };
             r.map_err(|e| match e.reason {
                 Reason::UnknownCa if !name.is_empty() && !leaf.names(name) => fail(AL_BAD_CERTIFICATE, "certificate for another name"),

@@ -29275,15 +29275,19 @@ Source: [`lib/plat/certs.rs`](../lib/plat/certs.rs)
 ```text
 certs -- the operating system's trusted certificate authorities
 
-  verify_tls_server(chain, host, ocsp, time) -> Option<Result<(), Refused>>
+  verify_tls_server(chain, host, ocsp, extra, time) -> Option<Result<(), Refused>>
        Windows: CryptoAPI builds and checks the chain (leaf first, DER) for a TLS server of
        that name at that time (Unix seconds), with the machine's and user's roots, enterprise
        policy and automatic root updates (like for every program there, Windows may fetch a
        missing intermediate or root); the leaf's revocation from the stapled OCSP response
-       (ocsp) and what Windows has cached, nothing fetched for it.  macOS and iOS: the
-       Security framework (SecTrustEvaluateWithError) with the system's and the user's roots
-       and trust settings and the stapled response, without network access.  Some(Err) says
-       why the system refuses.  Linux: None (netio checks against the bundle).
+       (ocsp) and what Windows has cached, nothing fetched for it.  Where its roots give no
+       path, once more with the extra CAs (DER: a company CA) as its only roots, nothing
+       fetched.  macOS and iOS: the Security framework (SecTrustEvaluateWithError) with the
+       system's and the user's roots and trust settings, the extra CAs as anchors beside them,
+       and the stapled response, without network access.  Either way the system's policy
+       applies to the extra CAs as well, and its answer is the whole answer.  Some(Err) says
+       why the system refuses.  Linux: None (netio checks against the bundle, then the extra
+       CAs).
   verify_tls_server_roots(chain, host, roots, time) -> Option<Result<(), Refused>>
        the same with only these CAs as trust anchors (DER), not the system's: nothing
        fetched, no revocation; the system's checks against a PKI of one's own
@@ -29320,11 +29324,11 @@ certs -- the operating system's trusted certificate authorities
 
 - **`fn root_bundle() -> Option<Vec<u8>>`** *(Windows)*
 
-- **`fn verify_tls_server(_chain: &[&[u8]], _host: &str, _ocsp: Option<&[u8]>, _time: i64) -> Option<Result<(), Refused>>`** *(Linux)*
+- **`fn verify_tls_server(_chain: &[&[u8]], _host: &str, _ocsp: Option<&[u8]>, _extra: &[&[u8]], _time: i64) -> Option<Result<(), Refused>>`** *(Linux)*
 
 - **`fn verify_tls_server_roots(_chain: &[&[u8]], _host: &str, _roots: &[&[u8]], _time: i64) -> Option<Result<(), Refused>>`** *(Linux)*
 
-- **`fn verify_tls_server(chain: &[&[u8]], host: &str, ocsp: Option<&[u8]>, time: i64) -> Option<Result<(), Refused>>`** *(Windows)*
+- **`fn verify_tls_server(chain: &[&[u8]], host: &str, ocsp: Option<&[u8]>, extra: &[&[u8]], time: i64) -> Option<Result<(), Refused>>`** *(Windows)*
 
 - **`fn verify_tls_server_roots(chain: &[&[u8]], host: &str, roots: &[&[u8]], time: i64) -> Option<Result<(), Refused>>`** *(Windows)*
 
@@ -29332,7 +29336,7 @@ certs -- the operating system's trusted certificate authorities
   macOS: the system's PEM bundle (/etc/ssl/cert.pem, updated with the system); iOS: None.  Apple's
   own trust decision is verify_tls_server.
 
-- **`fn verify_tls_server(chain: &[&[u8]], host: &str, ocsp: Option<&[u8]>, time: i64) -> Option<Result<(), Refused>>`** *(Apple)*
+- **`fn verify_tls_server(chain: &[&[u8]], host: &str, ocsp: Option<&[u8]>, extra: &[&[u8]], time: i64) -> Option<Result<(), Refused>>`** *(Apple)*
 
 - **`fn verify_tls_server_roots(chain: &[&[u8]], host: &str, roots: &[&[u8]], time: i64) -> Option<Result<(), Refused>>`** *(Apple)*
 
@@ -46291,11 +46295,15 @@ Source: [`lib/netio/roots.rs`](../lib/netio/roots.rs)
 ```text
 roots -- the system's certificate authorities for TLS clients of public servers
 
-  verify_system(chain, host, ocsp, now) -> Result<(), Refused>
+  verify_system(chain, host, extra, ocsp, now) -> Result<(), Refused>
        Windows, macOS, iOS: the system checks the chain (plat::certs: its roots and policy,
-       the stapled OCSP response), then netio the leaf once more (x509::check_leaf: its name,
-       usage and extensions, and a key netio takes: the same rules on every system); Linux:
-       a path to one of the bundle's CAs (verify_chain)
+       the extra CAs under the same policy, the stapled OCSP response), then netio the leaf
+       once more (x509::check_leaf: its name, usage and extensions, and a key netio takes:
+       the same rules on every system); Linux: a path to one of the bundle's CAs
+       (verify_chain), else, where it finds none, to one of the extra CAs.  The stapled
+       response goes to Windows' and Apple's checks; verify_system itself does not check it
+       (Linux takes none): the TLS client does (tls/conn.rs check_staple, by
+       ClientConfig::revocation), another caller with x509::ocsp::check
   verify_system_roots(chain, host, roots, now)
        the same with only these CAs trusted, nothing fetched: the system's checks against a
        PKI of one's own (tools/limbo_check.py --system); an empty host checks no name
@@ -46316,10 +46324,12 @@ Re-exports: `plat::certs::{Reason, Refused}`
 - **`fn system_anchors() -> Arc<Vec<Cert>>`**
   the CA certificates of the system bundle (empty on Windows and iOS: the system decides there)
 
-- **`fn verify_system(chain: &[Cert], host: &str, ocsp: Option<&[u8]>, now: i64) -> Result<(), Refused>`**
-  a server chain (leaf first) against the system's trust for this host name, with the
-  stapled OCSP response the server sent (the system reads it; netio checks it as well:
-  tls/conn.rs check_staple)
+- **`fn verify_system(chain: &[Cert], host: &str, extra: &[Cert], ocsp: Option<&[u8]>, now: i64) -> Result<(), Refused>`**
+  a server chain (leaf first) against the system's trust for this host name and the extra
+  CAs (a company CA: the system's policy holds for them too; on Linux they count where the
+  bundle gives no path), with the stapled OCSP response the server sent.  Windows and Apple
+  read that response; this function does not check it -- the TLS client does
+  (tls/conn.rs check_staple), another caller with x509::ocsp::check
 
 - **`fn verify_system_roots(chain: &[Cert], host: &str, roots: &[Cert], now: i64) -> Result<(), Refused>`**
   a server chain against only these CAs, with the system's checks (Linux: verify_chain's);
@@ -46624,8 +46634,8 @@ tls -- TLS 1.3 servers and clients, and TLS 1.2 towards public servers (RFC 8446
   Identity::new(chain, key) / Identity::from_pem(certs, key): a chain and its key (PrivateKey:
   Ed25519, ECDSA, RSA; PKCS #8, SEC 1, PKCS #1)
   Trust::Anchors(CAs) / Pinned(SHA-256 of the leaf) / Any (trust on first use: the caller
-  shows the fingerprint and pins it) / System(extra CAs) (the operating system's check; the
-  extra CAs where it finds no path to a CA it trusts)
+  shows the fingerprint and pins it) / System(extra CAs) (the operating system's check, the
+  extra CAs under its policy)
 
 conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over a Stream.
 ```
@@ -46650,10 +46660,11 @@ conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over 
   - `Any` -- anything (only to read the fingerprint for a trust decision)
   - `System(Vec<Cert>)` -- the operating system's certificate authorities, and these as well (a company CA): the
     system checks the chain (Windows CryptoAPI, Apple's Security framework with the stapled
-    OCSP response; on Linux the distribution's bundle: crate::roots), these count only where
-    its refusal is that it finds no path to a CA it trusts (roots::Reason::UnknownCa); the
-    alert follows its reason (expired, revoked, another name or usage, unknown CA).  Allows
-    TLS 1.2 and the public suites
+    OCSP response; on Linux the distribution's bundle: crate::roots), these under its own
+    policy (Windows with them as its roots where its own give no path, Apple as anchors
+    beside its own; Linux where the bundle gives no path); the alert follows its reason
+    (expired, revoked, another name or usage, unknown CA).  Allows TLS 1.2 and the public
+    suites
   - `Custom(Verifier)` -- a check the program brings (a PKI of its own, keys pinned by their SPKI, Certificate
     Transparency, the platform's verifier, a test peer); a client offers with it what it
     offers with System (TLS 1.2, the public suites)

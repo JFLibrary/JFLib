@@ -1,10 +1,14 @@
 // roots -- the system's certificate authorities for TLS clients of public servers
 //
-//   verify_system(chain, host, ocsp, now) -> Result<(), Refused>
+//   verify_system(chain, host, extra, ocsp, now) -> Result<(), Refused>
 //        Windows, macOS, iOS: the system checks the chain (plat::certs: its roots and policy,
-//        the stapled OCSP response), then netio the leaf once more (x509::check_leaf: its name,
-//        usage and extensions, and a key netio takes: the same rules on every system); Linux:
-//        a path to one of the bundle's CAs (verify_chain)
+//        the extra CAs under the same policy, the stapled OCSP response), then netio the leaf
+//        once more (x509::check_leaf: its name, usage and extensions, and a key netio takes:
+//        the same rules on every system); Linux: a path to one of the bundle's CAs
+//        (verify_chain), else, where it finds none, to one of the extra CAs.  The stapled
+//        response goes to Windows' and Apple's checks; verify_system itself does not check it
+//        (Linux takes none): the TLS client does (tls/conn.rs check_staple, by
+//        ClientConfig::revocation), another caller with x509::ocsp::check
 //   verify_system_roots(chain, host, roots, now)
 //        the same with only these CAs trusted, nothing fetched: the system's checks against a
 //        PKI of one's own (tools/limbo_check.py --system); an empty host checks no name
@@ -71,27 +75,32 @@ pub fn system_anchors() -> Arc<Vec<Cert>> {
     anchors
 }
 
-/// a server chain (leaf first) against the system's trust for this host name, with the
-/// stapled OCSP response the server sent (the system reads it; netio checks it as well:
-/// tls/conn.rs check_staple)
-pub fn verify_system(chain: &[Cert], host: &str, ocsp: Option<&[u8]>, now: i64) -> Result<(), Refused> {
+/// a server chain (leaf first) against the system's trust for this host name and the extra
+/// CAs (a company CA: the system's policy holds for them too; on Linux they count where the
+/// bundle gives no path), with the stapled OCSP response the server sent.  Windows and Apple
+/// read that response; this function does not check it -- the TLS client does
+/// (tls/conn.rs check_staple), another caller with x509::ocsp::check
+pub fn verify_system(chain: &[Cert], host: &str, extra: &[Cert], ocsp: Option<&[u8]>, now: i64) -> Result<(), Refused> {
     if host.is_empty() {
         return Err(Refused::new(Reason::Name, "no host name to check"));
     }
-    system(chain, host, ocsp, None, now)
+    system(chain, host, extra, ocsp, None, now)
 }
 
 /// a server chain against only these CAs, with the system's checks (Linux: verify_chain's);
 /// an empty host checks no name
 pub fn verify_system_roots(chain: &[Cert], host: &str, roots: &[Cert], now: i64) -> Result<(), Refused> {
-    system(chain, host, None, Some(roots), now)
+    system(chain, host, &[], None, Some(roots), now)
 }
 
-fn system(chain: &[Cert], host: &str, ocsp: Option<&[u8]>, roots: Option<&[Cert]>, now: i64) -> Result<(), Refused> {
+fn system(chain: &[Cert], host: &str, extra: &[Cert], ocsp: Option<&[u8]>, roots: Option<&[Cert]>, now: i64) -> Result<(), Refused> {
     let Some(leaf) = chain.first() else { return Err(Refused::new(Reason::Other, "no certificate")) };
     let ders: Vec<&[u8]> = chain.iter().map(|c| c.der.as_slice()).collect();
     let os = match roots {
-        None => plat::certs::verify_tls_server(&ders, host, ocsp, now),
+        None => {
+            let e: Vec<&[u8]> = extra.iter().map(|c| c.der.as_slice()).collect();
+            plat::certs::verify_tls_server(&ders, host, ocsp, &e, now)
+        }
         Some(r) => {
             let r: Vec<&[u8]> = r.iter().map(|c| c.der.as_slice()).collect();
             plat::certs::verify_tls_server_roots(&ders, host, &r, now)
@@ -117,13 +126,19 @@ fn system(chain: &[Cert], host: &str, ocsp: Option<&[u8]>, roots: Option<&[Cert]
                     &bundle
                 }
             };
-            verify_chain(chain, anchors, now, Some(host).filter(|h| !h.is_empty()), Usage::Server).map_err(|text| {
+            let name = Some(host).filter(|h| !h.is_empty());
+            let r = verify_chain(chain, anchors, now, name, Usage::Server).map_err(|text| {
                 let reason = match leaf_reason(leaf, host, now) {
                     Reason::Other => Reason::UnknownCa,
                     r => r,
                 };
                 Refused { reason, text }
-            })
+            });
+            // the extra CAs where the bundle gives no path (a company CA the program trusts)
+            match r {
+                Err(e) if roots.is_none() && e.reason == Reason::UnknownCa && !extra.is_empty() => verify_chain(chain, extra, now, name, Usage::Server).map_err(|_| e),
+                r => r,
+            }
         }
     }
 }

@@ -2819,9 +2819,10 @@ crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)
   `Trust::System(extra)` connects to public servers: TLS 1.3 or TLS 1.2 with ECDHE, the chain built and checked
   by the system (Windows CryptoAPI and macOS / iOS's Security framework, with the stapled OCSP
   response; Linux against the distribution's CA bundle, or `SSL_CERT_FILE` / `SSL_CERT_DIR`),
-  then the leaf's name by netio once more; the extra CAs (a company CA) count only where the
-  system finds no path to a CA it trusts (`roots::Reason::UnknownCa`), and a refusal names its reason (expired, revoked, another
-  name, unknown CA; `netio::roots::verify_system` answers it as `roots::Reason`);
+  then the leaf by netio once more (`x509::check_leaf`); the system checks the extra CAs (a
+  company CA) under its own policy (Linux where the bundle gives no path), and a refusal names
+  its reason (expired, revoked, another name, unknown CA; `netio::roots::verify_system`
+  answers it as `roots::Reason`);
   `netio::trust::system_connector(extra)` gives the connector for `Client`.
   OCSP stapling: `ServerConfig::ocsp` (`Arc<tls::Staples>`, kept current by
   `netio::ocsp::refresh(&staples, &client, &chain, issuer)`, which says when to call it again)

@@ -1,14 +1,18 @@
 // certs -- the operating system's trusted certificate authorities
 //
-//   verify_tls_server(chain, host, ocsp, time) -> Option<Result<(), Refused>>
+//   verify_tls_server(chain, host, ocsp, extra, time) -> Option<Result<(), Refused>>
 //        Windows: CryptoAPI builds and checks the chain (leaf first, DER) for a TLS server of
 //        that name at that time (Unix seconds), with the machine's and user's roots, enterprise
 //        policy and automatic root updates (like for every program there, Windows may fetch a
 //        missing intermediate or root); the leaf's revocation from the stapled OCSP response
-//        (ocsp) and what Windows has cached, nothing fetched for it.  macOS and iOS: the
-//        Security framework (SecTrustEvaluateWithError) with the system's and the user's roots
-//        and trust settings and the stapled response, without network access.  Some(Err) says
-//        why the system refuses.  Linux: None (netio checks against the bundle).
+//        (ocsp) and what Windows has cached, nothing fetched for it.  Where its roots give no
+//        path, once more with the extra CAs (DER: a company CA) as its only roots, nothing
+//        fetched.  macOS and iOS: the Security framework (SecTrustEvaluateWithError) with the
+//        system's and the user's roots and trust settings, the extra CAs as anchors beside them,
+//        and the stapled response, without network access.  Either way the system's policy
+//        applies to the extra CAs as well, and its answer is the whole answer.  Some(Err) says
+//        why the system refuses.  Linux: None (netio checks against the bundle, then the extra
+//        CAs).
 //   verify_tls_server_roots(chain, host, roots, time) -> Option<Result<(), Refused>>
 //        the same with only these CAs as trust anchors (DER), not the system's: nothing
 //        fetched, no revocation; the system's checks against a PKI of one's own
@@ -97,7 +101,7 @@ pub fn root_bundle() -> Option<Vec<u8>> {
 }
 
 #[cfg(target_os = "linux")]
-pub fn verify_tls_server(_chain: &[&[u8]], _host: &str, _ocsp: Option<&[u8]>, _time: i64) -> Option<Result<(), Refused>> {
+pub fn verify_tls_server(_chain: &[&[u8]], _host: &str, _ocsp: Option<&[u8]>, _extra: &[&[u8]], _time: i64) -> Option<Result<(), Refused>> {
     None
 }
 
@@ -259,8 +263,14 @@ fn refused_win(code: u32) -> Refused {
 }
 
 #[cfg(windows)]
-pub fn verify_tls_server(chain: &[&[u8]], host: &str, ocsp: Option<&[u8]>, time: i64) -> Option<Result<(), Refused>> {
-    Some(verify_win(chain, host, ocsp, None, time))
+pub fn verify_tls_server(chain: &[&[u8]], host: &str, ocsp: Option<&[u8]>, extra: &[&[u8]], time: i64) -> Option<Result<(), Refused>> {
+    // the extra CAs only where the system's roots give no path (CERT_E_UNTRUSTEDROOT and the
+    // like), then as CryptoAPI's only roots: its policy holds for them too, and a chain it
+    // refused for another reason (revoked, expired, another name) is not tried again
+    Some(match verify_win(chain, host, ocsp, None, time) {
+        Err(e) if e.reason == Reason::UnknownCa && !extra.is_empty() => verify_win(chain, host, ocsp, Some(extra), time),
+        r => r,
+    })
 }
 
 #[cfg(windows)]
@@ -278,8 +288,10 @@ fn verify_win(chain: &[&[u8]], host: &str, ocsp: Option<&[u8]>, roots: Option<&[
     let ids = [server_auth.as_ptr()];
     let host = bare(host);
     let name: Vec<u16> = host.encode_utf16().chain(core::iter::once(0)).collect();
-    // FILETIME: 100 ns since 1601
-    let ft = (time.max(0) as u64 + 11_644_473_600) * 10_000_000;
+    // FILETIME: 100 ns since 1601; a time before that or past its end is none CryptoAPI takes
+    let Some(ft) = u64::try_from((time as i128 + 11_644_473_600) * 10_000_000).ok() else {
+        return Err(Refused::new(Reason::Other, "a time CryptoAPI cannot check at (before 1601)"));
+    };
     let ft = FileTime { low: ft as u32, high: (ft >> 32) as u32 };
     // SAFETY: every pointer handed to CryptoAPI points into a buffer that lives until the call
     // returns; contexts, stores, the engine and the chain are freed on every path below.
@@ -368,13 +380,13 @@ pub fn root_bundle() -> Option<Vec<u8>> {
 }
 
 #[cfg(target_vendor = "apple")]
-pub fn verify_tls_server(chain: &[&[u8]], host: &str, ocsp: Option<&[u8]>, time: i64) -> Option<Result<(), Refused>> {
-    Some(apple::verify(chain, host, ocsp, None, time))
+pub fn verify_tls_server(chain: &[&[u8]], host: &str, ocsp: Option<&[u8]>, extra: &[&[u8]], time: i64) -> Option<Result<(), Refused>> {
+    Some(apple::verify(chain, host, ocsp, apple::Anchors::System(extra), time))
 }
 
 #[cfg(target_vendor = "apple")]
 pub fn verify_tls_server_roots(chain: &[&[u8]], host: &str, roots: &[&[u8]], time: i64) -> Option<Result<(), Refused>> {
-    Some(apple::verify(chain, host, None, Some(roots), time))
+    Some(apple::verify(chain, host, None, apple::Anchors::Only(roots), time))
 }
 
 /// macOS and iOS: the Security framework builds and checks the chain (leaf first, DER) for a TLS
@@ -413,6 +425,14 @@ mod apple {
         fn SecTrustEvaluateWithError(trust: CfRef, error: *mut CfRef) -> u8;
     }
     const UTF8: u32 = 0x0800_0100;
+
+    /// the anchors of an evaluation: the system's and these beside them (SecTrustSetAnchorCertificates,
+    /// SecTrustSetAnchorCertificatesOnly false), or only these
+    pub enum Anchors<'a> {
+        System(&'a [&'a [u8]]),
+        Only(&'a [&'a [u8]]),
+    }
+
     // CFAbsoluteTime counts from 2001-01-01
     const SINCE_1970: f64 = 978_307_200.0;
 
@@ -477,7 +497,7 @@ mod apple {
         }
     }
 
-    pub fn verify(chain: &[&[u8]], host: &str, ocsp: Option<&[u8]>, roots: Option<&[&[u8]]>, time: i64) -> Result<(), Refused> {
+    pub fn verify(chain: &[&[u8]], host: &str, ocsp: Option<&[u8]>, anchors: Anchors, time: i64) -> Result<(), Refused> {
         if chain.is_empty() {
             return Err(Refused::new(Reason::Other, "no certificate"));
         }
@@ -513,14 +533,20 @@ mod apple {
                     CFRelease(data);
                 }
             }
-            if let Some(r) = roots {
-                let Some(anchors) = certificates(r) else {
+            // the extra CAs beside the system's (its policy and distrust hold for them too), or
+            // only the roots given
+            let (given, only) = match anchors {
+                Anchors::System(e) => (e, false),
+                Anchors::Only(r) => (r, true),
+            };
+            if only || !given.is_empty() {
+                let Some(array) = certificates(given) else {
                     CFRelease(trust);
-                    return Err(Refused::new(Reason::Other, "a root cannot be read (Security)"));
+                    return Err(Refused::new(Reason::Other, "an anchor cannot be read (Security)"));
                 };
-                SecTrustSetAnchorCertificates(trust, anchors);
-                SecTrustSetAnchorCertificatesOnly(trust, 1);
-                CFRelease(anchors);
+                SecTrustSetAnchorCertificates(trust, array);
+                SecTrustSetAnchorCertificatesOnly(trust, only as u8);
+                CFRelease(array);
             }
             let mut err: CfRef = core::ptr::null();
             let ok = SecTrustEvaluateWithError(trust, &mut err) != 0;

@@ -1,9 +1,9 @@
 // systrust -- the system's trust (Trust::System, netio::roots, plat::certs) on every machine:
 // the system's checks against a CA of one's own (verify_system_roots: Windows CryptoAPI with an
 // exclusive root, Apple's Security framework with only these anchors, Linux verify_chain) and
-// the reason of each refusal; Trust::System's extra CAs (a company CA) in a handshake, taken
-// only where the system finds no path to a CA it trusts (UnknownCa); a server's client_auth with System; on
-// Linux the bundle of SSL_CERT_FILE and SSL_CERT_DIR.  Public servers: tools/tls_web_check.py
+// the reason of each refusal; Trust::System's extra CAs (a company CA) through the system and in
+// a handshake; a server's client_auth with System; on Linux the bundle of SSL_CERT_FILE and
+// SSL_CERT_DIR.  Public servers: tools/tls_web_check.py
 // --internet (badssl.com), limbo through the system: tools/limbo_check.py --system.
 
 use alloc::format;
@@ -26,14 +26,16 @@ struct Pki {
 }
 
 impl Pki {
-    fn new(seed: u8) -> Pki {
+    /// a CA valid from two years before `at` to three years after (the leaves below it: from
+    /// 400 days before to 300 days after)
+    fn new(seed: u8, at: i64) -> Pki {
         let ca_key = key(Kind::P256, seed);
         let b = CertBuilder {
             serial: [seed; 16],
             cn: format!("JFLib system trust test CA {}", seed),
             org: String::from("JFLib"),
-            not_before: NOW - 86_400,
-            not_after: NOW + 3 * 365 * 86_400,
+            not_before: at - 2 * 365 * 86_400,
+            not_after: at + 3 * 365 * 86_400,
             is_ca: true,
             spki: ca_key.spki(),
             ..CertBuilder::default()
@@ -91,8 +93,8 @@ pub fn run(t: &mut T) {
 
 /// the system's checks against only our CA: accepted, and each refusal with its reason
 fn roots_check(t: &mut T) {
-    let p = Pki::new(71);
-    let other = Pki::new(72);
+    let p = Pki::new(71, NOW);
+    let other = Pki::new(72, NOW);
     let ca = core::slice::from_ref(&p.ca);
     let leaf = chain(&p.good(NOW));
     let r = roots::verify_system_roots(&leaf, "web.lab", ca, NOW);
@@ -112,6 +114,14 @@ fn roots_check(t: &mut T) {
     t.check(&format!("system roots: an expired certificate -> Expired ({:?})", r), r.as_ref().is_err_and(|e| e.reason == Reason::Expired));
     let r = roots::verify_system_roots(&leaf, "web.lab", ca, NOW + 300 * 86_400);
     t.check(&format!("system roots: the time given counts (a year later: Expired) ({:?})", r), r.as_ref().is_err_and(|e| e.reason == Reason::Expired));
+    // the extra CAs through the system (Windows: CryptoAPI with them as its roots where its own
+    // give no path; Apple: anchors beside the system's; Linux: after the bundle)
+    let r = roots::verify_system(&leaf, "web.lab", ca, None, NOW);
+    t.check(&format!("system with extra CAs: a server below one ({:?})", r.as_ref().err()), r.is_ok());
+    let r = roots::verify_system(&leaf, "other.lab", ca, None, NOW);
+    t.check(&format!("system with extra CAs: another name -> Name ({:?})", r), r.as_ref().is_err_and(|e| e.reason == Reason::Name));
+    let r = roots::verify_system(&leaf, "web.lab", core::slice::from_ref(&other.ca), None, NOW);
+    t.check(&format!("system with extra CAs: not below one -> UnknownCa ({:?})", r), r.as_ref().is_err_and(|e| e.reason == Reason::UnknownCa));
     let client = chain(&p.leaf(74, NOW - 3600, NOW + 200 * 86_400, false));
     let r = roots::verify_system_roots(&client, "web.lab", ca, NOW);
     t.check(&format!("system roots: a client's certificate for a server is refused ({:?})", r), r.is_err());
@@ -119,8 +129,9 @@ fn roots_check(t: &mut T) {
 
 /// Trust::System(extra) in a handshake: the extra CA where the system knows none of the chain
 fn extra_cas(t: &mut T) {
-    let p = Pki::new(81);
+    // the handshake checks at the clock's time: the CA and the leaves count from it
     let now = clock();
+    let p = Pki::new(81, now);
     let server = p.good(now);
     let sys = || Trust::System(alloc::vec![p.ca.clone()]);
     let r = handshake(ClientConfig::new(sys(), "web.lab"), ServerConfig::new(server.clone()));
@@ -143,7 +154,7 @@ fn extra_cas(t: &mut T) {
 /// Linux: SSL_CERT_FILE and SSL_CERT_DIR choose the bundle
 #[cfg(target_os = "linux")]
 fn bundle_env(t: &mut T) {
-    let p = Pki::new(91);
+    let p = Pki::new(91, NOW);
     let leaf = chain(&p.good(NOW));
     let pem = netio::pem::encode("CERTIFICATE", &p.ca.der);
     let dir = format!("{}/coretest-systrust-{:x}", plat::temp_dir().unwrap_or_else(|| String::from("/tmp")), plat::random_u64() & 0xFFFF_FFFF);
@@ -154,23 +165,23 @@ fn bundle_env(t: &mut T) {
     plat::setenv("SSL_CERT_FILE", Some(&format!("{}/test-ca.pem", dir)));
     plat::setenv("SSL_CERT_DIR", None);
     roots::reload();
-    let r = roots::verify_system(&leaf, "web.lab", None, NOW);
+    let r = roots::verify_system(&leaf, "web.lab", &[], None, NOW);
     t.check(&format!("bundle: SSL_CERT_FILE names it ({:?})", r.as_ref().err()), r.is_ok() && roots::system_anchors().len() == 1);
 
     plat::setenv("SSL_CERT_FILE", Some(&format!("{}/missing.pem", dir)));
     roots::reload();
-    let r = roots::verify_system(&leaf, "web.lab", None, NOW);
+    let r = roots::verify_system(&leaf, "web.lab", &[], None, NOW);
     t.check(&format!("bundle: SSL_CERT_FILE names a missing file: no CA, not the distribution's ({:?})", r), r.is_err() && roots::system_anchors().is_empty());
 
     plat::setenv("SSL_CERT_DIR", Some(&format!("/nonexistent-coretest:{}/", dir)));
     roots::reload();
-    let r = roots::verify_system(&leaf, "web.lab", None, NOW);
+    let r = roots::verify_system(&leaf, "web.lab", &[], None, NOW);
     t.check(&format!("bundle: SSL_CERT_DIR's second folder holds it ({:?})", r.as_ref().err()), r.is_ok());
 
     plat::setenv("SSL_CERT_FILE", file0.as_deref());
     plat::setenv("SSL_CERT_DIR", dir0.as_deref());
     roots::reload();
-    let r = roots::verify_system(&leaf, "web.lab", None, NOW);
+    let r = roots::verify_system(&leaf, "web.lab", &[], None, NOW);
     t.check(&format!("bundle: the distribution's again, our CA not in it ({:?})", r), r.as_ref().is_err_and(|e| e.reason == Reason::UnknownCa));
     plat::delete(&format!("{}/test-ca.pem", dir));
     plat::delete(&dir);
