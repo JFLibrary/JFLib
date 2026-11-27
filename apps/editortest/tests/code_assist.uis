@@ -125,16 +125,16 @@ expect text:"step: Vervollständigen" exists
 # ---- the keys of the list: Ctrl+Space on an empty word, Down / Up / PgDn / PgUp, Esc
 key enter
 key ctrl+space
-expect text:"pop: 28:greet" exists
+expect text:"pop: 29:greet" exists
 key down
-expect text:"pop: 28:handle" exists
+expect text:"pop: 29:handle" exists
 key pgdn
-expect text:"pop: 28:map" exists
+expect text:"pop: 29:map" exists
 key pgup
-expect text:"pop: 28:handle" exists
+expect text:"pop: 29:handle" exists
 key up
 key up
-expect text:"pop: 28:greet" exists
+expect text:"pop: 29:greet" exists
 shot build/editortest/code_complete_light.png
 theme dark
 shot build/editortest/code_complete_dark.png
