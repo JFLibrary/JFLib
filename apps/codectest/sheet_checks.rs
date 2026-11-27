@@ -40,6 +40,9 @@ use sheet_io::{Table, Value};
 
 /// a refusal must come within this many microseconds
 const QUICK_US: u64 = 1_000_000;
+/// ... or within this many, when it first works through a default limit's worth (256 MB of shared
+/// string copies, a 64 MB text scanned): about 0.5 s alone, past 1 s beside the parallel suite
+const WORK_US: u64 = 10_000_000;
 
 struct H {
     ok: u32,
@@ -62,11 +65,15 @@ impl H {
     }
     /// f() must give `want`, within QUICK_US
     fn quick<T: PartialEq + core::fmt::Debug>(&mut self, name: &str, want: T, f: impl FnOnce() -> T) {
+        self.within(name, want, QUICK_US, f);
+    }
+    /// f() must give `want`, within `limit_us`
+    fn within<T: PartialEq + core::fmt::Debug>(&mut self, name: &str, want: T, limit_us: u64, f: impl FnOnce() -> T) {
         let t0 = plat::time_us();
         let r = f();
         let us = plat::time_us().wrapping_sub(t0);
         let what = format!("{r:?} (want {want:?}) in {} ms", us / 1000);
-        self.check(name, r == want && us < QUICK_US, what);
+        self.check(name, r == want && us < limit_us, what);
     }
 }
 
@@ -176,7 +183,7 @@ fn xlsx_limits(t: &mut H) {
     // one shared string of 100 KB in 20000 cells: 2 GB of text if each cell copied it unbounded
     let long = "x".repeat(100_000);
     let amp = zip(&book(&ws(&"<row><c t=\"s\"><v>0</v></c></row>".repeat(20_000)), &format!("<si><t>{long}</t></si>"), &[], ""));
-    t.quick("xlsx_limits/amplified", Some(Error::Limit("string_bytes")), || sheet_err(&amp, d));
+    t.within("xlsx_limits/amplified", Some(Error::Limit("string_bytes")), WORK_US, || sheet_err(&amp, d));
     t.quick("xlsx_limits/index", Some(Error::Invalid("a shared string index past the table")), || sheet_err(&z(r#"<row><c t="s"><v>3</v></c></row>"#), d));
     t.quick("xlsx_limits/index_huge", Some(Error::Invalid("a shared string index")), || sheet_err(&z(r#"<row><c t="s"><v>99999999999999999999999</v></c></row>"#), d));
 }
@@ -242,7 +249,7 @@ fn xlsx_large(t: &mut H) {
 
 fn csv_limits(t: &mut H) {
     let commas = vec![b';'; 64 << 20];
-    t.quick("csv_limits/delimiters", Some(csv::Error::Limit("fields")), || csv::read(&commas, &Options::default()).err());
+    t.within("csv_limits/delimiters", Some(csv::Error::Limit("fields")), WORK_US, || csv::read(&commas, &Options::default()).err());
     let lines = "a;b\n".repeat(1 << 20);
     t.quick("csv_limits/records", Some(csv::Error::Limit("records")), || csv::read(lines.as_bytes(), &Options { limits: CsvLimits { records: 1000, ..CsvLimits::DEFAULT }, ..Options::DEFAULT }).err());
     t.quick("csv_limits/cells", Some(csv::Error::Limit("cells")), || csv::read(lines.as_bytes(), &Options { limits: CsvLimits { cells: 1000, ..CsvLimits::DEFAULT }, ..Options::DEFAULT }).err());
