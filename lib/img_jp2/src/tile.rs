@@ -681,7 +681,11 @@ fn progression(comps: &[Geo], rect: (u32, u32, u32, u32), g: &Global, pocs: &[Po
             orders[o] = Some(list);
         }
         let list = orders[o].as_ref().map_or(&[][..], |l| &l[..]);
+        // (also when every packet of the list was sent before: many volumes cost their passes)
         budget.visits += list.len() as u64;
+        if budget.visits > MAX_VISITS {
+            return Err(Error::Limit);
+        }
         for a in list {
             let (c, r, k) = (a.c as usize, a.r, a.k as usize);
             if c < c0 || c >= c1 || r < r0 || r >= r1 {

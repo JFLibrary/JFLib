@@ -466,6 +466,13 @@ def print_fixtures():
     assert g4[42] == 7
     g4[42] = 3
     out["J2K_GRAY4"] = bytes(g4)
+    # 2-bit grey under 8-bit opacity: grey 127 (2 bits: 127 - 128 + 2 = 1) at opacity 192, the
+    # first component's Ssiz then set to 2 bits
+    la = bytearray(enc(Image.new("LA", (8, 8), (127, 192)), num_resolutions=2))
+    cs = la.find(b"\xff\x4f\xff\x51")
+    assert la[cs + 42] == 7 and la[cs + 45] == 7
+    la[cs + 42] = 1
+    out["JP2_GRAY2_ALPHA"] = bytes(la)
     for k, v in out.items():
         print("const %s: &[u8] = &[%s];  // %d bytes" % (k, ", ".join("0x%02X" % b for b in v), len(v)))
 

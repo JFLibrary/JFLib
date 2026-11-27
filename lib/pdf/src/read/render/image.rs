@@ -136,8 +136,10 @@ fn scale_range(lo: i64, hi: i64, max: u32, to: u32) -> (i64, i64) {
 /// `alpha`: the opacity channel is wanted (true: the dictionary says the colours are premultiplied
 /// by it, SMaskInData 2).  The colour components keep their precision when it is 1, 2, 4, 8 or 16
 /// bits for each, else they become 8 bits (16 when one has more than 8), scaled (indices are not);
-/// sub-sampled ones are brought to the image's size, premultiplied colours made straight on the
-/// samples.  A stencil mask comes as 1 bit (a sample at least half the range is 1).
+/// sub-sampled ones are brought to the image's size.  Premultiplied colours are made straight on
+/// the samples, at 8 or 16 bits (a straight colour needs more steps than the premultiplied one
+/// had); indices stay as they are.  A stencil mask comes as 1 bit (a sample at least half the
+/// range is 1).
 fn jpx(data: &[u8], named: Option<usize>, indexed: bool, alpha: Option<bool>, max_pixels: u64, stencil: bool) -> Option<Jpx> {
     let opt = img_jp2::Options { max_pixels, convert_sycc: named.is_none(), ..Default::default() };
     let img = img_jp2::decode(data, &opt).ok()?;
@@ -192,8 +194,10 @@ fn jpx(data: &[u8], named: Option<usize>, indexed: bool, alpha: Option<bool>, ma
     }
     let cols = &colour[..n];
     let opacity = alpha.and_then(|pdf_pre| img.alpha.and_then(|i| img.components.get(i)).map(|c| (c, pdf_pre || img.premultiplied)));
+    // premultiplied colours (not indices) to be made straight
+    let pre = !indexed && opacity.is_some_and(|o| o.1);
     let p0 = cols[0].precision.clamp(1, 24) as usize;
-    let native = [1, 2, 4, 8, 16].contains(&p0) && cols.iter().all(|c| c.precision as usize == p0);
+    let native = !pre && [1, 2, 4, 8, 16].contains(&p0) && cols.iter().all(|c| c.precision as usize == p0);
     let wide = cols.iter().any(|c| c.precision > 8);
     let bpc = if native { p0 } else if wide { 16 } else { 8 };
     let scaled: Vec<(u32, u32)> = if native || indexed { Vec::new() } else { cols.iter().map(|c| ((1u32 << c.precision.clamp(1, 24)) - 1, (1u32 << bpc) - 1)).collect() };
@@ -203,16 +207,19 @@ fn jpx(data: &[u8], named: Option<usize>, indexed: bool, alpha: Option<bool>, ma
     for y in 0..h {
         let row = &mut s[y * stride..][..stride];
         for x in 0..w {
-            let a = opacity.filter(|o| o.1).map(|o| at(o.0, x, y));
+            let a = opacity.filter(|_| pre).map(|o| at(o.0, x, y));
             for (ci, c) in cols.iter().enumerate() {
-                let (mut v, max) = at(c, x, y);
-                // premultiplied: straight again, on the samples before any colour conversion
-                if let Some((a, amax)) = a {
-                    if a > 0 && a < amax {
-                        v = ((v as u64 * amax as u64 + a as u64 / 2) / a as u64).min(max as u64) as u32;
+                let (v, max) = at(c, x, y);
+                let v = match a {
+                    // premultiplied: straight again on the samples (before any colour conversion),
+                    // v / max * amax / a at the precision of the output
+                    Some((a, amax)) if a > 0 && a < amax => {
+                        let d = max as u64 * a as u64;
+                        ((v as u64 * top as u64 * amax as u64 + d / 2) / d).min(top as u64) as u32
                     }
-                }
-                let v = if scaled.is_empty() { v.min(top) } else { scale_sample(v, max, top) };
+                    _ if scaled.is_empty() => v.min(top),
+                    _ => scale_sample(v, max, top),
+                };
                 let bit = (x * n + ci) * bpc;
                 match bpc {
                     16 => row[bit / 8..][..2].copy_from_slice(&(v as u16).to_be_bytes()),
