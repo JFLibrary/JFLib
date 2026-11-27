@@ -287,6 +287,7 @@ dependencies = [
  "jflib-img-gif",
  "jflib-img-heif",
  "jflib-img-hevc",
+ "jflib-img-jbig2",
  "jflib-img-jp2",
  "jflib-img-jpeg",
  "jflib-img-jxl",
@@ -692,6 +693,7 @@ dependencies = [
  "jflib-img-gif",
  "jflib-img-heif",
  "jflib-img-hevc",
+ "jflib-img-jbig2",
  "jflib-img-jp2",
  "jflib-img-jpeg",
  "jflib-img-jxl",
@@ -987,6 +989,7 @@ dependencies = [
  "jflib-img-dds",
  "jflib-img-gif",
  "jflib-img-heif",
+ "jflib-img-jbig2",
  "jflib-img-jp2",
  "jflib-img-jpeg",
  "jflib-img-jxl",
@@ -1089,6 +1092,15 @@ dependencies = [
  "jflib-plat",
  "jflib-rt",
  "jflib-simd",
+]
+
+[[package]]
+name = "jflib-img-jbig2"
+version = "0.2.1"
+dependencies = [
+ "jflib-gfx",
+ "jflib-img-core",
+ "jflib-rt",
 ]
 
 [[package]]
@@ -1286,6 +1298,7 @@ dependencies = [
  "jflib-crypto",
  "jflib-gfx",
  "jflib-img-core",
+ "jflib-img-jbig2",
  "jflib-img-jp2",
  "jflib-img-jpeg",
  "jflib-plat",

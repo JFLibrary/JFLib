@@ -1,11 +1,11 @@
 // Images (ISO 32000-1, 8.9): the samples of every bit depth through Decode and the colour
 // space into RGBA, stencil masks (ImageMask) painted with the fill colour or pattern, explicit
 // masks (/Mask as a stencil or as colour-key ranges; a soft mask takes their place), soft masks
-// (/SMask, with /Matte), inline
-// images with their abbreviations; DCTDecode through img_jpeg, CCITTFaxDecode through fax.rs,
-// JPXDecode through img_jp2 (its own size and bit depth, Decode ignored, the colour space from
-// the JP2 header when the dictionary names none, SMaskInData; JBIG2Decode is left out).  Drawing
-// maps the unit square through the CTM:
+// (/SMask, with /Matte), inline images with their abbreviations; DCTDecode through img_jpeg,
+// CCITTFaxDecode through fax.rs, JPXDecode through img_jp2 (its own size and bit depth, Decode
+// ignored, the colour space from the JP2 header when the dictionary names none, SMaskInData),
+// JBIG2Decode through img_jbig2 (with its JBIG2Globals; the page's own size; JBIG2's 1 for black
+// is the filter's 0).  Drawing maps the unit square through the CTM:
 // shrunk images are averaged over the pixels they cover first (a box filter), enlarged ones
 // are sampled bilinearly, from four times their size on (and without /Interpolate) as the
 // nearest sample.
@@ -383,7 +383,22 @@ impl Img {
                         decode_arr.clear();
                     }
                 }
-                _ => return None, // JBIG2Decode
+                b"JBIG2Decode" => {
+                    let globals = match doc.resolve(&doc.key(parms, "JBIG2Globals")) {
+                        Object::Stream(g) => doc.decode_until_image(&g).ok().map(|x| x.0),
+                        _ => None,
+                    };
+                    let page = img_jbig2::decode_embedded(&samples, globals.as_deref(), &img_jbig2::Options { max_pixels: run.opt.max_pixels.min(1 << 28) }).ok()?;
+                    if page.width == 0 || page.height == 0 {
+                        return None;
+                    }
+                    // the page's size counts (as a JPEG's does); its rows are padded to bytes as an
+                    // image's are, and JBIG2's 1 for black is the filter's 0
+                    (w, h) = (page.width as usize, page.height as usize);
+                    samples = page.bits.iter().map(|b| !b).collect();
+                    bpc = 1;
+                }
+                _ => return None,
             }
         }
         if ![1, 2, 4, 8, 16].contains(&bpc) {

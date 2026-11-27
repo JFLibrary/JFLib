@@ -134,6 +134,8 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
   <br>[lib.rs](#sheet_io-crate-root) · [src/csv.rs](#sheet_iosrccsvrs) · [src/xlsx.rs](#sheet_iosrcxlsxrs)
 - [img_jp2](#img_jp2) -- JPEG 2000 decoder
   <br>[lib.rs](#img_jp2-crate-root)
+- [img_jbig2](#img_jbig2) -- JBIG2 decoder
+  <br>[lib.rs](#img_jbig2-crate-root)
 
 ## ui
 
@@ -15486,10 +15488,14 @@ IMGF_COUNT: u32 = 55
 /// (register_external stops before it)
 IMGF_SVG: u32 = IMGF_COUNT - 1
 /// JPEG 2000 (JP2, JPX, J2K): the slot before SVG's, outside the static table until
-/// img_all::use_all_codecs fills it with img_jp2's codec.  register_external stops before it:
-/// the external codecs keep their numbers 23 to 52; a 31st external registration, which got
-/// slot 53 before, now gets 0, and a stored 53 now names JPEG 2000
+/// img_all::use_all_codecs fills it with img_jp2's codec (a stored 53 names JPEG 2000;
+/// register_external stops before IMGF_JBIG2)
 IMGF_JP2: u32 = IMGF_COUNT - 2
+/// JBIG2 files (their first page): the slot before JPEG 2000's, outside the static table until
+/// img_all::use_all_codecs fills it with img_jbig2's codec.  register_external stops before it:
+/// the external codecs keep their numbers 23 to 51; a 30th external registration, which got
+/// slot 52 before, now gets 0, and a stored 52 now names JBIG2
+IMGF_JBIG2: u32 = IMGF_COUNT - 3
 ```
 
 *limits*
@@ -16254,8 +16260,8 @@ Extended API:
                                                it does not fit into cap bytes)
   register(fmt, codec) -> 0 / ERR_UNSUPPORTED  register_dyn(name, exts, mime, props, codec)
   register_slot(IMGF_SVG, name, exts, mime, props, codec)   (svg) a built-in format without
-                                               a static entry (img_svg::register; IMGF_JP2:
-                                               img_all::use_all_codecs)
+                                               a static entry (img_svg::register; IMGF_JP2
+                                               and IMGF_JBIG2: img_all::use_all_codecs)
   set_file_io(FileIo)                          the file functions of load / save (img_core
                                                does not depend on plat: the app sets them)
 Glue for the core codecs (imgcore.s):
@@ -16294,13 +16300,14 @@ metadata fields stay).
   slot is taken or name / exts is empty  [img_register_dyn]
 
 - **`fn register_external(name: &'static str, exts: &'static str, props: u32, c: &'static Codec) -> u32`**
-  Separate slots for external codec hosts, preserving the native plugin ABI's IDs: 23 to 52, or
-  0 when they are taken (the last two slots, IMGF_JP2 and IMGF_SVG, are kept for JPEG 2000 and
-  SVG; slot 53 went to JPEG 2000, so a 31st registration gets 0).
+  Separate slots for external codec hosts, preserving the native plugin ABI's IDs: 23 to 51, or
+  0 when they are taken (the last three slots, IMGF_JBIG2, IMGF_JP2 and IMGF_SVG, are kept for
+  JBIG2, JPEG 2000 and SVG; slots 52 and 53 went to JBIG2 and JPEG 2000, so a 30th registration
+  gets 0).
 
 - **`fn register_slot(fmt: u32, name: &'static str, exts: &'static str, mime: &'static str, props: u32, c: Option<&'static Codec>) -> i32`**
-  a built-in format that has no entry in the static table (IMGF_SVG, IMGF_JP2): its name,
-  extension list, MIME type, properties and codec into slot fmt (None empties the slot)
+  a built-in format that has no entry in the static table (IMGF_SVG, IMGF_JP2, IMGF_JBIG2): its
+  name, extension list, MIME type, properties and codec into slot fmt (None empties the slot)
   -> 0 / ERR_UNSUPPORTED (fmt out of range, or a static / runtime format's slot)
 
 - **`fn filter_list(need: u32, cap: usize) -> Vec<u8>`**
@@ -17059,7 +17066,8 @@ img_all -- registration of the codec crates in the format table  [src/img/imgreg
   use_core_codecs()   PNG, JPEG, BMP, GIF (the assembly registers them statically: call it
                       once at start-up, before worker threads decode)
   use_all_codecs()    every codec of the library, the core formats included
-                      (img_use_all_codecs); JPEG 2000 into its slot IMGF_JP2
+                      (img_use_all_codecs); JPEG 2000 and JBIG2 into their slots
+                      IMGF_JP2 and IMGF_JBIG2
 
 Each codec crate exports `pub static CODEC: img_core::Codec`; the codec agents add one
 registration line for their crate below.
@@ -65881,7 +65889,7 @@ most Options::max_stream bytes.  Permissions are reported, not enforced: what a 
 allows its user to do with the document is its own decision.
 
 Not here: the image filters for decode_until_image (it stops before DCT, JPX, JBIG2 and
-CCITTFax; drawing decodes DCT, CCITTFax and JPX), JBIG2 images at all, the predefined CMaps
+CCITTFax; drawing decodes DCT, CCITTFax, JPX and JBIG2), the predefined CMaps
 of East Asian fonts other than Identity and the Unicode ones, verifying signatures, changing
 and saving documents.
 ```
@@ -66217,8 +66225,8 @@ stencil masks, colour-key masks, soft masks, the JPEG filter (through img_jpeg) 
 CCITTFax; shadings of every type (sh and as patterns), tiling patterns coloured and
 uncoloured; form XObjects, transparency groups and soft masks (luminosity and alpha, with
 backdrop and transfer function); the annotations' appearances; optional content (the
-default configuration, membership dictionaries); JPXDecode images through img_jp2.  Not here:
-JBIG2Decode images (left out), knockout and non-isolated groups (drawn as isolated ones),
+default configuration, membership dictionaries); JPXDecode images through img_jp2, JBIG2Decode
+images through img_jbig2.  Not here: knockout and non-isolated groups (drawn as isolated ones),
 overprint, halftones, transfer functions outside soft masks.
 
   let doc = read::Document::open(bytes)?;
@@ -74206,3 +74214,80 @@ refuse hostile files before they cost memory or time.
 
 - **`static CODEC: Codec`**
   jp2_codec: JP2, JPX and raw codestreams as 8-bit ARGB
+
+## img_jbig2
+
+*JBIG2 decoder* -- crate root [`lib/img_jbig2/src/lib.rs`](../lib/img_jbig2/src/lib.rs)
+
+```text
+img_jbig2 -- JBIG2 decoder (ITU-T T.88 | ISO/IEC 14492): bilevel images as PDF embeds them
+(JBIG2Decode, with its JBIG2Globals) and JBIG2 files
+
+  decode_embedded(data, globals, &Options) -> Bitmap / Error   PDF's JBIG2Decode: page 1
+  decode_file(data, &Options) -> Vec<Bitmap> / Error           a .jb2 / .jbig2 file: every page
+  probe(data) -> bool                                          the file header's id
+  Bitmap { width, height, stride, bits }                       1 = black, MSB first, rows
+                                                               padded to bytes
+  CODEC                                                        img_core's codec (page 1 as an
+                                                               8-bit ARGB surface) for img_all
+
+Modules: mq (the arithmetic decoder, integer decoding), huff (the Huffman tables), mmr (T.6),
+bitmap (images and combination operators), generic (generic and refinement regions), symbol
+(symbol dictionaries, text regions), halftone (pattern dictionaries, halftone regions).
+
+What it decodes: every segment type of a page -- page information (striped pages, pages of
+unknown height growing with their stripes, the default pixel and operator), end of stripe, end
+of page, end of file, tables; symbol dictionaries (arithmetic and Huffman, refinement /
+aggregate coding, collective bitmaps uncompressed or MMR, exports, contexts retained and used
+again), text regions (arithmetic and Huffman, refinement, transposed, every reference corner and
+combination operator), pattern dictionaries and halftone regions (MMR or arithmetic, skip,
+grids at any angle), generic regions (MMR; templates 0 to 3 with adaptive pixels and TPGDON;
+data of unknown length ended by its marker) and refinement regions (templates 0 and 1, TPGRON),
+each intermediate, immediate or lossless; the combination operators OR, AND, XOR, XNOR and
+REPLACE.  The file organisations sequential and random-access.
+
+Not here: colour (JBIG2 Amendment 3: colour palettes and coloured regions are ignored, the page
+stays bilevel), extension segments.  A damaged segment ends the page with what was decoded
+before it; limits (`Options::max_pixels`, symbol counts, the work of a stream) refuse hostile
+files before they cost memory or time, and symbol dictionaries and text regions stop where their
+arithmetic data has run out (mq.rs).
+```
+
+### `img_jbig2` crate root
+
+- **`enum Error`**
+  why a stream could not be decoded
+  - `NotJbig2` -- no JBIG2 file header (decode_file)
+  - `Truncated` -- the data ends early
+  - `Corrupt` -- a segment that breaks the standard
+  - `Unsupported` -- valid, but not decoded here
+  - `Limit` -- larger than the limits allow
+  - `NoPage` -- no page in the data
+
+- **`struct Options`**
+  what to decode
+  - `max_pixels: u64` -- the largest width \* height of the page and of any region
+
+- **`struct Bitmap`**
+  a decoded page: 1 = black, MSB first, `stride` bytes a row
+  - `width: u32`
+  - `height: u32`
+  - `stride: usize`
+  - `bits: Vec<u8>`
+
+**`impl Bitmap`**
+
+- **`fn get(&self, x: u32, y: u32) -> bool`**
+  the pixel at (x, y): true for black
+
+- **`fn probe(d: &[u8]) -> bool`**
+  a JBIG2 file (its header's id)
+
+- **`fn decode_embedded(data: &[u8], globals: Option<&[u8]>, opt: &Options) -> Result<Bitmap, Error>`**
+  PDF's JBIG2Decode: the embedded segments (and those of JBIG2Globals) -> the first page
+
+- **`fn decode_file(data: &[u8], opt: &Options) -> Result<Vec<Bitmap>, Error>`**
+  a JBIG2 file (sequential or random-access) -> its pages
+
+- **`static CODEC: Codec`**
+  jbig2_codec: the first page of a JBIG2 file as 8-bit ARGB (black on white)

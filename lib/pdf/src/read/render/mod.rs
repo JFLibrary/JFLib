@@ -9,8 +9,8 @@
 // CCITTFax; shadings of every type (sh and as patterns), tiling patterns coloured and
 // uncoloured; form XObjects, transparency groups and soft masks (luminosity and alpha, with
 // backdrop and transfer function); the annotations' appearances; optional content (the
-// default configuration, membership dictionaries); JPXDecode images through img_jp2.  Not here:
-// JBIG2Decode images (left out), knockout and non-isolated groups (drawn as isolated ones),
+// default configuration, membership dictionaries); JPXDecode images through img_jp2, JBIG2Decode
+// images through img_jbig2.  Not here: knockout and non-isolated groups (drawn as isolated ones),
 // overprint, halftones, transfer functions outside soft masks.
 //
 //   let doc = read::Document::open(bytes)?;

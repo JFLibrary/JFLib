@@ -12,6 +12,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 - JDF_RAW_CMYK: a 4-component JPEG's samples as stored (YCCK after its YCC step, as libjpeg gives them) in the bytes R, G, B and A, for a caller with its own CMYK conversion
 - `IMGF_JP2`: the slot of JPEG 2000, the one before `IMGF_SVG`, outside the static table (img_all fills it with img_jp2's codec); `register_slot` takes it as it takes `IMGF_SVG`, and `register_external` stops before it, so the external codecs keep their numbers 23 to 52 (a 31st external registration, which got slot 53 before, now gets 0, and a stored 53 now names JPEG 2000)
+- `IMGF_JBIG2`: the slot of JBIG2, the one before `IMGF_JP2`, outside the static table (img_all fills it with img_jbig2's codec); `register_slot` takes it as it takes `IMGF_SVG`, and `register_external` stops before it, so the external codecs keep their numbers 23 to 51 (a 30th external registration, which got slot 52 before, now gets 0, and a stored 52 now names JBIG2)
 
 ### Changed
 

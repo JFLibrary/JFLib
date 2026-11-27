@@ -14,7 +14,7 @@ fixtures, Ghostscript, LibreOffice, cairo, the system's PDFs) and pages made her
   - images: every bit depth, Decode, Indexed, stencil masks, colour-key and explicit masks, soft
     masks, inline images, turned images, enlarged and shrunk, JPEG (RGB, grey, CMYK), CCITT
     Group 3 and 4, JPEG 2000 (lossless and lossy, the colour space of the JP2 header, 16-bit grey,
-    a tiled raw codestream, SMaskInData)
+    a tiled raw codestream, SMaskInData), JBIG2 (an MMR generic region)
   - transparency: alpha, the sixteen blend modes, soft masks (luminosity, alpha), groups
   - text: the 14 standard fonts, embedded Type 1, CFF, TrueType, OpenType and CID fonts, Type 3,
     every render mode
@@ -263,6 +263,16 @@ def png_rows(w, h, f):
     return bytes(v for y in range(h) for x in range(w) for v in f(x, y))
 
 
+def jbig2_mmr_page(w, h, mmr):
+    """an embedded JBIG2 stream: page information, an immediate lossless generic region of the whole
+    page with MMR data, the end of the page (ITU-T T.88 7.2)"""
+    def seg(num, ty, data):
+        return struct.pack(">IBBBI", num, ty, 0, 1, len(data)) + data
+    info = struct.pack(">IIIIBH", w, h, 0, 0, 0, 0)
+    region = struct.pack(">IIIIB", w, h, 0, 0, 0) + b"\x01" + mmr
+    return seg(0, 48, info) + seg(1, 39, region) + seg(2, 49, b"")
+
+
 def images(d):
     doc = Doc()
     im = {}
@@ -347,6 +357,9 @@ EI Q
             off, n = t.tag_v2[273][0], t.tag_v2[279][0]
             data = tb.getvalue()[off:off + n]
             j[name] = doc.stream(b"/Type /XObject /Subtype /Image /Width 96 /Height 40 /ColorSpace /DeviceGray /BitsPerComponent 1 /Filter /CCITTFaxDecode /DecodeParms << /K %d /Columns 96 /Rows 40 /BlackIs1 true >>" % k, data, compress=False)
+            if comp == "group4":
+                # the same rows as JBIG2: a page with one generic region of MMR data (T.6 is MMR)
+                j[b"B2"] = doc.stream(b"/Type /XObject /Subtype /Image /Width 96 /Height 40 /ColorSpace /DeviceGray /BitsPerComponent 1 /Filter /JBIG2Decode", jbig2_mmr_page(96, 40, data), compress=False)
         res = b"/XObject << " + b" ".join(b"/" + k + b" %d 0 R" % v for k, v in j.items()) + b" >>"
         c = b"""q 128 0 0 96 10 290 cm /J0 Do Q
 q 128 0 0 96 150 290 cm /J1 Do Q
@@ -354,6 +367,7 @@ q 128 0 0 96 10 180 cm /J2 Do Q
 q 192 0 0 80 150 180 cm /C4 Do Q
 q 192 0 0 80 150 90 cm /C3 Do Q
 q 48 0 0 20 20 100 cm /C4 Do Q
+q 120 0 0 50 20 20 cm /B2 Do Q
 """
         doc.page(c, res)
         # (left out when Pillow was built without OpenJPEG)

@@ -98,6 +98,7 @@ geom.workspace = true
 netchan.workspace = true
 sheet_io.workspace = true
 img_jp2.workspace = true
+img_jbig2.workspace = true
 style_winui.workspace = true
 style_classic.workspace = true
 style_kde.workspace = true

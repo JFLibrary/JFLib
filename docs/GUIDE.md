@@ -1694,7 +1694,7 @@ ui.dialog_end(); // always
 * **Images** (`img_core::io`): the runtime registers PNG, JPEG, BMP, GIF and SVG (`.svg`,
   `.svgz`: drawn at their intrinsic size, section 31) at start-up and connects the file
   functions. For every other format call `img_all::use_all_codecs()` once in `App::init`
-  (TIFF, TGA, WebP, AVIF, HEIC, JPEG XL, JPEG XR, JPEG 2000, DDS, PDN, PSD).
+  (TIFF, TGA, WebP, AVIF, HEIC, JPEG XL, JPEG XR, JPEG 2000, JBIG2, DDS, PDN, PSD).
 
   ```rust
   match img_core::io::load_ex(path, None, None) {   // any registered format -> FMT_PARGB

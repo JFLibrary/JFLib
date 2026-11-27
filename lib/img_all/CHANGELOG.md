@@ -11,6 +11,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 ### Added
 
 - JPEG 2000: `use_all_codecs` registers img_jp2's codec as `IMGF_JP2` (`jp2;j2k;j2c;jpx;jpf`, image/jp2), so the functions of `img_core::io` open JP2, JPX and J2K files
+- JBIG2: `use_all_codecs` registers img_jbig2's codec as `IMGF_JBIG2` (`jb2;jbig2`), so the functions of `img_core::io` open a JBIG2 file's first page
 
 ## [0.2.1] - 2026-11-16
 
