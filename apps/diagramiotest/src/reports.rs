@@ -160,7 +160,7 @@ fn own(h: &mut H) {
     let t1 = report::run(&doc, &list, &ctx(&doc));
     let t2 = report::run(&back, &list, &ctx(&back));
     let rows: Vec<Vec<String>> = t2.rows.iter().map(|r| r.cells.iter().map(|c| c.text.clone()).collect()).collect();
-    h.check("reports/own/run", t1 == t2 && t2.shapes == 5 && rows.first().is_some_and(|r| r[1] == "Raum 1") && rows.last().is_some_and(|r| r[2] == "2549.50"), format!("the report on the read drawing: {} rows, last {:?}", rows.len(), rows.last()));
+    h.check("reports/own/run", t1 == t2 && t2.shapes == 5 && rows.first().is_some_and(|r| r[0] == "Raum 1") && rows.last().is_some_and(|r| r[2] == "2549.50"), format!("the report on the read drawing (the grouping column first, as Visio): {} rows, last {:?}", rows.len(), rows.last()));
 }
 
 // a text as Visio escapes it into an attribute value
@@ -177,7 +177,7 @@ fn attr(text: &str) -> String {
 // the document sheet as Visio writes one (the definition's XML in Visio's shape, the values
 // invented; the escaped text in V, a Prompt cell) and a row that is no definition
 fn visio_like(h: &mut H) {
-    let def = "<?xml version=\"1.0\"?>\n<VisioReportDefinition xmlns=\"urn:schemas-microsoft-com:office:visio:reportdefinition\" ReportExists=\"1\" SelectDrawingDataMethod=\"1\" Description=\"Alle Shapes mit Auslastung\" Precision=\"1\" ShowUnits=\"0\" CaseSensitive=\"0\" UserCells=\"0\" HiddenProperties=\"0\" AdvancedFilter=\"1\" FilterExpression=\"\" Version=\"3\">\
+    let def = "<?xml version=\"1.0\"?>\n<VisioReportDefinition xmlns=\"urn:schemas-microsoft-com:office:visio:reportdefinition\" ReportExists=\"1\" SelectDrawingDataMethod=\"1\" Description=\"Alle Shapes mit Auslastung\" Precision=\"1\" ShowUnits=\"0\" CaseSensitive=\"0\" UserCells=\"0\" HiddenProperties=\"0\" AdvancedFilter=\"0\" FilterExpression=\"\" Version=\"3\">\
 <Name>JD19 Bericht</Name><Title>JD19-Test</Title>\
 <VisioRptDefField ID=\"1\" Display=\"1\" DisplayOrder=\"1\" Type=\"0\" SummaryTypes=\"0\" Tag=\"1\"><Name>TEXTINFO</Name><DisplayName>&lt;Displayed Text&gt;</DisplayName></VisioRptDefField>\
 <VisioRptDefField ID=\"2\" Display=\"1\" DisplayOrder=\"2\" Type=\"2\" SummaryTypes=\"2\" Tag=\"2\"><Name>Kosten</Name><DisplayName>Kosten</DisplayName></VisioRptDefField>\
