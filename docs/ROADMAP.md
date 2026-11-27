@@ -2519,10 +2519,11 @@ Sicherheit:
   versiegelten Pakete); `gametest --netsum` blieb `4118995e45c0c067`. Kosten: 94 µs Server-Zeit je ACCEPT, die Flut über
   UDP 199 statt 460 MB/s auf einem i7-1165G7. Die Fuzz-Ziele `packet` und `endpoint` für `tools/net_fuzz` gingen an die
   Sicherheits-Sitzung.
-- **P1** · *fehlt* · Fuzzing der Datei-Parser. `tools/net_fuzz.py` und `tools/cov_fuzz.py` decken
-  nur zstd, LZ4, X.509, DNS, HTTP, TLS, die IP-Reassembly und `netpkt` ab. Es fehlen DEFLATE,
-  zlib, gzip und Brotli (`compress`), `archive` (ZIP, OPC), `formats::json` (darüber laufen auch
-  Update-Manifeste, `datastore`, glTF und Agent-Anfragen), `formats::xml` (`Reader`, `Lenient`; seit U5 der eine XML-Leser), die
+- **P1** · *teilweise* (2026-11-27, Sicherheitsplan 2d) · Fuzzing der Datei-Parser. `tools/net_fuzz.py` und
+  `tools/cov_fuzz.py` decken zstd, LZ4, X.509, DNS, HTTP, TLS, die IP-Reassembly und `netpkt` ab, dazu inzwischen
+  DEFLATE, zlib, gzip und Brotli (`compress`: die einmaligen Decoder, die Stream-Decoder in Stücken gegen sie und die
+  Encoder in Rundreisen), `formats::json`, `formats::xml` (`Reader`, `Lenient`) und die Zeichensätze. Es fehlen
+  `archive` (ZIP, OPC), die
   Bild-Decoder und die Schriften (bisher nur abgeschnittene und gekippte Kopien in den
   Python-Prüfungen, [`tools/imgtest_common.py`](../tools/imgtest_common.py),
   `tools/font_check.py --fuzz`), `doc_io` (RTF und HTML aus der Zwischenablage, die jedes andere
@@ -2614,7 +2615,7 @@ Grundbausteine am falschen Ort oder mehrfach:
   aus `agent_core` und `xml` und `encoding` aus `base` übernommen, unverändert; die alten Pfade
   bleiben als Re-Exporte. `cas`, `datastore`, `gltf` und `update` hängen nicht mehr an
   `agent_core`, `archive`, `doc_core` und `doc_io` nicht mehr an `base` (`doc_core` damit auch
-  nicht mehr an `plat`). `netio` nutzt noch `agent_core::json` (über die Sicherheits-Sitzung).
+  nicht mehr an `plat`). Seit 2026-11-27 nimmt auch `netio` `formats::json` (Sicherheitsplan 2d).
   Der Name `data` ging nicht: `build_rs.py` erkennt Crates an `NAME::`, und die Stile netlab,
   backupcraft und jfoffice haben ein eigenes Modul `data`.
 - **P2** · *erledigt* (2026-11-21, U5) · Ein XML-Leser statt fünf (die Bestandsaufnahme zählte sechs; `design/xml.rs`

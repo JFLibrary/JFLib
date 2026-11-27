@@ -1,4 +1,4 @@
-# External test suites -- Wycheproof, ACVP, x509-limbo, tlsfuzzer, TLS-Anvil, Pebble
+# External test suites -- Wycheproof, ACVP, x509-limbo, tlsfuzzer, TLS-Anvil, Pebble, Brotli's test data
 
 Four adversarial suites that found bugs in OpenSSL, Go, Java, BouncyCastle, GnuTLS, NSS and
 others, and NIST's conformance vectors (ACVP, which FIPS validations are tested with), run
@@ -18,6 +18,7 @@ python tools/tlsfuzzer_check.py       # tlsfuzzer @ 51aad6e9ae42, tlslite-ng @ 7
 python tools/tlsanvil_check.py        # TLS-Anvil @ c1762f4 (Temurin 21, Maven 3.9.9; 850 MB): netio's TLS client
 python tools/tlsanvil_check.py --server   # ... netio's TLS 1.3 server (RSA certificate)
 python tools/pebble_check.py          # Pebble v2.10.1 (Let's Encrypt's ACME test server; 7 MB): netio::acme
+python tools/brotli_check.py --vectors   # google/brotli @ 717514a67b3f: tests/testdata without bb.binast, 3.4 MB
 ```
 
 Wycheproof, ACVP and limbo turn each case into a `coretest --vectors` line (the operations are
@@ -36,6 +37,7 @@ tlsfuzzer and TLS-Anvil talk to `coretest` over TCP (sections below).
 | TLS-Anvil (client) | 232 tests | 192 | 2 (TLS-Anvil's own) | 38 | 85 s |
 | TLS-Anvil (server) | 289 tests | 123 | 0 | 166 | 9 min |
 | Pebble (ACME) | 29 checks | 29 | 0 | 0 | 40 s |
+| Brotli's test data (2026-11-27) | 45 streams, 23 originals | 68 | 0 | 0 | 26 s |
 
 Not one primitive in `lib/crypto` failed. The 15 Wycheproof failures of the first run were all
 in netio's DER decoding of ECDSA signatures and are fixed (below). The limbo failures that changed what netio accepts (17 in
@@ -420,6 +422,23 @@ KeyUpdate.appDataUnderNewKeysSucceeds); it now ends with `shutdown()`, as a prog
 p256`, `p384` and `rsa` all work, Ed25519 does not, since TLS-Scanner's probes offer none). Its
 results are above: all 123 server tests that apply pass, and tlsfuzzer tests the server with every
 kind of key besides.
+
+## Brotli's test data
+
+`python tools/brotli_check.py --vectors` fetches the files of google/brotli's `tests/testdata`
+at a pinned commit (`tools/suite_fetch.py`). It leaves out `bb.binast`, an encoder input of
+12 MB that has no stream beside it.
+
+- **45 streams** (`*.compressed*`) must decode to their originals, both through `decompress()`
+  and through the stream decoder (`coretest --stream brotli d1` / `d`). They come from the
+  reference encoder at every quality and window size, and include empty streams of every window
+  size, metadata blocks, a back reference of exactly 64 KiB and the static dictionary's
+  transforms.
+- **23 originals** must come back through `compress()` at levels 0, 5, 9 and 11 and through the
+  stream encoder at level 5. No libbrotli is needed, so the check runs on every system.
+
+All pass. The streams are also seeds of the fuzz targets `brotli` and `stream_brotli`:
+`tools/net_fuzz.py` copies them into its seed folder once they have been fetched.
 
 ## Pebble
 

@@ -21,6 +21,11 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - zstd::compress uses the tables the decoder already has when that is cheaper: the literals with the previous block's Huffman tree (treeless), a sequence code in Repeat_Mode. Frames of several blocks get up to 4% smaller; the zstd tool reads them as before
 - The Brotli decoder is 2.2 to 4.8 times as fast, brotli::decompress / decompress_prefix and brotli::Decoder alike: a bit reader with a 64-bit buffer refilled bytewise instead of single bits; prefix codes as lookup tables (8 bits, then second-level tables, as libbrotli builds them) instead of a walk bit by bit; the literals of a block in one run, without the context when all 64 contexts of a block type name one tree; copies of up to 32 bytes as one copy of a fixed size, dictionary words without an allocation. brotli::Decoder runs whole commands at once while the input surely holds them and the output has room, and goes step by step only near the ends. The same streams are accepted and refused as before, with the same errors, and brotli::Decoder returns the same Step for every call. On our streams and libbrotli's (levels 1, 5, 9, 11) of five kinds of data, the one-shot decoder now reads 270 to 800 MB/s (before 107 to 263), the stream decoder 250 to 790 (before 102 to 277); libbrotli 340 to 980
 
+### Fixed
+
+- zstd: `decompress` refuses a match that reaches farther back than the frame's window (its Window_Size, the content size when that is smaller, and a dictionary's content), as the stream decoder and the zstd tool do; before, it took such frames (nothing was read outside the output, but the two decoders answered differently for the same bytes)
+- brotli: the encoder no longer computes a negative word length for a dictionary transform that cuts more than the word (a debug build panicked; a release build skipped it as it does now)
+
 ## [0.2.1] - 2026-11-16
 
 No changes in this crate. It was released with the others because all of JFLib's crates move together.

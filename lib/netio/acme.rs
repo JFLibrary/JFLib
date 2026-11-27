@@ -29,7 +29,7 @@ use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use agent_core::json::{self, Value};
+use formats::json::{self, Value};
 use crypto::b64;
 use crypto::ecdsa::Curve;
 use crypto::HashAlg;

@@ -1431,7 +1431,9 @@ impl Core {
                     }
                     let nb = T::SIZE_BITS[l];
                     for &(t, cut, suf) in fam {
-                        let wl = l - cut as usize;
+                        // a transform that cuts more than the word gives no match (a release
+                        // build wrapped it into a length no match reaches; a debug build panicked)
+                        let Some(wl) = l.checked_sub(cut as usize) else { continue };
                         if c < wl {
                             continue;
                         }
