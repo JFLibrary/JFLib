@@ -159,6 +159,8 @@ struct Watch {
     last_bad: AtomicU32,
     /// samples wrong only in the strip's outermost columns on either side (a note, not wrong)
     edge: AtomicU32,
+    /// samples that show the bands scaled about the window's centre by 95 to 100 % (a note: Windows opening the window)
+    scaled: AtomicU32,
 }
 
 /// what a test or a bench draws beside the picture: panels on the layers above the base, images
@@ -413,26 +415,48 @@ impl Test {
         let (x0, y0, w) = (r[0], r[1] + fb.h - 40, fb.w);
         let want: Vec<u32> = (0..w).map(|x| bgr(band_of(x, w))).collect();
         let watch = Arc::new(Watch { stop: AtomicBool::new(false), samples: AtomicU32::new(0), bad: AtomicU32::new(0), covered: AtomicU32::new(0), last_bad: AtomicU32::new(0),
-                                     edge: AtomicU32::new(0) });
+                                     edge: AtomicU32::new(0), scaled: AtomicU32::new(0) });
         let w2 = watch.clone();
         let ours = plat::win_native(0).map_or(0, |n| n.hwnd);
         let th = plat::thread_spawn(0, Box::new(move || {
             while !w2.stop.load(Ordering::Relaxed) {
                 let Some(px) = plat::win_test_screen(x0, y0, w, 1) else { continue };
                 w2.samples.fetch_add(1, Ordering::Relaxed);
-                let off = |(p, c): &(&[u8], &u32)| (p[0] as u32 | (p[1] as u32) << 8 | (p[2] as u32) << 16) != **c;
-                let all: Vec<(&[u8], &u32)> = px.chunks_exact(4).zip(want.iter()).collect();
                 // (the outermost EDGE columns on either side: Windows 11 drew the window's edge there in every sample,
                 // in the first column at 150 % (30383f), in the second at 200 % (3a3e44); the Surface Go 3 and WS33)
                 const EDGE: usize = 4;
-                let n = all.len();
-                let wrong = all.iter().enumerate().find(|(i, q)| *i >= EDGE && *i + EDGE < n && off(*q)).map(|(_, q)| *q);
-                if wrong.is_none() && all.iter().any(off) {
+                let n = (px.len() / 4).min(want.len());
+                let rgb = |k: usize| px[4 * k] as u32 | (px[4 * k + 1] as u32) << 8 | (px[4 * k + 2] as u32) << 16;
+                // the first wrong column, the strip seen as the bands scaled by s about the window's centre: Windows 11
+                // scaled the window as it opened, also with its transitions off (WS33, 200 %: the edge between the first
+                // two bands moved from 297 to 286 px in the first 100 ms, a column there 40607f); scaled, the columns
+                // within 1.5 px of a band's edge and those outside the window do not count
+                let wrong_at = |s: f32| -> Option<usize> {
+                    let (cx, band) = (n as f32 / 2.0, n as f32 / 6.0);
+                    (EDGE..n.saturating_sub(EDGE)).find(|&k| {
+                        let c = if s == 1.0 {
+                            want[k]
+                        } else {
+                            let x = cx + (k as f32 + 0.5 - cx) / s;
+                            let f = x / band - (x / band) as i32 as f32;
+                            if x < 0.0 || x >= n as f32 || f.min(1.0 - f) * band < 1.5 {
+                                return false;
+                            }
+                            bgr(band_of(x as i32, n as i32))
+                        };
+                        rgb(k) != c
+                    })
+                };
+                let mut wrong = wrong_at(1.0);
+                if wrong.is_none() && (0..n).any(|k| rgb(k) != want[k]) {
                     w2.edge.fetch_add(1, Ordering::Relaxed);
                 }
-                if let Some((p, c)) = wrong {
-                    let i = (p.as_ptr() as usize - px.as_ptr() as usize) / 4;
-                    let v = p[0] as u32 | (p[1] as u32) << 8 | (p[2] as u32) << 16;
+                if wrong.is_some() && (950..1000).any(|m| wrong_at(m as f32 / 1000.0).is_none()) {
+                    w2.scaled.fetch_add(1, Ordering::Relaxed);
+                    wrong = None;
+                }
+                if let Some(i) = wrong {
+                    let (v, c) = (rgb(i), want[i]);
                     if plat::win_test_window_at(x0 + i as i32, y0) != ours {
                         w2.covered.fetch_add(1, Ordering::Relaxed); // another window on top of ours
                         continue;
@@ -459,6 +483,10 @@ impl Test {
         let e = w.edge.load(Ordering::Relaxed);
         if e != 0 {
             out(&format!("note: {what}: only the strip's outermost columns wrong in {e} of {n} samples"));
+        }
+        let s = w.scaled.load(Ordering::Relaxed);
+        if s != 0 {
+            out(&format!("note: {what}: the bands scaled about the window's centre (the window opening) in {s} of {n} samples"));
         }
         self.ok(b == 0, &format!("{what}: {n} screen samples, {b} wrong (last {:06x})", w.last_bad.load(Ordering::Relaxed)));
     }

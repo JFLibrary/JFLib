@@ -488,6 +488,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **netio:** TLS: a handshake message longer than a record (a certificate chain of over 16 KiB) goes in several records (RFC 8446 5.1); it went in one record, which the peer refused (record_overflow)
 - **crypto:** `rsa::PrivateKey::iqmp` of a key whose q has more 64-bit words than p: q is reduced mod p first; the words above p's length were dropped, and the coefficient a key file keeps was wrong
 - **plat:** iOS: a change of dark mode, contrast, motion or text size while the app ran never reached it (no E_SETTINGS): the host now marks the app as started when UIKit takes over
+- **render2d:** At a join whose two squared distances are equal up to JOIN_TIE (1e-4 of them) the pixel is the incoming segment's as both segments decide it: the outgoing one keeps a pixel only when it is nearer by more. Intel's Meteor Lake driver rounded the two sides of a near tie differently, and both gave up a pixel at a turn back (changes test, WS33); on the RTX 26 pixels of 16 of the 273 --dump images changed (near ties the outgoing segment had owned)
 
 ### Security
 

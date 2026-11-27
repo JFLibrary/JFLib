@@ -69,6 +69,11 @@ const JOIN: u32 = 2u;
 // segments up to this long (px) and strokes up to this half width (px) take the fast way near their ends
 const TINY_LEN: f32 = 3.0;
 const TINY_H: f32 = 0.75;
+// a pixel near a join whose two squared distances (to the incoming and the outgoing segment) are equal up to this share is
+// the incoming segment's, as each of the two decides it (the outgoing one keeps a pixel only when it is nearer by more): the
+// two decide apart, a GPU's compiler may round the two sides differently, and at a near tie both gave the pixel up (Intel's
+// Meteor Lake driver, a turn back in the changes test, docs/RENDER2D.md)
+const JOIN_TIE: f32 = 1e-4;
 // a dash pattern of a period up to DASH_FLAT pixels is drawn as a flat tone of its duty, from DASH_EXACT on exactly,
 // mixed in between
 const DASH_FLAT: f32 = 2.0;
@@ -1681,19 +1686,19 @@ fn fs(i: VsOut) -> @location(0) vec4f {
     let jk = (i.misc.x >> 8u) & 15u;
     let ends = (i.misc.x >> 12u) & 3u;
     let own = i.par.zw;
-    // a pixel near a join is the nearer segment's (the incoming one's when equal): see the head
+    // a pixel near a join is the nearer segment's (the incoming one's when equal, up to JOIN_TIE): see the head
     var dprev = 3.4e38;
     var dnext = 3.4e38;
     if sk == JOIN {
         dprev = dist_seg(q - s, i.nb.xy);
-        if !(dist_seg(q - s, own) < dprev) {
+        if !(dist_seg(q - s, own) < dprev - JOIN_TIE * max(dprev, 1.0)) {
             discard;
             return vec4f(0.0);
         }
     }
     if ek == JOIN {
         dnext = dist_seg(q - e, i.nb.zw);
-        if !(dist_seg(q - e, -own) <= dnext) {
+        if !(dist_seg(q - e, -own) <= dnext + JOIN_TIE * max(dnext, 1.0)) {
             discard;
             return vec4f(0.0);
         }
