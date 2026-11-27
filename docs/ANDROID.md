@@ -1,6 +1,6 @@
 # Android-Plan: Android so weit wie Windows, Linux und Apple
 
-Stand 2026-11-18, auf Basis von `main` 7cdabce4. AN0 und AN1 sind umgesetzt (Emulator und A56), AN2 auf dem Emulator (2026-11-27), der Rest nicht; die Aufwände sind geschätzt. Der Plan wartete auf ARM1 bis ARM3 ([ARM64.md](ARM64.md)): die Kernel-Tabellen
+Stand 2026-11-18, auf Basis von `main` 7cdabce4. AN0 und AN1 sind umgesetzt (Emulator und A56), AN2 auf dem Emulator und dem A56 (2026-11-27), der Rest nicht; die Aufwände sind geschätzt. Der Plan wartete auf ARM1 bis ARM3 ([ARM64.md](ARM64.md)): die Kernel-Tabellen
 und `plat` auf Linux ARM64 ohne libc.
 
 ## Ziel
@@ -381,7 +381,7 @@ Tick des Hosts (bis 250 ms). Ohne nice 10 für die Arbeiter lagen die längsten 
 sind, die Prüfungen von `tools/tls_web_check.py --internet` auf dem A56 öffentliche Server erreichen (das Skript
 bekommt dafür einen Android-Weg; nur mit Zustimmung, im WLAN) und ein Lauf ohne `INTERNET` die richtige Meldung zeigt.
 
-**Stand 2026-11-27:** umgesetzt und auf dem Emulator grün (beide Modi). Offen: das A56 und
+**Stand 2026-11-27:** umgesetzt, auf dem Emulator und dem A56 grün (beide Modi, auch ohne `INTERNET`). Offen:
 `tools/tls_web_check.py --internet` (öffentliche Server, nur auf Zuruf; das Skript hat noch keinen Android-Weg).
 
 - [`net.rs`](../lib/plat/net.rs): Android nimmt das Linux-Modul `sys` (Sockets über `rt::os` mit den Nummern aus
@@ -393,8 +393,8 @@ bekommt dafür einen Android-Weg; nur mit Zustimmung, im WLAN) und ein Lauf ohne
   `/sys` über den echten Pfad (`proc_file` aus AN1), nicht über die Namen von `android_files.rs`.
 - Unix-Sockets bleiben auf Android vorerst weg: Pfad, Aufräumen und `socket_id` brauchen `plat::fs` (AN3).
 - **Ohne `INTERNET`** bekommt die App keinen IPv4- oder IPv6-Socket. Der Code ist nicht überall derselbe: EACCES,
-  wo der Kernel die Gruppe `inet` prüft, **EPERM** auf dem Emulator mit Android 15 (dort prüft das eBPF-Programm von
-  `netd`). Beides wird `NetErrorKind::Denied` mit diesem Code; `NetError::no_internet()` erkennt es, die Meldung
+  wo der Kernel die Gruppe `inet` prüft, **EPERM** auf dem Emulator mit Android 15 und dem A56 mit Android 16 (dort
+  prüft das eBPF-Programm von `netd`). Beides wird `NetErrorKind::Denied` mit diesem Code; `NetError::no_internet()` erkennt es, die Meldung
   nennt das Manifest. `getaddrinfo` sagt ohne `INTERNET` nur „keine Adresse“; schlägt eine Auflösung fehl, prüft
   `resolve` deshalb mit einem Socket nach und meldet ebenfalls `no_internet`.
 - [`certs.rs`](../lib/plat/certs.rs): `root_bundle()` liest den ersten Ordner aus `ANDROID_CA_DIRS`, der Dateien hat
@@ -435,6 +435,11 @@ bekommt dafür einen Android-Weg; nur mit Zustimmung, im WLAN) und ein Lauf ohne
 | `plat` (mit Sockets und `android_net`) | 48 | 48 |
 | `coretest --only plat` ohne `INTERNET` (`--no-internet`) | – | 19 von 19, Meldung „lacks android.permission.INTERNET … (os error 1)“ |
 
+Auf dem A56 (SM-A566B, arm64, Android 16, API 36, im WLAN) dieselben Zahlen in jeder Zeile: `coretest` 5143 von 5143
+in der Shell (104 s) und 5140 von 5140 im APK (100 s), `dns` 53 und 50, `systrust` aus
+`/apex/com.android.conscrypt/cacerts`, ohne `INTERNET` 19 von 19 mit derselben Meldung (os error 1, also auch dort
+EPERM). Die Shell sieht dort die IPv4- und alle IPv6-Adressen, das APK nur `127.0.0.1` und die IPv4-Adresse (Fund 1).
+
 Funde:
 
 1. **Im App-Prozess keine IPv6-Adressen.** `/proc/net/if_inet6` darf eine App nicht lesen (seit Android 10), also
@@ -442,8 +447,8 @@ Funde:
    deshalb im APK die drei Prüfungen mit einem Namensserver auf einer link-lokalen Adresse. Ohne Netlink gibt es
    keinen anderen Weg; Bionics `getifaddrs` fragt per `RTM_GETADDR`, was Apps noch dürfen (nur `bind` und
    `RTM_GETLINK` sind gesperrt). Ob `local_addrs` das als Ausweg nehmen soll, ist offen (Entscheidung „ohne Netlink“).
-2. **EPERM statt EACCES.** Ohne `INTERNET` lehnt Android 15 `socket()` mit EPERM ab, nicht mit EACCES wie im Plan
-   (Fallen); `plat::net` nimmt beide.
+2. **EPERM statt EACCES.** Ohne `INTERNET` lehnen Android 15 (Emulator) und Android 16 (A56) `socket()` mit EPERM
+   ab, nicht mit EACCES wie im Plan (Fallen); `plat::net` nimmt beide.
 3. **`policy::tid()` war auf Android immer 0**, obwohl es seit AN1 Threads gibt; behoben (siehe oben).
 4. `ssh` und der TCP-Teil von `sshcore` brauchen den Test-Server aus `sshd.rs`, der `plat::process` nimmt; sie
    bleiben auf Android aus. Unix-Sockets warten auf AN3.
@@ -533,7 +538,7 @@ Fassade). AN4 braucht AN3 für die Schriften des Systems.
 - **Netlink ist eingeschränkt.** Apps ab `targetSdk` 30 dürfen `NETLINK_ROUTE` nicht binden und kein `RTM_GETLINK`
   senden. MAC-Adressen sind verborgen.
 - **Ohne `INTERNET` kein Socket.** Die App gehört dann nicht zur Gruppe `inet`, `socket()` gibt EACCES; auf dem
-  Emulator mit Android 15 gibt es EPERM (das eBPF-Programm von `netd` prüft). `plat::net` nimmt beide (AN2).
+  Emulator mit Android 15 und dem A56 mit Android 16 gibt es EPERM (das eBPF-Programm von `netd` prüft). `plat::net` nimmt beide (AN2).
 - **Network Security Config gilt nur für Java.** Klartext-Verbote und Pins des Manifests sehen die eigenen
   Sockets nicht. `netio` muss TLS selbst richtig machen, wie überall.
 - **Der UI-Thread darf nicht warten.** Fünf Sekunden ohne Antwort ergeben einen ANR. Netz nur über `task` und den
