@@ -8,6 +8,14 @@ build/net_fuzz and runs every target on its own thread for N seconds (default 60
                                 and its InflateState after any input decodes a known stream as a
                                 fresh one does; gzip with several members); Brotli's seeds are
                                 the reference encoder's streams of coretest
+  stream_deflate, stream_zlib, stream_gzip, stream_brotli, stream_zstd, stream_lz4
+                                the stream decoders (compress::stream) fed in pieces of 1 byte to
+                                5 KB with output buffers of 1 byte to 4 KB, in two schedules: the
+                                same output as the one-shot decoder (or both refuse), and the
+                                rules of a Step (read, written, Status) kept
+  roundtrip                     compress() and the stream encoders (pieces, Sync flushes) of each
+                                format and level: the one-shot decoder gives the data back, and
+                                without Sync the encoder writes compress()'s bytes
   json, xml, charsets           formats: JSON with default and tight limits, the XML tree, the
                                 strict Reader and the Lenient tokenizer with its entity decoding
                                 (every XML reader of the library is one of these), the charsets
@@ -86,7 +94,8 @@ def build():
 
 
 def seeds():
-    """build/net_fuzz/seeds: the system's certificates and the reference zstd's frames"""
+    """build/net_fuzz/seeds: the system's certificates, the reference zstd's frames and (when
+    fetched) google/brotli's test streams"""
     d = OUT / "seeds"
     d.mkdir(parents=True, exist_ok=True)
     for b in CA_BUNDLES:
@@ -95,6 +104,9 @@ def seeds():
             break
     else:
         print("net_fuzz: no CA bundle found; x509 starts from the fuzzer's own certificates only")
+    # google/brotli's test streams, where tools/brotli_check.py --vectors fetched them
+    for f in sorted(ROOT.glob("build/vectors/brotli-*/tests/testdata/*.compressed*")):
+        shutil.copyfile(f, d / f"{f.name}.br")
     if shutil.which("zstd") is None:
         print("net_fuzz: no zstd tool; zstd starts from the library's own frames only")
         return d

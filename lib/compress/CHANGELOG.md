@@ -23,6 +23,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ### Fixed
 
+- zstd: `decompress` refuses a match that reaches farther back than the frame's window (its Window_Size, the content size when that is smaller, and a dictionary's content), as the stream decoder and the zstd tool do; before, it took such frames (nothing was read outside the output, but the two decoders answered differently for the same bytes)
 - Brotli: compressing text with dictionary words of 4 to 8 letters no longer subtracts past zero (a panic where overflow checks are on, as in the debug builds of apps)
 
 ## [0.2.1] - 2026-11-16
