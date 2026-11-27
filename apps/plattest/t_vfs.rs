@@ -438,8 +438,14 @@ fn fs_names(t: &mut T) {
     t.check(os.is_some() && fs::stat("fsdir://a.txt") == os, "vfs: fs::stat on a folder mount is the OS file's");
     let secs = |m: fs::Meta| m.mtime_ns.div_euclid(1_000_000_000);
     t.check(fs::set_times("fsdir://a.txt", when, when) && fs::stat(&format!("{base}/a.txt")).map(secs) == Some(when / 1_000_000_000), "vfs: fs::set_times on a folder mount");
-    t.check(fs::hard_link("fsdir://a.txt", "fsdir://b.txt") && plat::read_file(&format!("{base}/b.txt")).as_deref() == Some(&b"abc"[..]), "vfs: fs::hard_link inside a folder mount");
-    t.check(fs::read_dir("fsdir://").is_some_and(|v| v.len() == 2) && fs::free_space("fsdir://").is_some(), "vfs: fs::read_dir and free_space on a folder mount");
+    // (Android: no hard links -- SELinux refuses apps every one, docs/ANDROID.md AN3)
+    let hard = !cfg!(target_os = "android");
+    if hard {
+        t.check(fs::hard_link("fsdir://a.txt", "fsdir://b.txt") && plat::read_file(&format!("{base}/b.txt")).as_deref() == Some(&b"abc"[..]), "vfs: fs::hard_link inside a folder mount");
+    } else {
+        t.check(!fs::hard_link("fsdir://a.txt", "fsdir://b.txt") && plat::file_exists(&format!("{base}/b.txt")) == 0, "vfs: fs::hard_link inside a folder mount: none on Android, nothing made");
+    }
+    t.check(fs::read_dir("fsdir://").is_some_and(|v| v.len() == 1 + usize::from(hard)) && fs::free_space("fsdir://").is_some(), "vfs: fs::read_dir and free_space on a folder mount");
     vfs::unmount("fsdir");
     rm_tree(&base);
 }

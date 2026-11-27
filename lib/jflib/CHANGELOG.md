@@ -12,7 +12,8 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ### Added
 
-- `netio` on Android too (it needed plat's sockets, docs/ANDROID.md AN2); `cas`, `datastore` and `update` still not there
+- `netio` on Android too (it needed plat's sockets, docs/ANDROID.md AN2); `update` still not there
+- `jflib::cas` and `jflib::datastore` on Android too (`plat::fs` there since AN3, docs/ANDROID.md); docs.rs builds them for `aarch64-linux-android`
 
 ## [0.2.1] - 2026-11-16
 

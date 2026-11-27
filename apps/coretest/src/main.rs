@@ -21,8 +21,8 @@
 //                                     tools/wycheproof_check.py, tools/limbo_check.py)
 //   (build_rs.py test runs it through tests/all.uis; --script is ignored)
 //   Android (docs/ANDROID.md, AN0): a program without a UI, python tools/android_console.py coretest;
-//   the groups and parts that need what plat lacks there so far (fs: AN3; processes) say "not on
-//   Android yet" instead.  The network groups run there since AN2
+//   the groups and parts that need what plat lacks there so far (processes: ssh) say "not on
+//   Android yet" instead (the network groups since AN2; fs, watch, datastore and cas since AN3)
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
@@ -32,7 +32,6 @@ extern crate alloc;
 use alloc::format;
 use alloc::string::String;
 
-#[cfg(not(target_os = "android"))]
 mod cast;
 mod crypto;
 mod dhcpt;
@@ -52,7 +51,6 @@ mod platx;
 mod rngt;
 #[cfg(not(target_os = "android"))]
 mod sshd;
-#[cfg(not(target_os = "android"))]
 mod store;
 mod tlst;
 mod tlsweb;
@@ -85,8 +83,7 @@ mod patternt;
 mod eapt;
 mod imapt;
 
-/// a group that needs what plat lacks on Android so far: fs (docs/ANDROID.md, AN3), processes ->
-/// (name, None) there
+/// a group that needs what plat lacks on Android so far: processes (ssh) -> (name, None) there
 #[cfg(not(target_os = "android"))]
 macro_rules! native {
     ($name:literal, $f:path) => {
@@ -176,10 +173,10 @@ fn run() -> i32 {
         ("crypto", Some(crypto::run)),
         ("compress", Some(lz::run)),
         ("stream", Some(lzs::run)),
-        ("plat", Some(platx::run)), // (Android: sync and rand, AN1)
-        native!("datastore", store::run),
+        ("plat", Some(platx::run)),
+        ("datastore", Some(store::run)),
         ("http", Some(httpt::run)),
-        native!("cas", cast::run),
+        ("cas", Some(cast::run)),
         ("tls", Some(tlst::run)),
         ("tlsweb", Some(tlsweb::run)),
         ("systrust", Some(systrust::run)),
@@ -287,18 +284,6 @@ fn server_modes(args: &[String]) -> Option<i32> {
         return Some(sshd::key_line(&f));
     }
     None
-}
-
-/// a file in a folder: plat::fs::join (Android has no plat::fs yet, docs/ANDROID.md AN3)
-pub fn join(dir: &str, name: &str) -> String {
-    #[cfg(not(target_os = "android"))]
-    {
-        plat::fs::join(dir, name)
-    }
-    #[cfg(target_os = "android")]
-    {
-        format!("{}/{}", dir.trim_end_matches('/'), name)
-    }
 }
 
 rt::main!(run());

@@ -114,13 +114,13 @@ pub mod sync;
 /// errors, in the browser the page's WebSocket (G7d).
 pub mod net;
 /// Metadata, directory listings, links, times, free space, owner-only files, the local zone.
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 pub mod fs;
 /// Running as a system service (Windows service control manager, systemd units).
 #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub mod service;
 /// Changes below folders as they happen (continuous data protection).
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 pub mod watch;
 /// The operating system's trusted certificate authorities (TLS clients of public servers).
 #[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]

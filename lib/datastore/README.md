@@ -119,7 +119,7 @@ writes a snapshot at once: its key id tells a wrong key from damage.
 ## Platforms
 
 The store needs the file system of JFLib's platform layer, so it is there on Windows, Linux,
-macOS and iOS. In the browser and on Android `jflib` leaves it out. Folder names may be paths of
+macOS, iOS and Android. In the browser `jflib` leaves it out. Folder names may be paths of
 the operating system or the names with a scheme that the platform layer knows, such as `data://`.
 
 ## How to get it

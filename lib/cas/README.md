@@ -105,7 +105,7 @@ stops, with nothing removed, when the snapshots cannot be listed or one of them 
 ## Platforms
 
 The crate needs JFLib's platform layer for its random numbers, locks and the `Folder` store, so it
-is there on Windows, Linux, macOS and iOS. In the browser and on Android `jflib` leaves it out.
+is there on Windows, Linux, macOS, iOS and Android. In the browser `jflib` leaves it out.
 
 ## How to get it
 

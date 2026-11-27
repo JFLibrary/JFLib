@@ -562,7 +562,7 @@ fn mode_alpn() -> Vec<String> {
 /// (PKCS #8)
 pub fn write_pki(dir: &str) -> i32 {
     let p = mode_pki();
-    let w = |name: &str, s: String| plat::write_file(&crate::join(dir, name), s.as_bytes());
+    let w = |name: &str, s: String| plat::write_file(&plat::fs::join(dir, name), s.as_bytes());
     let key = |id: &Identity| netio::pem::encode("PRIVATE KEY", &id.key.to_pkcs8().unwrap_or_default());
     let ok = w("ca.pem", netio::pem::encode("CERTIFICATE", &p.ca.der))
         && w("server.pem", netio::pem::encode("CERTIFICATE", &p.server.chain[0]))

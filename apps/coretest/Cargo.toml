@@ -30,9 +30,6 @@ compress.workspace = true
 netpkt.workspace = true
 eapm.workspace = true
 netio.workspace = true
-
-# plat has no fs on Android yet (docs/ANDROID.md, AN3)
-[target.'cfg(not(target_os = "android"))'.dependencies]
 datastore.workspace = true
 cas.workspace = true
 

@@ -1,6 +1,6 @@
 # Android-Plan: Android so weit wie Windows, Linux und Apple
 
-Stand 2026-11-18, auf Basis von `main` 7cdabce4. AN0 und AN1 sind umgesetzt (Emulator und A56), AN2 auf dem Emulator und dem A56 (2026-11-27), der Rest nicht; die Aufwände sind geschätzt. Der Plan wartete auf ARM1 bis ARM3 ([ARM64.md](ARM64.md)): die Kernel-Tabellen
+Stand 2026-11-27, auf Basis von `main` 7cdabce4. AN0, AN1 und AN2 sind umgesetzt (Emulator und A56), AN3 auf dem Emulator, der Rest nicht; die Aufwände sind geschätzt. Der Plan wartete auf ARM1 bis ARM3 ([ARM64.md](ARM64.md)): die Kernel-Tabellen
 und `plat` auf Linux ARM64 ohne libc.
 
 ## Ziel
@@ -33,9 +33,10 @@ Was auf Android fehlt (Code auf `main` 7cdabce4):
   ([ARM64.md](ARM64.md), ARM6). (Seit AN1 behoben.)
 - **Keine Module ohne Oberfläche.** `process`, `sync`, `net`, `fs`, `service`, `watch` und `certs` sind in
   [`lib/plat/lib.rs`](../lib/plat/lib.rs) nur für Windows, Linux und Apple da. `rand` hat Android seit b5134991
-  (`arc4random_buf`).
+  (`arc4random_buf`). (`sync` seit AN1, `fs` und `watch` seit AN3.)
 - **Die Fassade lässt Crates weg.** [`lib/jflib/Cargo.toml`](../lib/jflib/Cargo.toml) nimmt `cas`, `datastore`,
-  `netio` und `update` auf Android und im Browser nicht auf („plat has no fs and net there“).
+  `netio` und `update` auf Android und im Browser nicht auf („plat has no fs and net there“). (`cas` und
+  `datastore` seit AN3.)
 - **Das Manifest kennt kein Netz.** Das Standard-Manifest von `cargo jflib android`
   ([`android.rs`](../lib/cargo_jflib/src/android.rs), `default_manifest`) hat keine `INTERNET`-Berechtigung, und
   `tools/android.py` prüft nur `location` gegen das Manifest (`manifest_gaps`). (Seit AN2 behoben; `netio` ist seit
@@ -159,8 +160,8 @@ Funde von `plattest` (Fehler der Bibliothek auf Android):
    `bridge.c` noch der Java-Host. Das traf jede Android-App (Uhrzeit, Dateizeiten, Logs, in AN2 die Gültigkeit von
    Zertifikaten). Jetzt nimmt Android die Uhr des Systems (Bionics `CLOCK_REALTIME`), UTC wie Linux; die
    Umrechnung teilen sich Linux, Apple und Android (`utc_date` in `plat`). Die Zone bleibt Sache von AN3.
-2. **Offen: `plat::mkdir` über einer vorhandenen Datei meldet Erfolg.** `mkdirs` in
-   [`android_files.rs`](../lib/plat/android_files.rs) nimmt EEXIST auch hin, wenn der Name eine Datei ist.
+2. **Behoben in AN3: `plat::mkdir` über einer vorhandenen Datei meldete Erfolg.** `mkdirs` in
+   [`android_files.rs`](../lib/plat/android_files.rs) nahm EEXIST auch hin, wenn der Name eine Datei war.
 3. `plat::cpu_brand()` ist leer (rt nimmt auf Android den portablen CPU-Code); die Quelle wäre `/proc/cpuinfo`.
    `plattest` meldet das als „not on Android yet“, ebenso `mem_total()` (AN1).
 
@@ -424,7 +425,6 @@ erreicht `tools/tls_web_check.py` die öffentlichen Server aus der Shell und aus
   `android_net`: `getaddrinfo` über `/system/etc/hosts` (`ip6-localhost`), ein unbekannter Name, die Adressen und
   Schnittstellen, ohne `INTERNET` die Meldung. `systrust` prüft auf Android die CAs des Systems (ISRG Root X1 dabei,
   `SSL_CERT_FILE` ohne Wirkung, eine eigene CA nicht darunter). `ssh` braucht Kindprozesse und bleibt aus.
-  `plat::fs::join` der Server-Modi geht über eine eigene `join` in `coretest`, bis AN3 `plat::fs` bringt.
 
 | Lauf (Emulator x86-64, API 35) | `adb shell` | App (`untrusted_app`, seccomp 2) |
 |---|---|---|
@@ -484,6 +484,63 @@ und Linux); `build_rs.py test coretest` auf Windows und Linux; die Tests von `ca
 **Fertig, wenn:** die Dateisystem- und `watch`-Tests von `coretest` und `plattest` sowie die Tests von `datastore`
 und `cas` im Test-APK grün sind und `android_files.py` unverändert besteht.
 
+**Stand 2026-11-27:** umgesetzt und auf dem Emulator grün (beide Modi); das A56 war nicht dran (nur auf Zuruf).
+
+- `plat::fs` und `plat::watch` sind auf Android die Linux-Teile von [`fs.rs`](../lib/plat/fs.rs) und
+  [`watch.rs`](../lib/plat/watch.rs) (nur `cfg`): die Syscalls über `rt::os`, `struct stat` aus `rt::kernel` (x86-64 und
+  ARM64). Sie nehmen die Namen von [`android_files.rs`](../lib/plat/android_files.rs): `os_z` macht daraus den echten
+  Pfad für den Kernel, die Regeln (`policy`) sehen den Namen. `\` trennt wie in diesen Namen und in den Regeln (`join`,
+  `parent`, die Namen eines `Dir`). `rt::os` hat auf Android dafür auch `rename` (`renameat2`, sonst `renameat`).
+- **Namen und echte Pfade (Entscheidung):** `/`, `/config`, `/data`, `/cache`, `/tmp`, `/documents`, `/imports` und
+  alles Übrige unter `/` bleiben Namen im Speicher der App. Die Ordner des Systems selbst (`/system`, `/system_ext`,
+  `/product`, `/vendor`, `/odm`, `/apex`, `/proc`, `/sys`, `/dev`, `/storage`, `/sdcard`, `/mnt`) sind ihre echten
+  Pfade, für `plat::fs` und genauso für `read_file`, `dir_list` und die übrigen Dateifunktionen: eine Regel in
+  `android_files.rs` (`SYSTEM`); so liest AN4 `/system/fonts` ohne eigenen Weg. Einen echten Pfad in den Speicher
+  der App (`/data/user/0/PAKET/files/...`) gibt es nicht: `/data` ist schon ein Name, und ein zweiter Name derselben
+  Datei liefe an den Regeln vorbei (`fs.write /data/**` träfe sonst `/config`). `std`-Apps nehmen für `std::fs` den
+  echten Ordner, für `plat` die Namen.
+- **Kein `openat2`:** `Dir::open_dir` geht auf Android immer Schritt für Schritt (`openat` mit `O_NOFOLLOW` unter dem
+  offenen Ordner); der Versuch mit `openat2` ist dort nicht einmal gebaut. `plattest --test kernel` läuft dafür jetzt
+  auch auf Android (ohne `fork`, `clone` und `dup2`, die Helfer von `rt::os` nur unter Linux): 65 von 65 im
+  App-Prozess des x86-64-Emulators, wo `openat2` SIGSYS gäbe.
+- **Links:** ein absolutes Ziel (`symlink`, `Dir::symlink`) liegt als echter Pfad im Link (der Kernel löst Links auf
+  echten Pfaden auf), `read_link` liest es wieder als Namen; relative Ziele bleiben, wie sie sind.
+- **Hardlinks:** SELinux verweigert sie einer App (`avc: denied { link }` für `untrusted_app` auf `app_data_file`),
+  auch im eigenen Speicher, und `adb shell` ebenso. `fs::hard_link` antwortet auf Android `false`, ohne den Kernel zu
+  fragen (jeder Versuch hinterließe eine Zeile im Log); es ist `bool`, ein eigenes `Unsupported` hat es nicht.
+- **Zone:** `local_zone_id` nimmt `TZ`, sonst die Systemeigenschaft `persist.sys.timezone` (`__system_property_get`,
+  wie Bionics `tzset`); die Zone kennt `datetime` (Emulator: `GMT`).
+- **`watch`:** inotify wie unter Linux; Wurzeln und gemeldete Pfade sind Namen, die Uhren liegen auf den echten
+  Ordnern. Auch die Lücken (ein Watcher gleich nach `new`, eine gelöschte und neue Wurzel, eine verschobene Wurzel,
+  eine Liste, die beim ersten Mal scheitert) prüft `coretest` auf Android.
+- **Fund 2 von AN0 behoben:** `mkdirs` nimmt EEXIST am Ende nur noch für einen Ordner hin; `plat::mkdir` über einer
+  Datei ist `false`.
+- `File::create_new` gibt es auch auf Android (`O_EXCL`, 0600), damit auch die exklusiven Geschwister von
+  `AtomicFile` auf Ordner-Mounts; `plattest --test content` prüft es wieder.
+- Fassade: `cas` und `datastore` auch auf Android (`lib/jflib/Cargo.toml`, `src/lib.rs`), docs.rs baut sie für
+  `aarch64-linux-android`. `coretest` nimmt `datastore` und `cas` mit, seine Gruppe `plat` prüft Dateien, `watch`
+  und die Zone (`service` meldet AN4; das Netz seit dem Mischen mit AN2, ohne Unix-Sockets). `plattest`: `vfs`, `kernel`, `trash` (Android hat keinen
+  Papierkorb: `false`, die Datei bleibt) und `content` laufen auf Android.
+
+| Lauf (Emulator x86-64, API 35) | `adb shell` | App (`untrusted_app`, seccomp 2) |
+|---|---|---|
+| `coretest` | 4697 von 4697 | 4697 von 4697 |
+| darin `plat`, `datastore`, `cas` | 58, 95, 109 | 58, 95, 109 |
+| `plattest --test all` | 219 bestanden, 0 Fehler (Fund 2 behoben) | dasselbe |
+| `plattest --test kernel` (`fs::Dir`) | 65 von 65 | 65 von 65 |
+| `plattest --test vfs` | 132 von 132 | 132 von 132 |
+| `plattest --test content` | 97 von 97 | 97 von 97 |
+| `plattest --test trash` | 4 von 4 | 4 von 4 |
+| `asynctest --script tasks.uis`, `copy.uis` | grün | grün |
+
+Offen nach AN3:
+
+- Das A56 (ARM64: die andere `struct stat` im App-Prozess, `openat2` dort erlaubt, aber ungenutzt), nur auf Zuruf.
+- `plattest --test dirs` prüft auf Android die XDG-Ordner von Linux (25 Fehler, schon vor AN3; nicht in `all`).
+  Android kennt nur `/documents` und `/data` als Ordner der Logs; der Test braucht einen eigenen Zweig.
+- Unix-Sockets von `net` (mit `fs::socket_id`): nach dem Mischen von AN2 und AN3 sind beide Teile da, die Sockets
+  selbst sind auf Android noch nicht eingeschaltet.
+
 ### AN4: Drucken, Schriften, Rest (M)
 
 - Drucken: der Druckauftrag als PDF (`print.rs` schreibt es schon) über den `PrintManager` des Hosts, mit einem
@@ -519,6 +576,8 @@ Schriften des Systems findet (Roboto, Noto CJK).
 | Autostart | Activities dürfen seit Android 10 nicht aus dem Hintergrund starten |
 | Dateizuordnungen und Shell-Integration im Desktop-Sinn | laufen auf Android über Intents im Manifest |
 | Lokale IPC zwischen Programmen (`control_ipc`) | eine App ist auf Android ein Prozess; Einzelinstanz ist dort die Regel |
+| Hardlinks (`fs::hard_link`) | SELinux verweigert sie jeder App, auch im eigenen Speicher (AN3); `false` |
+| Papierkorb (`trash`) | eine App hat keinen, in den sie Dateien legen könnte; `false`, die Datei bleibt |
 
 ## Reihenfolge
 
@@ -555,7 +614,8 @@ Fassade). AN4 braucht AN3 für die Schriften des Systems.
   Blocking-Pool, nie direkt im Ereignis.
 - **Im Hintergrund friert Android Prozesse ein** (Cached-Apps-Freezer, Doze). Threads stehen dann, Verbindungen
   laufen in Timeouts. Der Plan dokumentiert das, löst es aber nicht.
-- **Hardlinks** sind in der Shell verboten (ARM64.md); im App-Prozess prüfen.
+- **Hardlinks** sind in der Shell verboten (ARM64.md) und im App-Prozess auch (AN3: SELinux, `link` auf
+  `app_data_file`); `fs::hard_link` ist dort `false`.
 - **Kein `/etc/localtime`.** Die Zone kommt aus `persist.sys.timezone`.
 - **Emulator und Gerät unterscheiden sich:** `x86_64` gegen ARM64 (`struct stat`, Syscall-Nummern), API 35 gegen
   Android 16. Jeder Meilenstein läuft auf beiden.

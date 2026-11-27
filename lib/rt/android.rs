@@ -55,6 +55,20 @@ pub unsafe fn poll(fds: usize, n: usize, ms: i32) -> isize {
     unsafe { syscall6(SYS_PPOLL, fds, n, timeout, 0, 8, 0) }
 }
 
+/// rename, replacing new, by renameat2 (renameat where the kernel has none), as on Linux
+/// (plat::fs, docs/ANDROID.md AN3; both reach the kernel through the app's seccomp filter)
+///
+/// # Safety
+/// old and new must be NUL-terminated paths.
+#[inline]
+pub unsafe fn rename(old: usize, new: usize) -> isize {
+    let r = unsafe { syscall6(SYS_RENAMEAT2, AT_FDCWD, old, AT_FDCWD, new, 0, 0) };
+    if r != -38 {
+        return r; // not ENOSYS
+    }
+    unsafe { syscall6(SYS_RENAMEAT, AT_FDCWD, old, AT_FDCWD, new, 0, 0) }
+}
+
 #[link(name = "c")]
 unsafe extern "C" {
     fn posix_memalign(out: *mut *mut c_void, align: usize, size: usize) -> c_int;

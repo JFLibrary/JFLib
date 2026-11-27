@@ -29,6 +29,14 @@
 //   fd_path(File) (Linux)                        a name of the open file itself for a program
 //                                                this one starts (/proc/<pid>/fd/<n>)
 //
+// Android (docs/ANDROID.md AN3): the Linux code (the kernel's calls through rt::os) on the names of
+// android_files.rs -- /config, /data, /cache, /tmp, /documents, /imports and the rest of "/" are the
+// app's storage, /system, /product, /proc and the other folders of the system's own their real
+// paths --, '\' separates as in those names; Dir opens component by component (never openat2:
+// SIGSYS); an absolute link target is kept as its real path and read back as its name; no hard
+// links (SELinux refuses apps every one: hard_link is false); local_zone_id from the property
+// persist.sys.timezone.
+//
 // Windows: reparse points count as links only for symbolic links and junctions; other tags
 // (deduplication, cloud placeholders) are ordinary files whose data is read.  Files are
 // opened with backup semantics (directories, and backup privileges when the process holds
@@ -97,13 +105,15 @@ pub struct DirEntry {
     pub kind: FileKind,
 }
 
-// the separators of a path: '/' and '\' on Windows and in vfs names (a mount turns '\' into
-// '/'); '/' alone in other OS paths ('\' is an ordinary character of a Linux or macOS name)
+// the separators of a path: '/' and '\' on Windows, on Android (its names, android_files.rs) and
+// in vfs names (a mount turns '\' into '/'); '/' alone in other OS paths ('\' is an ordinary
+// character of a Linux or macOS name)
 fn seps(path: &str) -> &'static [char] {
-    if cfg!(windows) || vfs::has_scheme(path) { &['/', '\\'] } else { &['/'] }
+    if cfg!(any(windows, target_os = "android")) || vfs::has_scheme(path) { &['/', '\\'] } else { &['/'] }
 }
 
-/// "a/b" + "c" with the platform separator (Linux, macOS: a '\' is part of a name)
+/// "a/b" + "c" with the platform separator (Linux, macOS: a '\' is part of a name; Android: '/',
+/// a '\' separates there too)
 pub fn join(dir: &str, name: &str) -> String {
     let sep = if cfg!(windows) { '\\' } else { '/' };
     let mut s = String::from(dir);
@@ -127,16 +137,23 @@ pub fn parent(path: &str) -> &str {
 
 #[cfg(windows)]
 pub use win::*;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub use lnx::*;
 #[cfg(target_vendor = "apple")]
 pub use apl::*;
 #[cfg(windows)]
 use win as sys;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use lnx as sys;
 #[cfg(target_vendor = "apple")]
 use apl as sys;
+
+/// (watch.rs: inotify) the path the kernel's calls take, NUL-terminated: Linux the path itself,
+/// Android the real path behind a name (android_files.rs); None for a name that has none
+#[cfg(any(target_os = "linux", target_os = "android"))]
+pub(crate) fn os_z(path: &str) -> Option<Vec<u8>> {
+    lnx::zp(path)
+}
 
 // ------------------------------------------------------------------ vfs names
 
@@ -264,6 +281,7 @@ fn link_target_allowed(target: &str, link: &str) -> bool {
 
 /// (net) (device, file id) of an OS path when it is a socket file (Windows: an AF_UNIX reparse
 /// point), a link not followed; without the policy check (net checked fs.write)
+#[cfg_attr(target_os = "android", allow(dead_code))] // (Android: net's Unix sockets, AN2)
 pub(crate) fn socket_id(path: &str) -> Option<(u64, u64)> {
     if path.contains('\0') {
         return None;
@@ -272,7 +290,8 @@ pub(crate) fn socket_id(path: &str) -> Option<(u64, u64)> {
 }
 
 /// a second name new for the file existing (both OS paths or folder mounts); with a manifest
-/// the app needs write access to both (writing through new changes existing)
+/// the app needs write access to both (writing through new changes existing); Android: false
+/// (SELinux allows an app no hard links)
 pub fn hard_link(existing: &str, new: &str) -> bool {
     match (at(existing), at(new)) {
         (At::Os(e), At::Os(n)) => sys::hard_link(e.as_deref().unwrap_or(existing), n.as_deref().unwrap_or(new)),
@@ -372,7 +391,8 @@ pub fn mkdir_private(path: &str) -> bool {
 ///                                     link on the way: Linux openat2 (RESOLVE_BENEATH |
 ///                                     RESOLVE_NO_SYMLINKS | RESOLVE_NO_MAGICLINKS), else openat
 ///                                     with O_NOFOLLOW for every component (kernels before 5.6,
-///                                     a seccomp filter that refuses openat2)
+///                                     a seccomp filter that refuses openat2; Android always:
+///                                     its filter may end the app on openat2)
 ///   names                             one component: no separator, not "." or ".." (Windows:
 ///                                     no ':' either); "" is the folder itself where noted
 ///   lstat / read_link / read_dir      links are reported, never followed
@@ -400,9 +420,9 @@ pub struct Dir {
     os: sys::OsDir,
 }
 
-// the separators of an OS path
+// the separators of an OS path (Android: its names take '\' too)
 fn os_seps() -> &'static [char] {
-    if cfg!(windows) { &['/', '\\'] } else { &['/'] }
+    if cfg!(any(windows, target_os = "android")) { &['/', '\\'] } else { &['/'] }
 }
 
 // one component of a path below a Dir
@@ -1565,20 +1585,54 @@ mod win {
 
 // ------------------------------------------------------------------ Linux
 
-#[cfg(target_os = "linux")]
+// Android (docs/ANDROID.md AN3) too: the same calls on the real paths behind its names (zp)
+#[cfg(any(target_os = "linux", target_os = "android"))]
 mod lnx {
     use super::{DirEntry, FileKind, Meta};
     use alloc::string::String;
     use alloc::vec::Vec;
-    use rt::os::{syscall3, syscall6, AT_FDCWD, O_CLOEXEC, O_CREAT, O_DIRECTORY, O_EXCL, O_NOFOLLOW, O_NONBLOCK, O_PATH, O_RDONLY, O_RDWR, O_WRONLY, SYS_CLOSE, SYS_FCHMOD, SYS_FCHMODAT, SYS_FCHOWNAT, SYS_FSTAT, SYS_FSYNC, SYS_GETDENTS64, SYS_GETEUID, SYS_LINKAT, SYS_MKDIRAT, SYS_NEWFSTATAT, SYS_OPENAT, SYS_OPENAT2, SYS_READLINKAT, SYS_RENAMEAT, SYS_RENAMEAT2, SYS_STATFS, SYS_SYMLINKAT, SYS_UNLINKAT, SYS_UTIMENSAT, SYS_WRITE, Stat};
+    #[cfg(target_os = "linux")]
+    use rt::os::SYS_OPENAT2;
+    use rt::os::{syscall3, syscall6, AT_FDCWD, O_CLOEXEC, O_CREAT, O_DIRECTORY, O_EXCL, O_NOFOLLOW, O_NONBLOCK, O_PATH, O_RDONLY, O_RDWR, O_WRONLY, SYS_CLOSE, SYS_FCHMOD, SYS_FCHMODAT, SYS_FCHOWNAT, SYS_FSTAT, SYS_FSYNC, SYS_GETDENTS64, SYS_GETEUID, SYS_LINKAT, SYS_MKDIRAT, SYS_NEWFSTATAT, SYS_OPENAT, SYS_READLINKAT, SYS_RENAMEAT, SYS_RENAMEAT2, SYS_STATFS, SYS_SYMLINKAT, SYS_UNLINKAT, SYS_UTIMENSAT, SYS_WRITE, Stat};
 
     const AT_SYMLINK_NOFOLLOW: usize = 0x100;
     const EINTR: isize = 4;
 
+    // a name relative to an open folder, NUL-terminated
     fn z(s: &str) -> Vec<u8> {
         let mut v = s.as_bytes().to_vec();
         v.push(0);
         v
+    }
+
+    // a whole path for the kernel, NUL-terminated: Linux the path itself; Android the real path
+    // behind one of its names (android_files.rs), None for a name that has none
+    #[cfg(target_os = "linux")]
+    pub(super) fn zp(path: &str) -> Option<Vec<u8>> {
+        Some(z(path))
+    }
+    #[cfg(target_os = "android")]
+    pub(super) fn zp(path: &str) -> Option<Vec<u8>> {
+        crate::web::os_z(path)
+    }
+
+    // a link's target for symlinkat (Android: an absolute name its real path) and back from
+    // readlinkat (Android: a real path into the app's storage its name)
+    #[cfg(target_os = "linux")]
+    fn target_out(t: &str) -> Option<String> {
+        Some(String::from(t))
+    }
+    #[cfg(target_os = "android")]
+    fn target_out(t: &str) -> Option<String> {
+        crate::web::link_out(t)
+    }
+    #[cfg(target_os = "linux")]
+    fn target_in(t: String) -> String {
+        t
+    }
+    #[cfg(target_os = "android")]
+    fn target_in(t: String) -> String {
+        crate::web::link_in(t)
     }
 
     struct Fd(usize);
@@ -1590,7 +1644,7 @@ mod lnx {
     }
 
     fn open(path: &str, flags: usize, mode: usize) -> Option<Fd> {
-        let p = z(path);
+        let p = zp(path)?;
         loop {
             // SAFETY: a NUL-terminated path.
             let r = unsafe { syscall6(SYS_OPENAT, AT_FDCWD, p.as_ptr() as usize, flags | O_CLOEXEC, mode, 0, 0) };
@@ -1617,7 +1671,7 @@ mod lnx {
     }
 
     fn statx(path: &str, flags: usize) -> Option<Meta> {
-        let p = z(path);
+        let p = zp(path)?;
         stat_in(AT_FDCWD, &p, flags)
     }
 
@@ -1664,6 +1718,7 @@ mod lnx {
         statx(path, AT_SYMLINK_NOFOLLOW)
     }
 
+    #[cfg_attr(target_os = "android", allow(dead_code))] // (Android: net's Unix sockets, AN2)
     pub(crate) fn socket_id(path: &str) -> Option<(u64, u64)> {
         statx(path, AT_SYMLINK_NOFOLLOW).filter(|m| m.mode & 0o170000 == 0o140000).map(|m| (m.dev, m.ino))
     }
@@ -1673,7 +1728,18 @@ mod lnx {
             return None;
         }
         let fd = open(path, O_RDONLY | O_DIRECTORY, 0)?;
-        list_fd(&fd, &|name| lstat(&super::join(path, name)).and_then(|m| m.kind).unwrap_or(FileKind::Other))
+        #[allow(unused_mut)] // (Linux)
+        let mut v = list_fd(&fd, &|name| lstat(&super::join(path, name)).and_then(|m| m.kind).unwrap_or(FileKind::Other))?;
+        // Android: the virtual root has the folders of the cache beside filesDir (as dir_list)
+        #[cfg(target_os = "android")]
+        if crate::web::os_root(path) {
+            for n in ["cache", "tmp"] {
+                if !v.iter().any(|e| e.name == n) {
+                    v.push(DirEntry { name: String::from(n), kind: FileKind::Dir });
+                }
+            }
+        }
+        Some(v)
     }
 
     // the entries of an open folder (getdents64 from its current position); `unknown`: the
@@ -1723,12 +1789,12 @@ mod lnx {
         if !crate::policy::fs_allowed(path, crate::policy::FS_READ) {
             return None;
         }
-        read_link_raw(path)
+        read_link_raw(path).map(target_in)
     }
 
     // read_link without the policy check (the system files of local_zone_id)
     fn read_link_raw(path: &str) -> Option<String> {
-        let p = z(path);
+        let p = zp(path)?;
         let mut buf = alloc::vec![0u8; 4096];
         // SAFETY: the buffer is writable.
         let r = unsafe { syscall6(SYS_READLINKAT, AT_FDCWD, p.as_ptr() as usize, buf.as_mut_ptr() as usize, buf.len(), 0, 0) };
@@ -1743,16 +1809,19 @@ mod lnx {
         if !(crate::policy::fs_allowed(link, crate::policy::FS_WRITE)) {
             return false;
         }
-        let (t, l) = (z(target), z(link));
+        let (Some(t), Some(l)) = (target_out(target).map(|t| z(&t)), zp(link)) else { return false };
         // SAFETY: NUL-terminated paths.
         unsafe { syscall3(SYS_SYMLINKAT, t.as_ptr() as usize, AT_FDCWD, l.as_ptr() as usize) >= 0 }
     }
 
+    /// Android: none -- SELinux refuses an app (untrusted_app) every hard link, also in its own
+    /// storage, and `adb shell` too (docs/ANDROID.md AN3): false without asking the kernel (each
+    /// try would leave an "avc: denied { link }" in the log)
     pub fn hard_link(existing: &str, new: &str) -> bool {
-        if !(crate::policy::fs_allowed(existing, crate::policy::FS_WRITE) && crate::policy::fs_allowed(new, crate::policy::FS_WRITE)) {
+        if cfg!(target_os = "android") || !(crate::policy::fs_allowed(existing, crate::policy::FS_WRITE) && crate::policy::fs_allowed(new, crate::policy::FS_WRITE)) {
             return false;
         }
-        let (e, n) = (z(existing), z(new));
+        let (Some(e), Some(n)) = (zp(existing), zp(new)) else { return false };
         // SAFETY: NUL-terminated paths.
         unsafe { syscall6(SYS_LINKAT, AT_FDCWD, e.as_ptr() as usize, AT_FDCWD, n.as_ptr() as usize, 0, 0) >= 0 }
     }
@@ -1761,7 +1830,7 @@ mod lnx {
         if !(crate::policy::fs_allowed(path, crate::policy::FS_WRITE)) {
             return false;
         }
-        let p = z(path);
+        let Some(p) = zp(path) else { return false };
         let ts = [atime_ns.div_euclid(1_000_000_000), atime_ns.rem_euclid(1_000_000_000), mtime_ns.div_euclid(1_000_000_000), mtime_ns.rem_euclid(1_000_000_000)];
         // SAFETY: two timespecs; the link itself (AT_SYMLINK_NOFOLLOW).
         unsafe { syscall6(SYS_UTIMENSAT, AT_FDCWD, p.as_ptr() as usize, ts.as_ptr() as usize, AT_SYMLINK_NOFOLLOW, 0, 0) >= 0 }
@@ -1795,7 +1864,7 @@ mod lnx {
         if !(crate::policy::fs_allowed(path, crate::policy::FS_WRITE)) {
             return false;
         }
-        let p = z(path);
+        let Some(p) = zp(path) else { return false };
         // SAFETY: a NUL-terminated path; the link itself.
         unsafe { syscall6(SYS_FCHOWNAT, AT_FDCWD, p.as_ptr() as usize, uid as usize, gid as usize, AT_SYMLINK_NOFOLLOW, 0) >= 0 }
     }
@@ -1808,7 +1877,7 @@ mod lnx {
         if !(crate::policy::fs_allowed(path, crate::policy::FS_READ)) {
             return None;
         }
-        let p = z(path);
+        let p = zp(path)?;
         let mut b = [0u8; 120];
         // SAFETY: struct statfs is 120 bytes on x86-64 and ARM64.
         if unsafe { syscall3(SYS_STATFS, p.as_ptr() as usize, b.as_mut_ptr() as usize, 0) } < 0 {
@@ -1867,9 +1936,12 @@ mod lnx {
         // SAFETY: an owned descriptor.
         let synced = unsafe { syscall3(SYS_FSYNC, fd.0, 0, 0) } >= 0;
         drop(fd);
-        let (t, d) = (z(&tmp), z(path));
-        // SAFETY: NUL-terminated paths.
-        if !synced || unsafe { rt::os::rename(t.as_ptr() as usize, d.as_ptr() as usize) } < 0 {
+        let renamed = match (zp(&tmp), zp(path)) {
+            // SAFETY: NUL-terminated paths.
+            (Some(t), Some(d)) => synced && unsafe { rt::os::rename(t.as_ptr() as usize, d.as_ptr() as usize) } >= 0,
+            _ => false,
+        };
+        if !renamed {
             unlink(&tmp);
             return false;
         }
@@ -1877,7 +1949,7 @@ mod lnx {
     }
 
     fn unlink(path: &str) {
-        let p = z(path);
+        let Some(p) = zp(path) else { return };
         // SAFETY: a NUL-terminated path.
         unsafe { syscall3(SYS_UNLINKAT, AT_FDCWD, p.as_ptr() as usize, 0) };
     }
@@ -1893,7 +1965,7 @@ mod lnx {
         if !up.is_empty() && up != path && !make_parents(up) {
             return false;
         }
-        let p = z(path);
+        let Some(p) = zp(path) else { return false };
         // SAFETY: a NUL-terminated path.
         let r = unsafe { syscall3(SYS_MKDIRAT, AT_FDCWD, p.as_ptr() as usize, 0o700) };
         r >= 0 || private_dir(path)
@@ -1912,7 +1984,7 @@ mod lnx {
         if !up.is_empty() && up != path && !make_parents(up) {
             return false;
         }
-        let p = z(path);
+        let Some(p) = zp(path) else { return false };
         // SAFETY: a NUL-terminated path.
         let r = unsafe { syscall3(SYS_MKDIRAT, AT_FDCWD, p.as_ptr() as usize, 0o700) };
         r >= 0 || stat(path).is_some_and(|m| m.is_dir())
@@ -1931,15 +2003,40 @@ mod lnx {
         m.mode & 0o077 == 0 || set_mode(path, 0o700)
     }
 
+    // the zone TZ names ("Europe/Berlin", ":Europe/Berlin", a path into a zoneinfo folder)
+    fn tz_env() -> Option<String> {
+        let tz = crate::env("TZ")?;
+        let tz = tz.trim_start_matches(':');
+        if let Some(i) = tz.find("zoneinfo/") {
+            return Some(String::from(&tz[i + 9..]));
+        }
+        (!tz.is_empty() && !tz.starts_with('/')).then(|| String::from(tz))
+    }
+
+    /// Android: TZ when set, else the system's setting persist.sys.timezone (as Bionic's own
+    /// tzset); there is no /etc/localtime (docs/ANDROID.md AN3)
+    #[cfg(target_os = "android")]
     pub fn local_zone_id() -> Option<String> {
-        if let Some(tz) = crate::env("TZ") {
-            let tz = tz.trim_start_matches(':');
-            if let Some(i) = tz.find("zoneinfo/") {
-                return Some(String::from(&tz[i + 9..]));
-            }
-            if !tz.is_empty() && !tz.starts_with('/') {
-                return Some(String::from(tz));
-            }
+        #[link(name = "c")]
+        unsafe extern "C" {
+            fn __system_property_get(name: *const core::ffi::c_char, value: *mut core::ffi::c_char) -> core::ffi::c_int;
+        }
+        if let Some(tz) = tz_env() {
+            return Some(tz);
+        }
+        let mut v = [0u8; 92]; // PROP_VALUE_MAX
+        // SAFETY: a NUL-terminated name and a buffer of PROP_VALUE_MAX bytes, the most Bionic writes.
+        let n = unsafe { __system_property_get(c"persist.sys.timezone".as_ptr(), v.as_mut_ptr().cast()) };
+        let n = usize::try_from(n).ok()?.min(v.len());
+        let s = String::from_utf8_lossy(&v[..n]);
+        let s = s.trim_matches(char::from(0)).trim();
+        (!s.is_empty()).then(|| String::from(s))
+    }
+
+    #[cfg(target_os = "linux")]
+    pub fn local_zone_id() -> Option<String> {
+        if let Some(tz) = tz_env() {
+            return Some(tz);
         }
         if let Some(t) = read_link_raw("/etc/localtime") {
             if let Some(i) = t.find("zoneinfo/") {
@@ -1955,13 +2052,19 @@ mod lnx {
     const AT_REMOVEDIR: usize = 0x200;
     const EPERM: isize = 1;
     const ENOENT: isize = 2;
-    const E2BIG: isize = 7;
-    const EAGAIN: isize = 11;
     const EISDIR: isize = 21;
-    const EINVAL: isize = 22;
     const ENOSYS: isize = 38;
+    #[cfg(target_os = "linux")]
+    const E2BIG: isize = 7;
+    #[cfg(target_os = "linux")]
+    const EAGAIN: isize = 11;
+    #[cfg(target_os = "linux")]
+    const EINVAL: isize = 22;
+    #[cfg(target_os = "linux")]
     const RESOLVE_NO_MAGICLINKS: u64 = 0x02;
+    #[cfg(target_os = "linux")]
     const RESOLVE_NO_SYMLINKS: u64 = 0x04;
+    #[cfg(target_os = "linux")]
     const RESOLVE_BENEATH: u64 = 0x08;
     const S_IFMT: u32 = 0o170000;
 
@@ -2007,24 +2110,29 @@ mod lnx {
 
         pub fn open_dir(&self, names: &[&str]) -> Option<OsDir> {
             let flags = O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC;
-            let rel = z(&names.join("/"));
-            // struct open_how: flags, mode, resolve
-            let how: [u64; 3] = [flags as u64, 0, RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS | RESOLVE_NO_MAGICLINKS];
-            loop {
-                // SAFETY: a NUL-terminated path and a 24-byte open_how.
-                let r = unsafe { syscall6(SYS_OPENAT2, (self.0).0, rel.as_ptr() as usize, how.as_ptr() as usize, 24, 0, 0) };
-                if r >= 0 {
-                    return Some(OsDir(Fd(r as usize)));
+            // Android never tries openat2: the app's seccomp filter ends the process with SIGSYS
+            // on x86-64 (API 35), which nothing can catch (docs/ANDROID.md AN0, AN3)
+            #[cfg(target_os = "linux")]
+            {
+                let rel = z(&names.join("/"));
+                // struct open_how: flags, mode, resolve
+                let how: [u64; 3] = [flags as u64, 0, RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS | RESOLVE_NO_MAGICLINKS];
+                loop {
+                    // SAFETY: a NUL-terminated path and a 24-byte open_how.
+                    let r = unsafe { syscall6(SYS_OPENAT2, (self.0).0, rel.as_ptr() as usize, how.as_ptr() as usize, 24, 0, 0) };
+                    if r >= 0 {
+                        return Some(OsDir(Fd(r as usize)));
+                    }
+                    if r == -EINTR {
+                        continue;
+                    }
+                    // no openat2 (before 5.6, a seccomp filter), or a rename meanwhile (EAGAIN):
+                    // the same rule one component at a time; anything else (ELOOP: a link) is final
+                    if ![-ENOSYS, -EPERM, -EAGAIN, -EINVAL, -E2BIG].contains(&r) {
+                        return None;
+                    }
+                    break;
                 }
-                if r == -EINTR {
-                    continue;
-                }
-                // no openat2 (before 5.6, a seccomp filter), or a rename meanwhile (EAGAIN):
-                // the same rule one component at a time; anything else (ELOOP: a link) is final
-                if ![-ENOSYS, -EPERM, -EAGAIN, -EINVAL, -E2BIG].contains(&r) {
-                    return None;
-                }
-                break;
             }
             let mut cur: Option<Fd> = None;
             for n in names {
@@ -2050,7 +2158,7 @@ mod lnx {
                 return None;
             }
             buf.truncate(r as usize);
-            Some(String::from_utf8_lossy(&buf).into_owned())
+            Some(target_in(String::from_utf8_lossy(&buf).into_owned()))
         }
 
         pub fn read_dir(&self) -> Option<Vec<DirEntry>> {
@@ -2096,7 +2204,8 @@ mod lnx {
         }
 
         pub fn symlink(&self, target: &str, name: &str, _dir: bool) -> bool {
-            let (t, l) = (z(target), z(name));
+            let Some(t) = target_out(target).map(|t| z(&t)) else { return false };
+            let l = z(name);
             // SAFETY: NUL-terminated target and name.
             unsafe { syscall3(SYS_SYMLINKAT, t.as_ptr() as usize, (self.0).0, l.as_ptr() as usize) >= 0 }
         }
