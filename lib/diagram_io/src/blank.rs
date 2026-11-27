@@ -21,7 +21,13 @@
 //                cells 65534 (the page's design)
 //   1 Normal     based on Theme: what shapes use
 //   2 Connector  based on Normal: the connector scheme's style 1 (line with its arrow, text),
-//                no fill, the background colour behind the text
+//                no fill, the background colour behind the text; the line in the variant's
+//                colour 7 (QuickStyleLineColor 106): NetLab's connector line is dk2 (slate),
+//                which Visio 16 does not take from a theme's style lists -- there it draws the
+//                shape's quick style colour instead (as for phClr; also a fixed srgbClr, and
+//                transforms on dk1 it drops), and colour 7 is that slate in NetLab's variants
+//                1 .. 3 (JD26 Visio check, 2026-11-27).  JFDiagrammer reads dk2 as dk2; the
+//                designs whose connector line is dk1 look the same with any colour
 //   3 Guide      based on No Style: thin light blue dashed line, no fill
 //   4 Text Only  based on Normal: no line, no fill, the dark text of font style 1, with
 //                Visio's contrast rule for text (QuickStyleVariation 2)
@@ -273,6 +279,8 @@ fn styles(doc: &mut Document) -> Vec<Style> {
     connector.cells = cells(
         doc,
         alloc::vec![
+            // variant colour 7 (see the module comment)
+            ("QuickStyleLineColor", num(106.0)),
             ("QuickStyleLineMatrix", num(1.0)),
             ("QuickStyleFillMatrix", num(1.0)),
             ("QuickStyleEffectsMatrix", num(1.0)),

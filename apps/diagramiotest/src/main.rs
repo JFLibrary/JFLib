@@ -33,6 +33,8 @@
 //                                         every master for the Visio counter-check
 //   diagramiotest --write-templates DIR  (JD13) every form of JFDiagrammer's templates as .vstx,
 //                                         metric and US (templates.rs)
+//   diagramiotest --write-all-stencils DIR   every stencil of JFDiagrammer as .vssx, metric
+//                                         and US, for visio_check (templates.rs)
 //   diagramiotest --data-dump FILE       (JD18) a file's connections, recordsets, rows, links and
 //                                         conflicts as diagram_io reads them (a check of files
 //                                         Visio wrote; nothing of them goes into the repository)
@@ -312,6 +314,9 @@ fn run() -> i32 {
     }
     if let Some(dir) = arg(&args, "--write-templates") {
         return templates::write(&dir);
+    }
+    if let Some(dir) = arg(&args, "--write-all-stencils") {
+        return templates::write_stencils(&dir);
     }
     if let Some(dir) = arg(&args, "--write-vdx") {
         // (JD16) the self-written .vdx / .vsx and what JFDiagrammer writes from them

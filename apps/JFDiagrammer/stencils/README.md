@@ -269,6 +269,13 @@ App (`diagram_core::glue::is_one_d`) liest es genauso.
   Hintergrund aus dem Design), gefüllte flächige Pfeile `Normal`. Ein Verbinder nur aus Umrissen
   (ohne Füllung) nimmt ebenfalls `Connector`, mit `BeginArrow = 0` und `EndArrow = 0`: mit
   `Normal` verschwände er in Designs ohne Shape-Linien (Kontrast).
+- **Pfeilspitze aus dem Design: `QuickStyleType = 3`.** Visio gibt einem Shape ohne `ObjType 2`
+  die Pfeilspitzen des Designs (`THEMEVAL()` in `BeginArrow`/`EndArrow`, auch
+  `THEMEVAL("ConnectorEnd",13)`) nur mit `QuickStyleType 3`; mit 0 sind sie dort 0 (1D-Shapes
+  zeichnet es dann aus der Verbinder-Liste ohne Spitzen, 2D-Shapes aus der Shape-Liste).
+  JFDiagrammer erkennt die Verbinder-Liste auch am Namen `Connector`. Jeder Master, dessen
+  Spitze aus dem Design kommt, setzt deshalb `QuickStyleType = 3` (Visio-Gegenprobe, alle
+  1D-Master von Blöcke und Verbinder einzeln abgelegt).
 - Text eines Linienverbinders: ein fester Textblock (z. B. `TxtWidth = 30 mm`) mitten auf dem
   Verlauf; der Hintergrund aus `Connector` erscheint nur hinter vorhandenem Text.
 
@@ -327,8 +334,14 @@ Ergänzt mit dem JD26-Probeblatt (vom Nutzer abgenommen, 2026-11-23):
   der Linien- und die Schriftmatrix aus der Text-Formatvorlage. Wer die Formatvorlagen mischt
   oder `style: Connector` mit `QuickStyleType = 3` nimmt, setzt `QuickStyleLineMatrix` selbst:
   reine Linien `2` (Linie 2 der Verbinder-Liste, 1 pt in der Variantenfarbe), Linien mit
-  Flächen wie Normal `100`. Linie 1 der Verbinder-Liste (und Linie 2 der Shape-Liste) von
-  NetLab ist `dk2`; die kennt Visio in Linienlisten nicht und zeichnet dort die Variantenfarbe.
+  Flächen wie Normal `100`, und dazu `QuickStyleLineColor = 100` (Variantenfarbe 1): Die
+  Formatvorlage `Connector` zeichnet in Variantenfarbe 7 (`QuickStyleLineColor 106`), damit
+  Visio die NetLab-Verbinder schiefergrau zeigt. Linie 1 der Verbinder-Liste von NetLab ist
+  `dk2`; aus den Listen eines Themes nimmt Visio aber nur dk1, lt1, die Akzente und den
+  Platzhalter, alles andere (dk2, eine feste Farbe, Transformationen auf dk1) zeichnet es in der
+  Schnellformatfarbe des Shapes. Variantenfarbe 7 ist in NetLab-Variante 1–3 dieses Schiefergrau
+  (Variante 4: Grau). Linie 2 und Schrift 2 der Shape-Liste (`dk2`) zeigt Visio deshalb in der
+  Schnellformatfarbe; kein Master nimmt sie.
   Die Pfeilspitze des Designs (`EndArrow` aus Connector) steht am Ende des *letzten* Pfads:
   eine Linie mit Kasten zeichnet den Kasten zuerst (Kategorie-Gräten).
 - **Textblock ganz oder gar nicht:** Visio liest eine fehlende Zelle eines Textblocks, von dem

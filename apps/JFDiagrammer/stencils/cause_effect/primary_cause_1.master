@@ -52,6 +52,7 @@ TextBkgnd = 0
 # Füll-Formatvorlage und kennt dk2 (Linie 1) nicht
 QuickStyleType = 3
 QuickStyleLineMatrix = 2
+QuickStyleLineColor = 100
 
 [Geometry]
 NoFill = TRUE

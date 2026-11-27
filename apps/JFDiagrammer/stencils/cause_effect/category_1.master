@@ -63,6 +63,7 @@ QuickStyleType = 3
 QuickStyleFillMatrix = 100
 QuickStyleFontMatrix = 100
 QuickStyleLineMatrix = 100
+QuickStyleLineColor = 100
 
 [User]
 # der Kasten der Kategorie: Breite und Höhe

@@ -52,6 +52,7 @@ QuickStyleType = 3
 QuickStyleFillMatrix = 100
 QuickStyleFontMatrix = 100
 QuickStyleLineMatrix = 100
+QuickStyleLineColor = 100
 
 [User]
 # die Breite des Kopfs, das Ende der Gräte (Anfang der Spitze), die Länge der Spitze
