@@ -833,7 +833,8 @@ impl Cert {
         self.issuer == issuer.subject && issuer.verify(self.sig_alg, &self.tbs, &self.signature)
     }
 
-    fn eku_allows(&self, u: Usage) -> bool {
+    /// whether the extended key usage allows this purpose (no extended key usage: every purpose)
+    pub fn eku_allows(&self, u: Usage) -> bool {
         if self.eku.is_empty() {
             return true;
         }
@@ -1007,6 +1008,20 @@ fn self_issued(c: &Cert) -> bool {
 /// certificates of the chain (in any order) to an anchor
 pub fn verify_chain(chain: &[Cert], anchors: &[Cert], now: i64, name: Option<&str>, usage: Usage) -> Result<(), String> {
     let leaf = chain.first().ok_or("kein Zertifikat")?;
+    check_leaf(leaf, now, name, usage)?;
+    let mut why = String::from("keine vertrauenswürdige Zertifizierungsstelle");
+    let mut used = alloc::vec![false; chain.len()];
+    let mut below = alloc::vec![0usize];
+    let mut budget = 64u32;
+    if path(chain, anchors, now, usage, &mut used, &mut below, &mut budget, &mut why) { Ok(()) } else { Err(why) }
+}
+
+/// the checks of verify_chain that concern the leaf alone: no unknown critical extension,
+/// valid at `now`, for this usage (extended key usage), allowed to sign (key usage
+/// digitalSignature), no CA's extensions on a certificate that is no CA (keyCertSign, name
+/// constraints: RFC 5280 4.2.1.9, 4.2.1.10), and the name.  netio::roots asks them after a
+/// system's verifier said yes to the path, so the leaf follows the same rules everywhere
+pub fn check_leaf(leaf: &Cert, now: i64, name: Option<&str>, usage: Usage) -> Result<(), String> {
     if leaf.unknown_critical {
         return Err(String::from("unbekannte kritische Erweiterung"));
     }
@@ -1028,11 +1043,7 @@ pub fn verify_chain(chain: &[Cert], anchors: &[Cert], now: i64, name: Option<&st
             return Err(format!("Zertifikat gilt nicht für {}", n));
         }
     }
-    let mut why = String::from("keine vertrauenswürdige Zertifizierungsstelle");
-    let mut used = alloc::vec![false; chain.len()];
-    let mut below = alloc::vec![0usize];
-    let mut budget = 64u32;
-    if path(chain, anchors, now, usage, &mut used, &mut below, &mut budget, &mut why) { Ok(()) } else { Err(why) }
+    Ok(())
 }
 
 /// whether a CA may sign above the certificates of `below` (indices into chain, leaf first):

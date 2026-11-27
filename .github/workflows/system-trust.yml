@@ -1,0 +1,96 @@
+# The system's trust (Trust::System: lib/plat/certs.rs, lib/netio/roots.rs) on Windows, macOS and
+# Linux runners: coretest's checks of it (systrust: the system's checks against a CA of their own
+# and the reason of each refusal, the extra CAs of Trust::System, a server's client_auth with it,
+# on Linux SSL_CERT_FILE and SSL_CERT_DIR), badssl.com's hosts through Trust::System (each refusal
+# with its reason: tools/tls_web_check.py --internet-only) and x509-limbo through the system's
+# checks (tools/limbo_check.py --system: Windows CryptoAPI and Apple's Security framework with
+# the testcases' roots as their only ones; where they decide otherwise than netio's own check,
+# SYSTEM_KNOWN says why, and a difference not listed fails).  The systems' checks change with
+# their updates: hence Mondays as well.  On a push to main or a pull request that touches the
+# trust, the TLS client, x509 or the tools; by hand.
+name: System trust
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - lib/plat/certs.rs
+      - lib/netio/roots.rs
+      - lib/netio/tls/**
+      - lib/x509/**
+      - apps/coretest/src/systrust.rs
+      - apps/coretest/src/suitevec.rs
+      - tools/limbo_check.py
+      - tools/tls_web_check.py
+      - .github/workflows/system-trust.yml
+  pull_request:
+    paths:
+      - lib/plat/certs.rs
+      - lib/netio/roots.rs
+      - lib/netio/tls/**
+      - lib/x509/**
+      - apps/coretest/src/systrust.rs
+      - apps/coretest/src/suitevec.rs
+      - tools/limbo_check.py
+      - tools/tls_web_check.py
+      - .github/workflows/system-trust.yml
+  schedule:
+    - cron: "23 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: system-trust-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  PYTHONUTF8: 1
+  PYTHONUNBUFFERED: 1
+
+jobs:
+  trust:
+    name: system trust ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, target: win }
+          - { os: macos-15, target: mac }
+          - { os: ubuntu-latest, target: linux }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: LLD (Linux)
+        if: matrix.target == 'linux'
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends lld > /dev/null
+          ld.lld --version
+      # 1.98.1: the rust-version of the root Cargo.toml
+      - name: Rust
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal --no-self-update
+          rustup default 1.98.1
+          rustc --version
+      - name: coretest
+        run: python -u build_rs.py app coretest --target ${{ matrix.target }}
+      - name: coretest's checks of the system's trust
+        run: build/${{ matrix.target }}/coretest --only systrust
+      - name: badssl.com through Trust::System
+        # also after a red step before: each says something of its own
+        if: success() || failure()
+        run: python -u tools/tls_web_check.py --internet-only --target ${{ matrix.target }}
+      - name: x509-limbo through the system's checks
+        # also after a red step before: each says something of its own
+        if: success() || failure()
+        run: python -u tools/limbo_check.py --system --target ${{ matrix.target }}
