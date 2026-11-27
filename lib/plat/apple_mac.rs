@@ -86,6 +86,10 @@ pub use pad_os::{gc_test_disconnect, gc_test_pad};
 #[path = "apple_mac_gpu.rs"]
 mod gpu;
 pub use gpu::*;
+// the colour pick and pictures of the screen (screen.rs): NSColorSampler, ScreenCaptureKit
+#[path = "apple_mac_screen.rs"]
+pub(crate) mod screen_os;
+pub use screen_os::mac_screen_access;
 // the share sheet (share.rs): NSSharingServicePicker
 #[path = "apple_mac_share.rs"]
 pub(crate) mod share_sheet;
