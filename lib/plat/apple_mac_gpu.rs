@@ -202,6 +202,11 @@ pub fn win_test_image(_w: i32) -> Option<(i32, i32, Vec<u8>)> {
     None
 }
 
+/// (tests) window w as the system composes it: Windows only (PrintWindow): None
+pub fn win_test_composed(_w: i32) -> Option<(i32, i32, Vec<u8>)> {
+    None
+}
+
 /// (tests) a part of the screen: macOS asks the user for that (screen recording): None
 pub fn win_test_screen(_x: i32, _y: i32, _w: i32, _h: i32) -> Option<Vec<u8>> {
     None

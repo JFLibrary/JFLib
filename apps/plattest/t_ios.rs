@@ -88,7 +88,8 @@ mod ios {
             SCALE.store(ui.text_scale(), SeqCst);
             DARK.store(ui.theme_dark(), SeqCst);
             if ASK_SHARE.swap(false, SeqCst) {
-                let file = alloc::format!("{}/plattest-share.txt", plat::temp_dir().unwrap_or_default().trim_end_matches('/'));
+                // a name with a scheme: the sheet gets the path behind it
+                let file = alloc::string::String::from("data://plattest-share.txt");
                 let _ = plat::write_file(&file, b"plattest");
                 let s = Share {
                     title: alloc::string::String::from("plattest"),

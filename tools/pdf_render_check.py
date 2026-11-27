@@ -13,7 +13,8 @@ fixtures, Ghostscript, LibreOffice, cairo, the system's PDFs) and pages made her
     shading patterns
   - images: every bit depth, Decode, Indexed, stencil masks, colour-key and explicit masks, soft
     masks, inline images, turned images, enlarged and shrunk, JPEG (RGB, grey, CMYK), CCITT
-    Group 3 and 4
+    Group 3 and 4, JPEG 2000 (lossless and lossy, the colour space of the JP2 header, 16-bit grey,
+    a tiled raw codestream, SMaskInData)
   - transparency: alpha, the sixteen blend modes, soft masks (luminosity, alpha), groups
   - text: the 14 standard fonts, embedded Type 1, CFF, TrueType, OpenType and CID fonts, Type 3,
     every render mode
@@ -61,6 +62,9 @@ KNOWN = {
     "form_russian.pdf": (2.5, "the rules of form_english.pdf"),
     ("draw_patterns.pdf", 2): (5.0, "Poppler puts the cells of a turned tiling pattern off their grid (at 3000 points ours match the "
                                     "pattern's geometry 99.8 %, Poppler's 88 %)"),
+    ("draw_images.pdf", 4): (40.0, "Poppler (26.01) draws a JPEG 2000 image with four components and SMaskInData as noise: it mixes the "
+                                   "opacity into the colours; ours draws the colours over the page through the opacity channel "
+                                   "(pdftest's render_image checks that)"),
 }
 
 
@@ -352,6 +356,38 @@ q 192 0 0 80 150 90 cm /C3 Do Q
 q 48 0 0 20 20 100 cm /C4 Do Q
 """
         doc.page(c, res)
+        # JPEG 2000 (JPXDecode) through Pillow's OpenJPEG: lossless and lossy, with and without a
+        # colour space (then the JP2 header's), 16-bit grey, an opacity channel (SMaskInData),
+        # a tiled raw codestream
+        def jp2(img, **opt):
+            b = BytesIO()
+            img.save(b, "JPEG2000", **opt)
+            return b.getvalue()
+        rgba = pim.convert("RGBA")
+        for y in range(48):
+            for x in range(64):
+                r, g, b, _ = rgba.getpixel((x, y))
+                rgba.putpixel((x, y), (r, g, b, 255 if (x // 16 + y // 12) % 2 else 70))
+        g16 = Image.new("I;16", (64, 48))
+        for y in range(48):
+            for x in range(64):
+                g16.putpixel((x, y), (x * 1000 + y * 300) % 65536)
+        x = {}
+        x[b"X0"] = doc.stream(b"/Type /XObject /Subtype /Image /Width 64 /Height 48 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /JPXDecode", jp2(pim), compress=False)
+        x[b"X1"] = doc.stream(b"/Type /XObject /Subtype /Image /Width 64 /Height 48 /Filter /JPXDecode", jp2(pim, irreversible=True, quality_layers=[12], quality_mode="rates"), compress=False)
+        x[b"X2"] = doc.stream(b"/Type /XObject /Subtype /Image /Width 64 /Height 48 /Filter /JPXDecode", jp2(g16), compress=False)
+        x[b"X3"] = doc.stream(b"/Type /XObject /Subtype /Image /Width 64 /Height 48 /Filter /JPXDecode /SMaskInData 1", jp2(rgba), compress=False)
+        x[b"X4"] = doc.stream(b"/Type /XObject /Subtype /Image /Width 64 /Height 48 /ColorSpace /DeviceRGB /Filter /JPXDecode", jp2(pim, no_jp2=True, tile_size=(24, 20), num_resolutions=3, progression="RPCL"), compress=False)
+        res = b"/XObject << " + b" ".join(b"/" + k + b" %d 0 R" % v for k, v in x.items()) + b" >>"
+        c = b"""0.9 0.5 0.1 rg 0 0 400 400 re f
+q 128 0 0 96 10 290 cm /X0 Do Q
+q 128 0 0 96 150 290 cm /X1 Do Q
+q 128 0 0 96 10 180 cm /X2 Do Q
+q 192 0 0 144 10 20 cm /X4 Do Q
+"""
+        doc.page(c, res)
+        # (a page of its own: Poppler draws it differently, see KNOWN)
+        doc.page(b"0.9 0.5 0.1 rg 0 0 400 400 re f q 256 0 0 192 70 100 cm /X3 Do Q\n", res)
     return doc.write()
 
 

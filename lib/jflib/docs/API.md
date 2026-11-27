@@ -132,6 +132,8 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
   <br>[lib.rs](#netchan-crate-root) · [src/client.rs](#netchansrcclientrs) · [src/conn.rs](#netchansrcconnrs) · [src/endpoint.rs](#netchansrcendpointrs) · [src/packet.rs](#netchansrcpacketrs) · [src/reliable.rs](#netchansrcreliablers) · [src/seal.rs](#netchansrcsealrs) · [src/server.rs](#netchansrcserverrs) · [src/ws.rs](#netchansrcwsrs)
 - [sheet_io](#sheet_io) -- XLSX and CSV import: workbooks and delimited text as typed tables
   <br>[lib.rs](#sheet_io-crate-root) · [src/csv.rs](#sheet_iosrccsvrs) · [src/xlsx.rs](#sheet_iosrcxlsxrs)
+- [img_jp2](#img_jp2) -- JPEG 2000 decoder
+  <br>[lib.rs](#img_jp2-crate-root)
 
 ## ui
 
@@ -10057,8 +10059,10 @@ does nothing):
                          back = the framebuffer byte for byte (x byte: 255), and no frame differed
                          since the last check (a canvas's scaled tiles count as GpuOutput::canvas_diff_*)
   gpu expect screen      the composed screen at the window = the framebuffer (another window on
-                         top of ours is a note, not a failure); X11: what the server holds for the
-                         window; Wayland: a note, no client can read it
+                         top of ours is a note, not a failure; Windows: also what takes no clicks,
+                         an overlay or a shadow, when the window as DWM composes it = the
+                         framebuffer); X11: what the server holds for the window; Wayland: a
+                         note, no client can read it
   gpu expect window      the window's DC = the framebuffer (the CPU path's pixels); Linux as `screen`
   gpu expect upload N    at most N bytes uploaded since the last check
   gpu expect base N      at most N bytes of them to the base texture since the last check
@@ -15481,6 +15485,10 @@ IMGF_COUNT: u32 = 55
 /// (svg) SVG: the last slot, outside the static table until img_svg::register fills it
 /// (register_external stops before it)
 IMGF_SVG: u32 = IMGF_COUNT - 1
+/// JPEG 2000 (JP2, JPX, J2K): the slot before SVG's, outside the static table until
+/// img_all::use_all_codecs fills it with img_jp2's codec (register_external stops before it, so
+/// the external codecs keep their numbers)
+IMGF_JP2: u32 = IMGF_COUNT - 2
 ```
 
 *limits*
@@ -16245,7 +16253,8 @@ Extended API:
                                                it does not fit into cap bytes)
   register(fmt, codec) -> 0 / ERR_UNSUPPORTED  register_dyn(name, exts, mime, props, codec)
   register_slot(IMGF_SVG, name, exts, mime, props, codec)   (svg) a built-in format without
-                                               a static entry (img_svg::register)
+                                               a static entry (img_svg::register; IMGF_JP2:
+                                               img_all::use_all_codecs)
   set_file_io(FileIo)                          the file functions of load / save (img_core
                                                does not depend on plat: the app sets them)
 Glue for the core codecs (imgcore.s):
@@ -16285,10 +16294,10 @@ metadata fields stay).
 
 - **`fn register_external(name: &'static str, exts: &'static str, props: u32, c: &'static Codec) -> u32`**
   Separate slots for external codec hosts, preserving the native plugin ABI's IDs (the
-  last slot, IMGF_SVG, is kept for SVG).
+  last two slots, IMGF_JP2 and IMGF_SVG, are kept for JPEG 2000 and SVG).
 
 - **`fn register_slot(fmt: u32, name: &'static str, exts: &'static str, mime: &'static str, props: u32, c: Option<&'static Codec>) -> i32`**
-  (svg) a built-in format that has no entry in the static table (IMGF_SVG): its name,
+  a built-in format that has no entry in the static table (IMGF_SVG, IMGF_JP2): its name,
   extension list, MIME type, properties and codec into slot fmt (None empties the slot)
   -> 0 / ERR_UNSUPPORTED (fmt out of range, or a static / runtime format's slot)
 
@@ -17048,7 +17057,7 @@ img_all -- registration of the codec crates in the format table  [src/img/imgreg
   use_core_codecs()   PNG, JPEG, BMP, GIF (the assembly registers them statically: call it
                       once at start-up, before worker threads decode)
   use_all_codecs()    every codec of the library, the core formats included
-                      (img_use_all_codecs)
+                      (img_use_all_codecs); JPEG 2000 into its slot IMGF_JP2
 
 Each codec crate exports `pub static CODEC: img_core::Codec`; the codec agents add one
 registration line for their crate below.
@@ -30902,8 +30911,9 @@ AirDrop, Nearby Share, a chat ...)
 
 Share { title, text, url, files, anchor }: `title` the subject (a mail's subject line, Windows'
 title of the data; may be empty), `text` plain text, `url` a link (http, https, mailto ...),
-`files` paths of the file system (the browser: of its virtual files) -- at least one of text, url,
-files.  `anchor` [x, y, w, h] in the window's pixels: what the sheet points at where it is a
+`files` paths of the file system or names with a scheme (data://, docs:// ...; the browser: its
+virtual files) -- at least one of text, url, files.  Windows, macOS and iOS get the path behind a
+scheme (vfs::os_path); a file without one there (mem://) is SHARE_NONE.  `anchor` [x, y, w, h] in the window's pixels: what the sheet points at where it is a
 popover (macOS, an iPad); empty: the window's middle (macOS, iPad) / its usual place.
 
 What "done" means differs (it says nothing about delivery): iOS and macOS a service was chosen
@@ -30914,7 +30924,8 @@ Windows (win_share.rs): DataTransferManager of the active window through
 IDataTransferManagerInterop (Windows 10), the data package filled in DataRequested (text, a web
 link, storage items of the files).  macOS (apple_mac_share.rs): NSSharingServicePicker at the
 anchor in the key window.  iOS (apple_ios_share.rs): UIActivityViewController over the scene's
-window, on an iPad a popover at the anchor.  Browser and Android (web_share.rs): the host --
+window, on an iPad a popover at the anchor; it offers only what takes every item ("Save to
+Files" only when all of them are files, a text or a link leaves it out).  Browser and Android (web_share.rs): the host --
 navigator.share (files as File objects; the browser asks for the user's gesture: call it while
 handling input) / Intent.ACTION_SEND(_MULTIPLE) in a chooser (files through the host's provider,
 readable by the target only).  Linux: none.
@@ -34573,6 +34584,8 @@ and poke our own windows only (no input is injected into the system)
     WT_SHOW       ShowWindow(w, a[0]) (SW_SHOWMINNOACTIVE, SW_SHOWNOACTIVATE: a test that leaves the
                   keyboard and the other windows alone) -> 1
   win_test_image(w) -> (w, h, px)   the client area as the window shows it (BitBlt from its DC)
+  win_test_composed(w) -> (w, h, px)  the client area as the system composes it, without what
+                  lies on top (PrintWindow, PW_RENDERFULLCONTENT: the GPU child's swapchain too)
   win_test_screen(x, y, w, h) -> px  a part of the screen as it shows now (any thread)
   win_test_post(hwnd, msg, wp, lp)  PostMessageW by handle (any thread)
   win_test_window_at(x, y) -> HWND  the window at a screen point (any thread)
@@ -34609,6 +34622,11 @@ WT_SHOW: u32 = 18
   (test aid) what window w shows: its client area read back from the window's DC (BitBlt into
   a DIB section; under DWM the window's own surface, also where other windows cover it) ->
   (w, h, rows of w \* 4 bytes B, G, R, x)
+
+- **`fn win_test_composed(w: i32) -> Option<(i32, i32, alloc::vec::Vec<u8>)>`**
+  (test aid) window w's client area as the system composes it: PrintWindow with
+  PW_RENDERFULLCONTENT, so the swapchain of its GPU child too, and nothing of what lies on top of
+  it (other windows, overlays that take no clicks, shadows) -> (w, h, rows of w \* 4 bytes B, G, R, x)
 
 - **`fn win_test_usage() -> (u64, u64, u64)`**
   (test aid) (CPU time of this process so far in us, its working set in bytes, its private bytes)
@@ -36402,6 +36420,9 @@ WT_SHOW: u32 = 18
   (tests) what the window system holds for window w: (w, h, rows of w \* 4 bytes): X11 reads it
   back (GetImage; also a buffer on the window), Wayland has no way to: None
 
+- **`fn win_test_composed(_w: i32) -> Option<(i32, i32, Vec<u8>)>`**
+  (tests) window w as the system composes it: Windows only (PrintWindow): None
+
 - **`fn win_test_screen(_x: i32, _y: i32, _w: i32, _h: i32) -> Option<Vec<u8>>`**
   (tests) a part of the screen: no client on Linux can read it without asking the user
 
@@ -37333,6 +37354,9 @@ as all of AppKit; lib/gpu may use the layer on its own thread (nextDrawable, dra
 - **`fn win_test_image(_w: i32) -> Option<(i32, i32, Vec<u8>)>`**
   (tests) what the window system holds for window w: the view layer's picture is ours (the CPU path)
   and the GPU layer's is not readable from here: None
+
+- **`fn win_test_composed(_w: i32) -> Option<(i32, i32, Vec<u8>)>`**
+  (tests) window w as the system composes it: Windows only (PrintWindow): None
 
 - **`fn win_test_screen(_x: i32, _y: i32, _w: i32, _h: i32) -> Option<Vec<u8>>`**
   (tests) a part of the screen: macOS asks the user for that (screen recording): None
@@ -38369,6 +38393,8 @@ WT_FROM_POINT: u32 = 0
 
 - **`fn win_test_image(_w: i32) -> Option<(i32, i32, alloc::vec::Vec<u8>)>`**
 
+- **`fn win_test_composed(_w: i32) -> Option<(i32, i32, alloc::vec::Vec<u8>)>`**
+
 - **`fn win_test_screen(_x: i32, _y: i32, _w: i32, _h: i32) -> Option<alloc::vec::Vec<u8>>`**
 
 - **`fn gpu_wait(_deadline_us: u64)`**
@@ -38450,6 +38476,8 @@ WT_FROM_POINT: u32 = 17
   -1: nothing to say about the pixel or the scale; 0 for the rest
 
 - **`fn win_test_image(_w: i32) -> Option<(i32, i32, Vec<u8>)>`**
+
+- **`fn win_test_composed(_w: i32) -> Option<(i32, i32, Vec<u8>)>`**
 
 - **`fn win_test_screen(_x: i32, _y: i32, _w: i32, _h: i32) -> Option<Vec<u8>>`**
 
@@ -38551,6 +38579,8 @@ WT_FROM_POINT: u32 = 0
 - **`fn win_test(_op: u32, _w: i32, _a: [i32; 4]) -> i64`**
 
 - **`fn win_test_image(_w: i32) -> Option<(i32, i32, alloc::vec::Vec<u8>)>`**
+
+- **`fn win_test_composed(_w: i32) -> Option<(i32, i32, alloc::vec::Vec<u8>)>`**
 
 - **`fn win_test_screen(_x: i32, _y: i32, _w: i32, _h: i32) -> Option<alloc::vec::Vec<u8>>`**
 
@@ -65730,7 +65760,7 @@ most Options::max_stream bytes.  Permissions are reported, not enforced: what a 
 allows its user to do with the document is its own decision.
 
 Not here: the image filters for decode_until_image (it stops before DCT, JPX, JBIG2 and
-CCITTFax; drawing decodes DCT and CCITTFax), JPX and JBIG2 images at all, the predefined CMaps
+CCITTFax; drawing decodes DCT, CCITTFax and JPX), JBIG2 images at all, the predefined CMaps
 of East Asian fonts other than Identity and the Unicode ones, verifying signatures, changing
 and saving documents.
 ```
@@ -66066,9 +66096,9 @@ stencil masks, colour-key masks, soft masks, the JPEG filter (through img_jpeg) 
 CCITTFax; shadings of every type (sh and as patterns), tiling patterns coloured and
 uncoloured; form XObjects, transparency groups and soft masks (luminosity and alpha, with
 backdrop and transfer function); the annotations' appearances; optional content (the
-default configuration, membership dictionaries).  Not here: JPXDecode and JBIG2Decode images
-(left out), knockout and non-isolated groups (drawn as isolated ones), overprint, halftones,
-transfer functions outside soft masks.
+default configuration, membership dictionaries); JPXDecode images through img_jp2.  Not here:
+JBIG2Decode images (left out), knockout and non-isolated groups (drawn as isolated ones),
+overprint, halftones, transfer functions outside soft masks.
 
   let doc = read::Document::open(bytes)?;
   let page: gfx::Surface = doc.render(0, &RenderOptions { dpi: 150.0, ..Default::default() })?;
@@ -73966,3 +73996,87 @@ never read; a shared-string index out of range is Invalid.
 - **`fn sheet_table(&self, index: usize, header: bool) -> Result<Table, Error>`**
   The used range of a sheet as a Table (from the first to the last row and column that hold
   a value); an empty sheet gives an empty Table.
+
+## img_jp2
+
+*JPEG 2000 decoder* -- crate root [`lib/img_jp2/src/lib.rs`](../lib/img_jp2/src/lib.rs)
+
+```text
+img_jp2 -- JPEG 2000 decoder (ITU-T T.800 | ISO/IEC 15444-1, the JP2 file format and the parts
+of JPX that JP2 readers meet)
+
+  decode(data, &Options) -> Image / Error     a JP2 / JPX file or a raw codestream (J2K, J2C)
+  probe(data) -> bool                         the JP2 signature or the start of a codestream
+  Image { width, height, components, color, alpha, premultiplied }
+  Component { width, height, dx, dy, precision, signed, data }   samples, row by row
+  CODEC                                       img_core's codec (8-bit ARGB surfaces) for img_all
+
+Modules: boxes (the JP2 boxes), codestream (the markers), tile (geometry, packets, progression,
+dequantisation, assembly), t1 (the code-blocks), mq (the arithmetic decoder), dwt (the wavelets).
+
+What it decodes: every progression order and POC, tiles and tile-parts in any order, precincts,
+layers, SOP / EPH, PPM / PPT, every code-block style (bypass, reset, terminate-all, vertically
+causal, predictable termination, segmentation symbols), ROI max-shift, the 5/3 and 9/7 wavelets
+with any image and tile offsets, RCT and ICT, sub-sampled components, precision 1 to 24 bits,
+signed and unsigned.  From the JP2 header: the colour space (enumerated sRGB, greyscale, sYCC,
+CMYK, CIELab; an ICC profile), the palette with its component mapping (applied here) and the
+channel definitions (colour channels in their order, the opacity channel).  sYCC is converted to
+RGB here.  `Options::reduce` decodes a lower resolution (each level halves the size).
+
+Not here: Part 2 (other wavelets, multiple-component transforms beyond RCT / ICT, trellis
+quantisation), precision above 24 bits.  A file that is cut short gives what was decoded up to
+there (like the common readers); limits (`Options::max_pixels`, code-blocks, precincts) refuse
+hostile files before they cost memory.
+```
+
+### `img_jp2` crate root
+
+- **`enum Error`**
+  why a file could not be decoded
+  - `NotJpeg2000` -- neither a JP2 file nor a codestream
+  - `Truncated` -- the headers end early
+  - `Corrupt` -- a header that breaks the standard
+  - `Unsupported` -- valid, but not decoded here (Part 2, more than 24 bits)
+  - `Limit` -- larger than the limits allow
+
+- **`struct Options`**
+  what to decode
+  - `reduce: u8` -- resolution levels to leave out (each halves width and height)
+  - `max_pixels: u64` -- the largest width \* height (the default: img_core's IMG_MAXPX_DEF)
+
+- **`enum Color`**
+  the colour space the JP2 header names (Unknown for a raw codestream)
+  - `Unknown`
+  - `Gray`
+  - `Srgb` -- sRGB (also sYCC after the conversion here)
+  - `Cmyk`
+  - `Lab` -- CIELab (the enumerated space of JPX)
+  - `Icc(Vec<u8>)` -- an ICC profile
+
+- **`struct Component`**
+  one component (channel) of the image
+  - `width: u32`
+  - `height: u32`
+  - `dx: u32` -- its sub-sampling on the image grid
+  - `dy: u32`
+  - `precision: u8`
+  - `signed: bool`
+  - `data: Vec<i32>` -- width \* height samples, row by row (unsigned: 0 .. 2^precision - 1)
+
+- **`struct Image`**
+  a decoded image: the colour channels first, in their order, then the opacity channel
+  - `width: u32`
+  - `height: u32`
+  - `components: Vec<Component>`
+  - `color: Color`
+  - `alpha: Option<usize>` -- the index of the opacity channel
+  - `premultiplied: bool` -- the colour channels are premultiplied by the opacity
+
+- **`fn probe(d: &[u8]) -> bool`**
+  a JP2 file or a raw codestream
+
+- **`fn decode(d: &[u8], opt: &Options) -> Result<Image, Error>`**
+  decode a JP2 / JPX file or a raw codestream
+
+- **`static CODEC: Codec`**
+  jp2_codec: JP2, JPX and raw codestreams as 8-bit ARGB
