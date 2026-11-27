@@ -71,18 +71,35 @@ let kugel = geom.sphere(0.03, 16).move(a)  // every point argument takes a vec o
 print(rohr.bounds().size.y, b.x)          // bounds() gives vecs; v.x instead of v[0]
 ```
 
+Every function and method also takes named arguments (JFScript S3), after the ones by position, with the
+parameter names `--api` shows; what is left out gets its default:
+
+```js
+let platte = geom.box(w: 1.2, h: 0.04, d: 0.8)
+let kegel = geom.cone(0.3, 1.2, r_top: 0.1)            // segments stays 32
+let fase = platte.bevel(0.01, segments: 3)
+model.add(fase, name: "platte")                        // the material stays "grau"
+model.expect_size(y: 0.04)                             // only the height
+```
+
+A name the function does not have is an error before the run, with the closest one (`geom.cone hat keinen
+Parameter segmens – meinst du segments?`); for a method of a mesh or a vector a warning before the run and
+an error at the call.
+
 The names of functions and parameters are English (decision G9.3 of JFScript's direction paper: with
-named arguments they become part of the interface), the descriptions and messages German; the names in a
-script (variables, `--param` keys) are its author's. One description in `src/host.rs` (`host::api()`, a
-`script::Api` with TypeScript-like signatures) gives `--api`, the names the compiler knows and JFScript's
+named arguments they are part of the interface), the descriptions and messages German (modeltool has no
+choice of language, so it does not call `script::set_language`); the names in a script (variables,
+`--param` keys) are its author's. One description in `src/host.rs` (`host::api()`, a `script::Api` with
+TypeScript-like signatures, one per form of a function: `m.move(x, y, z)` and `m.move(v: vec | list)`)
+gives `--api`, the compiler (`script::compile_api`) its names and the named arguments, and JFScript's
 language services their view of the host. What is very likely a mistake is a warning, and the script goes
-on: first those of the language services on the script and its modules (a member a mesh or a vector does
-not have, `vec.ad` for `vec.add`, a division of two ints), then the host's at the call (more arguments
-than a function reads, a value for `geom.sweep`'s `closed` that is no bool, a second `model.name`,
-`model.budget` or `model.uv_scale` with another value, a material defined again differently). The
-console shows each like an error (`kiste.jfs:3:7: Warnung: model.name: …` with the source line),
-`report.json` lists them under `warnings` (file, line, column, message), the watch window in a bar of
-their own.
+on: those of the language services from the same parse that compiles the script (a member a mesh or a
+vector does not have, `vec.ad` for `vec.add`, `geom.move` with what to take instead, a division of two
+ints), a module's when it is imported, and the host's at the call (more arguments than a function reads,
+a value for `geom.sweep`'s `closed` that is no bool, a second `model.name`, `model.budget` or
+`model.uv_scale` with another value, a material defined again differently). The console shows each like an
+error (`kiste.jfs:3:7: Warnung: model.name: …` with the source line), `report.json` lists them under
+`warnings` (file, line, column, message), the watch window in a bar of their own.
 
 ## Watch
 
@@ -98,7 +115,7 @@ builds by hand, Ctrl+Q ends.
 |---|---|
 | `src/main.rs` | the command line, a build (report, glTF, pictures), the cache |
 | `src/host.rs` | the script's functions (`geom.*`, `profile.*`, `vec.*`, `model.*`) and its objects (a mesh, a vector) as JFScript host objects, their description (`host::api()`: `--api`, the language services), the materials |
-| `src/run.rs` | compile, the language services' check, run, the errors and warnings with the source line, the measurements and the report |
+| `src/run.rs` | compile with the description (and the language services' warnings of the same parse), run, the errors and warnings with the source line, the measurements and the report |
 | `src/render.rs` | the pictures offscreen through render3d; the cameras, grid and light the window shares |
 | `src/watch.rs`, `src/watch_ui.rs` | the observation mode: the watched files and the builds; the window |
 | `src/export.rs` | the model as glTF (lib/gltf's `write_document`) |
