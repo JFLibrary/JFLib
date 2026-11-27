@@ -280,12 +280,39 @@ impl<'a, 'l, 'p> Cx<'a, 'l, 'p> {
         let value = v.as_deref().map_or(Value::Absent, |v| Value::parse(v, unit, strings));
         let formula = f.as_deref().map_or(Formula::Absent, |f| Formula::parse(f, strings));
         let error = e.as_deref().map(|e| strings.intern(e));
-        let cell = Cell { name, value, formula, unit, error, stale: false };
+        let mut cell = Cell { name, value, formula, unit, error, stale: false };
+        // (JD19) Visio writes a long string with line breaks as the element's text instead of V
+        // (<Cell N='Value' U='STR'>...</Cell>, the report definitions of User.visPropRptN): a
+        // Cell without V whose only content is text takes that text as its value
+        let mut text: Option<String> = None;
+        let mut child = false;
         loop {
             match self.next()? {
-                Event::Start(c) => self.unknown(&c, extras, Place::InCell(pos))?,
-                Event::Text(t) => self.text_extra(&t, extras, Place::InCell(pos))?,
-                Event::End { .. } => return Ok(cell),
+                Event::Start(c) => {
+                    // mixed content is no value: the text stays where it stood, as before
+                    if let Some(t) = text.take() {
+                        self.text_extra(&t, extras, Place::InCell(pos))?
+                    }
+                    child = true;
+                    self.unknown(&c, extras, Place::InCell(pos))?
+                }
+                Event::Text(t) => {
+                    if v.is_none() && !child && text.is_none() && !t.trim().is_empty() {
+                        if t.len() > max {
+                            return Err(Error::Limit("formula"));
+                        }
+                        text = Some(String::from(&*t));
+                    } else {
+                        self.text_extra(&t, extras, Place::InCell(pos))?
+                    }
+                }
+                Event::End { .. } => {
+                    if let Some(t) = text {
+                        let strings = self.ld.doc.strings_mut();
+                        cell.value = Value::parse(&t, unit, strings);
+                    }
+                    return Ok(cell);
+                }
                 Event::Eof => return Err(self.bad("a Cell without end")),
             }
         }

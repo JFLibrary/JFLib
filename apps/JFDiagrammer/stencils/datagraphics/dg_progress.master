@@ -42,6 +42,11 @@ BottomMargin = 0 mm
 
 [User]
 msvCalloutType:  Value = "Data Bar"
+# Visios Kennzeichen eines Datengrafik-Callouts (JD19, Visio-Gegenprobe: ohne sie und ohne die
+# Shape-ID 5 des Masters zählt Visio die Elemente einer Datengrafik nicht)
+visDGCalloutItem:  Value = 5
+visDGDefaultPos:  Value = 0
+visDGStackHeight:  Value = 0
 # der Anteil des Werts zwischen Minimum und Maximum, 0 bis 1
 F:  Value = IFERROR(BOUND((Prop.msvCalloutField-Prop.msvCalloutPropMin)/(Prop.msvCalloutPropMax-Prop.msvCalloutPropMin),0,FALSE,0,1),0)
 # der Platz für den Wert rechts
@@ -84,7 +89,8 @@ msvCalloutPropValueFormat:  Type = 0; Value = ""; Prompt = "Format"
 Row  Size = 7 pt
 
 [Field]
-Row  Value = IF(Prop.msvCalloutPropShowValue,FORMAT(Prop.msvCalloutField,Prop.msvCalloutPropValueFormat),""); Type = 0
+# ohne eigenes Format esc(0), Visios FIELDPICTURE(0): Visios FORMAT(x,"") ist leer (Visio-Gegenprobe JD19)
+Row  Value = IF(Prop.msvCalloutPropShowValue,FORMATEX(Prop.msvCalloutField,IF(STRSAME(Prop.msvCalloutPropValueFormat,""),"esc(0)",Prop.msvCalloutPropValueFormat)),""); Format = "esc(0)"; Type = 0
 
 # der Rahmen
 [Geometry]

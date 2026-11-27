@@ -29,7 +29,9 @@ fn codes_round_trip() {
     for b in BUILTINS {
         assert_eq!(Builtin::of(b.key()), b);
     }
-    assert_eq!(Func::of_mask(31), FUNCS.to_vec());
+    assert_eq!(Func::of_mask(63), FUNCS.to_vec());
+    // Visio's bits (checked in Visio 16): 1 count, 2 total, 4 average, 8 min, 16 max, 32 median
+    assert_eq!([Func::Count, Func::Total, Func::Average, Func::Min, Func::Max, Func::Median].map(Func::bit), [1, 2, 4, 8, 16, 32]);
 }
 
 // ---------------------------------------------------------------- the document
@@ -149,6 +151,19 @@ fn scopes_and_criteria() {
     // a currency criterion against a number with a decimal comma
     d.filters = vec![Filter::new(1, Property::Data(s("Kosten")), Condition::Le, "300,0")];
     assert_eq!(run(&f.doc, &d, &ctx(f.page)).shapes, 3);
+    // AdvancedFilter="1": Visio leaves the criteria out (its check in JD19), so does run
+    d.advanced_filter = true;
+    assert_eq!(run(&f.doc, &d, &ctx(f.page)).shapes, 6);
+}
+
+// (JD19) Visio's condition codes, checked in Visio 16: 1 =, 2 <>, 3 >, 4 <, 5 >=, 6 <=, 8 exists
+#[test]
+fn visio_condition_codes() {
+    let want = [(Condition::Eq, 1), (Condition::Ne, 2), (Condition::Gt, 3), (Condition::Lt, 4), (Condition::Ge, 5), (Condition::Le, 6), (Condition::Exists, 8)];
+    for (c, code) in want {
+        assert_eq!(c.code(), code, "{c:?}");
+        assert_eq!(Condition::of(code), c);
+    }
 }
 
 #[test]
@@ -345,4 +360,18 @@ fn numbers_kept_as_text_count_in_summaries() {
     let r = texts(&t);
     assert_eq!(r[2], vec![s("Router"), s("450")]);
     assert_eq!(r.last().unwrap(), &vec![s("Summe"), s("2699.50")]);
+}
+
+// (JD19) the grouping field's column comes first, as in Visio's report (Visio's output of the
+// check: Standort before Name although Name's DisplayOrder was 1)
+#[test]
+fn grouping_column_first() {
+    let f = fx();
+    let mut d = def(&[(1, Property::Data(s("Name")), "Name", 0), (2, Property::Data(s("Standort")), "Standort", 0)]);
+    let mut g = Grouping::default();
+    g.field = 2;
+    g.show_items = true;
+    d.grouping = Some(g);
+    let t = run(&f.doc, &d, &ctx(f.page));
+    assert_eq!(t.columns.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(), vec!["Standort", "Name"]);
 }

@@ -258,6 +258,17 @@ fn filter(s: &Start) -> Filter {
         }
     }
     f.property = Property::of(tag, &key);
+    // Visio's "exists" is 8 with a Boolean Value (INVENTRY.VRD: Value 1); 8 with Value 0 does not
+    // exist, so does 7 (written by earlier JFDiagrammer files); both are kept in that one form
+    // (Value 1 or 0, PropertyDataType 3), the form the writer gives them
+    if f.condition == Condition::Exists && f.value.trim() == "0" {
+        f.condition = Condition::NotExists;
+    }
+    match f.condition {
+        Condition::Exists => (f.value, f.data_type) = (String::from("1"), 3),
+        Condition::NotExists => (f.value, f.data_type) = (String::from("0"), 3),
+        _ => {}
+    }
     f
 }
 
@@ -362,11 +373,17 @@ pub fn to_xml(d: &ReportDef) -> String {
         o.push_str("<VisioRptDefFilter");
         attr(&mut o, "ID", &format!("{}", f.id));
         attr(&mut o, "Property", f.property.key());
-        attr(&mut o, "Condition", &format!("{}", f.condition.code()));
+        // "exists" and "does not exist" as Visio writes them: 8 with a Boolean Value 1 or 0
+        let (code, data_type, value) = match f.condition {
+            Condition::Exists => (8, 3, "1"),
+            Condition::NotExists => (8, 3, "0"),
+            c => (c.code(), f.data_type as u32, f.value.as_str()),
+        };
+        attr(&mut o, "Condition", &format!("{code}"));
         attr(&mut o, "AndOr", b(f.and));
         attr(&mut o, "PropertyType", &format!("{}", f.property.tag()));
-        attr(&mut o, "PropertyDataType", &format!("{}", f.data_type));
-        attr(&mut o, "Value", &f.value);
+        attr(&mut o, "PropertyDataType", &format!("{data_type}"));
+        attr(&mut o, "Value", value);
         attr(&mut o, "Unit", &f.unit);
         extra_attrs(&mut o, &f.attrs);
         o.push_str("/>");

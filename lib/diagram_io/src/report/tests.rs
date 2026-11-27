@@ -23,6 +23,24 @@ const VISIO: &str = "<?xml version=\"1.0\"?>\n<VisioReportDefinition xmlns=\"urn
 <VisioRptDefGroup ID=\"1\" GroupingField=\"0\" ItemDisplay=\"1\" GrandSummary=\"1\" ExcludeDuplicates=\"0\"/>\
 <VisioRptDefSort ID=\"1\" SortField=\"2\" Ascending=\"0\" CaseSensitive=\"0\"/></VisioReportDefinition>";
 
+// (JD19) "exists" and "does not exist" as Visio's own INVENTRY.VRD writes them: 8 with the
+// Boolean Value 1 or 0 (PropertyDataType 3); an earlier own 7 reads as "does not exist"
+#[test]
+fn exists_as_visio_writes_it() {
+    let base = VISIO.replace("AdvancedFilter=\"1\"", "AdvancedFilter=\"0\"");
+    let not = base.replace("Condition=\"8\" AndOr=\"1\" PropertyType=\"2\" PropertyDataType=\"2\" Value=\"\"", "Condition=\"8\" AndOr=\"1\" PropertyType=\"2\" PropertyDataType=\"3\" Value=\"0\"");
+    let seven = base.replace("Condition=\"8\"", "Condition=\"7\"");
+    let d = parse(&base).unwrap();
+    assert_eq!((d.filters[0].condition, d.filters[0].value.as_str(), d.filters[0].data_type), (Condition::Exists, "1", 3));
+    assert!(to_xml(&d).contains("Condition=\"8\" AndOr=\"1\" PropertyType=\"2\" PropertyDataType=\"3\" Value=\"1\""));
+    for x in [not, seven] {
+        let d = parse(&x).unwrap();
+        assert_eq!(d.filters[0].condition, Condition::NotExists);
+        assert!(to_xml(&d).contains("Condition=\"8\" AndOr=\"1\" PropertyType=\"2\" PropertyDataType=\"3\" Value=\"0\""));
+        assert_eq!(parse(&to_xml(&d)).unwrap(), d);
+    }
+}
+
 #[test]
 fn reads_visio_shaped_xml() {
     let d = parse(VISIO).unwrap();
@@ -34,7 +52,8 @@ fn reads_visio_shaped_xml() {
     assert_eq!(d.version, "3");
     assert_eq!(d.fields.len(), 3);
     assert_eq!(d.fields[1].property, Property::Data(s("Kosten")));
-    assert_eq!(Func::of_mask(d.fields[1].summary), vec![Func::Total, Func::Average]);
+    // SummaryTypes 3 = count and total (Visio's bits, checked in Visio 16)
+    assert_eq!(Func::of_mask(d.fields[1].summary), vec![Func::Total, Func::Count]);
     assert_eq!(d.fields[2].property, Property::Builtin(Builtin::Text));
     assert_eq!(d.fields[2].display_name, "<Anzeigetext>");
     assert_eq!(d.filters[0].condition, Condition::Exists);

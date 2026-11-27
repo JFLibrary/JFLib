@@ -26,6 +26,11 @@ FillPattern = 1
 
 [User]
 msvCalloutType:  Value = "Data Bar"
+# Visios Kennzeichen eines Datengrafik-Callouts (JD19, Visio-Gegenprobe: ohne sie und ohne die
+# Shape-ID 5 des Masters zählt Visio die Elemente einer Datengrafik nicht)
+visDGCalloutItem:  Value = 5
+visDGDefaultPos:  Value = 0
+visDGStackHeight:  Value = 0
 # der Anteil des Werts zwischen Minimum und Maximum, 0 bis 1
 F:  Value = IFERROR(BOUND((Prop.msvCalloutField-Prop.msvCalloutPropMin)/(Prop.msvCalloutPropMax-Prop.msvCalloutPropMin),0,FALSE,0,1),0)
 
