@@ -381,8 +381,8 @@ Tick des Hosts (bis 250 ms). Ohne nice 10 für die Arbeiter lagen die längsten 
 sind, die Prüfungen von `tools/tls_web_check.py --internet` auf dem A56 öffentliche Server erreichen (das Skript
 bekommt dafür einen Android-Weg; nur mit Zustimmung, im WLAN) und ein Lauf ohne `INTERNET` die richtige Meldung zeigt.
 
-**Stand 2026-11-27:** umgesetzt, auf dem Emulator und dem A56 grün (beide Modi, auch ohne `INTERNET`). Offen:
-`tools/tls_web_check.py --internet` (öffentliche Server, nur auf Zuruf; das Skript hat noch keinen Android-Weg).
+**Stand 2026-11-27:** fertig. Auf dem Emulator und dem A56 grün (beide Modi, auch ohne `INTERNET`), und auf dem A56
+erreicht `tools/tls_web_check.py` die öffentlichen Server aus der Shell und aus dem Test-APK (unten).
 
 - [`net.rs`](../lib/plat/net.rs): Android nimmt das Linux-Modul `sys` (Sockets über `rt::os` mit den Nummern aus
   `rt::kernel`: TCP, UDP, IPv4, IPv6, Timeouts, `SO_PEERCRED`). Namen über Bionics `getaddrinfo` (`resolve_system`,
@@ -439,6 +439,16 @@ Auf dem A56 (SM-A566B, arm64, Android 16, API 36, im WLAN) dieselben Zahlen in j
 in der Shell (104 s) und 5140 von 5140 im APK (100 s), `dns` 53 und 50, `systrust` aus
 `/apex/com.android.conscrypt/cacerts`, ohne `INTERNET` 19 von 19 mit derselben Meldung (os error 1, also auch dort
 EPERM). Die Shell sieht dort die IPv4- und alle IPv6-Adressen, das APK nur `127.0.0.1` und die IPv4-Adresse (Fund 1).
+
+**Öffentliche Server:** `python tools/tls_web_check.py --internet-only --target android [--serial S] [--mode
+shell|app|both] [--allow-install]` ist der Android-Weg des Skripts. Es nimmt `build/android/coretest-<ABI>` und das
+Test-APK (`android_console.py`), installiert es einmal für alle Hosts und deinstalliert es am Ende; jeder Host läuft
+als eigenes `am instrument` mit `--tls-web URL`, ein Lauf außerhalb von `untrusted_app` mit seccomp zählt als
+falsch. Auf dem A56 im WLAN (2026-11-27) waren alle 12 gewerteten Hosts in beiden Modi richtig, keiner
+unerreichbar: www.google.com mit TLS 1.3 und X25519MLKEM768 (0x11EC), github.com mit TLS 1.3 und X25519, die
+badssl-Hosts mit TLS 1.2; expired und sha384 „certificate expired“, wrong.host „certificate for another name“,
+self-signed und untrusted-root „certificate not trusted“. Nur gezeigt: revoked.badssl.com wird genommen (wie auf
+Linux: ohne Staple kein Widerruf), incomplete-chain „not trusted“ (wie macOS und Linux, nichts wird nachgeladen).
 
 Funde:
 
