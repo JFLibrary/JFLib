@@ -143,6 +143,14 @@ impl Fx {
         tx.commit()
     }
 
+    // (JD21v) ObjType 1: a placeable shape, which connectors route around (Visio's obstacles)
+    fn placeable(&mut self, s: ShapeRef) {
+        let mut tx = self.doc.transaction("ObjType");
+        let a = CellAddr::single(tx.intern("ObjType"));
+        tx.set_constant(SheetRef::Shape(s), &a, Value::Num(1.0), None).unwrap();
+        tx.commit();
+    }
+
     fn connector(&mut self, begin: ([f64; 2], Target), end: ([f64; 2], Target)) -> ShapeRef {
         let mut tx = self.doc.transaction("Verbinden");
         let c = new_connector(&mut tx, &mut self.eng, self.owner, begin, end).unwrap();
@@ -403,9 +411,10 @@ fn dynamic_glue_lines_up_when_it_can() {
     let b = f.rect(None, 2, [2.3, 6.0], [1.0, 1.0], 0.0);
     let c = f.connector(([2.0, 2.5], Target::Point { shape: a, row: 3 }), ([2.3, 6.0], Target::Shape(b)));
     assert_path(&path(&f.doc, c), &[[2.0, 2.5], [2.0, 5.5]]);
-    // both dynamic, the boxes overlap in x from 1.8 to 2.5: straight up in the middle of it
+    // both dynamic, the boxes overlap in x from 1.8 to 2.5: straight up in the middle of the part
+    // the first connector (at x = 2, glued to the same shapes) leaves free, as Visio spreads them
     let d = f.connector(([2.0, 2.0], Target::Shape(a)), ([2.3, 6.0], Target::Shape(b)));
-    assert_path(&path(&f.doc, d), &[[2.15, 2.5], [2.15, 5.5]]);
+    assert_path(&path(&f.doc, d), &[[2.25, 2.5], [2.25, 5.5]]);
     // out of reach: the middle of the side again
     f.move_to(b, [5.0, 6.0]).unwrap();
     let p = path(&f.doc, c);
@@ -656,6 +665,7 @@ fn connector_routes_around_shapes_on_the_page() {
     let a = f.rect(None, 1, [1.0, 2.0], [1.0, 1.0], 0.0);
     let b = f.rect(None, 2, [7.0, 2.0], [1.0, 1.0], 0.0);
     let wall = f.rect(None, 3, [4.0, 2.0], [1.0, 3.0], 0.0);
+    f.placeable(wall);
     let c = f.connector(([1.5, 2.0], Target::Point { shape: a, row: 1 }), ([6.5, 2.0], Target::Point { shape: b, row: 0 }));
     let p = path(&f.doc, c);
     let boxes: Vec<[f64; 4]> = [a, b, wall].iter().map(|s| page_box(&f.doc, *s).unwrap()).collect();

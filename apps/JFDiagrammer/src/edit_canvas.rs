@@ -1244,7 +1244,8 @@ fn app_frame_matches(doc: &Document, geo: &Geo, s: ShapeRef, b: &SeBox) -> bool 
 
 /// connectors glued to these shapes (and the shapes themselves when they are connectors)
 /// follow: routed again; so are the dynamic connectors whose way now runs through one of them
-/// (an obstacle moved into it, Visio's)
+/// or too close to it, where it keeps connectors out (an obstacle moved onto it, Visio's;
+/// (JD21v) placeable shapes only: glue::crowded)
 pub(crate) fn follow(tx: &mut diagram_core::Transaction, eng: &mut diagram_core::formula::Engine, owner: Owner, shapes: &[ShapeRef]) -> Result<(), diagram_core::EditError> {
     let doc = tx.doc();
     let mut deps = glue::dependents(doc, owner, shapes);
@@ -1259,15 +1260,10 @@ pub(crate) fn follow(tx: &mut diagram_core::Transaction, eng: &mut diagram_core:
             deps.push(s);
         }
     }
-    let boxes: Vec<[f64; 4]> = shapes.iter().filter(|&&s| !glue::is_one_d(doc, s)).map(|&s| ops::frame(doc, s).bounds()).collect();
     // (JD21 route) DynamicsOff: connectors do not reroute around shapes moved onto them
-    if !boxes.is_empty() && !diagram_core::route_styles::dynamics_off(doc, owner) {
-        for c in doc.top_shapes(owner) {
-            if deps.contains(&c) || shapes.contains(&c) || !glue::is_connector(doc, c) {
-                continue;
-            }
-            let way = glue::path(doc, c);
-            if way.windows(2).any(|w| boxes.iter().any(|b| diagram_core::route::hits_box(w[0], w[1], b))) {
+    if !diagram_core::route_styles::dynamics_off(doc, owner) {
+        for c in glue::crowded(doc, owner, shapes) {
+            if !deps.contains(&c) {
                 deps.push(c);
             }
         }

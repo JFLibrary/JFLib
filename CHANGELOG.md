@@ -341,6 +341,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **netio:** (breaking) TLS: `tls::ClientConfig` has the field `sessions`, `tls::ServerConfig` the fields `tickets` and `early_data`; a config built with `..ClientConfig::new(..)` / `..ServerConfig::new(..)` keeps compiling and resumes nothing
 - **netio:** https resumes its sessions: `trust::system_connector` and `trust::connector` with `ServerTrust::Ca` keep the tickets of the servers they reach (a pin and `Ask` check every handshake's CA and do not resume)
 - **netio:** TLS server: a ClientHello with pre_shared_key but no psk_key_exchange_modes is refused with missing_extension (RFC 8446 4.2.9, 9.2), and one with pre_shared_key may leave out signature_algorithms when its PSK is taken (9.2). TLS client: a NewSessionTicket during TLS 1.2 is unexpected_message (one comes only to a client that asked for tickets), a TLS 1.3 ticket with an extension that does not belong in it illegal_parameter, an empty one decode_error
+- **diagram_core:** (JD21v) Dynamic connectors route only around placeable shapes, as Visio 16 does: ObjType with bit 1 and without 4 (a group with 8 stands for its placeable members, a 1-D shape that is no connector counts too); drawn shapes with ObjType 0 become placeable when a connector is glued to them. The legs of the right-angle router keep out of the way of the other connectors glued to the same shapes (Visio spreads connectors leaving one side), and glue::crowded names the connectors a moved placeable shape crowds
 
 ### Deprecated
 

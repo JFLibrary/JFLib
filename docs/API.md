@@ -60677,8 +60677,12 @@ or bottom; around obstacles in the free part of the sides; else the cheapest way
 (length + bends; route::best_through, which is also all ends glued to points or free get); where
 the other end lies within a side's reach, the point straight opposite it is offered too.
 (JD15, SS-18) WalkPreference changes none of these ways in Visio: kept, not read.  Obstacles
-are the boxes of the page's top-level shapes that are not 1-D; the clearance is half the page's
-AvenueSize (opts_for).  After routing ConFixedCode becomes 6 or 0 as
+are, as in Visio 16 (JD21v), the placeable shapes (ObjType with bit 1, not 4; a group with 8 by
+its placeable members; obstacles()), and for each connector the shapes its ends are glued to;
+the clearance is half the page's AvenueSize (opts_for).  The legs of Visio's right-angle router
+keep out of the way of the other connectors glued to the same shapes (related_lines: Visio
+spreads connectors leaving one side); after a move the connectors a placeable shape now crowds
+route again (crowded).  After routing ConFixedCode becomes 6 or 0 as
 Visio writes it (route_styles::mark).  ConFixedCode 1 and 2 (reroute manually / never) keep the
 corners and only move the first and last pieces; reset() routes them anew.  (JD21) 1 is laid
 anew when the kept way runs through a shape (route_edit.rs); 3 .. 6 route freely (Visio writes
@@ -60779,6 +60783,13 @@ Nothing happens on its own: opening a file routes nothing, only the shapes hande
 - **`fn set_style(tx: &mut Transaction, eng: &mut Engine, connectors: &[ShapeRef], style: Style) -> Result<(), EditError>`**
   give these connectors a style (ShapeRouteStyle and ConLineRouteExt: right angle 1/1,
   straight 16/1, curved 1/2) and route them anew
+
+- **`fn crowded(doc: &Document, owner: Owner, shapes: &[ShapeRef]) -> Vec<ShapeRef>`**
+  (JD21v) the dynamic connectors whose way runs through one of these shapes, or closer to it than
+  the clearance (half the page's AvenueSize), where the shape keeps connectors out (an obstacle:
+  placeable, ObjType 1; a group with 8 by its placeable members): after the shapes moved Visio
+  routes them again (the counter-check visio-obst-1 [sprd] "beside": a way 0.05 in under a shape
+  moved next to it went round it anew); the shapes themselves are not in the list
 
 ### `diagram_core/src/groups.rs`
 
@@ -63856,9 +63867,9 @@ Automatic Layout"; the Visio 2000 user's guide, chapter 6):
 * DynamicsOff: TRUE turns off "placeable shapes move and connectors reroute around other shapes
   and connectors".  CtrlAsInput: which shape is the parent of a control handle's glue -- not
   routing, kept for Visio.  LineAdjustFrom / LineAdjustTo: which connectors routed on top of each
-  other are spaced apart / lined up -- kept for Visio and shown in Seite einrichten, connectors
-  here are not spaced apart (open).  LineRouteExt / ConLineRouteExt: 0 default, 1 straight,
-  2 curved (the appearance, glue.rs).
+  other are spaced apart / lined up -- kept for Visio and shown in Seite einrichten (JD21v: Visio
+  16 spread connectors at one shape apart whatever the two cells said, 0 .. 2; see below).
+  LineRouteExt / ConLineRouteExt: 0 default, 1 straight, 2 curved (the appearance, glue.rs).
 * ConFixedCode: 0 reroute freely, 1 reroute as needed (manual reroute), 2 never reroute,
   3 reroute on crossover, 4 .. 6 internal (route_edit.rs keeps a way by hand).
 
@@ -63866,9 +63877,10 @@ Automatic Layout"; the Visio 2000 user's guide, chapter 6):
 (Documents\JFLib-jd21-visio-check: visio-run3 grid.txt, every style against a child in ten places
 around its parent, the tests in route_styles_visio_tests.rs; visio-route-1 / -2, Visio's own
 drawings with obstacles, permeable shapes, WalkPreference, ConFixedCode; visio-run2 [route] and
-visio-route-3, our drawing after a move: 63 of 100 ways the same, the rest below under "Not
-here").  A is the connector's begin shape, B its end shape (both glued dynamically); "the
-stub" is half the page's AvenueSize (route clearance, glue::opts_for: 3.75 mm by default;
+visio-route-3, our drawing after a move: 63 of 100 ways the same; visio-obst-1 / -2, what Visio
+routes around and how it spreads connectors, then 76 of 100, the rest below under "Not here").
+A is the connector's begin shape, B its end shape (both glued dynamically); "the stub" is half
+the page's AvenueSize (route clearance, glue::opts_for: 3.75 mm by default;
 AvenueSize 0.5 in gave 0.25 in, LineToNode 0.4 in nothing); "overlap" means the two boxes share
 a stretch along an axis:
 * The direction of a style decides nothing but its axis: bottom to top lays the same ways as top
@@ -63883,7 +63895,12 @@ a stretch along an axis:
   obstacle between the shapes covers -- the nearest such part, then the one towards the other
   shape, then the higher one; no part free: the L leaving A sideways (horizontal, then vertical);
   neither: a detour around the obstacles at the stub's distance (route.rs; Visio's detours were
-  matched in form, not always in the side they pass).  Visio writes ConFixedCode 6.
+  matched in form, not always in the side they pass).  Visio writes ConFixedCode 6.  (visio-obst-1
+  [sprd]) The straight pieces of the other connectors glued to A or B that run along a leg split
+  its band as well (no clearance to them): a second connector leaving A's bottom runs in the
+  middle of the part the first leaves free (A 3.2 .. 4.8 wide, the first at 4.0: 4.4 towards C,
+  3.6 towards B), each connector routed again keeps out of the others' way; connectors between
+  other shapes do not count.  Placeable is ObjType with bit 1 (not 4): glue.rs.
 * Straight (2): B beside A: the right-angle's straight line (ConFixedCode 6); else a line from
   A's corner nearest to B to B's corner nearest to A (0).  Obstacles do not matter.
 * Centre to centre (16): the line between the middles, from outline to outline (6).
@@ -63907,13 +63924,14 @@ a stretch along an axis:
 Angenommen: ends glued to connection points or free keep the rules from before (the sides of
 the direction, the right-angle search); a stub longer than the gap gives the middle; Visio's only
 data had the parent at the begin (organization chart before B, flowchart after A are taken as
-before the end and after the begin).  Not here: Visio's obstacles are placeable shapes only
-(ObjType 1; a drawn rectangle with ObjType 0 is crossed even when glued to), glue.rs still routes
-around every 2-D shape; LineAdjustFrom/To: two connectors leaving one side are spread apart
-along it by Visio (seen in the counter-check of our drawing), not here.  In our own drawings
-Visio laid the stubs of organization chart and flowchart larger (0.264 in for our connectors,
-0.189 in for its own there; 0.148 in in its drawings): not arrows, line weight, text, other
-connectors or LineToNode -- unexplained, the drawing's theme is left (JD21v handover).
+before the end and after the begin).  Not here: in our own drawings Visio laid the stubs of
+organization chart and flowchart larger (0.264 in for our connectors, 0.189 in for its own
+there; 0.148 in in its drawings, half the AvenueSize): Visio reads our page's AvenueSize as
+7.5 mm, and 0.264 stayed with AvenueSize 0.375 in, LineToNode 0.4 in and without arrows
+(visio-obst-2 [stub]) -- unexplained, the drawing's theme is left; the counter-check of our
+drawing after the moves: 76 of 100 ways the same, the other 24 these stubs.  Two connectors
+between the same two shapes: when one end moves Visio left the first where it was (the second
+avoided it), here both are routed again.
 ```
 
 - **`enum Kind`**

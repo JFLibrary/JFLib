@@ -141,6 +141,7 @@ fn a_way_by_hand_is_kept_and_laid_anew_when_crossed() {
     assert_path(&f.path(c), &[[2.5, 2.0], [4.6, 2.0], [4.6, 5.0], [5.5, 5.0]]);
     // a shape moved onto the kept way: laid anew round it
     let w = f.rect(3, [10.0, 10.0], [0.6, 0.6]);
+    f.set(Some(w), "ObjType", 1.0);
     f.move_to(w, [4.6, 3.5]);
     let wb = glue::page_box(&f.doc, w).unwrap();
     let p = f.path(c);
@@ -152,6 +153,7 @@ fn a_way_by_hand_is_kept_and_laid_anew_when_crossed() {
     f.set(Some(c), "ConFixedCode", 2.0);
     f.move_to(b, [6.0, 5.0]);
     let w = f.rect(3, [10.0, 10.0], [0.6, 0.6]);
+    f.set(Some(w), "ObjType", 1.0);
     f.move_to(w, [4.6, 3.5]);
     assert_path(&f.path(c), &[[2.5, 2.0], [4.6, 2.0], [4.6, 5.0], [5.5, 5.0]]);
     // Verbinder zurücksetzen: 2 stays the user's choice, the way is routed anew

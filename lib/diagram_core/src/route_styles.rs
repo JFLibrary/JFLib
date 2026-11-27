@@ -33,9 +33,9 @@
 // * DynamicsOff: TRUE turns off "placeable shapes move and connectors reroute around other shapes
 //   and connectors".  CtrlAsInput: which shape is the parent of a control handle's glue -- not
 //   routing, kept for Visio.  LineAdjustFrom / LineAdjustTo: which connectors routed on top of each
-//   other are spaced apart / lined up -- kept for Visio and shown in Seite einrichten, connectors
-//   here are not spaced apart (open).  LineRouteExt / ConLineRouteExt: 0 default, 1 straight,
-//   2 curved (the appearance, glue.rs).
+//   other are spaced apart / lined up -- kept for Visio and shown in Seite einrichten (JD21v: Visio
+//   16 spread connectors at one shape apart whatever the two cells said, 0 .. 2; see below).
+//   LineRouteExt / ConLineRouteExt: 0 default, 1 straight, 2 curved (the appearance, glue.rs).
 // * ConFixedCode: 0 reroute freely, 1 reroute as needed (manual reroute), 2 never reroute,
 //   3 reroute on crossover, 4 .. 6 internal (route_edit.rs keeps a way by hand).
 //
@@ -43,9 +43,10 @@
 // (Documents\JFLib-jd21-visio-check: visio-run3 grid.txt, every style against a child in ten places
 // around its parent, the tests in route_styles_visio_tests.rs; visio-route-1 / -2, Visio's own
 // drawings with obstacles, permeable shapes, WalkPreference, ConFixedCode; visio-run2 [route] and
-// visio-route-3, our drawing after a move: 63 of 100 ways the same, the rest below under "Not
-// here").  A is the connector's begin shape, B its end shape (both glued dynamically); "the
-// stub" is half the page's AvenueSize (route clearance, glue::opts_for: 3.75 mm by default;
+// visio-route-3, our drawing after a move: 63 of 100 ways the same; visio-obst-1 / -2, what Visio
+// routes around and how it spreads connectors, then 76 of 100, the rest below under "Not here").
+// A is the connector's begin shape, B its end shape (both glued dynamically); "the stub" is half
+// the page's AvenueSize (route clearance, glue::opts_for: 3.75 mm by default;
 // AvenueSize 0.5 in gave 0.25 in, LineToNode 0.4 in nothing); "overlap" means the two boxes share
 // a stretch along an axis:
 // * The direction of a style decides nothing but its axis: bottom to top lays the same ways as top
@@ -60,7 +61,12 @@
 //   obstacle between the shapes covers -- the nearest such part, then the one towards the other
 //   shape, then the higher one; no part free: the L leaving A sideways (horizontal, then vertical);
 //   neither: a detour around the obstacles at the stub's distance (route.rs; Visio's detours were
-//   matched in form, not always in the side they pass).  Visio writes ConFixedCode 6.
+//   matched in form, not always in the side they pass).  Visio writes ConFixedCode 6.  (visio-obst-1
+//   [sprd]) The straight pieces of the other connectors glued to A or B that run along a leg split
+//   its band as well (no clearance to them): a second connector leaving A's bottom runs in the
+//   middle of the part the first leaves free (A 3.2 .. 4.8 wide, the first at 4.0: 4.4 towards C,
+//   3.6 towards B), each connector routed again keeps out of the others' way; connectors between
+//   other shapes do not count.  Placeable is ObjType with bit 1 (not 4): glue.rs.
 // * Straight (2): B beside A: the right-angle's straight line (ConFixedCode 6); else a line from
 //   A's corner nearest to B to B's corner nearest to A (0).  Obstacles do not matter.
 // * Centre to centre (16): the line between the middles, from outline to outline (6).
@@ -84,13 +90,14 @@
 // Angenommen: ends glued to connection points or free keep the rules from before (the sides of
 // the direction, the right-angle search); a stub longer than the gap gives the middle; Visio's only
 // data had the parent at the begin (organization chart before B, flowchart after A are taken as
-// before the end and after the begin).  Not here: Visio's obstacles are placeable shapes only
-// (ObjType 1; a drawn rectangle with ObjType 0 is crossed even when glued to), glue.rs still routes
-// around every 2-D shape; LineAdjustFrom/To: two connectors leaving one side are spread apart
-// along it by Visio (seen in the counter-check of our drawing), not here.  In our own drawings
-// Visio laid the stubs of organization chart and flowchart larger (0.264 in for our connectors,
-// 0.189 in for its own there; 0.148 in in its drawings): not arrows, line weight, text, other
-// connectors or LineToNode -- unexplained, the drawing's theme is left (JD21v handover).
+// before the end and after the begin).  Not here: in our own drawings Visio laid the stubs of
+// organization chart and flowchart larger (0.264 in for our connectors, 0.189 in for its own
+// there; 0.148 in in its drawings, half the AvenueSize): Visio reads our page's AvenueSize as
+// 7.5 mm, and 0.264 stayed with AvenueSize 0.375 in, LineToNode 0.4 in and without arrows
+// (visio-obst-2 [stub]) -- unexplained, the drawing's theme is left; the counter-check of our
+// drawing after the moves: 76 of 100 ways the same, the other 24 these stubs.  Two connectors
+// between the same two shapes: when one end moves Visio left the first where it was (the second
+// avoided it), here both are routed again.
 
 use alloc::vec::Vec;
 
@@ -374,11 +381,15 @@ fn others(a: &Shape, b: &Shape, boxes: &[[f64; 4]], pass: &[u8]) -> (Vec<[f64; 4
 }
 
 // the parts of the band [lo, hi] on axis k that no obstacle reaching into `region` covers; an
-// obstacle with the flag `through` lets the way cross it (PASS_Y for a vertical way)
-fn free(band: (f64, f64), k: usize, region: [f64; 4], ob: &[[f64; 4]], op: &[u8], through: u8) -> Vec<(f64, f64)> {
+// obstacle with the flag `through` lets the way cross it (PASS_Y for a vertical way).  (JD21v)
+// The pieces of related connectors that run along the way (across k) split the band where they
+// lie in it (Visio spreads connectors leaving one side so)
+fn free(band: (f64, f64), k: usize, region: [f64; 4], ob: &[[f64; 4]], op: &[u8], through: u8, lines: &[[[f64; 2]; 2]]) -> Vec<(f64, f64)> {
     let mut parts = alloc::vec![band];
-    for (n, o) in ob.iter().enumerate() {
-        if op.get(n).copied().unwrap_or(0) & through != 0 || !meets(o, &region) {
+    let along = lines.iter().filter(|l| (l[0][k] - l[1][k]).abs() <= tol(l[0][k])).map(|l| rect(k, (l[0][k], l[1][k]), (l[0][1 - k], l[1][1 - k])));
+    let cover: Vec<([f64; 4], u8)> = ob.iter().enumerate().map(|(n, o)| (*o, op.get(n).copied().unwrap_or(0))).chain(along.map(|b| (b, 0))).collect();
+    for (o, p) in &cover {
+        if p & through != 0 || !meets(o, &region) {
             continue;
         }
         let (c0, c1) = (o[k], o[k + 2]);
@@ -482,7 +493,7 @@ fn between(t: f64, from: f64, to: f64) -> f64 {
 
 // Visio's right-angle router without obstacles in the way: the straight line in the middle of the
 // free part of the overlap
-fn straight_channel(a: &Shape, b: &Shape, ob: &[[f64; 4]], op: &[u8]) -> Option<Vec<[f64; 2]>> {
+fn straight_channel(a: &Shape, b: &Shape, ob: &[[f64; 4]], op: &[u8], lines: &[[[f64; 2]; 2]]) -> Option<Vec<[f64; 2]>> {
     for k in 0..2 {
         let Some((l, h)) = overlap(&a.bx, &b.bx, k) else { continue };
         let j = 1 - k;
@@ -491,7 +502,7 @@ fn straight_channel(a: &Shape, b: &Shape, ob: &[[f64; 4]], op: &[u8]) -> Option<
         if (to - from) * s <= tol(to) {
             continue;
         }
-        let parts = free((l, h), k, rect(k, (l, h), (from, to)), ob, op, if j == 0 { PASS_X } else { PASS_Y });
+        let parts = free((l, h), k, rect(k, (l, h), (from, to)), ob, op, if j == 0 { PASS_X } else { PASS_Y }, lines);
         let t = pick(&parts, (l + h) * 0.5, b.mid[k])?;
         let d = unit(j, s);
         return Some(alloc::vec![a.side(d, t), b.side(neg(d), t)]);
@@ -501,7 +512,7 @@ fn straight_channel(a: &Shape, b: &Shape, ob: &[[f64; 4]], op: &[u8]) -> Option<
 
 // Visio's L: A's leg along axis v (1: vertical first) leaves the side facing B, B's leg along the
 // other axis comes into B's side facing A; each leg in the middle of the free part of its band
-fn l_channel(a: &Shape, b: &Shape, v: usize, ob: &[[f64; 4]], op: &[u8]) -> Option<Vec<[f64; 2]>> {
+fn l_channel(a: &Shape, b: &Shape, v: usize, ob: &[[f64; 4]], op: &[u8], lines: &[[[f64; 2]; 2]]) -> Option<Vec<[f64; 2]>> {
     let h = 1 - v;
     let (sv, sh) = (toward(a, b, v), toward(a, b, h));
     let a_side = edge(&a.bx, v, sv);
@@ -516,8 +527,8 @@ fn l_channel(a: &Shape, b: &Shape, v: usize, ob: &[[f64; 4]], op: &[u8]) -> Opti
     let region_a = rect(h, band_a, (a_side, edge(&b.bx, v, sv)));
     let region_b = rect(v, band_b, (edge(&a.bx, h, -sh), b_side));
     let flag = |axis: usize| if axis == 0 { PASS_X } else { PASS_Y };
-    let x = pick(&free(band_a, h, region_a, ob, op, flag(v)), a.mid[h], b.mid[h])?;
-    let y = pick(&free(band_b, v, region_b, ob, op, flag(h)), b.mid[v], a.mid[v])?;
+    let x = pick(&free(band_a, h, region_a, ob, op, flag(v), lines), a.mid[h], b.mid[h])?;
+    let y = pick(&free(band_b, v, region_b, ob, op, flag(h), lines), b.mid[v], a.mid[v])?;
     let p0 = a.side(unit(v, sv), x);
     let p2 = b.side(unit(h, -sh), y);
     let mut p1 = [0.0; 2];
@@ -529,11 +540,11 @@ fn l_channel(a: &Shape, b: &Shape, v: usize, ob: &[[f64; 4]], op: &[u8]) -> Opti
 // Visio's right-angle router between two dynamic ends; `both`: a detour between shapes beside each
 // other comes into B's facing side too (a style's fallback), else only A's is kept
 #[allow(clippy::too_many_arguments)]
-fn right_angle(a: &Shape, b: &Shape, ob: &[[f64; 4]], op: &[u8], ca: &[Port], cb: &[Port], boxes: &[[f64; 4]], pass: &[u8], opts: &Opts, both: bool) -> Routed {
+fn right_angle(a: &Shape, b: &Shape, ob: &[[f64; 4]], op: &[u8], lines: &[[[f64; 2]; 2]], ca: &[Port], cb: &[Port], boxes: &[[f64; 4]], pass: &[u8], opts: &Opts, both: bool) -> Routed {
     if tangled(a, b) {
         return routed(route::best_through(ca, cb, boxes, pass, opts).2, true);
     }
-    if let Some(w) = straight_channel(a, b, ob, op).or_else(|| l_channel(a, b, 1, ob, op)).or_else(|| l_channel(a, b, 0, ob, op)) {
+    if let Some(w) = straight_channel(a, b, ob, op, lines).or_else(|| l_channel(a, b, 1, ob, op, lines)).or_else(|| l_channel(a, b, 0, ob, op, lines)) {
         return routed(w, true);
     }
     // a detour from and to the middles of the sides (Visio's detours did); shapes beside each other
@@ -572,9 +583,10 @@ fn middles(ports: &[Port], s: &Shape) -> Vec<usize> {
 
 /// (JD21v) the way of a connector in its style: `shapes` the shapes its two ends are glued to as a
 /// whole (shape()), `ca`, `cb` the ports glue offers for them (glue::candidates), the obstacles with
-/// how they may be crossed
+/// how they may be crossed, `lines` the straight pieces of the other connectors glued to the same
+/// shapes (the right-angle router lays its legs between them)
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn route(style: RouteStyle, shapes: [Option<&Shape>; 2], ca: &[Port], cb: &[Port], boxes: &[[f64; 4]], pass: &[u8], opts: &Opts) -> Routed {
+pub(crate) fn route(style: RouteStyle, shapes: [Option<&Shape>; 2], ca: &[Port], cb: &[Port], boxes: &[[f64; 4]], pass: &[u8], lines: &[[[f64; 2]; 2]], opts: &Opts) -> Routed {
     if ca.is_empty() || cb.is_empty() {
         return routed(Vec::new(), true);
     }
@@ -585,7 +597,7 @@ pub(crate) fn route(style: RouteStyle, shapes: [Option<&Shape>; 2], ca: &[Port],
     let (ob, op) = others(a, b, boxes, pass);
     let stub = opts.clearance;
     match style.kind {
-        Kind::RightAngle | Kind::Network => right_angle(a, b, &ob, &op, ca, cb, boxes, pass, opts, false),
+        Kind::RightAngle | Kind::Network => right_angle(a, b, &ob, &op, lines, ca, cb, boxes, pass, opts, false),
         Kind::CentreToCentre => routed(alloc::vec![a.toward(b.mid), b.toward(a.mid)], true),
         Kind::Straight => {
             for k in 0..2 {
@@ -601,7 +613,7 @@ pub(crate) fn route(style: RouteStyle, shapes: [Option<&Shape>; 2], ca: &[Port],
         Kind::OrgChart | Kind::Flowchart => {
             let k = style.axis();
             if overlap(&a.bx, &b.bx, k).is_some() {
-                return right_angle(a, b, &ob, &op, ca, cb, boxes, pass, opts, true);
+                return right_angle(a, b, &ob, &op, lines, ca, cb, boxes, pass, opts, true);
             }
             let (j, s) = (1 - k, toward(a, b, k));
             let d = unit(k, s);

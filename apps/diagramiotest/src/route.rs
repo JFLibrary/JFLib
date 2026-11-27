@@ -7,7 +7,8 @@
 //                     the way by hand kept after a move); written and read back: RouteStyle,
 //                     LineRouteExt, LineAdjustFrom/To, DynamicsOff, ShapeRouteStyle, ConFixedCode,
 //                     ConLineRouteExt, ShapePermeableX/Y/Place and the ways unchanged; routed again
-//                     after reading the same ways (the styles come from the file); the local
+//                     after reading the same ways as the drawing routed again before writing (the
+//                     styles come from the file); the local
 //                     corpus' connectors (if there): all right-angled, ConFixedCode 0 or 3 .. 6
 //                     (never 1 or 2: none is kept, all route freely here)
 //   write(dir)        --write-jd21-route DIR: JD21-Gegenprobe-Routing.vsdx and a PNG of each page;
@@ -110,6 +111,18 @@ fn rect(tx: &mut diagram_core::Transaction, eng: &mut Engine, owner: Owner, at: 
     Ok(s)
 }
 
+// after a shape moved, as the app (edit_canvas::follow): what is glued to it routes again, and
+// (JD21v) the connectors it crowds (glue::crowded)
+fn follow(tx: &mut diagram_core::Transaction, eng: &mut Engine, owner: Owner, s: ShapeRef) -> Result<(), String> {
+    let mut deps = glue::dependents(tx.doc(), owner, &[s]);
+    for c in glue::crowded(tx.doc(), owner, &[s]) {
+        if !deps.contains(&c) {
+            deps.push(c);
+        }
+    }
+    glue::update(tx, eng, &deps).map_err(err)
+}
+
 fn centre(doc: &Document, s: ShapeRef) -> [f64; 2] {
     ops::bounds(doc, &[s]).map_or([0.0, 0.0], |b| [(b[0] + b[2]) * 0.5, (b[1] + b[3]) * 0.5])
 }
@@ -144,6 +157,8 @@ fn build() -> Result<(Document, Vec<Built>), String> {
             Some((at, size, cell)) => {
                 let w = rect(&mut tx, &mut eng, owner, at, size, "")?;
                 set(&mut tx, SheetRef::Shape(w), cell, 1.0)?;
+                // (JD21v) placeable (ObjType 1): Visio routes only around such shapes
+                set(&mut tx, SheetRef::Shape(w), "ObjType", 1.0)?;
                 let f = tx.single("FillForegnd");
                 tx.set_formula(SheetRef::Shape(w), &f, "RGB(200,200,200)").map_err(err)?;
                 eng.recalc(&mut tx, &[SheetRef::Shape(w)]).map_err(err)?;
@@ -171,8 +186,7 @@ fn build() -> Result<(Document, Vec<Built>), String> {
         }
         // C moves down a little: what is glued to it routes again
         ops::move_shapes(&mut tx, &mut eng, &[c], [0.0, -0.2]).map_err(err)?;
-        let deps = glue::dependents(tx.doc(), owner, &[c]);
-        glue::update(&mut tx, &mut eng, &deps).map_err(err)?;
+        follow(&mut tx, &mut eng, owner, c)?;
         // the title above the shapes
         let t = ops::new_shape(&mut tx, &mut eng, owner, Basic::Rectangle, [0.5, 7.4], [7.8, 8.0]).map_err(err)?;
         ops::set_text(&mut tx, &mut eng, t, Text::plain(&format!("{}\n", spec.title))).map_err(err)?;
@@ -336,21 +350,43 @@ pub(crate) fn check(h: &mut H, corpus: Option<String>) {
     }
     h.check("route: routing cells of pages and shapes read back", cells_ok, String::new());
     h.check("route: the ways read back unchanged", ways_ok && n == 50, format!("{n} connectors"));
-    // routed again from the file's cells: the same ways (the way by hand kept)
-    let mut eng = Engine::new();
+    // routed again from the file's cells: the same ways as the drawing routed again before it was
+    // written (the way by hand kept).  (JD21v) Not the ways it had: connectors at one shape keep
+    // out of each other's way as in Visio, so routing both again moves the first one off the
+    // second's way -- in both drawings alike
     let mut same = true;
+    let mut want: Vec<Vec<Vec<[f64; 2]>>> = Vec::new();
+    match build() {
+        Ok((mut fresh, fresh_built)) => {
+            let mut eng = Engine::new();
+            let mut tx = fresh.transaction("neu");
+            for b in &fresh_built {
+                let list: Vec<ShapeRef> = b.conns.iter().copied().filter(|&c| glue::is_connector(tx.doc(), c)).collect();
+                same &= glue::update(&mut tx, &mut eng, &list).is_ok();
+                want.push(list.iter().map(|&c| glue::path(tx.doc(), c)).collect());
+            }
+            let _ = tx.commit();
+        }
+        Err(_) => same = false,
+    }
+    let mut eng = Engine::new();
     let mut tx = back.transaction("neu");
-    for (_, list, ways) in &again {
+    for (k, (_, list, _)) in again.iter().enumerate() {
         if glue::update(&mut tx, &mut eng, list).is_err() {
             same = false;
         }
+        let Some(ways) = want.get(k) else {
+            same = false;
+            continue;
+        };
+        same &= ways.len() == list.len();
         for (t, p) in list.iter().zip(ways) {
             let q = glue::path(tx.doc(), *t);
             same &= p.len() == q.len() && p.iter().zip(&q).all(|(x, y)| (x[0] - y[0]).abs() < 1e-6 && (x[1] - y[1]).abs() < 1e-6);
         }
     }
     let _ = tx.commit();
-    h.check("route: routed again after reading, the same ways", same, String::new());
+    h.check("route: routed again after reading, the same ways as routed again before writing", same, String::new());
     // the local corpus: Visio's connectors on the pages are right-angled, ConFixedCode 0 or 3 .. 6
     let Some(dir) = crate::corpus::folder(corpus) else {
         crate::out("skip route corpus: no apps/JFDiagrammer/context/files\n");
@@ -398,8 +434,7 @@ fn expected() -> Result<String, String> {
             let owner = Owner::Page(b.page);
             let mut tx = doc.transaction("Verschieben");
             ops::move_shapes(&mut tx, &mut eng, &[s], [0.0, -0.3]).map_err(err)?;
-            let deps = glue::dependents(tx.doc(), owner, &[s]);
-            glue::update(&mut tx, &mut eng, &deps).map_err(err)?;
+            follow(&mut tx, &mut eng, owner, s)?;
             let _ = tx.commit();
             for &c in &b.conns {
                 let id = doc.shape(c).map_or(0, |x| x.id());

@@ -34,7 +34,9 @@ drag 805,420 695,300
 drag 695,300 465,350
 cmd 4400
 click 1100,700
-expect listitem:"Sheet.9" rect 500 346 226 204
+# (JD21v) "Prüfen" was not placeable yet when Start -> Schritt was laid (ObjType 0 until a
+# connector is glued to it): the L's upright leg runs through Start's middle, close past it
+expect listitem:"Sheet.9" rect 500 346 252 204
 cmd 7247
 expect dialog:"Layout konfigurieren" exists
 expect combo:"Flussdiagramm" exists
@@ -82,7 +84,7 @@ click button:"Abbrechen"
 key ctrl+z
 expect listitem:"Start" rect 701 550 101 50
 expect listitem:"Prüfen" rect 752 399 100 50
-expect listitem:"Sheet.9" rect 500 346 226 204
+expect listitem:"Sheet.9" rect 500 346 252 204
 cmd 7247
 expect combo:"Flussdiagramm" exists
 click button:"Abbrechen"
