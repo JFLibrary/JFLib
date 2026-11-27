@@ -314,6 +314,13 @@ Schablone alle Master.
   Stichworte je Sprache; NameU ist der naheliegende englische Begriff.
 - **Kategorien für Regeln:** Flussdiagramm-Shapes tragen `User.msvShapeCategories`
   (`"Flowchart"`, die Entscheidung `"Flowchart;Decision"`, Start/Ende `"Flowchart;Terminator"`).
+- **Hindernisse (`ObjType`, JD21v):** Dynamische Verbinder weichen nur platzierbaren Shapes aus
+  (`ObjType` mit Bit 1, wie Visio 16). Ein Master bekommt `ObjType = 1`, wo Visios Gegenstück
+  platzierbar ist (Gegenprobe visio-obst-2): die Flussdiagramm-Shapes, die gestellmontierten Server,
+  Wolke, Ring-Netzwerk und Ethernet. Die übrigen 2D-Master bleiben ohne `ObjType` (0, Visio
+  entscheidet: platzierbar erst, wenn ein Verbinder an ihnen klebt). Visios Gegenstücke sind dort
+  0, 4 oder Gruppen mit 8 ohne platzierbare Teile (Standard-Shapes, Blöcke, Netzwerk- und
+  Server-Symbole, Marketing, Venn, Pyramide, Matrix, Datengrafiken 4), also keine Hindernisse.
 
 Ergänzt mit dem JD26-Probeblatt (vom Nutzer abgenommen, 2026-11-23):
 

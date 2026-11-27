@@ -39,6 +39,7 @@ TxtPinY = Height
 TxtLocPinX = 0 mm
 TxtLocPinY = 0 mm
 VerticalAlign = 2
+ObjType = 1
 
 [Geometry]
 MoveTo  X = 0; Y = 0

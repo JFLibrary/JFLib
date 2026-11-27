@@ -4,11 +4,18 @@
 # half the AvenueSize, into the second one's bottom; Visio passed above in its own drawing).  Layout-Verhalten of the middle shape: Verbinder dürfen das Shape
 # waagerecht durchqueren (ShapePermeableX); when the first shape is dragged (the grid keeps it
 # where it is), the connector runs straight through.  Only vertically permeable: around it again.
-# The rows show what the shape has.
+# The rows show what the shape has.  (JD21v) The middle shape is made placeable first
+# (Layout-Verhalten: Layout und Routing um das Shape): Visio 16 routes only around placeable shapes.
 cmd 4404
 drag 500,330 640,420
 drag 700,300 760,450
 drag 820,330 960,420
+cmd 4400
+click 730,320
+cmd 5422
+expect dialog:"Layout-Verhalten" exists
+click radio:"Layout und Routing um das Shape"
+click button:"OK"
 cmd 4401
 drag 560,370 880,370
 cmd 4400

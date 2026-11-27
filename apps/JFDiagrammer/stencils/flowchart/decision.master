@@ -30,6 +30,7 @@ TxtPinY = Height*0.5
 TxtLocPinX = TxtWidth*0.5
 TxtLocPinY = TxtHeight*0.5
 ShapeSplit = 1
+ObjType = 1
 
 [User]
 # die Kategorie Decision zusätzlich: die Regeln der Vorlage finden Entscheidungen daran

@@ -52,8 +52,12 @@
 // (length + bends; route::best_through, which is also all ends glued to points or free get); where
 // the other end lies within a side's reach, the point straight opposite it is offered too.
 // (JD15, SS-18) WalkPreference changes none of these ways in Visio: kept, not read.  Obstacles
-// are the boxes of the page's top-level shapes that are not 1-D; the clearance is half the page's
-// AvenueSize (opts_for).  After routing ConFixedCode becomes 6 or 0 as
+// are, as in Visio 16 (JD21v), the placeable shapes (ObjType with bit 1, not 4; a group with 8 by
+// its placeable members; obstacles()), and for each connector the shapes its ends are glued to;
+// the clearance is half the page's AvenueSize (opts_for).  The legs of Visio's right-angle router
+// keep out of the way of the other connectors glued to the same shapes (related_lines: Visio
+// spreads connectors leaving one side); after a move the connectors a placeable shape now crowds
+// route again (crowded).  After routing ConFixedCode becomes 6 or 0 as
 // Visio writes it (route_styles::mark).  ConFixedCode 1 and 2 (reroute manually / never) keep the
 // corners and only move the first and last pieces; reset() routes them anew.  (JD21) 1 is laid
 // anew when the kept way runs through a shape (route_edit.rs); 3 .. 6 route freely (Visio writes
@@ -794,27 +798,99 @@ pub fn set_style(tx: &mut Transaction, eng: &mut Engine, connectors: &[ShapeRef]
     reset(tx, eng, connectors)
 }
 
-// the obstacles of a page or master: the boxes of its top-level shapes that are not 1-D,
-// guides, permeable both ways (ShapePermeableX and Y), set to "do not lay out and route
-// around" (ObjType 4, CN-17) or containers (JD10: their members sit inside them, Visio's
-// containers are not routed around either)
+// the obstacles of a page or master, as Visio 16 routes around them (JD21v, the counter-check
+// visio-obst-1): the boxes of the top-level shapes whose ObjType has the placeable flag (1, 9;
+// a 1-D shape that is no connector too), not 0 (Visio decides: a shape becomes 1 when a
+// connector is glued to it, set_end), 2, 8 or 4 ("do not lay out and route around", CN-17; it
+// wins); a group with the group flag (8) and without the placeable one stands for its placeable
+// members (and so on down).  Never guides, connectors, shapes permeable both ways
+// (ShapePermeableX and Y) or containers (JD10: their members sit inside them; Visio's own
+// containers are 0, a placeable member inside one is routed around)
 fn obstacles(doc: &Document, owner: Owner) -> Vec<(ShapeRef, [f64; 4])> {
     let mut out = Vec::new();
     for s in doc.top_shapes(owner) {
-        let Some(shape) = doc.shape(s) else { continue };
-        if shape.is_deleted() || shape.header().kind == ShapeKind::Guide || is_one_d(doc, s) {
-            continue;
-        }
-        let sheet = SheetRef::Shape(s);
-        let perm = |c: &str| num(doc, sheet, c).is_some_and(|v| v != 0.0);
-        if perm("ShapePermeableX") && perm("ShapePermeableY") {
-            continue;
-        }
-        if num(doc, sheet, "ObjType").is_some_and(|v| (v as i64) & 4 != 0) || crate::structure::is_container(doc, s) {
-            continue;
-        }
+        obstacle_into(doc, s, &mut out);
+    }
+    out
+}
+
+fn obstacle_into(doc: &Document, s: ShapeRef, out: &mut Vec<(ShapeRef, [f64; 4])>) {
+    let Some(shape) = doc.shape(s) else { return };
+    if shape.is_deleted() || shape.header().kind == ShapeKind::Guide || is_connector(doc, s) || !may_block(doc, s) {
+        return;
+    }
+    let obj = num(doc, SheetRef::Shape(s), "ObjType").map_or(0, |v| v as i64);
+    if obj & 1 != 0 {
         if let Some(b) = page_box(doc, s) {
             out.push((s, b));
+        }
+    } else if obj & 8 != 0 {
+        for m in shape.children() {
+            obstacle_into(doc, m, out);
+        }
+    }
+}
+
+/// (JD21v) the dynamic connectors whose way runs through one of these shapes, or closer to it than
+/// the clearance (half the page's AvenueSize), where the shape keeps connectors out (an obstacle:
+/// placeable, ObjType 1; a group with 8 by its placeable members): after the shapes moved Visio
+/// routes them again (the counter-check visio-obst-1 [sprd] "beside": a way 0.05 in under a shape
+/// moved next to it went round it anew); the shapes themselves are not in the list
+pub fn crowded(doc: &Document, owner: Owner, shapes: &[ShapeRef]) -> Vec<ShapeRef> {
+    let mut boxes = Vec::new();
+    for &s in shapes {
+        obstacle_into(doc, s, &mut boxes);
+    }
+    if boxes.is_empty() {
+        return Vec::new();
+    }
+    let c = opts_for(doc, owner).clearance;
+    let grown: Vec<[f64; 4]> = boxes.iter().map(|(_, b)| [b[0] - c, b[1] - c, b[2] + c, b[3] + c]).collect();
+    doc.top_shapes(owner).filter(|&k| !shapes.contains(&k) && is_connector(doc, k) && path(doc, k).windows(2).any(|w| grown.iter().any(|b| route::hits_box(w[0], w[1], b)))).collect()
+}
+
+// whether a shape may keep connectors out at all: not ObjType 4, not a container, not permeable
+// both ways
+fn may_block(doc: &Document, s: ShapeRef) -> bool {
+    let sheet = SheetRef::Shape(s);
+    let perm = |c: &str| num(doc, sheet, c).is_some_and(|v| v != 0.0);
+    let obj = num(doc, sheet, "ObjType").map_or(0, |v| v as i64);
+    obj & 4 == 0 && !crate::structure::is_container(doc, s) && !(perm("ShapePermeableX") && perm("ShapePermeableY"))
+}
+
+// (JD21v) the straight pieces of the other dynamic connectors glued to the shapes this one is
+// glued to: Visio's right-angle router lays each leg in the middle of the part of its band they
+// leave free (route_styles::free; the counter-check visio-obst-1 [sprd]: connectors between other
+// shapes did not count)
+fn related_lines(doc: &Document, c: ShapeRef, targets: &[Target; 2]) -> Vec<[[f64; 2]; 2]> {
+    let mut out = Vec::new();
+    let Some(own) = doc.shape(c).map(|s| s.id()) else { return out };
+    let ids: Vec<u32> = targets
+        .iter()
+        .filter_map(|t| match *t {
+            Target::Shape(s) | Target::Point { shape: s, .. } => doc.shape(s).map(|x| x.id()),
+            Target::None => None,
+        })
+        .collect();
+    if ids.is_empty() {
+        return out;
+    }
+    let mut seen = BTreeSet::new();
+    for k in connects(doc, c.owner) {
+        if k.from_sheet == own || !ids.contains(&k.to_sheet) || !seen.insert(k.from_sheet) {
+            continue;
+        }
+        let Some(o) = doc.shape_by_id(c.owner, k.from_sheet) else { continue };
+        if !is_connector(doc, o) {
+            continue;
+        }
+        let way = path(doc, o);
+        for s in way.windows(2) {
+            let t = 1e-9 * (1.0 + s[0][0].abs().max(s[0][1].abs()));
+            let (dx, dy) = ((s[0][0] - s[1][0]).abs(), (s[0][1] - s[1][1]).abs());
+            if (dx <= t) != (dy <= t) {
+                out.push([s[0], s[1]]);
+            }
         }
     }
     out
@@ -861,8 +937,21 @@ fn run(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef], force: bool)
                     cache.len() - 1
                 }
             };
-            let boxes: Vec<[f64; 4]> = cache[i].1.iter().filter(|(s, _)| *s != c).map(|(_, b)| *b).collect();
-            let pass: Vec<u8> = cache[i].1.iter().zip(&passes[i]).filter(|((s, _), _)| *s != c).map(|(_, p)| *p).collect();
+            let mut boxes: Vec<[f64; 4]> = cache[i].1.iter().filter(|(s, _)| *s != c).map(|(_, b)| *b).collect();
+            let mut pass: Vec<u8> = cache[i].1.iter().zip(&passes[i]).filter(|((s, _), _)| *s != c).map(|(_, p)| *p).collect();
+            // (JD21v) the shapes its own ends are glued to keep it out also where they are not
+            // placeable (a file without ObjType; Visio makes them 1 when it glues)
+            for t in glued(tx.doc(), c) {
+                if let Target::Shape(s) | Target::Point { shape: s, .. } = t {
+                    let doc = tx.doc();
+                    if cache[i].1.iter().all(|(o, _)| *o != s) && !is_one_d(doc, s) && may_block(doc, s) {
+                        if let Some(b) = page_box(doc, s) {
+                            boxes.push(b);
+                            pass.push(crate::route_styles::pass(doc, s));
+                        }
+                    }
+                }
+            }
             laid.note(tx.doc(), c);
             route_one(tx, eng, c, force, &boxes, &pass)?;
         } else {
@@ -993,7 +1082,8 @@ fn route_one(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef, force: bool, b
     // shapes of ends glued to whole shapes).  (JD15, SS-18) WalkPreference changes none of these
     // ways in Visio (the counter-check): it is kept, not read
     let shapes = [crate::route_styles::shape(doc, targets[0]), crate::route_styles::shape(doc, targets[1])];
-    let lay = || crate::route_styles::route(crate::route_styles::of(doc, c), [shapes[0].as_ref(), shapes[1].as_ref()], &ca, &cb, boxes, pass, &opts);
+    let lines = related_lines(doc, c, &targets);
+    let lay = || crate::route_styles::route(crate::route_styles::of(doc, c), [shapes[0].as_ref(), shapes[1].as_ref()], &ca, &cb, boxes, pass, &lines, &opts);
     let (pts, router) = if style == Style::Straight {
         // (JD21, CN-04) a straight way with vertices of its own keeps them
         match fixed.then(|| crate::route_edit::kept_polyline(doc, c, &targets)).flatten() {

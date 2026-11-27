@@ -31,6 +31,7 @@ TxtPinY = Height*0.5
 TxtLocPinX = TxtWidth*0.5
 TxtLocPinY = TxtHeight*0.5
 ShapeSplit = 1
+ObjType = 1
 
 [User]
 msvShapeCategories:  Value = "Flowchart"

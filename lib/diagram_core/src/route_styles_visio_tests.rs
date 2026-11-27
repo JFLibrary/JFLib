@@ -352,6 +352,7 @@ fn own_drawings_against_visio() {
         let b = f.rect(2, [o.end[0], o.end[1]], [o.end[2], o.end[3]]);
         if let Some((w, p)) = o.wall {
             let s = f.rect(3, [w[0], w[1]], [w[2], w[3]]);
+            f.set(Some(s), "ObjType", 1.0);
             if p & route::PASS_X != 0 {
                 f.set(Some(s), "ShapePermeableX", 1.0);
             }
@@ -382,6 +383,161 @@ fn own_drawings_against_visio() {
             }
             None if !ok => bad.push(alloc::format!("{}: ours {got:?} / moved {got2:?}, Visio {:?} / {:?}", o.name, o.want, o.after)),
             None => {}
+        }
+    }
+    assert!(bad.is_empty(), "{bad:#?}");
+}
+
+// (visio-obst-1 [obst]) what Visio routes around: A 1.2 x 0.8 at (3, 5), B 1.2 x 0.8 at (9, 5),
+// between them X 1 x 1.2 at (6, 5) (a rectangle with these cells; a group of two rectangles 1 x 0.6
+// with the group's and the members' ObjType; an upright 1-D line from (6, 3.5) to (6, 6.5)), a
+// right-angle connector A -> B glued to both; whether Visio's way went round X, and Visio's way
+// where it went through (before and after B moved 0.3 in down).  Visio: only the placeable flag
+// (ObjType 1, 9) keeps connectors out, 4 wins, a group with 8 stands for its placeable members
+#[test]
+fn obstacles_against_visio() {
+    enum X {
+        Rect(&'static [(&'static str, f64)]),
+        Group(f64, f64),
+        Line(f64),
+    }
+    let cases: &[(&str, X, bool)] = &[
+        ("drawn 0", X::Rect(&[]), false),
+        ("ObjType 1", X::Rect(&[("ObjType", 1.0)]), true),
+        ("ObjType 2", X::Rect(&[("ObjType", 2.0)]), false),
+        ("ObjType 4", X::Rect(&[("ObjType", 4.0)]), false),
+        ("ObjType 8", X::Rect(&[("ObjType", 8.0)]), false),
+        ("ObjType 9", X::Rect(&[("ObjType", 9.0)]), true),
+        ("ObjType 1 permeable X", X::Rect(&[("ObjType", 1.0), ("ShapePermeableX", 1.0)]), false),
+        ("group 8 of placeable", X::Group(8.0, 1.0), true),
+        ("group 1 of 0", X::Group(1.0, 0.0), true),
+        ("group 8 of 0", X::Group(8.0, 0.0), false),
+        ("group 0 of 0", X::Group(0.0, 0.0), false),
+        ("1-D line 0", X::Line(0.0), false),
+        ("1-D line 1", X::Line(1.0), true),
+    ];
+    let mut bad = Vec::new();
+    for (name, x, round) in cases {
+        let mut f = page(1);
+        let a = f.rect(1, [3.0, 5.0], [1.2, 0.8]);
+        let b = f.rect(2, [9.0, 5.0], [1.2, 0.8]);
+        let (doc, pg) = (&mut f.doc, f.page);
+        let xb = match x {
+            X::Rect(cells) => {
+                let g = crate::hit::tests::poly(doc, 0, &crate::hit::tests::rect_pts(1.0, 1.2));
+                crate::hit::tests::add(doc, pg, None, 3, [6.0, 5.0], [1.0, 1.2], alloc::vec![g], cells, None);
+                [5.5, 4.4, 6.5, 5.6]
+            }
+            X::Group(own, members) => {
+                let grp = crate::hit::tests::add_kind(doc, pg, None, 3, crate::ShapeKind::Group, [6.0, 5.0], [1.0, 1.2], Vec::new(), &[("ObjType", *own)], None);
+                for (id, y) in [(4, 0.9), (5, 0.3)] {
+                    let g = crate::hit::tests::poly(doc, 0, &crate::hit::tests::rect_pts(1.0, 0.6));
+                    crate::hit::tests::add(doc, pg, Some(grp), id, [0.5, y], [1.0, 0.6], alloc::vec![g], &[("ObjType", *members)], None);
+                }
+                [5.5, 4.4, 6.5, 5.6]
+            }
+            X::Line(obj) => {
+                let g = crate::hit::tests::poly(doc, 0, &[[0.0, 0.0], [3.0, 0.0]]);
+                let cells = [("BeginX", 6.0), ("BeginY", 3.5), ("EndX", 6.0), ("EndY", 6.5), ("Angle", core::f64::consts::FRAC_PI_2), ("ObjType", *obj)];
+                crate::hit::tests::add(doc, pg, None, 3, [6.0, 5.0], [3.0, 0.0], alloc::vec![g], &cells, None);
+                [6.0, 3.5, 6.0, 6.5]
+            }
+        };
+        let c = f.connect(a, b);
+        let got = f.path(c);
+        // through X: a piece of the way meets its box (also a line's box without width)
+        let through = got.windows(2).any(|s| s[0][0].min(s[1][0]) <= xb[2] && s[0][0].max(s[1][0]) >= xb[0] && s[0][1].min(s[1][1]) <= xb[3] && s[0][1].max(s[1][1]) >= xb[1]);
+        if through == *round || (!round && !same_way(&got, &[[3.6, 5.0], [8.4, 5.0]])) {
+            bad.push(alloc::format!("{name}: ours {got:?}, Visio {}", if *round { "round X" } else { "straight through" }));
+            continue;
+        }
+        if !round {
+            f.move_to(b, [9.0, 4.7]);
+            let got2 = f.path(c);
+            if !same_way(&got2, &[[3.6, 4.85], [8.4, 4.85]]) {
+                bad.push(alloc::format!("{name}: B moved, ours {got2:?}, Visio [[3.6, 4.85], [8.4, 4.85]]"));
+            }
+        }
+    }
+    assert!(bad.is_empty(), "{bad:#?}");
+}
+
+// (visio-obst-1 [sprd]) connectors leaving one side of a shape: A 1.6 x 0.8 at (4, 6), B 1.4 x 0.8
+// at (2, 3), C 1.4 x 0.8 at (6.5, 3); right-angle connectors glued in the order given, then C and
+// then B moved 0.3 in down.  Visio lays each leg in the middle of the part of its band the other
+// connectors at the same shapes leave free (the one holding the middle, else the one towards the
+// other shape)
+#[test]
+fn spreading_against_visio() {
+    type Ways = &'static [&'static [[f64; 2]]];
+    // which connectors (0: A -> B, 1: A -> C) in which order, the ways after gluing, after C moved,
+    // after B moved (in the connectors' order 0, 1)
+    let cases: &[(&str, [usize; 2], Ways, Ways, Ways)] = &[
+        (
+            "B then C",
+            [0, 1],
+            &[&[[4.0, 5.6], [4.0, 3.0], [2.7, 3.0]], &[[4.4, 5.6], [4.4, 3.2], [5.8, 3.2]]],
+            &[&[[4.0, 5.6], [4.0, 3.0], [2.7, 3.0]], &[[4.4, 5.6], [4.4, 2.65], [5.8, 2.65]]],
+            &[&[[3.8, 5.6], [3.8, 2.875], [2.7, 2.875]], &[[4.4, 5.6], [4.4, 2.65], [5.8, 2.65]]],
+        ),
+        (
+            "C then B",
+            [1, 0],
+            &[&[[3.6, 5.6], [3.6, 3.2], [2.7, 3.2]], &[[4.0, 5.6], [4.0, 3.0], [5.8, 3.0]]],
+            &[&[[3.6, 5.6], [3.6, 3.2], [2.7, 3.2]], &[[4.2, 5.6], [4.2, 2.7], [5.8, 2.7]]],
+            &[&[[3.7, 5.6], [3.7, 2.9], [2.7, 2.9]], &[[4.2, 5.6], [4.2, 2.7], [5.8, 2.7]]],
+        ),
+    ];
+    let mut bad = Vec::new();
+    for (name, order, glued, c_moved, b_moved) in cases {
+        let mut f = page(1);
+        let a = f.rect(1, [4.0, 6.0], [1.6, 0.8]);
+        let b = f.rect(2, [2.0, 3.0], [1.4, 0.8]);
+        let c = f.rect(3, [6.5, 3.0], [1.4, 0.8]);
+        let mut conns = [None, None];
+        for &k in order {
+            conns[k] = Some(f.connect(a, if k == 0 { b } else { c }));
+        }
+        let conns = conns.map(|x| x.unwrap());
+        let mut check = |f: &super::tests::Fx, when: &str, want: Ways| {
+            for k in 0..2 {
+                let got = f.path(conns[k]);
+                if !same_way(&got, want[k]) {
+                    bad.push(alloc::format!("{name}, {when}, connector {k}: ours {got:?}, Visio {:?}", want[k]));
+                }
+            }
+        };
+        check(&f, "glued", glued);
+        f.move_to(c, [6.5, 2.7]);
+        check(&f, "C moved", c_moved);
+        f.move_to(b, [2.0, 2.7]);
+        check(&f, "B moved", b_moved);
+    }
+    // shapes beside A, B in C's way: straight lines in the free parts of the overlaps
+    let mut f = page(1);
+    let a = f.rect(1, [3.0, 5.0], [1.2, 1.6]);
+    let b = f.rect(2, [8.0, 5.3], [1.2, 0.8]);
+    let c = f.rect(3, [10.0, 4.8], [1.2, 0.8]);
+    let ab = f.connect(a, b);
+    let ac = f.connect(a, c);
+    for (when, want) in [("glued", [[[3.6, 5.3], [7.4, 5.3]], [[3.6, 4.65], [9.4, 4.65]]])] {
+        for (k, conn) in [ab, ac].into_iter().enumerate() {
+            let got = f.path(conn);
+            if !same_way(&got, &want[k]) {
+                bad.push(alloc::format!("beside, {when}, connector {k}: ours {got:?}, Visio {:?}", want[k]));
+            }
+        }
+    }
+    f.move_to(c, [10.0, 4.5]);
+    let got = f.path(ac);
+    if !same_way(&got, &[[3.6, 4.55], [9.4, 4.55]]) {
+        bad.push(alloc::format!("beside, C moved: ours {got:?}, Visio [[3.6, 4.55], [9.4, 4.55]]"));
+    }
+    f.move_to(b, [8.0, 5.0]);
+    for (k, conn, want) in [(0, ab, [[3.6, 5.0], [7.4, 5.0]]), (1, ac, [[3.6, 4.4], [9.4, 4.4]])] {
+        let got = f.path(conn);
+        if !same_way(&got, &want) {
+            bad.push(alloc::format!("beside, B moved, connector {k}: ours {got:?}, Visio {want:?}"));
         }
     }
     assert!(bad.is_empty(), "{bad:#?}");

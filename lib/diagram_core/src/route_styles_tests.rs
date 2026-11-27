@@ -105,7 +105,8 @@ impl Fx {
         tx.commit();
     }
 
-    // move a shape's pin, then update what is glued to it and what its box now crosses
+    // move a shape's pin, then update what is glued to it and the connectors it now crowds (as
+    // the app's edit_canvas::follow: glue::crowded)
     pub fn move_to(&mut self, s: ShapeRef, at: [f64; 2]) {
         let mut tx = self.doc.transaction("Verschieben");
         let sheet = SheetRef::Shape(s);
@@ -114,11 +115,9 @@ impl Fx {
         tx.set_length(sheet, &py, at[1], Unit::Inches).unwrap();
         self.eng.recalc_cells(&mut tx, &[(sheet, px), (sheet, py)]).unwrap();
         let mut deps = glue::dependents(tx.doc(), self.owner, &[s]);
-        if let Some(b) = glue::page_box(tx.doc(), s) {
-            for c in tx.doc().top_shapes(self.owner).collect::<Vec<_>>() {
-                if !deps.contains(&c) && glue::is_connector(tx.doc(), c) && glue::path(tx.doc(), c).windows(2).any(|w| route::hits_box(w[0], w[1], &b)) {
-                    deps.push(c);
-                }
+        for c in glue::crowded(tx.doc(), self.owner, &[s]) {
+            if !deps.contains(&c) {
+                deps.push(c);
             }
         }
         glue::update(&mut tx, &mut self.eng, &deps).unwrap();
@@ -281,7 +280,8 @@ fn simple_styles_ignore_obstacles() {
     let a = f.rect(1, [2.0, 8.0], [1.0, 1.0]);
     let b = f.rect(2, [2.0, 2.0], [1.0, 1.0]);
     // a wall between them
-    let _w = f.rect(3, [2.0, 5.0], [3.0, 0.5]);
+    let w = f.rect(3, [2.0, 5.0], [3.0, 0.5]);
+    f.set(Some(w), "ObjType", 1.0);
     let c = f.connect(a, b);
     // the organization chart goes round the wall
     let p = with_page_style(&mut f, 3.0, c);
@@ -314,7 +314,8 @@ fn straight_styles_draw_one_line() {
     let mut f = fx();
     let a = f.rect(1, [2.0, 2.0], [1.0, 1.0]);
     let b = f.rect(2, [6.0, 2.0], [1.0, 1.0]);
-    let _w = f.rect(3, [4.0, 2.0], [0.5, 0.5]);
+    let w = f.rect(3, [4.0, 2.0], [0.5, 0.5]);
+    f.set(Some(w), "ObjType", 1.0);
     let c = f.connect(a, b);
     assert_path(&with_page_style(&mut f, 9.0, c), &[[2.5, 2.375], [5.5, 2.375]]);
     assert_eq!(glue::style(&f.doc, c), glue::Style::RightAngle);
@@ -337,6 +338,7 @@ fn permeable_shapes_let_ways_through_one_way() {
     let a = f.rect(1, [1.0, 2.0], [1.0, 1.0]);
     let b = f.rect(2, [7.0, 2.0], [1.0, 1.0]);
     let w = f.rect(3, [4.0, 2.0], [1.0, 1.0]);
+    f.set(Some(w), "ObjType", 1.0);
     let c = f.connect(a, b);
     // round the shape in the middle
     assert!(route::bends(&f.path(c)) >= 2, "{:?}", f.path(c));
@@ -357,6 +359,7 @@ fn permeable_shapes_let_ways_through_one_way() {
     let a = f.rect(1, [2.0, 1.0], [1.0, 1.0]);
     let b = f.rect(2, [2.0, 7.0], [1.0, 1.0]);
     let w = f.rect(3, [2.0, 4.0], [1.0, 1.0]);
+    f.set(Some(w), "ObjType", 1.0);
     let c = f.connect(a, b);
     assert!(route::bends(&f.path(c)) >= 2, "{:?}", f.path(c));
     f.set(Some(w), "ShapePermeableX", 1.0);
