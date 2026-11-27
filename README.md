@@ -473,8 +473,16 @@ See the [Build Manager documentation](apps/buildManager/README.md) and
 
 ### A window with a click counter
 
-Make a project with `cargo jflib new hello` and replace its `src/lib.rs` with this complete app
-(its `src/main.rs` only links it):
+Make a project with `cargo jflib new hello` ([Your own app with Cargo](#your-own-app-with-cargo)) and
+replace its **`src/lib.rs`** with this complete app. The project's `src/main.rs` only links it, its
+`build.rs` (`jflib_build::app()`) hands the linker JFLib's entry point, and its `Cargo.toml` has the
+profiles JFLib needs.
+
+**Not in `src/main.rs` of a `cargo new` project:** there the code needs `#![no_main]` under
+`#![no_std]` (JFLib brings its own entry point instead of Rust's `main`), a `build.rs` with
+`fn main() { jflib_build::app(); }`, `jflib-build` (the version of `jflib`) under
+`[build-dependencies]`, and the template's profiles with `panic = "abort"`. Without them the build
+stops at `ui::main!` with a message that names what is missing.
 
 ```rust
 #![no_std]

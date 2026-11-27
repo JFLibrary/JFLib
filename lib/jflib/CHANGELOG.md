@@ -10,6 +10,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Changed
+
+- The README ("Quick start") and docs/GUIDE.md (section 2): code from an example is the app in `src/lib.rs` of a project from `cargo jflib new`; a program in one `src/main.rs` of its own (a `cargo new` project) needs `#![no_main]` under `#![no_std]`, a `build.rs` with `jflib_build::app()`, `jflib-build` under `[build-dependencies]` and the template's profiles. Without them `ui::main!` and `rt::main!` stop the build with a message that names what is missing (jflib-ui, jflib-rt)
+
 ## [0.2.1] - 2026-11-16
 
 ### Changed

@@ -256,6 +256,22 @@ Re-exports: `plat::screen::{Monitor, ScreenError}`
   nor `#![no_main]`.  In a library crate (the template's app) that `fn main` stays unused and
   the program's own calls `jflib::plat::std_start()`.
 
+  Without std it says what a program of its own lacks, for the code of an example put into
+  `src/main.rs` of a `cargo new` project (README.md, "A window with a click counter"):
+  - a program built by Cargo (`CARGO_BIN_NAME`) without JFLib's build script (jflib_build, which
+  ```text
+  always hands over `JFGUI_APP`): it would not link, so the build stops with a message that
+  names the build script, `jflib-build` and `#![no_main]`.  Not in a library crate (the
+  template's app: its program's build script links it), its unit tests or a program rustc
+  builds without Cargo;
+  ```
+  - `#![no_main]`: a `main` that Rust's entry point would take (imported from a module of the
+  ```text
+  macro, so an app's own `fn main` beside it wins without a clash) makes rustc say "using `fn
+  main` requires the standard library" with "use `#![no_main]`", not "`main` function not
+  found".  With `#![no_main]` or in a library crate it stays unused.
+  ```
+
   The unit tests of the crate that holds it (the template's app with std, `cargo test --lib`)
   need no `test_main!`: this `jfgui_main` links their test binary (never called there), and the
   panic check leaves the test build out (`cfg(test)`: Cargo builds tests with unwind whatever the
@@ -64755,6 +64771,14 @@ VERSION_PATCH: u32 = version_part(VERSION, 2)
   In a program with std (feature `std`) it also defines `fn main`, which hands over to plat's
   start of a std program (`jfgui_std_start`: crash handlers, the panic hook, then `jfgui_main`,
   the end through `std::process::exit`); the crate then has neither `#![no_std]` nor `#![no_main]`.
+
+  Without std it says what a program of its own lacks, as ui::main! does: built by Cargo
+  (`CARGO_BIN_NAME`) without JFLib's build script (jflib_build, which always hands over
+  `JFGUI_APP`) the build stops with a message that names the build script, `jflib-build` and
+  `#![no_main]` (not in a library crate, its unit tests or a program rustc builds without
+  Cargo); and a `main` that Rust's entry point would take (imported from a module of the macro,
+  so an app's own `fn main` beside it wins without a clash) makes a program without
+  `#![no_main]` hear "use `#![no_main]`" from rustc instead of "`main` function not found".
 
   The unit tests of a library crate that holds it (`cargo test --lib`) need no `test_main!`: this
   `jfgui_main` links their test binary (never called there), and the panic check leaves the test

@@ -95,6 +95,14 @@ macro_rules! app_version {
 /// start of a std program (`jfgui_std_start`: crash handlers, the panic hook, then `jfgui_main`,
 /// the end through `std::process::exit`); the crate then has neither `#![no_std]` nor `#![no_main]`.
 ///
+/// Without std it says what a program of its own lacks, as ui::main! does: built by Cargo
+/// (`CARGO_BIN_NAME`) without JFLib's build script (jflib_build, which always hands over
+/// `JFGUI_APP`) the build stops with a message that names the build script, `jflib-build` and
+/// `#![no_main]` (not in a library crate, its unit tests or a program rustc builds without
+/// Cargo); and a `main` that Rust's entry point would take (imported from a module of the macro,
+/// so an app's own `fn main` beside it wins without a clash) makes a program without
+/// `#![no_main]` hear "use `#![no_main]`" from rustc instead of "`main` function not found".
+///
 /// The unit tests of a library crate that holds it (`cargo test --lib`) need no `test_main!`: this
 /// `jfgui_main` links their test binary (never called there), and the panic check leaves the test
 /// build out (`cfg(test)`: Cargo builds tests with unwind whatever the profiles say; doc tests
@@ -105,6 +113,16 @@ macro_rules! app_version {
 macro_rules! main {
     ($body:expr) => {
         $crate::__jfgui_main!($body);
+        #[cfg(not(test))]
+        const _: () = if ::core::option_env!("CARGO_BIN_NAME").is_some() && ::core::option_env!("JFGUI_APP").is_none() {
+            ::core::panic!("JFLib's build script did not run for this program. A program in src/main.rs needs #![no_main] under #![no_std], a build.rs with `fn main() {{ jflib_build::console(); }}` (jflib_build::app() for a window) and jflib-build (the version of jflib) under [build-dependencies] in Cargo.toml; `cargo jflib new NAME` makes such a project");
+        };
+        mod __jfgui_entry {
+            #[allow(dead_code)]
+            pub(super) fn main() {}
+        }
+        #[allow(unused_imports)]
+        use __jfgui_entry::*;
     };
 }
 

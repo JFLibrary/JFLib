@@ -64,6 +64,14 @@ It is the template below as a project of its own: the one dependency `jflib` (`u
 settings for Windows and Linux in `.cargo/config.toml`. The README of the crate `jflib` names
 every file.
 
+The app is the template's `src/lib.rs`; its `src/main.rs` only links it. Code from this guide and
+the README goes into `src/lib.rs`, with `use jflib::{style, ui};` in place of this repository's
+crate names. A program in one `src/main.rs` of its own, a project from `cargo new` say, needs
+`#![no_main]` under `#![no_std]` (JFLib brings its own entry point instead of Rust's `main`), a
+`build.rs` with `jflib_build::app()` (`jflib_build::console()` for a command-line program),
+`jflib-build` in the version of `jflib` under `[build-dependencies]`, and the template's profiles.
+Without them `ui::main!` and `rt::main!` stop the build with a message that names what is missing.
+
 ### An app with std
 
 JFLib itself is `no_std` and brings what an app needs from one hand: windows and controls, files,
@@ -201,7 +209,8 @@ tests it, so the skeletons keep building.
 The app's own version is `version=` in `PACKAGE`; the program reads it with
 `rt::app_version!()`, the library's version is `ui::VERSION` ([VERSIONING.md](VERSIONING.md)).
 
-`apps/template/main.rs`, the smallest complete app:
+`apps/template/main.rs`, the smallest complete app (in a project of your own it is `src/lib.rs`,
+without `#![no_main]` and with `use jflib::{style, ui};`, as the template has it):
 
 ```rust
 #![no_std]

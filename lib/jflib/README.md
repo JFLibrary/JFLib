@@ -46,6 +46,13 @@ to `Cargo.toml`).
 
 Names come from the crate in code: `use jflib::{style, ui};`, then `ui::Ui`, `plat::read_file`.
 
+**The app is `src/lib.rs`.** Code from an example (the repository's README, `docs/GUIDE.md`) goes
+there. A program in one `src/main.rs` of its own, a project from `cargo new` say, needs
+`#![no_main]` under `#![no_std]` (JFLib brings its own entry point instead of Rust's `main`), a
+`build.rs` with `jflib_build::app()`, `jflib-build` in the version of `jflib` under
+`[build-dependencies]`, and the profiles below. Without them the build stops at `ui::main!` with a
+message that names what is missing.
+
 ## Apps with std
 
 JFLib is `no_std` and brings everything an app needs from one hand. Write apps `no_std` as well

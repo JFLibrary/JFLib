@@ -325,6 +325,18 @@ pub use value::{cvtd, deg_atan2, deg_sincos, grad_at, part_id, px_mix, RangeF, T
 /// nor `#![no_main]`.  In a library crate (the template's app) that `fn main` stays unused and
 /// the program's own calls `jflib::plat::std_start()`.
 ///
+/// Without std it says what a program of its own lacks, for the code of an example put into
+/// `src/main.rs` of a `cargo new` project (README.md, "A window with a click counter"):
+/// - a program built by Cargo (`CARGO_BIN_NAME`) without JFLib's build script (jflib_build, which
+///   always hands over `JFGUI_APP`): it would not link, so the build stops with a message that
+///   names the build script, `jflib-build` and `#![no_main]`.  Not in a library crate (the
+///   template's app: its program's build script links it), its unit tests or a program rustc
+///   builds without Cargo;
+/// - `#![no_main]`: a `main` that Rust's entry point would take (imported from a module of the
+///   macro, so an app's own `fn main` beside it wins without a clash) makes rustc say "using `fn
+///   main` requires the standard library" with "use `#![no_main]`", not "`main` function not
+///   found".  With `#![no_main]` or in a library crate it stays unused.
+///
 /// The unit tests of the crate that holds it (the template's app with std, `cargo test --lib`)
 /// need no `test_main!`: this `jfgui_main` links their test binary (never called there), and the
 /// panic check leaves the test build out (`cfg(test)`: Cargo builds tests with unwind whatever the
@@ -335,6 +347,16 @@ pub use value::{cvtd, deg_atan2, deg_sincos, grad_at, part_id, px_mix, RangeF, T
 macro_rules! main {
     ($body:expr) => {
         $crate::__jfgui_main!($body);
+        #[cfg(not(test))]
+        const _: () = if ::core::option_env!("CARGO_BIN_NAME").is_some() && ::core::option_env!("JFGUI_APP").is_none() {
+            ::core::panic!("JFLib's build script did not run for this program. An app from `cargo jflib new NAME` has all it needs (the app in src/lib.rs). A program in src/main.rs of its own needs #![no_main] under #![no_std], a build.rs with `fn main() {{ jflib_build::app(); }}` and jflib-build (the version of jflib) under [build-dependencies] in Cargo.toml");
+        };
+        mod __jfgui_entry {
+            #[allow(dead_code)]
+            pub(super) fn main() {}
+        }
+        #[allow(unused_imports)]
+        use __jfgui_entry::*;
     };
 }
 

@@ -18,6 +18,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 ### Changed
 
 - `fx::sqrt_portable`: the correctly rounded binary64 square root from f64 operations and one 64 x 64 bit product (Newton's method, then an integer test picks the neighbour), with the bits of `sqrtsd` for every input, NaN included, on every target (lib/physics and lib/geom had a copy each and use this one now). Where the processor's root is not used (the browser, the x86-64 Android emulator) `fx::sqrtd` is this function now instead of the bit-by-bit integer root: the same bits, several times faster (docs/PHYSICS.md, Messwerte)
+- Without std `rt::main!` says what a program in `src/main.rs` of its own lacks (an example copied into a `cargo new` project): built by Cargo without JFLib's build script (no `JFGUI_APP`, which `jflib_build` always hands over) the build stops at the macro with a message that names `build.rs` with `jflib_build::console()`, `jflib-build` under `[build-dependencies]` and `#![no_main]`, where it ended in a link error before; without `#![no_main]` rustc says "using `fn main` requires the standard library" with "use `#![no_main]`" in place of E0601 ("`main` function not found"), through a `main` the macro imports from a module of its own (an app's own `fn main` beside the macro wins without a clash, with `#![no_main]` it stays unused). Library crates, unit tests and programs rustc builds without Cargo are not checked
 
 ### Fixed
 
