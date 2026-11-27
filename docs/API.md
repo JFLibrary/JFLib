@@ -62911,8 +62911,8 @@ patterns, and line ends drawn by JFDiagrammer itself
   PALETTE[i]                      the colours of index 0 .. 23 (the document's Colors table
                                   comes first)
   dash(pattern) -> &[f64]         LinePattern 2 .. 23 in multiples of the line's weight
-  fill_pattern(p) -> FillKind     FillPattern 2 .. 24 as hatches, 25 .. 40 as the old
-                                  two-colour gradients
+  fill_pattern(p) -> FillKind     FillPattern 2 .. 24 as Visio draws them (hatches, dot
+                                  patterns as a tint), 25 .. 40 as the old two-colour gradients
   arrow(kind, size, weight)       BeginArrow / EndArrow 1 .. 45 with the size 0 (very small)
                                   .. 6 (colossal): JFDiagrammer's own line ends, pointing to
                                   +x with the tip at the origin, and how far the line stops
@@ -62940,6 +62940,7 @@ PALETTE: [u32; 24] = [ 0x000000, 0xFFFFFF, 0xFF0000, 0x00FF00, 0x0000FF, 0xFFF .
   - `Solid`
   - `Hatch(&'static [(f64, f64)])` -- lines in the foreground colour over the background colour: up to two families (angle in
     degrees, spacing in inches)
+  - `Tint(f64)` -- a dot pattern too fine to draw: the foreground's share (0 .. 1) mixed over the background
   - `Legacy(Legacy)` -- the old gradients from the foreground to the background colour
 
 - **`enum Legacy`**
@@ -62949,6 +62950,10 @@ PALETTE: [u32; 24] = [ 0x000000, 0xFFFFFF, 0xFF0000, 0x00FF00, 0x0000FF, 0xFFF .
   - `Radial(f64, f64)` -- from a point of the box (fractions, 0..1) outwards
 
 - **`fn fill_pattern(p: u32) -> FillKind`**
+  FillPattern 2 .. 24 as Visio draws them (JD26 Visio check: its SVG export holds each as an
+  8 x 8 bitmap tiled every 6 pt, a pixel 1/96 inch): the line patterns as hatches with Visio's
+  directions and spacings (hatch lines are a pixel wide), the dot patterns as their share of the
+  foreground over the background; 25 .. 40 the old gradients (36 .. 39 from the corners)
 
 - **`struct Arrow`**
   a line end in its own space: the tip at the origin, the line coming in from -x

@@ -816,6 +816,12 @@ impl<'d, 'm> Builder<'d, 'm> {
                     self.push_fill(r, Role::Shape, fill.clone(), Paint::Solid(fg));
                 }
             }
+            style::FillKind::Tint(k) => {
+                let c = mix(bg, fg, k);
+                if c >> 24 != 0 {
+                    self.push_fill(r, Role::Shape, fill.clone(), Paint::Solid(c));
+                }
+            }
             style::FillKind::Hatch(fams) => {
                 if bg >> 24 != 0 {
                     self.push_fill(r, Role::Shape, fill.clone(), Paint::Solid(bg));

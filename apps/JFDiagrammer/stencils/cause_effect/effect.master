@@ -45,11 +45,13 @@ TxtLocPinY = TxtHeight*0.5
 BeginArrow = 0
 EndArrow = 0
 # Linie, Füllung und Text aus der Verbinder-Liste des Designs (QuickStyleType 3, ausdrücklich:
-# Visio wählt sonst nach der Art des Shapes); Füll- und Schriftstil der Variante wie Normal (100)
-# statt Stil 1 aus Connector
+# Visio wählt sonst nach der Art des Shapes); Linie, Füll- und Schriftstil der Variante wie
+# Normal (100) statt Stil 1 aus Connector, alle drei ausdrücklich: Visio nimmt die
+# Schnellformatzellen aus der Füll-Formatvorlage, JFDiagrammer die Linie aus der Linien-Formatvorlage
 QuickStyleType = 3
 QuickStyleFillMatrix = 100
 QuickStyleFontMatrix = 100
+QuickStyleLineMatrix = 100
 
 [User]
 # die Breite des Kopfs, das Ende der Gräte (Anfang der Spitze), die Länge der Spitze

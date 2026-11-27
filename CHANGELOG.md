@@ -473,6 +473,9 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **netio:** TLS: a handshake message longer than a record (a certificate chain of over 16 KiB) goes in several records (RFC 8446 5.1); it went in one record, which the peer refused (record_overflow)
 - **crypto:** `rsa::PrivateKey::iqmp` of a key whose q has more 64-bit words than p: q is reduced mod p first; the words above p's length were dropped, and the coefficient a key file keeps was wrong
 - **plat:** iOS: a change of dark mode, contrast, motion or text size while the app ran never reached it (no E_SETTINGS): the host now marks the app as started when UIKit takes over
+- **JFDiagrammer:** (JD26 Visio check) The general and business-graphics stencils draw in Visio as in JFDiagrammer: lines of `style: Connector` with `QuickStyleType 3` set `QuickStyleLineMatrix 2` (Visio takes the quick style cells from the fill style and has no dk2 in its line lists: it drew them in the variant colour, JFDiagrammer in slate); the fishbone's categories and effect take the variant's line (100, bold and dark in both), a category draws its box first (the design's arrowhead goes on the end of the last path, so it sits on the bone in both), Primary cause 1 has `QuickStyleType 3` like its siblings; fourteen 1-D masters of the style Normal (block arrows, flexible arrows, bus, circle from centre) have `QuickStyleType 2` (Visio drew a 1-D shape of type 0 from the connector list: grey with a dark line)
+- **diagram_io:** (JD26 Visio check) The stencil tool writes a text block whole: a master or part that sets some of its six cells gets the others as the shape's box (Visio reads a missing one as 0)
+- **diagram_core:** (JD26 Visio check) Fill patterns 2 .. 24 drawn as Visio draws them (its 8 x 8 bitmaps: directions and spacings of the hatches, the dot patterns as a tint), patterns 36 .. 39 from the corners
 
 ### Security
 
