@@ -148,7 +148,11 @@ pub fn parse(f: &str) -> Vec<(u32, Vec<u32>)> {
             }
             j += 1;
         }
-        let args = &f[start..j.saturating_sub(1).max(start)];
+        // closed: j is past the ")"; else the call runs to the end of the text (an open quote
+        // can carry j one past it, and the last letter may be more than one byte)
+        let j = j.min(b.len());
+        let end = if depth == 0 { j - 1 } else { j };
+        let args = &f[start..end.max(start)];
         let mut parts = args.splitn(2, ',');
         let kind = parts.next().and_then(|t| t.trim().parse::<f64>().ok()).filter(|x| *x >= 0.0).map(|x| x as u32);
         if let Some(kind) = kind {

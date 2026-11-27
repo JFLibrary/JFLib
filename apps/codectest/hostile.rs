@@ -14,6 +14,9 @@
 //   jxl_patch_area   20480 patches of 128 x 128 on a 128 x 128 frame
 //   jxr_index        a 16384 x 16384 image with an index table and no tile data (86 bytes)
 //   jxl_rt, jxr_rt   controls: the encoders' files decode (exactly when lossless)
+//   jp2_box64        a JP2 box whose 64-bit size wraps the next box to the start (28 bytes)
+//   jp2_ppm          PPM and PPT segments of length 2 (no Zppm / Zppt)
+//   jp2_cut          a tile-part cut after each byte of its data, that byte made 0xFF
 //
 // --only NAME runs the groups above whose names start with NAME.  (build_rs.py test codectest
 // runs it through tests/hostile.uis; --script is ignored)
@@ -574,6 +577,74 @@ pub fn run(only: Option<&str>) -> i32 {
         let (r, sf) = if e == 0 { jxr_dec(&out, None) } else { (e, Surface::default()) };
         t.check("jxr_rt/lossless", r == 0 && same_pixels(&src, &sf), format!("{} bytes: result {r}, exact", out.len()));
     }
+    // JPEG 2000 (third review): a box whose 64-bit size wrapped the next box in front of the
+    // first went round forever; PPM / PPT segments too short for their Zppm / Zppt sliced past
+    // their end; a tile cut right after a 0xFF of a packet header sliced past the data
+    if t.on("jp2_box64") {
+        let mut d = vec![0, 0, 0, 12, b'j', b'P', b' ', b' ', 0x0D, 0x0A, 0x87, 0x0A];
+        d.extend_from_slice(&1u32.to_be_bytes());
+        d.extend_from_slice(b"jp2h");
+        // 12 + this = 2^64: the next box was at 0 again
+        d.extend_from_slice(&(u64::MAX - 11).to_be_bytes());
+        let (r, us) = jp2_dec(&d);
+        t.check("jp2_box64", r.is_err() && us < QUICK_US, format!("{} bytes: {r:?} in {} ms", d.len(), us / 1000));
+    }
+    if t.on("jp2_ppm") {
+        let (r, _) = jp2_dec(J2K_RGB);
+        t.check("jp2_ppm/control", r.is_ok(), format!("the 8 x 8 codestream: {r:?}"));
+        // in the main header, after SIZ (2 + 2 + 47 bytes): a PPM of length 2
+        let d = insert_at(J2K_RGB, 51, &[0xFF, 0x60, 0x00, 0x02]);
+        let (r, us) = jp2_dec(&d);
+        t.check("jp2_ppm/main", r.is_err() && us < QUICK_US, format!("PPM without Zppm: {r:?}"));
+        // in the tile-part header, after SOT: a PPT of length 2 (Psot four bytes more)
+        let sot = jp2_sot(J2K_RGB);
+        let mut d = insert_at(J2K_RGB, sot + 12, &[0xFF, 0x61, 0x00, 0x02]);
+        let psot = u32::from_be_bytes([d[sot + 6], d[sot + 7], d[sot + 8], d[sot + 9]]) + 4;
+        d[sot + 6..sot + 10].copy_from_slice(&psot.to_be_bytes());
+        let (r, us) = jp2_dec(&d);
+        t.check("jp2_ppm/tile", r.is_err() && us < QUICK_US, format!("PPT without Zppt: {r:?}"));
+    }
+    if t.on("jp2_cut") {
+        // the tile-part cut after each byte of its data, that byte made 0xFF (Psot follows the
+        // cut, EOC after it): every one decodes or is refused, none panics
+        let sot = jp2_sot(J2K_RGB);
+        let psot = u32::from_be_bytes([J2K_RGB[sot + 6], J2K_RGB[sot + 7], J2K_RGB[sot + 8], J2K_RGB[sot + 9]]) as usize;
+        let (mut done, mut slowest) = (0, 0);
+        for k in sot + 14..sot + psot {
+            let mut d = J2K_RGB[..=k].to_vec();
+            d[k] = 0xFF;
+            d[sot + 6..sot + 10].copy_from_slice(&((k + 1 - sot) as u32).to_be_bytes());
+            d.extend_from_slice(&[0xFF, 0xD9]);
+            let (_, us) = jp2_dec(&d);
+            slowest = slowest.max(us);
+            done += 1;
+        }
+        t.check("jp2_cut", done == psot - 14 && slowest < QUICK_US, format!("{done} cut tiles, the slowest in {} ms", slowest / 1000));
+    }
     plat::write_stdout(format!("hostile: {} of {} checks passed\n", t.ok, t.ok + t.failed).as_bytes());
     if t.failed != 0 { 1 } else { 0 }
 }
+
+/// a JPEG 2000 decode: what came out, in microseconds
+fn jp2_dec(d: &[u8]) -> (Result<(), img_jp2::Error>, u64) {
+    let t0 = plat::time_us();
+    let r = img_jp2::decode(d, &img_jp2::Options::default()).map(|_| ());
+    (r, plat::time_us().wrapping_sub(t0))
+}
+
+/// where the first SOT marker of a codestream is
+fn jp2_sot(d: &[u8]) -> usize {
+    d.windows(2).position(|w| w == [0xFF, 0x90]).unwrap_or(0)
+}
+
+/// `d` with `ins` put in at `at`
+fn insert_at(d: &[u8], at: usize, ins: &[u8]) -> Vec<u8> {
+    let mut v = d[..at].to_vec();
+    v.extend_from_slice(ins);
+    v.extend_from_slice(&d[at..]);
+    v
+}
+
+// an 8 x 8 RGB codestream, lossless, one tile (the same as apps/pdftest/src/rdraw.rs J2K_RGB: Pillow
+// with OpenJPEG 2.5, `python tools/jp2_check.py --fixtures`)
+const J2K_RGB: &[u8] = &[0xFF, 0x4F, 0xFF, 0x51, 0x00, 0x2F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x07, 0x01, 0x01, 0x07, 0x01, 0x01, 0x07, 0x01, 0x01, 0xFF, 0x52, 0x00, 0x0C, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x04, 0x04, 0x00, 0x01, 0xFF, 0x5C, 0x00, 0x07, 0x40, 0x40, 0x48, 0x48, 0x50, 0xFF, 0x64, 0x00, 0x25, 0x00, 0x01, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x64, 0x20, 0x62, 0x79, 0x20, 0x4F, 0x70, 0x65, 0x6E, 0x4A, 0x50, 0x45, 0x47, 0x20, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6F, 0x6E, 0x20, 0x32, 0x2E, 0x35, 0x2E, 0x34, 0xFF, 0x90, 0x00, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x5D, 0x00, 0x01, 0xFF, 0x93, 0xCF, 0xB4, 0x3C, 0x10, 0xCC, 0x4E, 0x0C, 0x04, 0xEC, 0x3D, 0x61, 0xE6, 0x13, 0x9C, 0x5C, 0x52, 0x33, 0x0F, 0xCF, 0xB4, 0x38, 0x06, 0x31, 0x3A, 0xE1, 0xF6, 0xBC, 0x75, 0x91, 0x87, 0x01, 0xE9, 0x44, 0x92, 0x7F, 0xCF, 0xB4, 0x38, 0x13, 0x8C, 0x45, 0x30, 0x14, 0x4D, 0x30, 0x11, 0x36, 0x09, 0x0C, 0x00, 0x02, 0x9F, 0xA3, 0xED, 0x05, 0x00, 0x0C, 0x78, 0x3B, 0x2E, 0x9F, 0xA1, 0xF5, 0x02, 0x80, 0x0F, 0x27, 0x97, 0x3C, 0x5B, 0xA1, 0xF5, 0x02, 0x80, 0x0F, 0x27, 0xA7, 0x14, 0x7F, 0xFF, 0xD9];

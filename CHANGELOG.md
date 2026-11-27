@@ -495,6 +495,13 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** Scripts: a `gpu on` after `gpu off` left its new windows at 320 x 240 (the size asked of the closed ones stayed), so every GPU check after it was only "the system keeps the window at another size (no result)": diagramtest's gpu_canvas.uis checked nothing of its switches (`jfgui_GPU_CANVAS_PAN`, `jfgui_GPU_CANVAS_CPU`, `jfgui_GPU_CANVAS`), Kritzel's nothing of `jfgui_GPU_CANVAS_ZOOM`; `gpu off` forgets that size with its windows
 - **tests:** uigputest: viewplain.uis's veils on the screen failed on Windows where an overlay that takes no clicks (Discord's, the GPU driver's) drew over the window, which the hit test passes through: when the window as the system composes it (plat::win_test_composed) equals the CPU's picture, that is a note now, as for gpu expect screen
 - **pdf:** Drawing pages: a soft mask takes the place of the image's `Mask` (ISO 32000-1, Table 89): `SMask` and the opacity channel of a JPEG 2000 image (`SMaskInData`), which stands for it; before, a colour key or stencil mask was applied as well
+- **diagram_core:** A cell with `SETATREF()` (no reference), a cut-off `DEPENDSON(` in a Relationships cell and a spline or NURBS degree from the file (`NURBS(1,1e12,0,0)`) no longer crash or ask for terabytes; a formula more than 512 operators deep (`1+1+1+...`) is too complex, its evaluation overflowed the stack
+- **img_jp2:** Tile-part and PPM lengths saturate: on 32-bit targets a tile-part length near 2^32 wrapped in front of the part (the parts went round forever) and a PPM length could slice backwards
+- **compress:** Brotli: compressing text with dictionary words of 4 to 8 letters no longer subtracts past zero (a panic where overflow checks are on, as in the debug builds of apps)
+- **diagram_io:** VSS: a formula block whose length wraps on 32-bit targets ends its row instead of panicking or looping
+- **cas:** `Folder`: a pack name whose first two bytes are not whole letters is refused instead of panicking
+- **game:** net: a count of 0xFFFFFFFF in a peer's inputs or events no longer overflows on 32-bit targets
+- **pdf:** PostScript calculator functions: `bitshift` by -2^63 shifts everything out (its negation overflowed)
 
 ### Security
 

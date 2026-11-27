@@ -245,13 +245,16 @@ fn render_color(t: &mut T) {
               /V [/Separation /Sampled /DeviceRGB 14 0 R] \
               /L [/Lab << /WhitePoint [0.9505 1 1.089] /Range [-100 100 -100 100] >>] /C [/CalRGB << /WhitePoint [0.9505 1 1.089] /Matrix [0.4124 0.2126 0.0193 0.3576 0.7152 0.1192 0.1805 0.0722 0.9505] >>] \
               /G [/CalGray << /WhitePoint [0.9505 1 1.089] /Gamma 2.2 >>] /None [/Separation /None /DeviceGray << /FunctionType 2 /Domain [0 1] /C0 [1] /C1 [0] /N 1 >>] \
-              /All [/Separation /All /DeviceGray << /FunctionType 2 /Domain [0 1] /C0 [1] /C1 [0] /N 1 >>] >>";
+              /All [/Separation /All /DeviceGray << /FunctionType 2 /Domain [0 1] /C0 [1] /C1 [0] /N 1 >>] \
+              /W [/Separation /Shift /DeviceGray 15 0 R] >>";
     let extra = vec![
         (10, stream("/FunctionType 4 /Domain [0 1] /Range [0 1 0 1 0 1]", b"{ dup dup }")),
         (11, stream("/FunctionType 4 /Domain [0 1] /Range [0 1 0 1 0 1]", b"{ 0.5 gt { 1 0 0 } { 0 0 1 } ifelse }")),
         (12, stream("/FunctionType 4 /Domain [0 1] /Range [0 1]", b"{ 4 mul cvi 2 mod dup 0 eq { pop 1 } { pop 0 } ifelse }")),
         (13, stream("/FunctionType 4 /Domain [0 1 0 1] /Range [0 1 0 1 0 1]", b"{ exch 2 copy add 2 div 3 1 roll exch 3 -1 roll }")),
         (14, stream("/FunctionType 0 /Domain [0 1] /Range [0 1 0 1 0 1] /Size [3] /BitsPerSample 8", &[255, 0, 0, 0, 255, 0, 0, 0, 255])),
+        // a shift by -2^63 (as i64): -s overflowed (third review); it shifts everything out
+        (15, stream("/FunctionType 4 /Domain [0 1] /Range [0 1]", b"{ pop 256 -9223372036854775807 bitshift }")),
     ];
     for (op, want, tol) in [
         ("/I cs 1 sc", BLUE, 0),
@@ -269,6 +272,7 @@ fn render_color(t: &mut T) {
         ("/U cs 0.75 scn", [128, 128, 128], 1),
         ("/V cs 0.5 scn", GREEN, 0),
         ("/V cs 0.25 scn", [128, 128, 0], 1),
+        ("/W cs 0.5 scn", BLACK, 0),
         ("/L cs 100 0 0 scn", WHITE, 2),
         ("/L cs 0 0 0 scn", BLACK, 2),
         ("/C cs 1 0 0 scn", RED, 3),
