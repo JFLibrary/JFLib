@@ -48,7 +48,8 @@ visDGDefaultPos:  Value = 0
 visDGStackHeight:  Value = 0
 # die Beschriftung: [Default] ist die Bezeichnung des Datenfelds (SortKey von msvCalloutField)
 L:  Value = IF(STRSAME(Prop.msvCalloutPropLabel,"[Default]"),Prop.msvCalloutField.SortKey,Prop.msvCalloutPropLabel)
-V:  Value = IF(Prop.msvCalloutPropShowValue,FORMAT(Prop.msvCalloutField,Prop.msvCalloutPropValueFormat),"")
+# ohne eigenes Format esc(0), Visios FIELDPICTURE(0): Visios FORMAT(x,"") ist leer (Visio-Gegenprobe JD19)
+V:  Value = IF(Prop.msvCalloutPropShowValue,FORMATEX(Prop.msvCalloutField,IF(STRSAME(Prop.msvCalloutPropValueFormat,""),"esc(0)",Prop.msvCalloutPropValueFormat)),"")
 # die Lage der Beschriftung: 0 keine, 1 links, 2 rechts, 3 darüber, 4 darunter
 P:  Value = LOOKUP(Prop.msvCalloutPropLabelPosition,"Not Shown;Left of Value;Right of Value;Above Value;Below Value")
 
@@ -100,7 +101,7 @@ msvCalloutPropFill:  Type = 1; Value = "None"; Prompt = "List"; Format = "None;F
 Row  Size = 8 pt
 
 [Field]
-Row  Value = IF(User.P=1,User.L&": "&User.V,IF(User.P=2,User.V&" "&User.L,IF(User.P=3,User.L&CHAR(10)&User.V,IF(User.P=4,User.V&CHAR(10)&User.L,User.V)))); Type = 0
+Row  Value = IF(User.P=1,User.L&": "&User.V,IF(User.P=2,User.V&" "&User.L,IF(User.P=3,User.L&CHAR(10)&User.V,IF(User.P=4,User.V&CHAR(10)&User.L,User.V)))); Format = "esc(0)"; Type = 0
 
 # der Kasten: Linie nur mit Rahmen Outline, Füllung nur mit Filled
 [Geometry]

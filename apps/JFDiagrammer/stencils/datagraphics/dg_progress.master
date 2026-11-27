@@ -89,7 +89,8 @@ msvCalloutPropValueFormat:  Type = 0; Value = ""; Prompt = "Format"
 Row  Size = 7 pt
 
 [Field]
-Row  Value = IF(Prop.msvCalloutPropShowValue,FORMAT(Prop.msvCalloutField,Prop.msvCalloutPropValueFormat),""); Type = 0
+# ohne eigenes Format esc(0), Visios FIELDPICTURE(0): Visios FORMAT(x,"") ist leer (Visio-Gegenprobe JD19)
+Row  Value = IF(Prop.msvCalloutPropShowValue,FORMATEX(Prop.msvCalloutField,IF(STRSAME(Prop.msvCalloutPropValueFormat,""),"esc(0)",Prop.msvCalloutPropValueFormat)),""); Format = "esc(0)"; Type = 0
 
 # der Rahmen
 [Geometry]
