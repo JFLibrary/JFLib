@@ -770,6 +770,47 @@ fn host_objects(c: &mut Ctx) {
     c.check(json_has(&r, "{\"file\": \"lib/warnt.jfs\", \"line\": 2, \"col\": 28, \"message\": \"mesh hat keine Methode flatt"), || "ls warning in the report".into());
 }
 
+/// (S3) named arguments through the description: to functions and methods (in any order, the left-out ones at
+/// their defaults, the form chosen by the names), a wrong name with the closest one and a parameter given twice
+/// (a function's before the run, a method's a warning before the run and an error at the call); the removed
+/// geom.move says what to take instead
+fn named_args(c: &mut Ctx) {
+    let src = concat!(
+        "let m = geom.box(1, 1, 1)\n",
+        "assert(geom.box(w: 2, h: 1, d: 3).bounds().size == vec(2, 1, 3) && geom.box(d: 3, w: 2, h: 1).bounds().size == vec(2, 1, 3), \"box\")\n",
+        "assert(geom.cone(1, 2, r_top: 0.5).tris == geom.cone(1, 2, 32, 0.5).tris && geom.sphere(1, rings: 4).tris == geom.sphere(1, 32, 4).tris, \"defaults\")\n",
+        "assert(m.move(x: 1, y: 2, z: 3).bounds().min == m.move(1, 2, 3).bounds().min && m.move(z: 3, x: 1, y: 2).bounds().min == vec(0.5, 2, 2.5), \"move\")\n",
+        "assert(m.move(v: [1, 2, 3]).bounds().min == vec(0.5, 2, 2.5) && m.bevel(0.1, segments: 3).tris == m.bevel(0.1, 3).tris, \"forms\")\n",
+        "assert(vec(x: 1, y: 2, z: 3) == vec(1, 2, 3) && vec(v: [1, 2, 3]) == vec(1, 2, 3) && vec(1, 2, 3).lerp(other: [3, 2, 1], t: 0.5) == vec(2, 2, 2), \"vec\")\n",
+        "assert(geom.merge(meshes: [m, m.move(3, 0, 0)]).tris == 24 && vec.add(a: [1, 2], b: [3, 4])[1] == 6, \"lists\")\n",
+        "model.add(m, name: \"deckel\")\n",
+        "model.expect_size(y: 1)\n",
+    );
+    let (r, text) = script_run(src, &[]);
+    let part = r.model.parts.first();
+    let e = r.model.expects.first();
+    c.check(r.ok() && r.warnings.is_empty(), || format!("named arguments: {text} {:?}", r.warnings));
+    c.check(part.is_some_and(|p| p.name == "deckel" && r.model.materials[p.material].name == "grau"), || format!("model.add(m, name:): {:?}", part.map(|p| &p.name)));
+    c.check(e.is_some_and(|e| e.size[0].is_nan() && e.size[1] == 1.0 && e.size[2].is_nan() && e.tolerance == 0.001), || format!("model.expect_size(y:): {:?}", e.map(|e| e.size)));
+    // a name the function does not take: an error before the run, with the closest name; given twice
+    for (src, want) in [
+        ("model.add(geom.cone(r: 1, h: 2, segmens: 8))\n", "test.jfs:1:33: Fehler: geom.cone hat keinen Parameter segmens – meinst du segments?"),
+        ("model.add(geom.box(1, w: 2, h: 1, d: 1))\n", "test.jfs:1:23: Fehler: geom.box: der Parameter w hat schon ein Argument"),
+        ("model.add(geom.box(w: 1, w: 2, h: 1, d: 1))\n", "test.jfs:1:26: Fehler: Das benannte Argument w kommt zweimal vor"),
+    ] {
+        let (r, text) = script_run(src, &[]);
+        c.check(!r.ok() && r.output.is_empty() && text.starts_with(want), || format!("{:?}: wanted {want}, got: {text}", src));
+    }
+    // a method's: a warning before the run and the same text thrown at the call (catchable); geom.move
+    let src = "let m = geom.box(1, 1, 1)\nlet e = []\nfor f in [fn() { m.bevel(widht: 0.1) }, fn() { m.move(1, x: 2) }, fn() { geom.move(m, 1, 0, 0) }] {\n  try { f() } catch x { e.push(x) }\n}\nprint(e.join(\"|\"))\nmodel.add(m)\n";
+    let (r, text) = script_run(src, &[]);
+    let want = ["mesh.bevel hat keinen Parameter widht – meinst du width?", "mesh.move: der Parameter x hat schon ein Argument", "geom.move wurde entfernt – nimm m.move"];
+    let got: Vec<&str> = r.output.trim_end().split('|').collect();
+    let warned: Vec<String> = r.warnings.iter().map(|w| format!("{}:{}: {}", w.line, w.col, w.msg)).collect();
+    c.check(r.ok() && got == want, || format!("method names: {text} {:?}", got));
+    c.check(warned == [format!("3:26: {}", want[0]), format!("3:58: {}", want[1]), format!("3:79: {}", want[2])], || format!("method names, warnings: {:?}", warned));
+}
+
 fn script(c: &mut Ctx) {
     // a good script: parts, materials, expectations met
     let (r, text) = script_run(
@@ -882,37 +923,61 @@ fn script(c: &mut Ctx) {
         "geom.sphere(r: float, segments: int = 32, rings: int = segments / 2): mesh",
         "geom.sweep(profile: list, path: list, closed: bool = false, smooth: float = 30): mesh",
         "geom.difference(m: mesh, ...cuts: mesh): mesh",
-        "m.bevel(width: float, segments: int = 1, axis: str = nil): mesh",
+        "m.bevel(width: float, segments: int = 1, axis?: str): mesh",
         "m.radial(count: int, step: float = 360 / count): mesh",
         "m.tris: int, nur lesbar",
         "profile.arc(r: float, start: float, end: float, n: int = 16): list",
         "model.budget(triangles: int): nil",
-        "model.expect_size(x: float, y: float, z: float, tolerance: float = 0.001): nil",
+        "model.expect_size(x?: float, y?: float, z?: float, tolerance: float = 0.001): nil",
         "vec(x: float, y: float, z: float): vec",
         "v.x: float, nur lesbar",
         "v.normalized(): vec",
         "float * vec: vec",
         "-vec: vec",
         "Materialien: grau, weiss",
+        // (S3) the forms, unions and parameters that may be left out
+        "vec(v: vec | list): vec",
+        "m.move(v: vec | list): mesh",
+        "m.scale(s: float): mesh",
+        "geom.difference(meshes: list<mesh>): mesh",
+        "model.add(m: mesh, material: str | map = \"grau\", name?: str): int",
+        "model.expect_size(size: vec | list, tolerance: float = 0.001): nil",
+        "vec.add(a: list, b: list): list",
+        "v.dot(other: vec | list): float",
+        "m.bounds(): map | nil",
     ] {
         c.check(text.contains(want), || format!("--api lacks {want}"));
     }
     let german = ["segmente", "r_oben", "ringe", "seiten", "stufen", "staerke", "profil", "tiefe", "grundriss", "pfad", "geschlossen", "glatt", "grad", "toleranz", "anzahl", "schritt", "breite", "hoehe", "achse", "dreiecke", "meter", "von", "bis", "abzug", "abzug1"];
-    let mut sigs: Vec<(String, &script::api::Sig)> = api.globals.iter().filter_map(|g| match &g.kind {
+    // every function and method with its forms (S3: one signature per form)
+    let mut sigs: Vec<(String, Vec<&script::api::Sig>)> = Vec::new();
+    let funcs = api.globals.iter().filter_map(|g| match &g.kind {
         script::api::GlobalKind::Func(s) => Some((g.name.clone(), s)),
         _ => None,
-    }).collect();
-    for t in &api.types {
-        sigs.extend(t.methods.iter().map(|m| (format!("{}.{}", t.name, m.name), &m.sig)));
+    });
+    // (as --api names them, m.dot apart from the function vec.dot)
+    let methods = api.types.iter().flat_map(|t| t.methods.iter().map(move |m| (format!("{}.{}", &t.name[..1], m.name), &m.sig)));
+    for (name, s) in funcs.chain(methods) {
+        match sigs.iter_mut().find(|x| x.0 == name) {
+            Some(x) => x.1.push(s),
+            None => sigs.push((name, vec![s])),
+        }
     }
-    c.check(sigs.len() == 65, || format!("{} functions and methods", sigs.len()));
-    for (name, sig) in &sigs {
-        let params = sig.params.iter().map(|p| p.name.as_str()).collect::<Vec<_>>().join(", ");
-        let old: Vec<&&str> = german.iter().filter(|g| sig.params.iter().any(|p| p.name == **g)).collect();
-        c.check(old.is_empty(), || format!("--api: {}({}) has German names {:?}", name, params, old));
+    let forms: usize = sigs.iter().map(|x| x.1.len()).sum();
+    c.check(sigs.len() == 65 && forms == 82, || format!("{} functions and methods, {} forms", sigs.len(), forms));
+    for (name, forms) in &sigs {
+        for sig in forms {
+            let params = sig.params.iter().map(|p| p.name.as_str()).collect::<Vec<_>>().join(", ");
+            let old: Vec<&&str> = german.iter().filter(|g| sig.params.iter().any(|p| p.name == **g)).collect();
+            c.check(old.is_empty(), || format!("--api: {}({}) has German names {:?}", name, params, old));
+        }
         let variadic = matches!(name.as_str(), "geom.merge" | "geom.union" | "geom.difference" | "geom.intersection");
-        c.check(crate::host::max_args(sig).is_none() == variadic, || format!("max_args({}) = {:?}", name, crate::host::max_args(sig)));
+        let most = crate::host::longest(forms).map(|s| s.params.len());
+        c.check(most.is_none() == variadic, || format!("longest({}) = {:?}", name, most));
     }
+    // (S2 removed a mesh's methods as functions geom.NAME(m, ..)) each says what to take instead
+    let gone = api.removed.iter().find(|r| r.name == "geom.move");
+    c.check(api.removed.len() == 20 && gone.is_some_and(|r| r.hint == "m.move"), || format!("removed: {:?}", api.removed));
     // the language services with it (an editor, G7o): after "m." a mesh's members, after "v." a vec's, after "vec."
     // the namespace's functions although vec is a function too; the signature of vec(..)
     let lcx = script::ls::Context::new(&api);
@@ -924,8 +989,9 @@ fn script(c: &mut Ctx) {
     c.check(has(&m, &["tris", "move", "bevel", "bounds"]) && !m.iter().any(|x| x == "keys"), || format!("complete m.: {:?}", m));
     c.check(has(&v, &["x", "z", "length", "normalized"]) && !v.iter().any(|x| x == "tris"), || format!("complete v.: {:?}", v));
     c.check(has(&ns, &["add", "cross", "lerp"]) && ns.len() == 9, || format!("complete vec.: {:?}", ns));
-    let sig = script::ls::signature("let v = vec(1, ", 15, &lcx).map(|s| s.label);
-    c.check(sig.as_deref() == Some("vec(x: float, y: float, z: float): vec"), || format!("signature vec(: {:?}", sig));
+    // (S3: both forms of vec, the one with room for a second argument chosen)
+    let sig = script::ls::signature("let v = vec(1, ", 15, &lcx).map(|s| (s.label, s.forms.len()));
+    c.check(sig == Some((String::from("vec(x: float, y: float, z: float): vec"), 2)), || format!("signature vec(: {:?}", sig));
     // queries (since S2 the points of bounds are vecs, as is the result of vec.* in 3D)
     let (r, text) = script_run(
         "let m = geom.box(2, 1, 1)\nlet b = m.bounds()\nassert(b.size.x == 2 && b.max.y == 1, \"bounds\")\nassert(m.area() == 10 && m.volume() == 2, \"area\")\nassert(m.check().closed && m.tris == 12, \"check\")\nassert(vec.len([3, 4]) == 5 && vec.cross([1, 0, 0], [0, 1, 0]).z == 1, \"vec\")\nassert(profile.area(profile.rect(2, 3)) == 6, \"profile\")\nmodel.add(m.place(0, 1, 0).center().weld().smooth(45).flat())\n",
@@ -933,6 +999,7 @@ fn script(c: &mut Ctx) {
     );
     c.check(r.ok(), || format!("queries: {text}"));
     host_objects(c);
+    named_args(c);
     // Boolean operations and bevels from a script: a wall with a window (a ring: Euler 0), the result turned and
     // cut again (its cells go along), a rounded block
     let (r, text) = script_run(
