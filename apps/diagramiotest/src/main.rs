@@ -33,6 +33,9 @@
 //                                         every master for the Visio counter-check
 //   diagramiotest --write-templates DIR  (JD13) every form of JFDiagrammer's templates as .vstx,
 //                                         metric and US (templates.rs)
+//   diagramiotest --data-dump FILE       (JD18) a file's connections, recordsets, rows, links and
+//                                         conflicts as diagram_io reads them (a check of files
+//                                         Visio wrote; nothing of them goes into the repository)
 //   diagramiotest --write-data DIR [--xlsx PATH]   (JD18) jd18-verknuepft.vsdx: a drawing with
 //                                         linked data for the Visio counter-check (data.rs)
 //   diagramiotest --write-link-fixture DIR   (JD18) jd18-link.vsdx and jd18-link.csv, the fixture
@@ -317,6 +320,10 @@ fn run() -> i32 {
     if let Some(dir) = arg(&args, "--write-link-fixture") {
         // (JD18) the drawing and the text file of JFDiagrammer's data scripts
         return data_fixture::write(&dir);
+    }
+    if let Some(file) = arg(&args, "--data-dump") {
+        // (JD18) the data parts of a file as diagram_io reads them (Visio's own files, locally)
+        return data::dump(&file);
     }
     if let Some(dir) = arg(&args, "--write-data") {
         // (JD18) the drawing with linked data for the Visio counter-check
