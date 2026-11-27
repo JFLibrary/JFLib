@@ -679,21 +679,30 @@ fn piece(r: &mut Rng) -> usize {
     1 + r.below(k)
 }
 
+/// why pump_pieces stopped without the stream: the decoder refused it (or, for a format of one
+/// stream, the input after it), or the output grew past DECODE_LIMIT -- the pump's own limit,
+/// kept apart from a decoder's Error::Limit (zstd's window)
+#[derive(Debug, PartialEq)]
+enum Stop {
+    Dec(compress::stream::Error),
+    Over,
+}
+
 /// a stream decoder fed in pieces of the schedule's sizes, with output buffers of 1 byte to 4
 /// KiB, the way stream::decode_all pumps it (input after a stream goes on with the next
-/// member or frame; a format of one stream refuses it) -> the output, or the error
-fn pump_pieces(dec: &mut dyn compress::stream::Decode, d: &[u8], r: &mut Rng) -> Result<Vec<u8>, compress::stream::Error> {
+/// member or frame; a format of one stream refuses it) -> the output, or why it stopped
+fn pump_pieces(dec: &mut dyn compress::stream::Decode, d: &[u8], r: &mut Rng) -> Result<Vec<u8>, Stop> {
     use compress::stream::{Error, Status};
     let (mut out, mut buf, mut off) = (Vec::new(), vec![0u8; 4096], 0usize);
     for _ in 0..(16 * d.len() + (1 << 16)) {
         let n = piece(r).min(d.len() - off);
         let ob = piece(r).min(buf.len());
-        let s = dec.decode(&d[off..off + n], &mut buf[..ob])?;
+        let s = dec.decode(&d[off..off + n], &mut buf[..ob]).map_err(Stop::Dec)?;
         assert!(s.read <= n && s.written <= ob, "a decoder took or wrote more than it was given: {s:?} of {n} / {ob}");
         off += s.read;
         out.extend_from_slice(&buf[..s.written]);
         if out.len() > DECODE_LIMIT {
-            return Err(Error::Limit);
+            return Err(Stop::Over);
         }
         let eof = off == d.len();
         match s.status {
@@ -701,12 +710,12 @@ fn pump_pieces(dec: &mut dyn compress::stream::Decode, d: &[u8], r: &mut Rng) ->
             Status::Input => {
                 assert!(s.read == n, "Status::Input with input left: {s:?} of {n}");
                 if eof {
-                    dec.finish()?;
+                    dec.finish().map_err(Stop::Dec)?;
                     return Ok(out);
                 }
             }
             Status::End if eof => return Ok(out),
-            Status::End if s.read == 0 && s.written == 0 => return Err(Error::Corrupt),
+            Status::End if s.read == 0 && s.written == 0 => return Err(Stop::Dec(Error::Corrupt)),
             Status::End => {}
         }
     }
@@ -717,15 +726,17 @@ fn pump_pieces(dec: &mut dyn compress::stream::Decode, d: &[u8], r: &mut Rng) ->
 /// -- the same output where one-shot decodes the input (or, in pieces, an error), and the two
 /// schedules alike.  `window_limit`: the stream decoder refuses a window above its memory
 /// limit (zstd: Error::Limit, as the zstd tool does), which one-shot, holding the whole output
-/// anyway, does not need to
+/// anyway, does not need to.  Output past DECODE_LIMIT in pieces where one-shot decodes within
+/// it is a finding, like any other difference
 fn stream_target(new: fn() -> Box<dyn compress::stream::Decode>, oneshot: fn(&[u8], usize) -> Option<Vec<u8>>, window_limit: bool) -> Fun {
     Box::new(move |d: &[u8]| {
         let seed = 0x9E37_79B9_7F4A_7C15 ^ (d.len() as u64) ^ d.iter().take(16).fold(0u64, |h, &b| h.rotate_left(8) ^ b as u64);
         let one = oneshot(d, DECODE_LIMIT);
         let a = pump_pieces(&mut *new(), d, &mut Rng(seed | 1));
         let b = pump_pieces(&mut *new(), d, &mut Rng(seed.rotate_left(17) | 1));
-        if window_limit && one.is_some() && a == Err(compress::stream::Error::Limit) {
-            assert!(b == Err(compress::stream::Error::Limit), "the window limit in one schedule only");
+        let window = Err(Stop::Dec(compress::stream::Error::Limit));
+        if window_limit && one.is_some() && a == window {
+            assert!(b == window, "the window limit in one schedule only");
             return;
         }
         assert!(a.as_ref().ok() == one.as_ref(), "in pieces {:?} bytes, one-shot {:?} bytes", a.as_ref().map(|v| v.len()), one.as_ref().map(|v| v.len()));
@@ -753,7 +764,7 @@ fn encode_pieces(enc: &mut dyn compress::stream::Encode, data: &[u8], r: &mut Rn
             out.extend_from_slice(&buf[..s.written]);
             input = &input[s.read..];
             match s.status {
-                Status::Output => {}
+                Status::Output => assert!(s.written == ob, "Status::Output with room left: {s:?} of {ob}"),
                 Status::Input if flush == Flush::Finish => {}
                 Status::Input => {
                     assert!(input.is_empty(), "Status::Input with input left");
