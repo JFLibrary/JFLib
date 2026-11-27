@@ -478,6 +478,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **diagram_core:** (JD26 Visio check) Fill patterns 2 .. 24 drawn as Visio draws them (its 8 x 8 bitmaps: directions and spacings of the hatches, the dot patterns as a tint), patterns 36 .. 39 from the corners
 - **diagram_io:** (JD26 Visio check) The style Connector of new documents draws in variant colour 7: Visio shows NetLab's connectors slate (variants 1 .. 3) as JFDiagrammer does, not in the variant's blue
 - **JFDiagrammer:** (JD26 Visio check) 25 masters with the design's arrowheads (curved, dotted, wavy, jump, double and single arrowheads, dot and arrow, line with arrow, elbow and curved connectors of Blocks and Connectors; polyline and zigzag arrow) have `QuickStyleType 3`: Visio gives a shape without ObjType 2 the design's arrows only then (each 1-D master of both stencils dropped in Visio 16); the masters that take line 2 or the variant's line from the style Connector keep variant colour 1 (`QuickStyleLineColor 100`)
+- **diagram_io:** (JD26 Visio check) New documents number their styles as Visio does (1 Text Only, 2 None, 3 Normal, 4 Guide, 6 Theme, 7 Connector): Visio renamed ours by number, and its connector tool drew in our drawings in the guide's look
 
 ### Security
 

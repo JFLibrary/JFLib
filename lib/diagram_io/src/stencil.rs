@@ -935,7 +935,7 @@ fn style_id(tx: &Transaction, file: &str, s: &Option<(String, u32)>, line: u32) 
         Some((n, l)) => (n.as_str(), *l),
         None => ("Normal", line),
     };
-    let r = tx.doc().style_by_name_u(name).ok_or_else(|| err(file, at, format!("Formatvorlage „{name}“ gibt es nicht (No Style, Normal, Connector, Guide, Text Only)")))?;
+    let r = tx.doc().style_by_name_u(name).ok_or_else(|| err(file, at, format!("Formatvorlage „{name}“ gibt es nicht (No Style, Text Only, None, Normal, Guide, Theme, Connector)")))?;
     Ok(tx.doc().style(r).map_or(0, |st| st.header.id))
 }
 

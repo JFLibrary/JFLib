@@ -120,7 +120,8 @@ fn new_docs(h: &mut H) {
                 &format!("{name} content"),
                 l.warnings.is_empty()
                     && l.format == Format { kind, macros: false }
-                    && styles.iter().map(|x| x.1.as_str()).collect::<Vec<_>>() == ["No Style", "Theme", "Normal", "Connector", "Guide", "Text Only"]
+                    && styles.iter().map(|x| x.1.as_str()).collect::<Vec<_>>() == ["No Style", "Text Only", "None", "Normal", "Guide", "Theme", "Connector"]
+                    && styles.iter().map(|x| x.0).collect::<Vec<_>>() == [0, 1, 2, 3, 4, 6, 7]
                     && d.page_count() == 1
                     && part_ok
                     && (width - want_w).abs() < 1e-12
