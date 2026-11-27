@@ -25,6 +25,7 @@ another name, not trusted); revoked and incomplete-chain are shown, not counted 
 knows of revocation or fetches differs).  --internet-only runs just these with build/TARGET/coretest (.github/workflows/
 system-trust.yml).  (Hosts of a public test service: a failure there can also mean it changed.)"""
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -200,6 +201,10 @@ def main():
     return 1 if bad else 0
 
 
+# what the network says, not netio's check: tried again (internet_checks)
+NET_FAILURE = re.compile(r"connection reset|connection refused|connection aborted|timed out|^timeout$|unreachable|os error \d+", re.I)
+
+
 def internet_checks(cmd, tag):
     ok_hosts = ["https://www.google.com/", "https://github.com/", "https://tls-v1-2.badssl.com:1012/", "https://rsa2048.badssl.com/",
                 "https://rsa4096.badssl.com/", "https://ecc256.badssl.com/", "https://ecc384.badssl.com/"]
@@ -214,10 +219,17 @@ def internet_checks(cmd, tag):
     info_hosts = ["https://revoked.badssl.com/", "https://incomplete-chain.badssl.com/"]
     bad = 0
     for u in ok_hosts + list(bad_hosts) + info_hosts:
-        try:
-            out = subprocess.run(cmd + ["--tls-web", u], capture_output=True, text=True, timeout=40).stdout.strip()
-        except subprocess.TimeoutExpired:
-            out = "timeout"
+        # the network's failures (a reset, a timeout: badssl.com drops connections now and
+        # then) are tried again, up to three times; a TLS answer never is
+        for pause in (2, 5, 10, None):
+            try:
+                out = subprocess.run(cmd + ["--tls-web", u], capture_output=True, text=True, timeout=40).stdout.strip()
+            except subprocess.TimeoutExpired:
+                out = "timeout"
+            if pause is None or not NET_FAILURE.search(out):
+                break
+            print(f"     [{tag}] {u:42} {out[:80]} -- again in {pause} s")
+            time.sleep(pause)
         if u in info_hosts:
             print(f"info [{tag}] {u:42} {out[:110]}")
             continue
