@@ -33,6 +33,8 @@
 // (from 1), `cmd 909 L` the execution line (0: none), `cmd 910` / `cmd 911` fold / unfold all,
 // `cmd 912 N` a JFS file of N functions (folding and completion on a long file), `cmd 913 L` a
 // debugger's stop at line L: the execution line, shown with ui.code_reveal (the focus stays).
+// JFScript's texts (its diagnostics, the services' details and hovers) follow the UI language
+// (script::set_language, JFScript S3): German or English; headless runs keep German.
 // Fonts: DejaVu Sans Mono (the code editor, mono_font_set; also registered as a family) and
 // DejaVu Serif (registered for the rich text) from lib/doc_view/assets (licence:
 // DejaVu-LICENSE.txt there).
@@ -120,6 +122,8 @@ struct EdTest {
     bps: Vec<(usize, u8)>,
     // the revision the folding ranges belong to
     folds_rev: Option<(u64, usize)>,
+    // the UI language JFScript's texts were last set to (sync_script_language)
+    script_lang: Option<u32>,
 }
 
 /// JFScript's language services for JFS in the code editor
@@ -562,6 +566,19 @@ impl EdTest {
             last_ev: String::from("-"),
             bps: Vec::new(),
             folds_rev: None,
+            script_lang: None,
+        }
+    }
+
+    // JFScript's messages and the texts of its language services (completion, hover, signature help,
+    // "Prüfen", rename) in the UI language: script::set_language holds for the whole process, as the UI
+    // language does, so it follows it at the start and whenever it changes (a jfgui_dev build's inspector
+    // switches it while the app runs); headless runs stay German
+    fn sync_script_language(&mut self) {
+        let lang = i18n::language();
+        if self.script_lang != Some(lang) {
+            self.script_lang = Some(lang);
+            script::set_language(&i18n::language_code());
         }
     }
 
@@ -828,10 +845,12 @@ impl App for EdTest {
             ui.font_register("DejaVu Serif", 700, false, sb as u32);
         }
         self.focus_pending = true;
+        self.sync_script_language();
         true
     }
 
     fn frame(&mut self, ui: &mut Ui) {
+        self.sync_script_language();
         ui.next_size(-1, -1);
         ui.box_begin(0, BOX_V | pad(12), 8);
         let old = self.tab;
