@@ -415,6 +415,13 @@ fn located(app: &mut Diagrammer, ui: &mut Ui, rs: u32, path: &str) {
 // new rows for recordset `rs` (from another file when `path` is given): one undo step
 fn apply(app: &mut Diagrammer, ui: &mut Ui, rs: u32, path: Option<&str>, l: Loaded) {
     let auto = auto_link_on(app);
+    // a key column the source no longer has (renamed, removed): refused, its rows cannot be matched
+    let missing = app.opened.as_ref().map(|o| (data::missing_key(&o.doc, rs, &l.headers), o.doc.recordset(rs).map(|s| s.name.clone()).unwrap_or_default()));
+    if let Some((missing, name)) = missing.filter(|m| !m.0.is_empty()) {
+        app.error = Some((tf("„{}“ lässt sich nicht aktualisieren.", &[&name]), tf("Der Datenquelle fehlt die Schlüsselspalte: {}", &[&missing.join(", ")])));
+        note(app, tf("„{}“ lässt sich nicht aktualisieren.", &[&name]));
+        return;
+    }
     let Some(o) = app.opened.as_mut() else { return };
     let Some(set) = o.doc.recordset(rs).cloned() else { return };
     let moved = match path {

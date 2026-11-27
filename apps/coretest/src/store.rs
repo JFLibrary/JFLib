@@ -511,6 +511,35 @@ fn rekey(t: &mut T) {
     }
     t.check("rekey: in the clear again", Store::open_with(&dir, opts()).is_ok_and(|s| s.count("secrets") == 12) && holds(&dir, b"Geheimnis"));
     rm(&dir);
+    rekey_no_log(t);
+}
+
+/// rekey whose new log cannot start (here a folder has its name): the snapshot under the new
+/// key was written, but the store kept sealing with the old one, so its next open failed under
+/// either key
+fn rekey_no_log(t: &mut T) {
+    let dir = tmp("store-rekey-nolog");
+    let k = [3u8; 32];
+    let block = {
+        let Ok(s) = Store::open_with(&dir, opts()) else { return };
+        for i in 0..3 {
+            let _ = s.put("secrets", &format!("s{}", i), secret_rec(i));
+        }
+        // where the log after the new snapshot would start
+        let block = plat::fs::join(&dir, &format!("wal-{:016x}.log", s.seq() + 1));
+        let _ = plat::fs::mkdir_private(&block);
+        t.check("rekey without a new log: an error", s.rekey(Some(&k)).is_err());
+        t.check("rekey without a new log: still writes", s.put("secrets", "after", secret_rec(9)).is_ok());
+        block
+    };
+    plat::delete(&block);
+    let again = Store::open_encrypted(&dir, opts(), &k);
+    let why = match &again {
+        Ok(s) => format!("{} records", s.count("secrets")),
+        Err(e) => format!("{e:?}"),
+    };
+    t.check(&format!("rekey without a new log: the new key opens everything ({why})"), again.is_ok_and(|s| s.count("secrets") == 4 && s.get("secrets", "after") == Some(secret_rec(9))));
+    rm(&dir);
 }
 
 fn journal_sealed(t: &mut T) {

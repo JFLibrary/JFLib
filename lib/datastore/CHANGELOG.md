@@ -22,6 +22,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 - A torn last log frame whose payload holds the bytes `BCW1` is cut like any torn frame: only a whole valid frame behind a damaged one makes it damaged (a bare magic made the store refuse to open).
 - On Windows, a second compact() with no transaction in between failed with Io (cannot open the log): it opened the log that was open already, and Windows opens a file for writing once. The log that is open is kept now
+- Store::rekey holds the lock until the files under the old key are removed; it let go before: a commit or compact of another thread in between made a newer snapshot and log, which rekey took for old ones and removed (the commits after them lost; on Windows the open log stayed and rekey failed). After the new snapshot the store seals with the new key also when the new log does not start; start_log switches file, name and length together once the file is empty (a failed truncate left the old length beside the new file)
 
 ## [0.2.1] - 2026-11-16
 

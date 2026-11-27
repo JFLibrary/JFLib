@@ -131,13 +131,13 @@ def preview(color):
     return pngutil.png_bytes(w, h, bytes(color + (255,)) * (w * h))
 
 
-def make_setup(stub, out, two_styles=True):
+def make_setup(stub, out, two_styles=True, extra=()):
     """a setup of the stand-in app: styles winui (and classic, translated, the default; then a web
-    browser too)"""
+    browser too); `extra`: more manifest lines"""
     man = [f"app={APP}", f"display={DISPLAY}", "version=1.2.3", "publisher=JFLib Tests",
            f"default={'classic' if two_styles else 'winui'}",
            "desc_winui=Fluent-Design: abgerundete Steuerelemente, Akzentfarbe",
-           "filetypes=chk|application/x-check|Check-Datei|own", f"app_id=org.jflib.{APP}"]
+           "filetypes=chk|application/x-check|Check-Datei|own", f"app_id=org.jflib.{APP}", *extra]
     styles = [("winui", "Windows 11 (WinUI)", WINUI, (40, 120, 200))]
     if two_styles:
         # (and a web browser: the finish page's second option)
@@ -377,6 +377,57 @@ def t_all_users(host, setup2):
     check(gone(c.inst), "all users: uninstall.exe and the folder go")
 
 
+def t_guards(host, setup_mail):
+    """(third review) what an installation for all users must not hand administrator rights or take
+    from others: a folder with other files, a URL scheme another program holds, a shortcut path in
+    install.ini that names another file"""
+    # a folder that already holds a file of somebody else: refused, the file stays
+    c = Case(host, setup_mail, "guard_folder")
+    c.inst.mkdir(parents=True)
+    (c.inst / "version.dll").write_bytes(b"not the setup's")
+    r = c.run(["--quiet", "--all-users", "--dir", host.path(c.inst)], admin=True)
+    check(r.returncode == 1 and not (c.inst / f"{APP}.exe").exists() and (c.inst / "version.dll").exists(),
+          "guards: for all users not into a folder with other files" + out(r))
+    # the app's own installation is fine (an update into the same folder)
+    shutil.rmtree(c.inst)
+    r1 = c.run(["--quiet", "--all-users", "--dir", host.path(c.inst)], admin=True)
+    r2 = c.run(["--quiet", "--all-users", "--dir", host.path(c.inst)], admin=True)
+    check(r1.returncode == 0 and r2.returncode == 0 and (c.inst / f"{APP}.exe").exists(),
+          "guards: for all users again into the app's own folder" + out(r2))
+    c.uninstaller(["--quiet"], admin=True)
+    gone(c.inst)
+    # mailto held by another program: not written, not removed; free: written and removed
+    c = Case(host, setup_mail, "guard_scheme")
+    m = c.shell / "machine"
+    m.mkdir(parents=True)
+    (m / "existing.txt").write_text('Software\\Classes\\mailto|"C:\\Mail\\mail.exe" "%1"\n', encoding="utf-8")
+    log = c.d / "setup.log"
+    r = c.run(["--quiet", "--all-users", "--dir", host.path(c.inst), "--log", host.path(log)], admin=True)
+    assoc = (m / "assoc.txt").read_text(encoding="utf-8") if (m / "assoc.txt").exists() else ""
+    i = ini(c.inst / "install.ini")
+    text = log.read_text(encoding="utf-8") if log.exists() else ""
+    check(r.returncode == 0 and "Software\\Classes\\mailto" not in assoc and f"Software\\Classes\\{APP}.chk" in assoc
+          and "mailto" not in i.get("assoc", "") and "kept: Software\\Classes\\mailto" in text,
+          f"guards: a scheme another program holds is left to it {assoc!r} {i.get('assoc')!r}" + out(r))
+    c.uninstaller(["--quiet"], admin=True)
+    gone(c.inst)
+    c = Case(host, setup_mail, "guard_scheme_free")
+    r = c.run(["--quiet", "--dir", host.path(c.inst)])
+    assoc = (c.shell / "assoc.txt").read_text(encoding="utf-8") if (c.shell / "assoc.txt").exists() else ""
+    check(r.returncode == 0 and "Software\\Classes\\mailto|" in assoc and "T:Software\\Classes\\mailto" in ini(c.inst / "install.ini").get("assoc", ""),
+          "guards: a free scheme is the app's" + out(r))
+    # install.ini's desktop= naming another file: the uninstaller leaves it
+    victim = c.d / "victim.txt"
+    victim.write_bytes(b"keep me")
+    t = (c.inst / "install.ini").read_text(encoding="utf-8")
+    lines = [f"desktop={host.path(victim)}" if l.startswith("desktop=") else l for l in t.splitlines()]
+    (c.inst / "install.ini").write_text("\r\n".join(lines) + "\r\n", encoding="utf-8")
+    r = c.uninstaller(["--quiet"])
+    check(r.returncode == 0 and victim.exists() and not (c.inst / f"{APP}.exe").exists() and not (c.shell / "Programs" / f"{DISPLAY}.lnk").exists(),
+          "guards: the uninstaller deletes only its shortcuts, not a file install.ini names elsewhere" + out(r))
+    gone(c.inst)
+
+
 def t_preselect(host, setup2):
     if not host.wine:
         return skip("preselect", "writes to Program Files: under Wine only")
@@ -414,11 +465,13 @@ def main():
         host.fonts()
     setup2 = make_setup(stub, WORK / "Check_Setup.exe")
     setup1 = make_setup(stub, WORK / "Check1_Setup.exe", two_styles=False)
+    setup_mail = make_setup(stub, WORK / "CheckMail_Setup.exe", two_styles=False, extra=["schemes=mailto"])
     t_pages(host, setup2)
     t_languages(host, setup2, shots)
     t_one_style(host, setup1)
     t_quiet(host, setup2)
     t_all_users(host, setup2)
+    t_guards(host, setup_mail)
     t_preselect(host, setup2)
     if not a.keep:
         for d in WORK.iterdir():

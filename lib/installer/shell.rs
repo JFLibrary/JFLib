@@ -184,6 +184,21 @@ pub(crate) fn sh_reg_delete(app: &str, scope: Scope) -> bool {
     plat::inst::reg_delete_in(scope.root(), &sh_regpath(app))
 }
 
+/// the command of a key that exists in the scope's registry (key\shell\open\command's default
+/// value, "" without one) -> None when the key is missing.  Test mode: the lines "key|command"
+/// of existing.txt in the scope's test folder stand for the keys there  [sh_key_command]
+pub(crate) fn sh_key_command(key: &str, scope: Scope) -> Option<String> {
+    if let Some(t) = sh_testdir(scope) {
+        let text = plat::read_file(&str_cap(&(t + "\\existing.txt"), PATH_CAP))?;
+        let text = String::from_utf8_lossy(&text);
+        return text.lines().find_map(|l| l.split_once('|').filter(|(k, _)| k.eq_ignore_ascii_case(key)).map(|(_, c)| String::from(c)));
+    }
+    if !plat::inst::reg_exists_in(scope.root(), key) {
+        return None;
+    }
+    Some(plat::inst::reg_get_sz_in(scope.root(), &format!("{key}\\shell\\open\\command"), "").unwrap_or_default())
+}
+
 /// write the registry values of the file types and URL schemes (test mode: assoc.txt)
 pub(crate) fn sh_assoc_set(entries: &[(String, String, String)], scope: Scope) {
     if entries.is_empty() {

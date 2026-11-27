@@ -3,6 +3,7 @@
 // app's permissions; the reliable channel there and back (large messages in chunks, in order);
 // netchan's own WebSocket client type against netio's echo server
 
+use alloc::collections::VecDeque;
 use alloc::format;
 use alloc::string::String;
 use alloc::sync::Arc;
@@ -37,15 +38,34 @@ pub struct Seen {
     pub end: Option<Reason>,
 }
 
+/// echoes a server could not send yet (Backlog: a busy machine, the client's link full), with the
+/// server's address: sent in order before newer ones, also by the next pump of that server
+static ECHO: Mutex<VecDeque<(usize, u32, Vec<u8>)>> = Mutex::new(VecDeque::new());
+
 /// poll the server (echoing every message back to its sender) and the clients for `ms`, or until
 /// `done` holds
 pub fn pump(server: &mut Server, clients: &mut [Client], seen: &mut [Seen], ms: u64, done: impl Fn(&[Seen]) -> bool) -> Vec<ServerEvent> {
     let end = plat::time_us() + ms * 1000;
     let mut events = Vec::new();
+    let me = server as *const Server as usize;
     loop {
+        {
+            // (the echo dropped what got Backlog: 1945 of 2000 came back under load)
+            let mut q = ECHO.lock();
+            q.retain(|e| e.0 == me);
+            while let Some((_, id, d)) = q.front() {
+                if server.send(*id, d) == Err(Error::Backlog) {
+                    break;
+                }
+                q.pop_front();
+            }
+        }
         while let Some(e) = server.poll() {
             if let ServerEvent::Message { id, data, .. } = &e {
-                let _ = server.send(*id, data);
+                let mut q = ECHO.lock();
+                if !q.is_empty() || server.send(*id, data) == Err(Error::Backlog) {
+                    q.push_back((me, *id, data.clone()));
+                }
             }
             events.push(e);
         }
@@ -265,6 +285,51 @@ pub fn run_udp(quick: bool) -> Ctx {
     c
 }
 
+/// a server that stops reading (it is not polled: its queue fills, then the sockets), and the
+/// client's reliable chunks past what its WebSocket queues (max_unsent): they were dropped and
+/// counted as sent, the server would have waited for them forever.  The connection ends now
+fn ws_backlog(c: &mut Ctx) {
+    let mut server = Server::new(ServerConfig { max_stream_payload: 256 << 10, ..scfg() });
+    let Ok(wa) = server.listen_ws(&lo4(), "/chan") else {
+        c.check(false, || String::from("ws backlog: listen_ws"));
+        return;
+    };
+    let cfg = ClientConfig { reliable_bytes_per_s: u32::MAX, max_reliable_queued: 64 << 20, ..ccfg() };
+    let Ok(cl) = Client::connect(Endpoint::WebSocket(format!("ws://{}/chan", wa)), cfg) else {
+        c.check(false, || String::from("ws backlog: connect"));
+        return;
+    };
+    let mut cls = [cl];
+    let mut seen = [Seen::default()];
+    pump(&mut server, &mut cls, &mut seen, 3000, |s| s[0].connected || s[0].end.is_some());
+    if !c.check(seen[0].connected, || format!("ws backlog: not connected ({:?})", seen[0].end)) {
+        return;
+    }
+    // more than the server's queue holds, while it is not polled
+    for i in 0..9000u32 {
+        let _ = cls[0].send(&i.to_le_bytes());
+    }
+    // 40 MB on the reliable channel, chunks of 256 KiB at no pace
+    let msg = alloc::vec![5u8; 1_000_000];
+    for _ in 0..40 {
+        if cls[0].send_reliable(&msg).is_err() {
+            break;
+        }
+    }
+    let end = plat::time_us() + 1_000_000;
+    while seen[0].end.is_none() && plat::time_us() < end {
+        while let Some(e) = cls[0].poll() {
+            if let ClientEvent::Disconnected(r) = e {
+                seen[0].end = Some(r);
+            }
+        }
+        plat::sleep_ms(5);
+    }
+    c.check(seen[0].end == Some(Reason::Closed(1011)), || format!("ws backlog: chunks the WebSocket cannot queue end the connection: {:?}", seen[0].end));
+    drop(cls);
+    drop(server);
+}
+
 pub fn run_ws(quick: bool) -> Ctx {
     let mut c = Ctx::new("wschan", quick);
     let n = c.n(2000).max(100);
@@ -327,6 +392,7 @@ pub fn run_ws(quick: bool) -> Ctx {
     c.check(matches!(Client::connect(Endpoint::WebSocket(String::from("ws://example.org/chan")), ccfg()), Err(Error::Net(ref e)) if e.kind == NetErrorKind::Denied), || String::from("ws: example.org is not in the permissions"));
     c.check(matches!(Client::connect(Endpoint::WebSocket(String::from("http://x/")), ccfg()), Err(Error::Url(_))), || String::from("ws: http:// is refused"));
     drop(server);
+    ws_backlog(&mut c);
 
     // netchan's WebSocket against netio's echo server: connect, messages, close
     let log = Arc::new(Mutex::new(Vec::new()));

@@ -276,6 +276,29 @@ fn refresh_by_order() {
 }
 
 #[test]
+fn refresh_without_the_key_column_is_refused() {
+    let mut f = fx();
+    let rs = add(&mut f, &["Gerät"]);
+    let a = f.shapes[0];
+    let mut tx = f.doc.transaction("link");
+    link(&mut tx, a, rs, 1).unwrap();
+    tx.commit();
+    let (rows_before, ip_before) = (f.doc.recordset(rs).unwrap().rows.clone(), value(&f.doc, a, "IP_Adresse"));
+    // the key column renamed in the source, the rows in another order: matched by position, a got
+    // another row's data without a conflict
+    let (mut h, mut rows) = table();
+    h[0] = s("Name");
+    rows.reverse();
+    assert_eq!(missing_key(&f.doc, rs, &h), vec![s("Gerät")]);
+    let mut tx = f.doc.transaction("refresh");
+    assert_eq!(refresh(&mut tx, rs, &h, rows, "now").err(), Some(EditError::Invalid));
+    tx.commit();
+    assert_eq!(f.doc.recordset(rs).unwrap().rows, rows_before);
+    assert_eq!(value(&f.doc, a, "IP_Adresse"), ip_before);
+    assert!(missing_key(&f.doc, rs, &table().0).is_empty());
+}
+
+#[test]
 fn deleted_shapes_lose_their_links_on_refresh() {
     let mut f = fx();
     let rs = add(&mut f, &[]);

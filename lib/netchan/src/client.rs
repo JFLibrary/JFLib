@@ -9,8 +9,9 @@
 //
 // Nothing blocks.  UDP (Windows, Linux, Apple): a thread of its own reads the socket, keeps only
 // the server's datagrams (a bounded queue) and wakes the UI (plat::wake); sends go out at once.
-// WebSocket: netchan::ws (the browser's own, or netio's on threads).  In the browser only
-// Endpoint::WebSocket exists; on Android nothing yet (Unsupported).
+// WebSocket: netchan::ws (the browser's own, or netio's on threads); a packet of the client's own
+// that it cannot queue (max_unsent bytes waiting) ends the connection, Disconnected(Closed(1011)).
+// In the browser only Endpoint::WebSocket exists; on Android nothing yet (Unsupported).
 
 use alloc::string::String;
 
@@ -27,6 +28,10 @@ use core::sync::atomic::{AtomicBool, Ordering};
 /// datagrams the UDP thread keeps until poll takes them
 #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 const UDP_QUEUE: usize = 4096;
+
+/// the close code when the WebSocket cannot take the client's own packets (RFC 6455: an
+/// unexpected condition); Disconnected(Closed(1011)) tells the app
+const CLOSE_BACKLOG: u16 = 1011;
 
 /// where a client connects to
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -160,9 +165,25 @@ impl Client {
                 Io::Udp(u) => {
                     let _ = u.sock.send_to(&b, &u.server);
                 }
-                Io::Ws { ws, .. } => {
-                    let _ = ws.send_binary(&b);
-                }
+                Io::Ws { ws, .. } => match ws.send_binary(&b) {
+                    Ok(()) => {}
+                    // over a stream an ack says that everything before it came: a packet that is
+                    // not sent may not leave a gap (Delivered for it, the server waiting for a
+                    // chunk forever).  One the WebSocket cannot queue (WsOptions::max_unsent
+                    // bytes waiting: the reliable channel, acks, keep-alives) ends the
+                    // connection, as the server ends one that does not take what it is sent
+                    Err(Error::Backlog) => {
+                        ws.close(CLOSE_BACKLOG, "backlog");
+                        self.core.transport_closed(CLOSE_BACKLOG);
+                        while self.core.take_out().is_some() {}
+                        return;
+                    }
+                    // (not open: it is ending, and pump reports how; nothing after it goes out)
+                    Err(_) => {
+                        while self.core.take_out().is_some() {}
+                        return;
+                    }
+                },
             }
         }
     }

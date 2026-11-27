@@ -21,6 +21,12 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 ### Fixed
 
 - The uninstaller deletes uninstall.exe and its folder once it has ended, trying once a second for up to five minutes: it tried once after two seconds, and Windows deletes no running program, so both stayed whenever its last page was open longer (not checked on Windows: Wine deletes running programs). The removal page said the files were being installed
+- A key of the app's own that exists with another program's command (a scheme such as mailto) is neither written nor removed; a setup for all users overwrote the computer's handler and its uninstaller removed the key, for every user (setup.log: kept)
+
+### Security
+
+- An installation for all users puts its folder (and the payload's folders) under the administrators with a DACL of its own (SYSTEM and administrators full, users read and run) and takes only a new, empty or its own folder: in a folder chosen outside Program Files (D:\Apps) users could swap the program or the uninstaller that runs with administrator rights, or put a DLL beside them
+- The uninstaller removes only shortcuts the setup made (a .lnk in the desktop or start menu folder of the scope); it deleted any path install.ini named, with administrator rights for an installation for all users
 
 ## [0.2.1] - 2026-11-16
 
