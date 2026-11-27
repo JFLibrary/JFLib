@@ -322,6 +322,18 @@ Ergänzt mit dem JD26-Probeblatt (vom Nutzer abgenommen, 2026-11-23):
   wenn das Shape eigene Spitzen zeichnet. Linien und Flächen in einem Shape: `line_style:
   Connector`, `fill_style`/`text_style: Normal`, `QuickStyleType = 3`, `QuickStyleFillMatrix` und
   `QuickStyleFontMatrix` 100; oder eine Gruppe mit einem Linien- und einem Flächen-Teil.
+- **Schnellformatzellen ausdrücklich** (Visio-Gegenprobe JD26): Visio nimmt `QuickStyleType` und
+  alle `QuickStyle…Matrix`-Zellen aus der *Füll*-Formatvorlage, JFDiagrammer die Linienmatrix aus
+  der Linien- und die Schriftmatrix aus der Text-Formatvorlage. Wer die Formatvorlagen mischt
+  oder `style: Connector` mit `QuickStyleType = 3` nimmt, setzt `QuickStyleLineMatrix` selbst:
+  reine Linien `2` (Linie 2 der Verbinder-Liste, 1 pt in der Variantenfarbe), Linien mit
+  Flächen wie Normal `100`. Linie 1 der Verbinder-Liste (und Linie 2 der Shape-Liste) von
+  NetLab ist `dk2`; die kennt Visio in Linienlisten nicht und zeichnet dort die Variantenfarbe.
+  Die Pfeilspitze des Designs (`EndArrow` aus Connector) steht am Ende des *letzten* Pfads:
+  eine Linie mit Kasten zeichnet den Kasten zuerst (Kategorie-Gräten).
+- **Textblock ganz oder gar nicht:** Visio liest eine fehlende Zelle eines Textblocks, von dem
+  das Shape eine Zelle hat, als 0 (Breite 0, am linken Rand); das Bauwerkzeug ergänzt deshalb
+  die übrigen der sechs Zellen (`TxtPinX` … `TxtLocPinY`) mit dem Shape-Kasten.
 - **Anzahl aus Shape-Daten** (Ebenen, Stufen, Phasen, Segmente): `Prop.<Name>` (Typ 2) mit Label
   und Prompt in fünf Sprachen, `User.N` begrenzt; Teile oder Abschnitte über N mit `NoShow` und
   `HideText`, deckungsgleich mit dem letzten sichtbaren und darunter. Wo Ziehen Elemente

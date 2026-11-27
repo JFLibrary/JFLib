@@ -73,6 +73,7 @@ style: Connector
 BeginArrow = 0
 EndArrow = 0
 QuickStyleType = 3
+QuickStyleLineMatrix = 2
 
 [Geometry]
 NoFill = TRUE

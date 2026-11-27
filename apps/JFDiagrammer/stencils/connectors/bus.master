@@ -41,6 +41,9 @@ TxtPinX = Width*0.5
 TxtPinY = -TxtHeight*0.5
 TxtLocPinX = TxtWidth*0.5
 TxtLocPinY = TxtHeight*0.5
+# Visio zeichnet ein 1D-Shape mit QuickStyleType 0 aus der Verbinder-Liste des Designs (graue
+# Fläche, dunkle Linie); 2: aus der Shape-Liste wie in JFDiagrammer
+QuickStyleType = 2
 
 # 1 der Balken
 [Geometry]
