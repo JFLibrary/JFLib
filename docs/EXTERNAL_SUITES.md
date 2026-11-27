@@ -1,4 +1,4 @@
-# External test suites -- Wycheproof, ACVP, x509-limbo, tlsfuzzer, TLS-Anvil, Pebble
+# External test suites -- Wycheproof, ACVP, x509-limbo, tlsfuzzer, TLS-Anvil, Pebble, SerenityOS's images
 
 Four adversarial suites that found bugs in OpenSSL, Go, Java, BouncyCastle, GnuTLS, NSS and
 others, and NIST's conformance vectors (ACVP, which FIPS validations are tested with), run
@@ -18,6 +18,7 @@ python tools/tlsfuzzer_check.py       # tlsfuzzer @ 51aad6e9ae42, tlslite-ng @ 7
 python tools/tlsanvil_check.py        # TLS-Anvil @ c1762f4 (Temurin 21, Maven 3.9.9; 850 MB): netio's TLS client
 python tools/tlsanvil_check.py --server   # ... netio's TLS 1.3 server (RSA certificate)
 python tools/pebble_check.py          # Pebble v2.10.1 (Let's Encrypt's ACME test server; 7 MB): netio::acme
+python tools/jp2_check.py             # SerenityOS @ 835d22663feb: its JPEG 2000 test images (49 files, 1.4 MB): lib/img_jp2
 ```
 
 Wycheproof, ACVP and limbo turn each case into a `coretest --vectors` line (the operations are
@@ -454,3 +455,30 @@ API. A second Pebble that requires an external account binding checks EAB.
 The client's checks of what a CA sends back (a chain for another key or without a name, a token
 outside base64url, an http URL, rate limits, a CA that never decides) cannot be made with Pebble,
 which behaves; coretest's ACME server (`apps/coretest/src/acmesrv.rs`, suite `acme`) makes them.
+
+## SerenityOS's JPEG 2000 images
+
+SerenityOS keeps the JPEG 2000 files its own decoder is tested with in
+`Tests/LibGfx/test-inputs/jpeg2000` (BSD-2-Clause). `tools/jp2_check.py` fetches 48 of them,
+`ref.png` and the licence once, at commit 835d22663feb, into `build/vectors/serenity-835d22663feb/`.
+They are written by three encoders, so they cover what OpenJPEG through Pillow cannot write here:
+
+- **JasPer:** every code-block style alone and combined (bypass, reset, terminate-all,
+  vertically causal, predictable termination, segmentation symbols).
+- **Kakadu:** CMYK, CMYKA, CIELab, ICC profiles, alpha and 16 bits.
+- **OpenJPEG:** ROI, PLT, TLM, SOP, EPH, empty packets, a palette, 4 bits, BGRA channel definitions
+  and all five progressions in tiled files of three layers.
+
+How each file is checked:
+
+- **Against Pillow's decode** (OpenJPEG 2.5): lossless files exactly, lossy files within 1.
+- **Against `ref.png`:** where Pillow does something else. It ignores channel definitions, scales
+  4 and 16 bits its own way, and cannot open two of the files (one with five components, one with
+  an overflowing tile-part index).
+
+| Files | Pass | Fail |
+| --- | ---: | ---: |
+| 48 | 48 | 0 |
+
+The same tool also checks 284 decodes of files OpenJPEG writes here, img_all's codec, 6000 damaged
+copies and the speed of a large page. Those need no download.

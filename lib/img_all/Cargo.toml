@@ -32,6 +32,7 @@ img_heif.workspace = true
 img_avif.workspace = true
 img_jxl.workspace = true
 img_jxr.workspace = true
+img_jp2.workspace = true
 img_dds.workspace = true
 img_pdn.workspace = true
 

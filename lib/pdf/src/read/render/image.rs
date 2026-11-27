@@ -1,8 +1,10 @@
 // Images (ISO 32000-1, 8.9): the samples of every bit depth through Decode and the colour
 // space into RGBA, stencil masks (ImageMask) painted with the fill colour or pattern, explicit
 // masks (/Mask as a stencil or as colour-key ranges), soft masks (/SMask, with /Matte), inline
-// images with their abbreviations; DCTDecode through img_jpeg, CCITTFaxDecode through fax.rs
-// (JPXDecode and JBIG2Decode are left out).  Drawing maps the unit square through the CTM:
+// images with their abbreviations; DCTDecode through img_jpeg, CCITTFaxDecode through fax.rs,
+// JPXDecode through img_jp2 (its own size and bit depth, Decode ignored, the colour space from
+// the JP2 header when the dictionary names none, SMaskInData; JBIG2Decode is left out).  Drawing
+// maps the unit square through the CTM:
 // shrunk images are averaged over the pixels they cover first (a box filter), enlarged ones
 // are sampled bilinearly, from four times their size on (and without /Interpolate) as the
 // nearest sample.
@@ -100,6 +102,98 @@ impl Samples<'_> {
     }
 }
 
+/// a JPXDecode image, as samples the rest of the image code takes
+struct Jpx {
+    samples: Vec<u8>,
+    w: usize,
+    h: usize,
+    bpc: usize,
+    /// the colour space of the JP2 header (when the dictionary names none)
+    cs: Option<Rc<Cs>>,
+    /// the opacity channel (8 bits) and whether the colours are premultiplied by it
+    alpha: Option<(Vec<u8>, bool)>,
+}
+
+/// decode a JPEG 2000 image: `named` is the component count of the dictionary's colour space (None:
+/// the JP2 header's counts); the colour components at 8 bits, or 16 when one has more than 8, the
+/// sub-sampled ones brought to the image's size; a stencil mask as 1 bit (a sample at least half
+/// the range is 1)
+fn jpx(data: &[u8], named: Option<usize>, max_pixels: u64, stencil: bool) -> Option<Jpx> {
+    let img = img_jp2::decode(data, &img_jp2::Options { reduce: 0, max_pixels }).ok()?;
+    let (w, h) = (img.width as usize, img.height as usize);
+    if w == 0 || h == 0 {
+        return None;
+    }
+    let colour: Vec<&img_jp2::Component> = img.components.iter().enumerate().filter(|(i, _)| Some(*i) != img.alpha).map(|(_, c)| c).collect();
+    let cs = match named {
+        Some(_) => None,
+        None => Some(Rc::new(match (&img.color, colour.len()) {
+            (img_jp2::Color::Gray, _) => Cs::Gray,
+            (img_jp2::Color::Srgb, _) => Cs::Rgb,
+            (img_jp2::Color::Cmyk, _) => Cs::Cmyk,
+            // the enumerated CIELab of JPX: D50, a and b around the middle of their range
+            (img_jp2::Color::Lab, _) => Cs::Lab { wp: [0.9642, 1.0, 0.8249], range: [-128.0, 127.0, -128.0, 127.0] },
+            (_, 1 | 2) => Cs::Gray,
+            (_, 4) => Cs::Cmyk,
+            _ => Cs::Rgb,
+        })),
+    };
+    let n = named.unwrap_or_else(|| cs.as_ref().map_or(1, |c| c.n()));
+    if colour.len() < n || n == 0 {
+        return None;
+    }
+    // component c at image pixel (x, y), and its maximum
+    let at = |c: &img_jp2::Component, x: usize, y: usize| -> (u32, u32) {
+        let (cw, ch) = (c.width as usize, c.height as usize);
+        if cw == 0 || ch == 0 {
+            return (0, 1);
+        }
+        let v = c.data[(y * ch / h).min(ch - 1) * cw + (x * cw / w).min(cw - 1)] as i64;
+        let p = c.precision.clamp(1, 24) as u32;
+        let v = if c.signed { v + (1i64 << (p - 1)) } else { v };
+        let max = (1i64 << p) - 1;
+        (v.clamp(0, max) as u32, max as u32)
+    };
+    let scale = |(v, max): (u32, u32), to: u32| -> u32 { ((v as u64 * to as u64 + max as u64 / 2) / max as u64) as u32 };
+    if stencil {
+        let stride = w.div_ceil(8);
+        let mut s = vec![0u8; stride * h];
+        for y in 0..h {
+            for x in 0..w {
+                let (v, max) = at(colour[0], x, y);
+                if v as u64 * 2 >= max as u64 {
+                    s[y * stride + x / 8] |= 0x80 >> (x % 8);
+                }
+            }
+        }
+        return Some(Jpx { samples: s, w, h, bpc: 1, cs: None, alpha: None });
+    }
+    let wide = colour[..n].iter().any(|c| c.precision > 8);
+    let mut s = Vec::with_capacity(w.checked_mul(h)?.checked_mul(n)?.checked_mul(1 + wide as usize)?);
+    for y in 0..h {
+        for x in 0..w {
+            for c in &colour[..n] {
+                if wide {
+                    let v = scale(at(c, x, y), 65535);
+                    s.extend_from_slice(&(v as u16).to_be_bytes());
+                } else {
+                    s.push(scale(at(c, x, y), 255) as u8);
+                }
+            }
+        }
+    }
+    let alpha = img.alpha.and_then(|i| img.components.get(i)).map(|c| {
+        let mut a = Vec::with_capacity(w * h);
+        for y in 0..h {
+            for x in 0..w {
+                a.push(scale(at(c, x, y), 255) as u8);
+            }
+        }
+        (a, img.premultiplied)
+    });
+    Some(Jpx { samples: s, w, h, bpc: if wide { 16 } else { 8 }, cs, alpha })
+}
+
 impl Img {
     pub fn load_xobject(run: &mut Run, o: &Object, res: &Rc<Res>) -> Option<Rc<Img>> {
         let Object::Stream(s) = run.doc.resolve(o) else { return None };
@@ -125,12 +219,12 @@ impl Img {
         if w <= 0 || h <= 0 || w > 1 << 20 || h > 1 << 20 || (w as u64) * (h as u64) > run.opt.max_pixels.min(1 << 28) {
             return None;
         }
-        let (w, h) = (w as usize, h as usize);
+        let (mut w, mut h) = (w as usize, h as usize);
         let stencil = doc.key(d, "ImageMask").as_bool() == Some(true);
         let interpolate = doc.key(d, "Interpolate").as_bool() == Some(true);
         let mut bpc = if stencil { 1 } else { doc.key(d, "BitsPerComponent").as_int().unwrap_or(8) as usize };
-        let decode_arr: Vec<f64> = super::color::nums(doc, &doc.key(d, "Decode"));
-        let cs: Rc<Cs> = if stencil {
+        let mut decode_arr: Vec<f64> = super::color::nums(doc, &doc.key(d, "Decode"));
+        let mut cs: Rc<Cs> = if stencil {
             Rc::new(Cs::Gray)
         } else {
             match d.get("ColorSpace") {
@@ -141,9 +235,12 @@ impl Img {
                 None => Rc::new(Cs::Gray),
             }
         };
-        let n = cs.n();
+        let mut n = cs.n();
         // the samples: decoded by an image filter, else as they are
         let mut rgb_direct: Option<Vec<u8>> = None;
+        // a JPEG 2000 image's own opacity channel (SMaskInData), 8 bits, and whether the colours
+        // are premultiplied by it
+        let mut jpx_alpha: Option<(Vec<u8>, bool)> = None;
         let mut samples = data;
         if let Some((f, parms)) = &image_filter {
             match f.0.as_slice() {
@@ -216,7 +313,25 @@ impl Img {
                     samples = super::fax::decode(doc, &samples, parms, w, h)?;
                     bpc = 1;
                 }
-                _ => return None, // JPXDecode, JBIG2Decode
+                b"JPXDecode" => {
+                    let named = (d.get("ColorSpace").is_some() || stencil).then_some(n);
+                    let j = jpx(&samples, named, run.opt.max_pixels.min(1 << 28), stencil)?;
+                    samples = j.samples;
+                    (w, h, bpc) = (j.w, j.h, j.bpc);
+                    if let Some(c) = j.cs {
+                        cs = c;
+                        n = cs.n();
+                    }
+                    // Decode counts only for a stencil mask (ISO 32000-1, 8.9.5.3)
+                    if !stencil {
+                        decode_arr.clear();
+                    }
+                    let smask_in_data = doc.key(d, "SMaskInData").as_int().unwrap_or(0);
+                    if smask_in_data > 0 && d.get("SMask").is_none() {
+                        jpx_alpha = j.alpha.map(|(a, pre)| (a, pre || smask_in_data == 2));
+                    }
+                }
+                _ => return None, // JBIG2Decode
             }
         }
         if ![1, 2, 4, 8, 16].contains(&bpc) {
@@ -311,6 +426,23 @@ impl Img {
             }
         }
         let mut img = Img { w, h, px, stencil: false, interpolate, oc: d.get("OC").cloned() };
+        if let Some((a, pre)) = jpx_alpha {
+            if pre {
+                // premultiplied colours back to straight ones before the alpha multiplies them
+                for (p, &a) in img.px.chunks_exact_mut(4).zip(&a) {
+                    if a > 0 && a < 255 {
+                        for c in &mut p[..3] {
+                            *c = ((*c as u32 * 255 + a as u32 / 2) / a as u32).min(255) as u8;
+                        }
+                    }
+                }
+            }
+            let mut mpx = vec![0u8; w * h * 4];
+            for (m, &a) in mpx.chunks_exact_mut(4).zip(&a) {
+                m.fill(a);
+            }
+            img.apply_alpha(&Img { w, h, px: mpx, stencil: false, interpolate: false, oc: None }, true);
+        }
         // masks
         match doc.key(d, "Mask") {
             Object::Array(ranges) if rgb_direct.is_none() => {

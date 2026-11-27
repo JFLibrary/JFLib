@@ -2652,7 +2652,7 @@ Grundbausteine am falschen Ort oder mehrfach:
 
 Crates, die einer JF-App folgen:
 
-- **P2** · *teilweise* (2026-11-23, U15 und U16) · `pdf`: Lesen ist da ([`pdf/src/read/`](../lib/pdf/src/read/mod.rs),
+- **P2** · *teilweise* (2026-11-23, U15 und U16; 2026-11-26, U19) · `pdf`: Lesen ist da ([`pdf/src/read/`](../lib/pdf/src/read/mod.rs),
   `pdf::read::Document`). PDF 1.0 bis 2.0 mit klassischen Tabellen, Querverweis- und Objektströmen,
   inkrementellen Updates und hybriden Dateien; beschädigte, abgeschnittene und Dateien ohne Tabelle
   werden aus ihren Objekten neu aufgebaut. Verschlüsselung mit dem Standard-Handler (RC4 40 bis
@@ -2686,7 +2686,8 @@ Crates, die einer JF-App folgen:
   eingebettete Schriften aus einer `FontSource` (vorgegeben: die Schriften des Systems, für die 14
   Standardschriften die metrisch gleichen Familien), alle Render-Modi, Glyphen auf Viertelpixeln
   und je Dokument gecacht. Bilder aller Bittiefen und Farbräume mit Decode, Masken aller Arten,
-  JPEG und CCITT Gruppe 3 und 4 (ein eigener Decoder), verkleinert gemittelt; Shadings aller
+  JPEG, CCITT Gruppe 3 und 4 (ein eigener Decoder) und JPEG 2000 (U19, siehe unten), verkleinert
+  gemittelt; Shadings aller
   sieben Typen, Kachelmuster farbig und ungefärbt; Alpha, die 16 Mischmodi, weiche Masken,
   Transparenzgruppen; Anmerkungen über ihre Erscheinungsbilder; Optional Content. Die Arbeit
   einer Seite ist begrenzt. Geprüft mit `tools/pdf_render_check.py` gegen Poppler (`pdftoppm`),
@@ -2698,7 +2699,29 @@ Crates, die einer JF-App folgen:
   dunkler, als ihre Fläche ist). In `pdftest --only render_*` (524 Prüfungen, ohne Schriften des
   Systems; unter Wine dieselben Pixel bis auf Seiten mit Ersatzschriften) und mit 55 000
   Mutationen ohne Absturz und ohne Zeitüberschreitung. Etwa so schnell wie `pdftoppm` (der Korpus
-  bei 150 dpi in 3,4 s, Poppler 3,0 s). Offen: JPEG-2000- und JBIG2-Bilder, Knockout- und nicht
+  bei 150 dpi in 3,4 s, Poppler 3,0 s).
+
+  JPEG 2000 (U19): Die neue Crate [`img_jp2`](../lib/img_jp2/src/lib.rs) ist ein eigener Decoder
+  nach ITU-T T.800.
+  - **Was sie liest:** JP2, JPX und rohe Codestreams.
+  - **Umfang:**
+    - alle Progressionen und POC, Kacheln, Precincts, Schichten, SOP/EPH, PPM/PPT
+    - alle Codeblock-Stile, ROI, die Wavelets 5/3 und 9/7, RCT/ICT
+    - Farbraum, Palette und Kanäle aus dem JP2-Kopf
+    - eine kleinere Auflösung (`reduce`)
+  - **In img_all:** als `IMGF_JP2`.
+  - **In pdf:** zeichnet `JPXDecode` mit eigener Größe und Bittiefe, dem Farbraum des JP2-Kopfs und
+    `SMaskInData`.
+  - **Geprüft** mit `tools/jp2_check.py`:
+    - gegen die Testbilder von SerenityOS: 48 von 48 (alle Codeblock-Stile von JasPer, Dateien von
+      Kakadu und OpenJPEG)
+    - 284 Dekodierungen von Dateien, die OpenJPEG über Pillow mit all seinen Optionen schreibt,
+      auch in kleinerer Auflösung: verlustfrei bitgenau, verlustbehaftet bis auf 1 (bei 16 Bit 4
+      von 65535)
+    - 6000 beschädigte Kopien ohne Absturz
+    - eine Seite von 2500 × 3500 in 0,50 s (OpenJPEG 0,37 s)
+
+  Offen: JBIG2-Bilder (U20), Knockout- und nicht
   isolierte Gruppen (wie isolierte gezeichnet), Überdrucken, ICC-Profile (wie ihre Gerätefarben),
   Formulare ausfüllen und schreiben, Verschlüsselung, PDF/A und Signaturen beim Schreiben,
   Signaturen prüfen, die vordefinierten CMaps Ostasiens außer Identity und den Unicode-CMaps.
