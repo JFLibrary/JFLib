@@ -10,14 +10,18 @@
 //                     after reading the same ways (the styles come from the file); the local
 //                     corpus' connectors (if there): all right-angled, ConFixedCode 0 or 3 .. 6
 //                     (never 1 or 2: none is kept, all route freely here)
-//   write(dir)        --write-jd21-route DIR: JD21-Gegenprobe-Routing.vsdx and a PNG of each page
+//   write(dir)        --write-jd21-route DIR: JD21-Gegenprobe-Routing.vsdx and a PNG of each page;
+//                     (JD21v) JD21-Gegenprobe-Routing-erwartet.txt: the ways after C and then B
+//                     moved 0.3 in down, to set beside Visio's
 //
 // The pages: A above (4, 6), B lower left (2, 3), C lower right (6.5, 3.2), connectors A -> B and
 // A -> C glued to the whole shapes, the page's RouteStyle set, then C moved down a little and the
 // connectors routed again (Visio routes when something moves); a title box says what Visio should
 // show.  The last pages: a shape in the way that connectors may cross horizontally / vertically,
 // and a connector with a piece moved by hand and a vertex of its own (ConFixedCode 1) whose shape
-// moved afterwards.
+// moved afterwards.  (JD21v) The titles and the checks follow the ways Visio 16 laid in the
+// counter-check (route_styles.rs): the direction gives only the axis, the sides come from where
+// B and C lie; the permeable shapes lie on the legs of the right-angle L (A's way down, C's way in).
 
 use alloc::format;
 use alloc::string::String;
@@ -55,31 +59,31 @@ struct Spec {
 
 // i18n: none (the file is for the user's look in Visio, German like the instructions)
 const SPECS: [Spec; 25] = [
-    Spec { name: "Rechtwinklig", code: 1, extra: Extra::None, title: "RouteStyle 1 rechtwinklig: die günstigsten Seiten" },
-    Spec { name: "Gerade", code: 2, extra: Extra::None, title: "RouteStyle 2 gerade: eine Linie zwischen den Umrissen" },
-    Spec { name: "Organigramm oben-unten", code: 3, extra: Extra::None, title: "3 Organigramm von oben nach unten: unten heraus, oben hinein, Knick auf halber Höhe" },
-    Spec { name: "Organigramm links-rechts", code: 4, extra: Extra::None, title: "4 Organigramm von links nach rechts: rechts heraus, links hinein (B liegt links: Umweg)" },
-    Spec { name: "Flussdiagramm oben-unten", code: 5, extra: Extra::None, title: "5 Flussdiagramm von oben nach unten: unten heraus, oben hinein" },
-    Spec { name: "Flussdiagramm links-rechts", code: 6, extra: Extra::None, title: "6 Flussdiagramm von links nach rechts: zu C rechts heraus, links hinein; zu B freie Seiten" },
-    Spec { name: "Baum oben-unten", code: 7, extra: Extra::None, title: "7 Baum von oben nach unten: Knick gleich unter A (gemeinsame Linie)" },
-    Spec { name: "Baum links-rechts", code: 8, extra: Extra::None, title: "8 Baum von links nach rechts: Knick gleich rechts von A" },
-    Spec { name: "Netzwerk", code: 9, extra: Extra::None, title: "9 Netzwerk: gerade Linien (angenommen)" },
-    Spec { name: "Organigramm unten-oben", code: 10, extra: Extra::None, title: "10 Organigramm von unten nach oben: oben heraus, unten hinein (Umweg)" },
-    Spec { name: "Organigramm rechts-links", code: 11, extra: Extra::None, title: "11 Organigramm von rechts nach links" },
-    Spec { name: "Flussdiagramm unten-oben", code: 12, extra: Extra::None, title: "12 Flussdiagramm von unten nach oben: gegen die Richtung freie Seiten" },
-    Spec { name: "Flussdiagramm rechts-links", code: 13, extra: Extra::None, title: "13 Flussdiagramm von rechts nach links: zu B links heraus, rechts hinein" },
-    Spec { name: "Baum unten-oben", code: 14, extra: Extra::None, title: "14 Baum von unten nach oben" },
-    Spec { name: "Baum rechts-links", code: 15, extra: Extra::None, title: "15 Baum von rechts nach links" },
+    Spec { name: "Rechtwinklig", code: 1, extra: Extra::None, title: "RouteStyle 1 rechtwinklig: ein L, unten aus A heraus, seitlich in B und C hinein" },
+    Spec { name: "Gerade", code: 2, extra: Extra::None, title: "RouteStyle 2 gerade: von Ecke zu Ecke (die einander nächsten)" },
+    Spec { name: "Organigramm oben-unten", code: 3, extra: Extra::None, title: "3 Organigramm von oben nach unten: unten heraus, oben hinein, Knick kurz vor dem Kind" },
+    Spec { name: "Organigramm links-rechts", code: 4, extra: Extra::None, title: "4 Organigramm von links nach rechts: zu C rechts heraus, zu B links; Knick kurz vor dem Kind" },
+    Spec { name: "Flussdiagramm oben-unten", code: 5, extra: Extra::None, title: "5 Flussdiagramm von oben nach unten: unten heraus, oben hinein, Knick kurz nach A" },
+    Spec { name: "Flussdiagramm links-rechts", code: 6, extra: Extra::None, title: "6 Flussdiagramm von links nach rechts: seitlich heraus und hinein, Knick kurz nach A" },
+    Spec { name: "Baum oben-unten", code: 7, extra: Extra::None, title: "7 Baum von oben nach unten: gerade Linie von der Unterkante zur Oberkante (Mitten)" },
+    Spec { name: "Baum links-rechts", code: 8, extra: Extra::None, title: "8 Baum von links nach rechts: gerade Linie von Seite zu Seite (Mitten)" },
+    Spec { name: "Netzwerk", code: 9, extra: Extra::None, title: "9 Netzwerk: wie rechtwinklig (ein L)" },
+    Spec { name: "Organigramm unten-oben", code: 10, extra: Extra::None, title: "10 Organigramm von unten nach oben: wie 3 (die Lage entscheidet)" },
+    Spec { name: "Organigramm rechts-links", code: 11, extra: Extra::None, title: "11 Organigramm von rechts nach links: wie 4" },
+    Spec { name: "Flussdiagramm unten-oben", code: 12, extra: Extra::None, title: "12 Flussdiagramm von unten nach oben: wie 5" },
+    Spec { name: "Flussdiagramm rechts-links", code: 13, extra: Extra::None, title: "13 Flussdiagramm von rechts nach links: wie 6" },
+    Spec { name: "Baum unten-oben", code: 14, extra: Extra::None, title: "14 Baum von unten nach oben: wie 7" },
+    Spec { name: "Baum rechts-links", code: 15, extra: Extra::None, title: "15 Baum von rechts nach links: wie 8" },
     Spec { name: "Mittig zu Mittig", code: 16, extra: Extra::None, title: "16 Mittig zu Mittig: gerade Linien auf die Mitten zu" },
-    Spec { name: "Einfach oben-unten", code: 17, extra: Extra::None, title: "17 Einfach von oben nach unten: unten heraus, oben hinein, um nichts herum" },
-    Spec { name: "Einfach links-rechts", code: 18, extra: Extra::None, title: "18 Einfach von links nach rechts" },
-    Spec { name: "Einfach unten-oben", code: 19, extra: Extra::None, title: "19 Einfach von unten nach oben" },
-    Spec { name: "Einfach rechts-links", code: 20, extra: Extra::None, title: "20 Einfach von rechts nach links" },
-    Spec { name: "Einfach waagerecht-senkrecht", code: 21, extra: Extra::None, title: "21 Einfach waagerecht-senkrecht: seitlich heraus, von oben/unten hinein (ein L)" },
-    Spec { name: "Einfach senkrecht-waagerecht", code: 22, extra: Extra::None, title: "22 Einfach senkrecht-waagerecht: oben/unten heraus, seitlich hinein" },
-    Spec { name: "Durchlaessig waagerecht", code: 1, extra: Extra::PassX, title: "Das graue Shape: ShapePermeableX 1 -- A zu C waagerecht hindurch" },
-    Spec { name: "Durchlaessig senkrecht", code: 1, extra: Extra::PassY, title: "Das graue Shape: ShapePermeableY 1 -- A zu B senkrecht hindurch" },
-    Spec { name: "Von Hand", code: 1, extra: Extra::ByHand, title: "A zu C von Hand: senkrechtes Stück verschoben, eigener Knick; danach C bewegt (ConFixedCode 1)" },
+    Spec { name: "Einfach oben-unten", code: 17, extra: Extra::None, title: "17 Einfach von oben nach unten: unten heraus, oben hinein, Knick auf halber Höhe" },
+    Spec { name: "Einfach links-rechts", code: 18, extra: Extra::None, title: "18 Einfach von links nach rechts: seitlich, Knick auf halbem Weg" },
+    Spec { name: "Einfach unten-oben", code: 19, extra: Extra::None, title: "19 Einfach von unten nach oben: wie 17" },
+    Spec { name: "Einfach rechts-links", code: 20, extra: Extra::None, title: "20 Einfach von rechts nach links: wie 18" },
+    Spec { name: "Einfach waagerecht-senkrecht", code: 21, extra: Extra::None, title: "21 Einfach waagerecht-senkrecht: seitlich heraus, von oben hinein (ein L)" },
+    Spec { name: "Einfach senkrecht-waagerecht", code: 22, extra: Extra::None, title: "22 Einfach senkrecht-waagerecht: unten heraus, seitlich hinein (ein L)" },
+    Spec { name: "Durchlaessig waagerecht", code: 1, extra: Extra::PassX, title: "Das graue Shape: ShapePermeableX 1 -- A zu C waagerecht hindurch (das L)" },
+    Spec { name: "Durchlaessig senkrecht", code: 1, extra: Extra::PassY, title: "Das graue Shape: ShapePermeableY 1 -- A zu B und C senkrecht hindurch (das L)" },
+    Spec { name: "Von Hand", code: 1, extra: Extra::ByHand, title: "A zu C von Hand: waagerechtes Stück hochgezogen, eigene Stufe; danach C bewegt (ConFixedCode 1)" },
 ];
 
 /// a page as built
@@ -129,11 +133,11 @@ fn build() -> Result<(Document, Vec<Built>), String> {
         let a = rect(&mut tx, &mut eng, owner, [4.0, 6.0], [1.6, 0.8], "A")?;
         let b = rect(&mut tx, &mut eng, owner, [2.0, 3.0], [1.4, 0.8], "B")?;
         let c = rect(&mut tx, &mut eng, owner, [6.5, 3.2], [1.4, 0.8], "C")?;
-        // a grey shape in the way: A -> C runs level through the tall one (y 6), A -> B upright
-        // through the flat one (x 2)
+        // (JD21v) a grey shape on the legs of the right-angle L: A -> C runs level through the tall
+        // one (into C's left side at y 3), A -> B and A -> C upright through the flat one under A
         let wall = match spec.extra {
-            Extra::PassX => Some(([5.6, 4.6], [0.5, 3.0], "ShapePermeableX")),
-            Extra::PassY => Some(([2.0, 4.6], [1.6, 0.5], "ShapePermeableY")),
+            Extra::PassX => Some(([5.0, 3.1], [0.5, 1.4], "ShapePermeableX")),
+            Extra::PassY => Some(([4.0, 4.6], [1.6, 0.5], "ShapePermeableY")),
             _ => None,
         };
         let extra = match wall {
@@ -153,17 +157,17 @@ fn build() -> Result<(Document, Vec<Built>), String> {
             conns[n] = glue::new_connector(&mut tx, &mut eng, owner, (pa, glue::Target::Shape(a)), (pb, glue::Target::Shape(to))).map_err(err)?;
         }
         if spec.extra == Extra::ByHand {
-            // the upright piece of A -> C one inch to the right, a vertex on its first piece
-            // dragged up into a step
+            // (JD21v: A -> C is an L now) its level piece one inch up, a vertex on its first piece
+            // dragged right into a step
             let w = route_edit::way(tx.doc(), conns[1]).ok_or("no way")?;
-            if let Some(i) = (0..w.pts.len() - 1).find(|&i| (w.pts[i][0] - w.pts[i + 1][0]).abs() < 1e-9) {
+            if let Some(i) = (0..w.pts.len() - 1).find(|&i| (w.pts[i][1] - w.pts[i + 1][1]).abs() < 1e-9) {
                 let p = w.pts[i];
-                route_edit::edit(&mut tx, &mut eng, conns[1], Edit::Piece(i, [p[0] + 1.0, p[1]]), 0.0).map_err(err)?;
+                route_edit::edit(&mut tx, &mut eng, conns[1], Edit::Piece(i, [p[0], p[1] + 1.0]), 0.0).map_err(err)?;
             }
             let w = route_edit::way(tx.doc(), conns[1]).ok_or("no way")?;
             let at = [(w.pts[0][0] + w.pts[1][0]) * 0.5, (w.pts[0][1] + w.pts[1][1]) * 0.5];
             route_edit::edit(&mut tx, &mut eng, conns[1], Edit::Add(at), 0.0).map_err(err)?;
-            route_edit::edit(&mut tx, &mut eng, conns[1], Edit::Bend(1, [at[0], at[1] + 0.4]), 0.0).map_err(err)?;
+            route_edit::edit(&mut tx, &mut eng, conns[1], Edit::Bend(1, [at[0] + 0.4, at[1]]), 0.0).map_err(err)?;
         }
         // C moves down a little: what is glued to it routes again
         ops::move_shapes(&mut tx, &mut eng, &[c], [0.0, -0.2]).map_err(err)?;
@@ -210,7 +214,8 @@ fn judge(doc: &Document, spec: &Spec, b: &Built) -> String {
             continue;
         }
         let (first, last) = (heading(p[0], p[1]), heading(p[k - 2], p[k - 1]));
-        if style.kind.straight() {
+        // (JD21v) the tree draws one line as well
+        if style.kind.straight() || style.kind == Kind::Tree {
             if k != 2 {
                 notes.push_str(&format!("conn {n}: not straight {p:?}; "));
             }
@@ -219,9 +224,11 @@ fn judge(doc: &Document, spec: &Spec, b: &Built) -> String {
         if !upright_or_level(&p) {
             notes.push_str(&format!("conn {n}: slanted {p:?}; "));
         }
-        let d = style.dir.map(|d| d.vector());
+        // (JD21v) the direction gives the axis, where the shape lies the sense: B and C lie below A,
+        // B to its left, C to its right
+        let d = style.dir.map(|d| if d.vector()[0] == 0.0 { [0.0, -1.0] } else { [if n == 0 { -1.0 } else { 1.0 }, 0.0] });
         let ok = match style.kind {
-            Kind::OrgChart | Kind::Tree | Kind::Simple => d.is_some_and(|d| first == d && last == d),
+            Kind::OrgChart | Kind::Simple => d.is_some_and(|d| first == d && last == d),
             Kind::Flowchart => {
                 let d = d.unwrap_or([0.0, -1.0]);
                 let (ba, bb) = (ops::bounds(doc, &[b.shapes[0]]), ops::bounds(doc, &[b.shapes[n + 1]]));
@@ -232,6 +239,9 @@ fn judge(doc: &Document, spec: &Spec, b: &Built) -> String {
             }
             Kind::SimpleHV => first[1] == 0.0 && last[0] == 0.0 && k == 3,
             Kind::SimpleVH => first[0] == 0.0 && last[1] == 0.0 && k == 3,
+            // right angles and network: the L leaves A downwards and comes in from the side (not
+            // the way by hand)
+            Kind::RightAngle | Kind::Network => (spec.extra == Extra::ByHand && n == 1) || (first == [0.0, -1.0] && last[1] == 0.0 && k == 3),
             _ => true,
         };
         if !ok {
@@ -239,8 +249,8 @@ fn judge(doc: &Document, spec: &Spec, b: &Built) -> String {
         }
     }
     match spec.extra {
-        // A -> C level through the tall permeable shape, A -> B upright through the flat one,
-        // each an L (one bend)
+        // A -> C level through the tall permeable shape, A -> B (and C) upright through the flat
+        // one, each an L (one bend)
         Extra::PassX | Extra::PassY => {
             let k = if spec.extra == Extra::PassX { 1 } else { 0 };
             let p = glue::path(doc, b.conns[k]);
@@ -372,6 +382,36 @@ pub(crate) fn check(h: &mut H, corpus: Option<String>) {
     h.check("route: corpus ConFixedCode 0 or 3 .. 6, never 1 or 2 (Visio's own routing: free here)", codes[1] + codes[2] == 0 && codes[3] + codes[4] + codes[5] + codes[6] > 0, format!("{codes:?}"));
 }
 
+// the ways of every connector, C moved 0.3 in down, then B: lines as the Visio check writes them
+// (Sheet.<id>, the points rounded to 1/1000 in, ConFixedCode)
+fn expected() -> Result<String, String> {
+    let (mut doc, built) = build()?;
+    let mut eng = Engine::new();
+    let mut out = String::new();
+    let f = |v: f64| {
+        let s = format!("{:.3}", v);
+        let s = String::from(s.trim_end_matches('0').trim_end_matches('.'));
+        if s == "-0" { String::from("0") } else { s }
+    };
+    for (k, (spec, b)) in SPECS.iter().zip(&built).enumerate() {
+        for (who, s) in [("C", b.shapes[2]), ("B", b.shapes[1])] {
+            let owner = Owner::Page(b.page);
+            let mut tx = doc.transaction("Verschieben");
+            ops::move_shapes(&mut tx, &mut eng, &[s], [0.0, -0.3]).map_err(err)?;
+            let deps = glue::dependents(tx.doc(), owner, &[s]);
+            glue::update(&mut tx, &mut eng, &deps).map_err(err)?;
+            let _ = tx.commit();
+            for &c in &b.conns {
+                let id = doc.shape(c).map_or(0, |x| x.id());
+                let way: Vec<String> = glue::path(&doc, c).iter().map(|p| format!("({},{})", f(p[0]), f(p[1]))).collect();
+                let fixed = num(&doc, SheetRef::Shape(c), "ConFixedCode").unwrap_or(0.0);
+                out.push_str(&format!("page {} \"{}\" {who} moved: Sheet.{id} {}  Fixed {}\n", k + 1, spec.name, way.join(" "), f(fixed)));
+            }
+        }
+    }
+    Ok(out)
+}
+
 /// --write-jd21-route DIR: the drawing for the Visio counter-check and a PNG of each page
 pub(crate) fn write(dir: &str) -> i32 {
     img_core::io::register(img_core::IMGF_PNG, Some(&img_png::CODEC));
@@ -395,6 +435,22 @@ pub(crate) fn write(dir: &str) -> i32 {
         return 1;
     }
     crate::out(&format!("wrote {path}\n"));
+    // (JD21v) the ways expected after Visio's moves in the check (C, then B 0.3 in down), to set
+    // beside what Visio lays: JD21-Gegenprobe-Routing-erwartet.txt
+    match expected() {
+        Ok(text) => {
+            let path = format!("{dir}/JD21-Gegenprobe-Routing-erwartet.txt");
+            if !plat::write_file(&path, text.as_bytes()) {
+                crate::out(&format!("cannot write {path}\n"));
+                return 1;
+            }
+            crate::out(&format!("wrote {path}\n"));
+        }
+        Err(e) => {
+            crate::out(&format!("expected: {e}\n"));
+            return 1;
+        }
+    }
     let mut fonts = crate::render::fonts();
     let mut status = 0;
     for (k, (spec, b)) in SPECS.iter().zip(&built).enumerate() {

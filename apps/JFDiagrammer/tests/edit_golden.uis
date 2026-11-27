@@ -1,6 +1,7 @@
 #!args --no-system-fonts
 # JFDiagrammer, JD7, golden images (light theme, the style's fonts): a dynamic connector glued
-# to two shapes routes around a third one between them (both ends glued: green); the third
+# to two shapes routes around a third one between them (both ends glued: green; JD21v: out of the
+# first shape's facing side, over the third one into the second's top, as Visio 16); the third
 # shape turned by its rotation handle and moved into the connector's way: the connector routes
 # again (below), the turned frame shows its eight handles and the rotation handle.
 # New references: the same script with "shot FILE X Y W H" in place of "expect same" (look first)

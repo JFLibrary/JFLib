@@ -34,7 +34,7 @@ drag 805,420 695,300
 drag 695,300 465,350
 cmd 4400
 click 1100,700
-expect listitem:"Sheet.9" rect 500 346 201 229
+expect listitem:"Sheet.9" rect 500 346 226 204
 cmd 7247
 expect dialog:"Layout konfigurieren" exists
 expect combo:"Flussdiagramm" exists
@@ -68,9 +68,9 @@ expect listitem:"Schritt" rect 563 273 75 51
 expect listitem:"Prüfen" rect 689 273 100 51
 expect listitem:"Ja" rect 840 374 100 50
 expect listitem:"Nein" rect 840 273 100 51
-# the connectors straight lines now
+# the connectors straight lines now (JD21v: Visio's straight style runs corner to corner)
 expect listitem:"Sheet.9" rect 525 296 38 6
-expect listitem:"Sheet.11" rect 777 324 75 50
+expect listitem:"Sheet.11" rect 789 324 51 50
 # the page keeps what the dialog set
 cmd 7247
 expect combo:"Hierarchie" exists
@@ -82,7 +82,7 @@ click button:"Abbrechen"
 key ctrl+z
 expect listitem:"Start" rect 701 550 101 50
 expect listitem:"Prüfen" rect 752 399 100 50
-expect listitem:"Sheet.9" rect 500 346 201 229
+expect listitem:"Sheet.9" rect 500 346 226 204
 cmd 7247
 expect combo:"Flussdiagramm" exists
 click button:"Abbrechen"
