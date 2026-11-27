@@ -157,7 +157,7 @@ struct Watch {
     bad: AtomicU32,
     covered: AtomicU32,
     last_bad: AtomicU32,
-    /// samples wrong only in the strip's outermost column on either side (a note, not wrong)
+    /// samples wrong only in the strip's outermost columns on either side (a note, not wrong)
     edge: AtomicU32,
 }
 
@@ -408,7 +408,9 @@ impl Test {
     fn watch_start(&mut self, ui: &Ui) {
         let Some(r) = plat::win_get_rect(0) else { return };
         let fb = ui.fb();
-        let (x0, y0, w) = (r[0], r[1] + fb.h - 8, fb.w);
+        // (40 px above the bottom: Windows 11 rounds the window's corners, at 200 % by about 16 px; 8 px above it the
+        // strip's fifth column showed the desktop, 0c0c0c)
+        let (x0, y0, w) = (r[0], r[1] + fb.h - 40, fb.w);
         let want: Vec<u32> = (0..w).map(|x| bgr(band_of(x, w))).collect();
         let watch = Arc::new(Watch { stop: AtomicBool::new(false), samples: AtomicU32::new(0), bad: AtomicU32::new(0), covered: AtomicU32::new(0), last_bad: AtomicU32::new(0),
                                      edge: AtomicU32::new(0) });
@@ -420,10 +422,11 @@ impl Test {
                 w2.samples.fetch_add(1, Ordering::Relaxed);
                 let off = |(p, c): &(&[u8], &u32)| (p[0] as u32 | (p[1] as u32) << 8 | (p[2] as u32) << 16) != **c;
                 let all: Vec<(&[u8], &u32)> = px.chunks_exact(4).zip(want.iter()).collect();
-                // (the outermost column on either side: at 150 % on Windows 11 the strip's first column showed 30383f in
-                // every sample, the window's edge rather than its picture)
-                let inner = all.len().saturating_sub(1);
-                let wrong = all.iter().enumerate().find(|(i, q)| *i != 0 && *i != inner && off(*q)).map(|(_, q)| *q);
+                // (the outermost EDGE columns on either side: Windows 11 drew the window's edge there in every sample,
+                // in the first column at 150 % (30383f), in the second at 200 % (3a3e44); the Surface Go 3 and WS33)
+                const EDGE: usize = 4;
+                let n = all.len();
+                let wrong = all.iter().enumerate().find(|(i, q)| *i >= EDGE && *i + EDGE < n && off(*q)).map(|(_, q)| *q);
                 if wrong.is_none() && all.iter().any(off) {
                     w2.edge.fetch_add(1, Ordering::Relaxed);
                 }
@@ -455,7 +458,7 @@ impl Test {
         }
         let e = w.edge.load(Ordering::Relaxed);
         if e != 0 {
-            out(&format!("note: {what}: only the strip's outermost column wrong in {e} of {n} samples"));
+            out(&format!("note: {what}: only the strip's outermost columns wrong in {e} of {n} samples"));
         }
         self.ok(b == 0, &format!("{what}: {n} screen samples, {b} wrong (last {:06x})", w.last_bad.load(Ordering::Relaxed)));
     }
