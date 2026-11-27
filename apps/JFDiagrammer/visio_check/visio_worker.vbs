@@ -272,14 +272,33 @@ Sub StartWatch()
     L "warning: the dialog watcher did not start; Visio's questions are answered with No and not reported"
 End Sub
 
+' the process ids of Visio's automation instances (",1,2,"); Application.ProcessID is not the
+' process id the system knows, so the job's own Visio is the one that appeared with CreateObject
+Function AutomationPids()
+    Dim p, s
+    s = ","
+    For Each p In GetObject("winmgmts:\\.\root\cimv2").ExecQuery("select ProcessId, CommandLine from Win32_Process where Name='VISIO.EXE'")
+        If InStr(p.CommandLine & "", "/Automation") > 0 Then s = s & p.ProcessId & ","
+    Next
+    AutomationPids = s
+End Function
+
 ' ---------------------------------------------------------------- main
-Dim file, extra, n
+Dim file, extra, n, pidsBefore, pidsAfter, vpid, q
 ReadJob
 On Error Resume Next
+pidsBefore = AutomationPids()
 Set app = CreateObject("Visio.InvisibleApp")
 If Err.Number <> 0 Then L "FATAL: Visio not started: " & Err.Description: Finish "fatal": WScript.Quit 1
-Dim pidFile: Set pidFile = fso.CreateTextFile(jobDir & "\visio.pid", True): pidFile.WriteLine app.ProcessID: pidFile.Close
-L "Visio " & app.Version & " build " & app.Build & ", pid " & app.ProcessID
+pidsAfter = AutomationPids()
+vpid = ""
+For Each q In Split(pidsAfter, ",")
+    If q <> "" And InStr(pidsBefore, "," & q & ",") = 0 And vpid = "" Then vpid = q
+Next
+If vpid <> "" Then
+    Dim pidFile: Set pidFile = fso.CreateTextFile(jobDir & "\visio.pid", True): pidFile.WriteLine vpid: pidFile.Close
+End If
+L "Visio " & app.Version & " build " & app.Build & ", pid " & vpid
 StartWatch
 app.AlertResponse = 7
 extraLoaded = False
