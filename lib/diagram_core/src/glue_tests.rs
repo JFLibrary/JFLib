@@ -347,6 +347,26 @@ fn dynamic_glue_faces_the_other_shape() {
     assert_eq!(f.formula(c, "EndX"), "_WALKGLUE(EndTrigger,BegTrigger,WalkPreference)");
 }
 
+// (JD21) a shape a dynamic connector is glued to becomes placeable (ObjType 1) when its ObjType
+// let Visio decide, as Visio does (Visio check visio-run4 [objtype]); one that says otherwise keeps it
+#[test]
+fn glued_shapes_become_placeable() {
+    let mut f = fx();
+    let a = f.rect(None, 1, [2.0, 2.0], [1.0, 1.0], 0.0);
+    let b = f.rect(None, 2, [6.0, 2.0], [1.0, 1.0], 0.0);
+    let objtype = |f: &Fx, s| f.doc.sym("ObjType").and_then(|c| f.doc.resolve(SheetRef::Shape(s), &CellAddr::single(c)).num());
+    assert_eq!(objtype(&f, a).unwrap_or(0.0), 0.0);
+    {
+        let mut tx = f.doc.transaction("ObjType");
+        let c = CellAddr::single(tx.intern("ObjType"));
+        tx.set_constant(SheetRef::Shape(b), &c, Value::Num(4.0), None).unwrap();
+        tx.commit();
+    }
+    f.connector(([2.0, 2.0], Target::Shape(a)), ([6.0, 2.0], Target::Shape(b)));
+    assert_eq!(objtype(&f, a), Some(1.0));
+    assert_eq!(objtype(&f, b), Some(4.0));
+}
+
 // (JD15, SS-18) WalkPreference decides between ways of the same cost: B diagonal to A, both ends
 // dynamic -- by default the begin leaves A's side (Visio's side to side), with bit 1
 // (visWalkPrefBegNS) its top; bit 2 (visWalkPrefEndNS) docks the end on B's bottom; a dearer way

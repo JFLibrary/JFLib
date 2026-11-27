@@ -161,7 +161,8 @@ pub(crate) fn check(h: &mut H) {
         }
     };
     let before = connects(&doc);
-    h.check("pointglue: Connect entries of a control point, a vertex, a handle, a guide", before.len() == 4 && before.iter().any(|c| c.contains("Controls.Row_1 100")) && before.iter().any(|c| c.contains("Angle 2")), format!("{before:?}"));
+    // (JD21) an end on a guide has two entries (X and Y to the guide's Angle, ToPart 4), as Visio 16 writes them
+    h.check("pointglue: Connect entries of a control point, a vertex, a handle, a guide", before.len() == 5 && before.iter().any(|c| c.contains("Controls.Row_1 100")) && before.iter().filter(|c| c.contains("Angle 4")).count() == 2, format!("{before:?}"));
     h.check("pointglue: the control point's formula", formula_row(&doc, bus).starts_with("LOC(PNT(Sheet."), formula_row(&doc, bus));
     let bytes = match vsdx::write(&doc, &WriteOptions::DEFAULT) {
         Ok(b) => b,

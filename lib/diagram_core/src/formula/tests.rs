@@ -700,6 +700,21 @@ fn atan2_takes_y_first() {
     assert_near!(f.n("ATAN2(-1,-1)"), -3.0 * PI / 4.0);
 }
 
+// (JD21) Visio 16 glues an end to a guide with INTERSECTX/Y(guide pin, guide angle, the end's
+// own point, guide angle + 90 deg): the foot of the end on the guide (Visio check
+// visio-run2 [glue]: a horizontal guide at y 4.314, the point (3, 4.2) -> (3, 4.314))
+#[test]
+fn intersect_is_where_two_lines_meet() {
+    let f = fx();
+    assert_near!(f.n("INTERSECTX(0,4.314,0,3,4.2,0+90 deg)"), 3.0);
+    assert_near!(f.n("INTERSECTY(0,4.314,0,3,4.2,0+90 deg)"), 4.314);
+    // a guide turned 45 degrees through (1, 1): the foot of (3, 1) is (2, 2)
+    assert_near!(f.n("INTERSECTX(1,1,45 deg,3,1,135 deg)"), 2.0);
+    assert_near!(f.n("INTERSECTY(1,1,45 deg,3,1,135 deg)"), 2.0);
+    // parallel lines meet nowhere
+    assert_eq!(f.e("INTERSECTX(0,0,0,1,1,0)"), CellError::Num);
+}
+
 #[test]
 fn math_domain_errors() {
     let f = fx();

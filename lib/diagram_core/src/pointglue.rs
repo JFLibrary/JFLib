@@ -38,12 +38,14 @@
 //   .Y<r> of the vertex (relative rows: times Width and Height), Width*fx and Height*fy of the
 //   handle, Controls.<row> and Controls.<row>.Y of the control point (assumed); DirX, DirY 0,
 //   Type 0.  A row with these formulas that is there already is used again.
-// * An end on a guide (assumed, the Visio-Gegenprobe checks it): a horizontal guide gives the
-//   end's Y the formula Sheet.G!PinY (vertical: X = Sheet.G!PinX), the other coordinate stays a
-//   value; Connect FromCell=BeginX (EndX) FromPart=9 (12) ToSheet=G ToCell=Angle ToPart=2
-//   (visGuideY; a vertical guide 1, visGuideX).  GlueTo's text names two connections "to the
-//   guide's Angle cell"; one entry per end is written here (glue::glue replaces it like any).
-//   Only top-level 1-D shapes and guides that run across or up the page.
+// * An end on a guide (JD21, as Visio 16 writes it; Visio check visio-run2 [glue]): both
+//   coordinates of the end INTERSECTX/INTERSECTY(Sheet.G!PinX, Sheet.G!PinY, Sheet.G!Angle, the
+//   end's point, Sheet.G!Angle+90 deg) -- the foot of the point on the guide's line, so the end
+//   follows the guide and keeps its place along it; two Connect entries, FromCell BeginX and
+//   BeginY (EndX, EndY), FromPart 7 and 8 (10 and 11), ToSheet=G, ToCell=Angle, ToPart=4
+//   (glue::glue replaces both like any).  An older form Visio still reads: the coordinate the
+//   guide fixes = Sheet.G!PinY (PinX), one entry ToPart 2 (1).  Only top-level 1-D shapes and
+//   guides that run across or up the page.
 //
 // The connection point tool (Visio's: Ctrl+click on a selected shape adds a point, a drag moves
 // it, Del takes it out; the point's menu sets its kind): a new row's X and Y are Width*k and
@@ -386,21 +388,30 @@ pub fn glue_guide(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, end: 
     let id = doc.shape(shape).ok_or(EditError::NoShape)?.id();
     let gid = doc.shape(guide).ok_or(EditError::NoShape)?.id();
     let sheet = SheetRef::Shape(shape);
-    let (cx, cy, part) = match end {
-        End::Begin => (names::BEGIN_X, names::BEGIN_Y, 9),
-        End::End => (names::END_X, names::END_Y, 12),
+    // (JD21) Visio 16's own formulas and entries (Visio check visio-run2 [glue], GlueTo of an
+    // end to a guide): both coordinates the foot of the end's point on the guide's line,
+    // INTERSECTX/Y(guide pin, guide angle, the point, guide angle + 90 deg); FromCell BeginX/Y
+    // (EndX/Y), FromPart 7/8 (10/11: visBeginX/Y, visEndX/Y), ToCell Angle, ToPart 4
+    let (cx, cy, px, py) = match end {
+        End::Begin => (names::BEGIN_X, names::BEGIN_Y, 7, 8),
+        End::End => (names::END_X, names::END_Y, 10, 11),
     };
-    let (cell, f) = if across { (cy, format!("Sheet.{gid}!PinY")) } else { (cx, format!("Sheet.{gid}!PinX")) };
-    let a = CellAddr::single(cell);
-    match tx.set_formula(sheet, &a, &f) {
-        Ok(()) => {}
-        Err(EditError::Guarded) => return Ok(()),
-        Err(e) => return Err(e),
+    let g = format!("Sheet.{gid}!");
+    let args = format!("{g}PinX,{g}PinY,{g}Angle,{} in,{} in,{g}Angle+90 deg", crate::ops::text::num(p[0]), crate::ops::text::num(p[1]));
+    let (ax, ay) = (CellAddr::single(cx), CellAddr::single(cy));
+    for (a, f) in [(&ax, format!("INTERSECTX({args})")), (&ay, format!("INTERSECTY({args})"))] {
+        match tx.set_formula(sheet, a, &f) {
+            Ok(()) => {}
+            Err(EditError::Guarded) => return Ok(()),
+            Err(e) => return Err(e),
+        }
     }
     let to_cell = tx.intern("Angle");
-    let c = Connect { from_sheet: id, from_cell: Some(cx), from_part: Some(part), to_sheet: gid, to_cell: Some(to_cell), to_part: Some(if across { 2 } else { 1 }), extras: Extras::new() };
-    tx.add_connect(shape.owner, c)?;
-    eng.recalc_cells(tx, &[(sheet, a)])?;
+    for (cell, part) in [(cx, px), (cy, py)] {
+        let c = Connect { from_sheet: id, from_cell: Some(cell), from_part: Some(part), to_sheet: gid, to_cell: Some(to_cell), to_part: Some(4), extras: Extras::new() };
+        tx.add_connect(shape.owner, c)?;
+    }
+    eng.recalc_cells(tx, &[(sheet, ax), (sheet, ay)])?;
     glue::update(tx, eng, &[shape])
 }
 

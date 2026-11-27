@@ -201,6 +201,22 @@ pub(crate) fn call(ev: &mut Ev, f: Func, start: u32, n: u32, sheet: u32) -> R {
             let (ca, x, cb, y) = (num(ev, 0)?, num(ev, 1)?, num(ev, 2)?, num(ev, 3)?);
             Ok(Val::Num(math::sqrt((ca * x) * (ca * x) + (cb * y) * (cb * y))))
         }
+        // (JD21) INTERSECTX/Y(x1, y1, angle1, x2, y2, angle2): where the line through (x1, y1) at
+        // angle1 meets the one through (x2, y2) at angle2 ([MS-VSDX] 2.5.3.72, .73); parallel
+        // lines meet nowhere (#NUM!)
+        IntersectX | IntersectY => {
+            need!(n, 6, 6);
+            let (x1, y1, a1) = (num(ev, 0)?, num(ev, 1)?, num(ev, 2)?);
+            let (x2, y2, a2) = (num(ev, 3)?, num(ev, 4)?, num(ev, 5)?);
+            let ((s1, c1), (s2, c2)) = (math::sincos(a1), math::sincos(a2));
+            let cross = c1 * s2 - s1 * c2;
+            if cross.abs() < 1e-12 {
+                return Err(CellError::Num);
+            }
+            // p1 + t d1 = p2 + u d2 -> t = ((p2 - p1) x d2) / (d1 x d2)
+            let t = ((x2 - x1) * s2 - (y2 - y1) * c2) / cross;
+            finite(if f == IntersectX { x1 + t * c1 } else { y1 + t * s1 })
+        }
         Ang360 => n1(ev, |x| math::modulus(x, core::f64::consts::TAU)),
         Deg => n1(ev, |x| x * 180.0 / core::f64::consts::PI),
         Rad => n1(ev, |x| x),

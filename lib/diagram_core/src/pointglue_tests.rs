@@ -348,10 +348,15 @@ fn ends_glue_to_guides_and_follow_them() {
     let owner = f.owner;
     let line = f.edit("Linie", |tx, eng| glue::new_line(tx, eng, owner, ([1.0, 1.0], Target::None), ([2.0, 2.9], Target::None)));
     f.edit("Kleben", |tx, eng| glue_guide(tx, eng, line, End::End, [2.0, 2.9], g));
-    assert_eq!(f.formula(line, &CellAddr::single(names::END_Y)), "Sheet.1!PinY");
+    // (JD21) Visio 16's form: the foot of the point on the guide, both cells, two entries
+    assert_eq!(f.formula(line, &CellAddr::single(names::END_X)), "INTERSECTX(Sheet.1!PinX,Sheet.1!PinY,Sheet.1!Angle,2 in,3 in,Sheet.1!Angle+90 deg)");
+    assert_eq!(f.formula(line, &CellAddr::single(names::END_Y)), "INTERSECTY(Sheet.1!PinX,Sheet.1!PinY,Sheet.1!Angle,2 in,3 in,Sheet.1!Angle+90 deg)");
     assert_pt!(glue::ends(&f.doc, line).unwrap().1, [2.0, 3.0]);
     let id = f.doc.shape(line).unwrap().id();
-    assert_eq!(f.connects(), vec![(id, String::from("EndX"), 12, 1, String::from("Angle"), 2)]);
+    assert_eq!(
+        f.connects(),
+        vec![(id, String::from("EndX"), 10, 1, String::from("Angle"), 4), (id, String::from("EndY"), 11, 1, String::from("Angle"), 4)]
+    );
     assert_eq!(guide_of(&f.doc, line), [None, Some(g)]);
     assert_eq!(glue::glued(&f.doc, line), [Target::None, Target::None]);
     // the guide moves up: the end follows, its x stays
@@ -359,7 +364,7 @@ fn ends_glue_to_guides_and_follow_them() {
     assert_pt!(glue::ends(&f.doc, line).unwrap().1, [2.0, 4.0]);
     // the begin on the vertical guide
     f.edit("Kleben", |tx, eng| glue_guide(tx, eng, line, End::Begin, [6.2, 1.0], gv));
-    assert_eq!(f.formula(line, &CellAddr::single(names::BEGIN_X)), "Sheet.2!PinX");
+    assert!(f.formula(line, &CellAddr::single(names::BEGIN_X)).starts_with("INTERSECTX(Sheet.2!PinX,Sheet.2!PinY,Sheet.2!Angle,6 in,1 in,"));
     f.move_to(gv, [7.0, 0.0]);
     assert_pt!(glue::ends(&f.doc, line).unwrap().0, [7.0, 1.0]);
     assert_eq!(guide_of(&f.doc, line), [Some(gv), Some(g)]);

@@ -460,9 +460,13 @@ fn set_end(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, end: End, at
     }
     let p = parent_xform(doc, shape).inverse().unwrap_or(Xform::IDENTITY).apply(at);
     let (cx, cy) = end_cells(end);
-    // the old Connect entries of this end go
-    let old: Vec<usize> =
-        connects(doc, owner).iter().enumerate().filter(|(_, c)| c.from_sheet == id && c.from_cell == Some(cx)).map(|(i, _)| i).collect();
+    // the old Connect entries of this end go (JD21: an end on a guide has one from each cell)
+    let old: Vec<usize> = connects(doc, owner)
+        .iter()
+        .enumerate()
+        .filter(|(_, c)| c.from_sheet == id && (c.from_cell == Some(cx) || c.from_cell == Some(cy)))
+        .map(|(i, _)| i)
+        .collect();
     for i in old.into_iter().rev() {
         tx.remove_connect(owner, i)?;
     }
@@ -516,6 +520,17 @@ fn set_end(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, end: End, at
         }
     }
     eng.recalc_cells(tx, &[(sheet, ax), (sheet, ay), (sheet, trig)])?;
+    // (JD21) a dynamic connector glued to a 2-D shape whose ObjType lets Visio decide (0) makes it
+    // placeable (1), as Visio does (Visio check visio-run4 [objtype]: a drawn rectangle 0 -> 1 when
+    // a connector's end is glued to it); Visio's Re-Layout Page moves only such shapes
+    if let Target::Point { shape: t, .. } | Target::Shape(t) = to {
+        let doc = tx.doc();
+        let ts = SheetRef::Shape(t);
+        if is_connector(doc, shape) && !is_one_d(doc, t) && num(doc, ts, "ObjType").unwrap_or(0.0) == 0.0 {
+            let a = CellAddr::single(tx.intern("ObjType"));
+            tx.set_constant(ts, &a, Value::Num(1.0), None)?;
+        }
+    }
     Ok(())
 }
 
