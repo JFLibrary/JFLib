@@ -728,6 +728,16 @@ echten Fenster. Dabei behoben:
 Offen für AP8: `.dmg`, Developer-ID-Signatur und Notarisierung (dann mit Hardened Runtime), `SMAppService` für
 Autostart in der Sandbox, eine Bildaufnahme über ImageCaptureCore statt SANE.
 
+**Scanner (2026-11-27):** Die Bibliothek hat jetzt `plat::scan` ([`scan.rs`](../lib/plat/scan.rs)): `scan_start(title)`
+öffnet den Scan-Dialog des Systems, `scan_poll()` gibt einmal die Datei, wie der Scanner sie schrieb (Name und Bytes,
+PNG), `Cancelled` oder `Failed`. Auf macOS ([`apple_mac_scan.rs`](../lib/plat/apple_mac_scan.rs)) ist das ein Fenster
+mit ImageKits Geräteliste (lokale und Netzwerkscanner) neben `IKScannerDeviceView`, dem Dialog von Vorschau.app, auf
+ImageCaptureCore; der Scan landet in einem eigenen Ordner unter dem Temp-Ordner, wird gelesen und entfernt. Windows
+(WIA) und Linux (SANE) folgen, bis dahin `Unavailable`; JFPainter nutzt bis zu einem neuen Release weiter seinen
+eigenen Weg. Geprüft mit `plattest --test scan` und `scan-ui` auf dem Mac mini: Fenster auf, ein zweites `Busy`,
+Schließen gibt `Cancelled`. Ein echter Scan steht aus: Der Netzwerkscanner im LAN meldet sich nicht per Bonjour
+(kein `_uscan._tcp`, `icdd` fand 0 Geräte), so fand der Mac ihn nicht.
+
 #### Menüs in der Menüleiste (2026-11-10)
 
 Die Hand-Probe des Nutzers im Vollbild zeigte: macOS legt dort, sobald der Zeiger den oberen Bildschirmrand

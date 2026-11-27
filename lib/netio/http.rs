@@ -17,7 +17,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::sync::atomic::AtomicBool;
 
-use agent_core::json::{self, Value};
+use formats::json::{self, Value};
 use plat::net::{NetError, NetErrorKind, SocketAddr};
 
 use crate::Stream;

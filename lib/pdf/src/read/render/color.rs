@@ -541,7 +541,8 @@ fn op(o: u8, st: &mut Vec<V>) -> bool {
         b"bitshift" => {
             let s = pop!().f() as i64;
             let a = pop!().f() as i64;
-            st.push(V::I(if s >= 0 { a.checked_shl(s.min(63) as u32).unwrap_or(0) } else { a >> (-s).min(63) }));
+            // (unsigned_abs: -s overflowed for i64::MIN, a shift of -inf)
+            st.push(V::I(if s >= 0 { a.checked_shl(s.min(63) as u32).unwrap_or(0) } else { a >> s.unsigned_abs().min(63) }));
         }
         b"eq" | b"ne" | b"ge" | b"gt" | b"le" | b"lt" => {
             let b = pop!().f();

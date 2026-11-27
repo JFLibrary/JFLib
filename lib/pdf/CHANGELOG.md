@@ -48,6 +48,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 ### Fixed
 
 - Drawing pages: a soft mask takes the place of the image's `Mask` (ISO 32000-1, Table 89): `SMask` and the opacity channel of a JPEG 2000 image (`SMaskInData`), which stands for it; before, a colour key or stencil mask was applied as well
+- PostScript calculator functions: `bitshift` by -2^63 shifts everything out (its negation overflowed)
 
 [Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.1...HEAD
 

@@ -370,7 +370,7 @@ pub(crate) fn parse(d: &[u8]) -> Result<Codestream<'_>, Error> {
     while q + 4 <= ppm_all.len() {
         let l = u32::from_be_bytes([ppm_all[q], ppm_all[q + 1], ppm_all[q + 2], ppm_all[q + 3]]) as usize;
         q += 4;
-        let e = (q + l).min(ppm_all.len());
+        let e = q.saturating_add(l).min(ppm_all.len());
         ppm_spans.push((q, e));
         q = e;
     }
@@ -401,7 +401,9 @@ pub(crate) fn parse(d: &[u8]) -> Result<Codestream<'_>, Error> {
                 d.len()
             }
         } else {
-            (sot + psot).min(d.len())
+            // (on 32 bits sot + psot could wrap in front of the part: the parts went round
+            // forever; never behind what was read)
+            sot.saturating_add(psot).min(d.len()).max(r.p)
         };
         if isot >= ntiles {
             // a tile that is not there: skip its part

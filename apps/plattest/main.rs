@@ -97,6 +97,9 @@
 //   plattest --test share / share-ui       (t_share.rs) the system's share sheet: the contract and
 //                                          CAP_SHARE; share-ui (Windows, macOS) a real window opens
 //                                          the sheet and closes it again -> SHARE_CANCELLED
+//   plattest --test scan / scan-ui         (t_scan.rs) the system's scan dialog: the contract;
+//                                          scan-ui (macOS) its window opened and closed ->
+//                                          Cancelled, by hand (jfgui_SCAN_HAND=1) a page scanned
 //   plattest --test ios                    (t_ios.rs, iOS under UIKit: tools/apple.py simapp) the screen
 //                                          kept on (the idle timer), the system's text size followed,
 //                                          turning (with jfgui_GPU=1 on the GPU's layer)
@@ -249,6 +252,7 @@ mod t_bookmarks;
 // iOS under UIKit: screen on, text size, turning
 mod t_ios;
 // the system's share sheet
+mod t_scan;
 mod t_share;
 // a web page's accessibility tree (apps/a11ytest's page)
 mod t_a11y_rich;
@@ -621,6 +625,8 @@ fn plattest() -> i32 {
         Some("ios") => t_ios::t_ios,                  // iOS under UIKit (simapp): screen on, text size, turning
         Some("share") => t_share::t_share,            // plat::share: the contract, CAP_SHARE
         Some("share-ui") => t_share::t_share_ui,      // Windows, macOS, a real window: the sheet opened and closed
+        Some("scan") => t_scan::t_scan,               // plat::scan: the contract
+        Some("scan-ui") => t_scan::t_scan_ui,         // macOS, a real window: the scan dialog opened and closed
         Some("secret") => t_secret::t_secret,          // the system's secret store (not in "all")
         Some("secret-bus") => t_secret::t_secret_bus,  // Linux: against tools/platshared/secret_bus.py
         Some("power") => t_power::t_power,             // plat::inhibit (Windows: real power requests)

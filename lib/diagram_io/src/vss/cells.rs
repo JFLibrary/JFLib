@@ -437,13 +437,12 @@ fn blocks(d: &[u8], from: usize) -> Vec<(u8, &[u8])> {
     let mut i = from;
     while i + 6 <= d.len() {
         let len = u32at(d, i).unwrap_or(0) as usize;
-        if len < 6 || i + len > d.len() {
-            break;
-        }
+        // (on 32 bits i + len could wrap below d.len(): a slice backwards, or a loop)
+        let Some(end) = i.checked_add(len).filter(|&e| len >= 6 && e <= d.len()) else { break };
         if d[i + 4] == 2 {
-            v.push((d[i + 5], &d[i + 6..i + len]));
+            v.push((d[i + 5], &d[i + 6..end]));
         }
-        i += len;
+        i = end;
     }
     v
 }

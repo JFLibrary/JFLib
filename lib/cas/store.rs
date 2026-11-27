@@ -173,7 +173,9 @@ impl Folder {
     }
 
     fn file(&self, kind: Kind, name: &str) -> CasResult<String> {
-        if !name_ok(name) || (kind == Kind::Pack && name.len() < 2) {
+        // (a pack goes into the folder of its first two bytes: they must be whole letters,
+        // name_ok lets "€a" through, and &name[..2] cut the euro sign in two)
+        if !name_ok(name) || (kind == Kind::Pack && !name.is_char_boundary(2)) {
             return Err(CasError::Io(format!("invalid name {:?}", name)));
         }
         Ok(match kind {
