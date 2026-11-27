@@ -15,7 +15,7 @@
 //   screen_take() -> Vec<ScreenEvent> the answers since the last call (each one calls wake())
 //   pick_test_point(Some((x, y)))     (test aid) the next pick_start answers the pixel at the
 //                                     desktop point x, y without asking the user (Windows,
-//                                     X11; the portal and the browser ignore it)
+//                                     X11, macOS; the portal and the browser ignore it)
 //
 // One pick and one capture at a time (else Busy).  Picking needs no right: the user chooses
 // the one pixel the app gets, like a file in the file dialog.  Call pick_start and
@@ -32,7 +32,11 @@
 // size; no work area, no primary: the first output); in Wayland sessions and in Flatpak the
 // screenshot portal (Screenshot, PickColor: the desktop asks the user).  Browser: the host's
 // window.screen (getScreenDetails when the page may), the EyeDropper API (Chromium) for the
-// pick, no capture.  Android: the host's DisplayManager displays, no pick, no capture.
+// pick, no capture.  Android: the host's DisplayManager displays, no pick, no capture.  macOS
+// (apple_mac_screen.rs): NSScreen's screens; the pick through the system's loupe
+// (NSColorSampler, no right needed); pictures through ScreenCaptureKit (macOS 15.2 and later,
+// before CGWindowListCreateImage), which need the user's screen recording right for the program
+// (without it: Denied, and the system's dialog once).  iOS: none of the three.
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -199,7 +203,7 @@ pub fn pick_start() -> Result<(), ScreenError> {
 }
 
 /// (test aid) the next pick_start answers the pixel at the desktop point x, y at once,
-/// without asking the user (Windows, X11; the portal and the browser ignore it); None: ask
+/// without asking the user (Windows, X11, macOS; the portal and the browser ignore it); None: ask
 /// again.  With a manifest only where `screen.capture` allows pictures of the screen
 pub fn pick_test_point(p: Option<(i32, i32)>) {
     *TEST_POINT.lock() = p;
@@ -249,16 +253,23 @@ use crate::linux_screen as native;
 #[cfg(any(target_arch = "wasm32", target_os = "android"))]
 use crate::web_screen as native;
 
-// macOS: the screens of NSScreen (apple_mac.rs); iOS before AP5: none.  No colour pick and no
-// capture yet (docs/APPLE.md)
-#[cfg(target_vendor = "apple")]
+// macOS: the screens of NSScreen (apple_mac.rs), the pick and the pictures in apple_mac_screen.rs
+#[cfg(target_os = "macos")]
+mod native {
+    use super::Monitor;
+    use alloc::vec::Vec;
+    pub use crate::apple::mac::screen_os::{capture_available, capture_start, pick_available, pick_start};
+    pub fn monitors() -> Vec<Monitor> {
+        crate::apple::mac::monitors_os()
+    }
+}
+
+// iOS: no monitors, no pick outside the app, no pictures of the screen
+#[cfg(target_os = "ios")]
 mod native {
     use super::{Monitor, ScreenError};
     use alloc::vec::Vec;
     pub fn monitors() -> Vec<Monitor> {
-        #[cfg(target_os = "macos")]
-        return crate::apple::mac::monitors_os();
-        #[cfg(not(target_os = "macos"))]
         Vec::new()
     }
     pub fn pick_available() -> bool {
