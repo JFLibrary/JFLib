@@ -12,8 +12,9 @@
 //                             (data_refresh.rs)
 //
 // Shape fields: the shape's text, its name, every shape data field one of the shapes has (shown
-// by its label, the row name behind it).  A shape is linked when every pair matches (compared as
-// text, trimmed, ignoring case; diagram_core::data::auto_link).  The pairs go into the recordset
+// by its label; the row name only where two fields share a label).  A shape is linked when
+// every pair matches (compared as text, trimmed, ignoring case; diagram_core::data::auto_link).
+// The pairs go into the recordset
 // as Visio's AutoLinkComparison with the ContextType codes of VisAutoLinkFieldTypes: 1 the
 // shape's text, 9 its name, 14 a shape data row name (the label read from a file, 2, is found
 // on the shapes).
@@ -106,17 +107,29 @@ fn shapes(doc: &Document, st: &LinkState) -> Vec<ShapeRef> {
 // the shape fields: text, name, the shape data fields the shapes have (by row name, once)
 fn fields_of(doc: &Document, shapes: &[ShapeRef]) -> Vec<(String, ShapeField)> {
     let mut out: Vec<(String, ShapeField)> = alloc::vec![(String::from(t("Shape-Text")), ShapeField::Text), (String::from(t("Shape-Name")), ShapeField::Name)];
-    let mut data: Vec<(String, String)> = Vec::new();
+    // (name, label); a field shows its label, its row name only where two fields share a label
+    // (linked columns have Visio's row names "_VisDM_...", which say nothing to the user)
+    let mut named: Vec<(String, String)> = Vec::new();
     for &s in shapes {
         for r in doc.shape_data(SheetRef::Shape(s)) {
             let Some(name) = r.name() else { continue };
-            if data.iter().any(|(n, _)| n == name) {
+            if named.iter().any(|(n, _)| n == name) {
                 continue;
             }
-            let label = r.text("Label").unwrap_or("");
-            let shown = if label.is_empty() || label == name { String::from(name) } else { format!("{label} ({name})") };
-            data.push((String::from(name), shown));
+            named.push((String::from(name), String::from(r.text("Label").unwrap_or(""))));
         }
+    }
+    let mut data: Vec<(String, String)> = Vec::new();
+    for (name, label) in &named {
+        let twice = named.iter().filter(|(_, l)| !label.is_empty() && l.eq_ignore_ascii_case(label)).count() > 1;
+        let shown = if label.is_empty() || label == name {
+            name.clone()
+        } else if twice {
+            format!("{label} ({name})")
+        } else {
+            label.clone()
+        };
+        data.push((name.clone(), shown));
     }
     data.sort_by_key(|a| a.1.to_lowercase());
     out.extend(data.into_iter().map(|(n, shown)| (shown, ShapeField::Data(n))));

@@ -354,3 +354,63 @@ pub fn run(only: Option<&str>) -> i32 {
     plat::write_stdout(format!("sheet: {} ok, {} failed\n", t.ok, t.failed).as_bytes());
     if t.failed == 0 { 0 } else { 1 }
 }
+
+/// --sheet-dump FILE: a real workbook or text file as sheet_io reads it (a check of files that
+/// Excel or another program wrote; nothing of them goes into the repository)
+pub fn dump(path: &str) -> i32 {
+    let say = |s: String| plat::write_stdout(s.as_bytes());
+    let Some(bytes) = plat::read_file(path) else {
+        say(format!("{path}: cannot read\n"));
+        return 1;
+    };
+    let typed = |v: &Value| match v {
+        Value::Empty => String::from("-"),
+        Value::Number(x) => format!("N:{x}"),
+        Value::Text(t) => format!("T:{t:?}"),
+        Value::Bool(b) => format!("B:{b}"),
+        Value::Date(d) => format!("D:{}", v.text()).replace("D:", &format!("D({d}):")),
+        Value::Error(e) => format!("E:{}", e.text()),
+    };
+    let table = |t: &Table| {
+        say(format!("    columns: {}\n", t.columns.join(" | ")));
+        for r in &t.rows {
+            say(format!("    {}\n", r.iter().map(typed).collect::<Vec<_>>().join(" | ")));
+        }
+    };
+    if path.to_ascii_lowercase().ends_with(".csv") || path.to_ascii_lowercase().ends_with(".txt") {
+        return match csv::read(&bytes, &Options::DEFAULT) {
+            Ok(c) => {
+                say(format!("{path}: CSV, delimiter {:?}, {:?}, {} records\n", c.delimiter as char, c.encoding, c.records.len()));
+                table(&csv::to_table(&c, true, true));
+                0
+            }
+            Err(e) => {
+                say(format!("{path}: {}\n", e.text()));
+                1
+            }
+        };
+    }
+    let wb = match Workbook::open(&bytes, Limits::DEFAULT) {
+        Ok(wb) => wb,
+        Err(e) => {
+            say(format!("{path}: {}\n", e.text()));
+            return 1;
+        }
+    };
+    say(format!("{path}: {} sheets, date1904 {}\n", wb.sheets().len(), wb.date1904()));
+    for n in wb.names() {
+        say(format!("  name {:?} scope {:?} hidden {} builtin {} = {} -> {:?}\n", n.name, n.scope, n.hidden, n.builtin(), n.formula, n.area));
+    }
+    let mut rc = 0;
+    for (i, s) in wb.sheets().iter().enumerate() {
+        say(format!("  sheet {i} {:?} {:?} {:?}\n", s.name, s.state, s.kind));
+        match wb.sheet_table(i, true) {
+            Ok(t) => table(&t),
+            Err(e) => {
+                say(format!("    ERROR {}\n", e.text()));
+                rc = 1;
+            }
+        }
+    }
+    rc
+}
