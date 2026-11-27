@@ -57908,7 +57908,8 @@ with PrimaryKey elements the key columns identify a row across refreshes, withou
 (RowOrder = 1) its position does; RefreshOverwriteAll = 0 updates only the Value cells whose
 row has DataLinked = 1.  Row IDs start at 1 in the order of the source (Visio's DataAsXML).
 Visio's codes stay as they are in the model: Type and DataType 0 text, 1 fixed list,
-2 number, 3 Boolean, 4 variable list, 5 date, 6 duration, 7 currency.
+2 number, 3 Boolean, 4 variable list, 5 date, 6 duration, 7 currency.  New columns get Visio's
+row names ("_VisDM_" and the source name's letters and digits, ROW_PREFIX).
 ```
 
 - **`struct DataSets`**
@@ -57939,7 +57940,8 @@ Visio's codes stay as they are in the model: Type and DataType 0 text, 1 fixed l
   - `name: String` -- Name: the name of the shape data rows (Prop.&lt;Name>) the column maps to, unique
   - `label: String` -- Label: what the user sees (the shape data label; renaming a column changes it)
   - `orig_label: Option<String>` -- OrigLabel
-  - `lang: Option<u32>` -- LangID
+  - `lang: Option<String>` -- LangID as written: Visio writes a culture name ("de-DE"), not the number [MS-VSDX]'s
+    schema names
   - `calendar: Option<u16>` -- Calendar
   - `data_type: u16` -- DataType (kind::\*)
   - `unit_type: Option<String>` -- UnitType
@@ -58039,6 +58041,11 @@ Visio's codes stay as they are in the model: Type and DataType 0 text, 1 fixed l
   a row's key as text (the key columns' values joined by TAB; the row ID without key)
 - **`fn update_key_values(&mut self)`**
   recompute the RowKeyValue lists from the rows (after a change of rows or key columns)
+
+```rust
+/// the prefix of the shape data rows Visio makes for a linked column ("Prop._VisDM_Ports")
+ROW_PREFIX: &str = "_VisDM_"
+```
 
 - **`fn guess_kind<'a>(values: impl Iterator<Item = &'a DataValue>) -> u16`**
   the data type of a column from its values: number, date, Boolean or currency when every
@@ -65542,9 +65549,15 @@ The parts ([MS-VSDX] 2.3.3.2, 2.3.3.10; desktop Visio):
                                  persisted recordset: <xml> s:Schema > s:ElementType >
                                  s:AttributeType (name, rs:name, s:datatype dt:type) and
                                  rs:data > z:row with one attribute per column
-Row IDs: a Visio_RowID column when the data has one (DataAsXML adds it), else the
-RowKeyValue of the row's key, else the position (from 1).  The data is written without
-Visio_RowID: the key or the position gives the IDs back.
+Row IDs: the column "_Visio_RowID_" (Visio 16 writes it first in the data of a recordset it
+made itself; DataAsXML calls it "Visio_RowID"), else the RowKeyValue of the row's key (when
+the key values name every row once), else the RowIDs of the key values in their order (Visio
+saves rows it has not loaded with stale key values, the RowIDs in row order), else the
+position (from 1).  Written with "_Visio_RowID_" first, as Visio writes its own.
+What Visio 16 does otherwise (the Visio check of 2026-11-27): LangID='de-DE' (a culture name,
+not the number the schema names), no XML declaration in the data part, a column's name as
+the attribute when it is a plain name (else cN with rs:name), hex character references;
+it keeps a data part it has not loaded as it was.
 
 Everything is untrusted: the parts are bounded by the ZIP limits (part size), the XML by the
 reader's depth and attribute limits; nothing recurses.
