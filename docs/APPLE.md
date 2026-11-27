@@ -335,8 +335,12 @@ Nord (mit Magnetometer, sonst beliebig), der Standort „beim Verwenden“ (`NSL
   - **Geprüft:** `plattest --test ios` unter UIKit (21 von 21: Bildschirm an, Dunkel und Hell, Textgröße bis zur
     größten Barrierefreiheitsstufe, Teilen, Drehen; mit `jfgui_GPU=1` folgt die GPU-Ebene dem Drehen), `--test
     bookmarks` (12 von 12), `--test power`, `--test settings`, `--test share`.
-  - **Noch offen:** Lesezeichen und Teilen auf dem echten iPhone; ob ein Ziel die geteilten Dateien wirklich bekommt,
-    zeigt nur ein Test von Hand.
+  - **Auf dem iPhone 14 von Hand geprüft (2026-11-27)** mit der Galerie (Karten „06 System“ und „04 Dateien“): Teilen
+    öffnet den Dialog, Schließen ohne Ziel gibt „abgebrochen“, „In Dateien sichern“ gibt „geteilt“ und legt die Datei
+    ab; die gewählte Datei öffnet nach einem Neustart der App wieder („Zuletzt öffnen“). Dabei gefunden: Dateien mit
+    Schema (`data://…`) gingen ungeprüft als Pfad an den Dialog, der sie still wegließ (behoben: `plat::share` gibt
+    den Pfad dahinter weiter, auch auf macOS und Windows). iOS bietet „In Dateien sichern“ nur an, wenn alles
+    Geteilte Dateien sind.
 
   Markierter Text der Tastatur (`UITextInput`: Diktat, Vorschläge, Tastaturen mit Zusammensetzung) und Accessibility
   kamen mit VoiceOver ([VOICEOVER.md](VOICEOVER.md) VO4). Das Bild geht bei jedem Frame ganz als Kopie an den Layer;

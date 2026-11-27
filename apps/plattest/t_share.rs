@@ -1,6 +1,7 @@
 // t_share -- the system's share sheet (lib/plat/share.rs)
 //
-//   plattest --test share      the contract: nothing to share, an empty or missing file -> SHARE_NONE,
+//   plattest --test share      the contract: nothing to share, an empty or missing file, a mem:// file
+//                              where the system's sheet needs a path (Windows, macOS, iOS) -> SHARE_NONE,
 //                              no answer without a sheet, nothing open; CAP_SHARE where the system
 //                              has a sheet (Windows, macOS; iOS only under UIKit's host; Linux none)
 //   plattest --test share-ui   (by hand, Windows and macOS: a real window that takes the front) the
@@ -24,6 +25,13 @@ pub fn t_share(t: &mut T) {
     t.check(share(&Share { files: alloc::vec![alloc::string::String::new()], ..Share::default() }) == SHARE_NONE, "share: an empty path -> SHARE_NONE");
     let missing = format!("{}/plattest-share-missing-{}.txt", plat::temp_dir().unwrap_or_default().trim_end_matches('/'), plat::time_us());
     t.check(share(&Share::files(&[&missing])) == SHARE_NONE, "share: a missing file -> SHARE_NONE");
+    // the system's sheets get the path behind a scheme (data://); a file without one cannot go
+    if cfg!(any(windows, target_os = "macos", target_os = "ios")) {
+        let mem = "mem://plattest-share.txt";
+        let there = plat::write_file(mem, b"nur im Speicher") && plat::file_exists(mem) == 1;
+        t.check(there && share(&Share::files(&[mem])) == SHARE_NONE, "share: a mem:// file (no path of the system) -> SHARE_NONE");
+        let _ = plat::delete(mem);
+    }
     t.check(share_poll().is_none() && !share_open(), "share: no answer, nothing open");
     let cap = capabilities().supports(CAP_SHARE);
     let want = cfg!(any(windows, target_os = "macos"));
@@ -109,7 +117,8 @@ mod ui_test {
     }
 
     pub fn t_share_ui(t: &mut T) {
-        let file = format!("{}/plattest-share.txt", plat::temp_dir().unwrap_or_default().trim_end_matches('/'));
+        // a name with a scheme: the sheet gets the path behind it
+        let file = String::from("data://plattest-share.txt");
         t.check(plat::write_file(&file, "Eine Datei aus plattest\n".as_bytes()), "share-ui: the file to share");
         let code = ui::launch(&DESC, Sharer { file: file.clone() }, &style::STYLE);
         t.expect_i(code as i64, 0, "share-ui: the window ran");

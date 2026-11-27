@@ -30911,8 +30911,9 @@ AirDrop, Nearby Share, a chat ...)
 
 Share { title, text, url, files, anchor }: `title` the subject (a mail's subject line, Windows'
 title of the data; may be empty), `text` plain text, `url` a link (http, https, mailto ...),
-`files` paths of the file system (the browser: of its virtual files) -- at least one of text, url,
-files.  `anchor` [x, y, w, h] in the window's pixels: what the sheet points at where it is a
+`files` paths of the file system or names with a scheme (data://, docs:// ...; the browser: its
+virtual files) -- at least one of text, url, files.  Windows, macOS and iOS get the path behind a
+scheme (vfs::os_path); a file without one there (mem://) is SHARE_NONE.  `anchor` [x, y, w, h] in the window's pixels: what the sheet points at where it is a
 popover (macOS, an iPad); empty: the window's middle (macOS, iPad) / its usual place.
 
 What "done" means differs (it says nothing about delivery): iOS and macOS a service was chosen
@@ -30923,7 +30924,8 @@ Windows (win_share.rs): DataTransferManager of the active window through
 IDataTransferManagerInterop (Windows 10), the data package filled in DataRequested (text, a web
 link, storage items of the files).  macOS (apple_mac_share.rs): NSSharingServicePicker at the
 anchor in the key window.  iOS (apple_ios_share.rs): UIActivityViewController over the scene's
-window, on an iPad a popover at the anchor.  Browser and Android (web_share.rs): the host --
+window, on an iPad a popover at the anchor; it offers only what takes every item ("Save to
+Files" only when all of them are files, a text or a link leaves it out).  Browser and Android (web_share.rs): the host --
 navigator.share (files as File objects; the browser asks for the user's gesture: call it while
 handling input) / Intent.ACTION_SEND(_MULTIPLE) in a chooser (files through the host's provider,
 readable by the target only).  Linux: none.
