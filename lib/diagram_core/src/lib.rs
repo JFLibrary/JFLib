@@ -78,6 +78,8 @@
 //                                 CN-05, SS-40), shapes connectors may cross (SS-19)
 //   route_edit::*                 (JD21) a connector's way by hand: midpoints and vertices
 //                                 moved, added, removed, the way kept when its shapes move (CN-04)
+//   jumps::*                      (JD21) line jumps where connectors cross, written into the
+//                                 connectors' Geometry when they are laid, as Visio does (CN-06)
 //   pointglue::*                  (JD21) control points that glue to connection points and
 //                                 follow them (SP-04), glue to vertices, handles, control points
 //                                 and guides (CN-02), the connection point tool (CN-01)
@@ -115,6 +117,7 @@ pub mod groups;
 pub mod hit;
 mod inherit;
 pub mod instance;
+pub mod jumps;
 pub mod layout;
 mod names;
 pub mod ops;

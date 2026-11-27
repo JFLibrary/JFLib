@@ -59,6 +59,10 @@
 // itself); the styles with a direction choose the sides (route_styles.rs); ShapePermeableX/Y let
 // ways cross a shape (route::best_through).
 //
+// (JD21v) After routing, the line jumps of the connectors laid and of the connectors they cross
+// go into their Geometry (jumps.rs, as Visio writes them); detach takes the jumps over deleted
+// connectors away; path() reads a connector's way without them.
+//
 // Nothing happens on its own: opening a file routes nothing, only the shapes handed to update.
 
 use alloc::collections::BTreeSet;
@@ -293,11 +297,15 @@ pub fn style(doc: &Document, shape: ShapeRef) -> Style {
     }
 }
 
-/// the drawn way of a shape on the page: the first shown Geometry section, curves flattened
+/// the drawn way of a shape on the page: the first shown Geometry section, curves flattened;
+/// (JD21 jumps) a connector's way without its line jumps (jumps::way)
 pub fn path(doc: &Document, shape: ShapeRef) -> Vec<[f64; 2]> {
     let mut out = Vec::new();
     if doc.shape(shape).is_none() {
         return out;
+    }
+    if let Some(w) = crate::jumps::way(doc, shape) {
+        return w;
     }
     let sheet = SheetRef::Shape(shape);
     let (w, h) = (num_sym(doc, sheet, names::WIDTH).unwrap_or(0.0), num_sym(doc, sheet, names::HEIGHT).unwrap_or(0.0));
@@ -542,6 +550,8 @@ pub fn dependents(doc: &Document, owner: Owner, moved: &[ShapeRef]) -> Vec<Shape
 /// ends -- the glued cells keep their values as constants, triggers point to the shape itself,
 /// the Connect entries go (Transaction::delete_shapes removes the deleted shapes' own)
 pub fn detach(tx: &mut Transaction, eng: &mut Engine, owner: Owner, deleted: &[ShapeRef]) -> Result<(), EditError> {
+    // (JD21 jumps) the line jumps over their connectors go
+    crate::jumps::forget(tx, eng, deleted)?;
     let ids = subtree_ids(tx.doc(), owner, deleted);
     let list: Vec<(usize, Connect)> = connects(tx.doc(), owner)
         .iter()
@@ -813,6 +823,8 @@ fn run(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef], force: bool)
     let mut cache: Vec<(Owner, Vec<(ShapeRef, [f64; 4])>)> = Vec::new();
     // (JD21, SS-19) which way connectors may cross each obstacle of an entry of the cache
     let mut passes: Vec<Vec<u8>> = Vec::new();
+    // (JD21 jumps) the connectors laid, in order, with their ways before (jumps.rs)
+    let mut laid = crate::jumps::Laid::default();
     for &c in shapes {
         if !is_one_d(tx.doc(), c) {
             continue;
@@ -833,12 +845,14 @@ fn run(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef], force: bool)
             };
             let boxes: Vec<[f64; 4]> = cache[i].1.iter().filter(|(s, _)| *s != c).map(|(_, b)| *b).collect();
             let pass: Vec<u8> = cache[i].1.iter().zip(&passes[i]).filter(|((s, _), _)| *s != c).map(|(_, p)| *p).collect();
+            laid.note(tx.doc(), c);
             route_one(tx, eng, c, force, &boxes, &pass)?;
         } else {
             walk_line(tx, eng, c)?;
         }
     }
-    Ok(())
+    // (JD21 jumps) their line jumps and those of the connectors they cross or crossed
+    crate::jumps::lay(tx, eng, &laid)
 }
 
 // a 1-D shape with walking glue that is no connector: a dynamic end docks on the outline
@@ -1021,16 +1035,16 @@ fn side_formula(current: &str, d: f64, standard: &'static str) -> Option<String>
     (want != current).then_some(want)
 }
 
-// a value of a Geometry cell: a constant or a formula
-enum Cv {
+// a value of a Geometry cell: a constant or a formula (NURBS(..), POLYLINE(..))
+pub(crate) enum Cv {
     N(f64),
     F(String),
 }
 
-struct GeoRow {
-    kind: Sym,
-    kind_name: &'static str,
-    cells: Vec<(Sym, Cv)>,
+pub(crate) struct GeoRow {
+    pub(crate) kind: Sym,
+    pub(crate) kind_name: &'static str,
+    pub(crate) cells: Vec<(Sym, Cv)>,
 }
 
 pub(crate) fn write_route(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef, targets: &[Target; 2], pts: &[[f64; 2]], style: Style) -> Result<(), EditError> {
@@ -1182,8 +1196,9 @@ fn place_row(tx: &mut Transaction, sheet: SheetRef, sk: SecKey, key: u32, kind: 
     }
 }
 
-// write the rows into the connector's first Geometry section (made when it has none)
-fn write_geometry(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef, rows: &[GeoRow]) -> Result<(), EditError> {
+// write the rows into the connector's first Geometry section (made when it has none); (JD21
+// jumps) jumps.rs writes its line jumps through it
+pub(crate) fn write_geometry(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef, rows: &[GeoRow]) -> Result<(), EditError> {
     let sheet = SheetRef::Shape(c);
     let sk = match tx.doc().geometry(sheet).first() {
         Some(k) => *k,
@@ -1235,9 +1250,10 @@ fn write_geometry(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef, rows: &[G
             match v {
                 Cv::N(x) => tx.force_constant(sheet, &a, Value::Num(*x), None)?,
                 Cv::F(f) => {
-                    // the value as text with its unit (U="NURBS"), then the formula for it
+                    // the value as text with its unit (U="NURBS", "POLYLINE"), then the formula
+                    let unit = if f.starts_with("POLYLINE") { crate::units::Unit::Polyline } else { crate::units::Unit::Nurbs };
                     let v = Value::Text(tx.intern(f));
-                    tx.force_constant(sheet, &a, v, Some(crate::units::Unit::Nurbs))?;
+                    tx.force_constant(sheet, &a, v, Some(unit))?;
                     tx.force_formula(sheet, &a, f)?;
                     formulas.push((sheet, a));
                 }

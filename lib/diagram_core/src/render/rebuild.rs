@@ -12,21 +12,17 @@
 // changed.  false (nothing changed in the drawing): a shape came or went, the top-level order
 // changed, the page's size or scale changed, a named shape of the page is not in the drawing
 // -- the caller builds anew.  Changes the shapes do not show (the page's layers, styles,
-// masters, themes; JD21: its line jump cells) are the caller's to know: they need build.
-//
-// (JD21) Line jumps: a connector that moved changes the jumps of the connectors it crossed and
-// crosses now, so their top-level shapes are made anew too (jumps::plan; render::affected names
-// them all beforehand, for a caller that keeps something per top-level shape, PageView::update).
+// masters, themes) are the caller's to know: they need build.  (JD21) Line jumps are rows of
+// the connectors' Geometry: a connector whose jumps changed is a changed shape like any other.
 
 use alloc::vec::Vec;
 
-use super::{chain_of, fonts_of, jumps, merge_notes, page_frame, ApproxMeasure, Builder, Drawing, Item, Measure, Note, Options};
+use super::{chain_of, fonts_of, merge_notes, page_frame, Builder, Drawing, Item, Measure, Note, Options};
 use crate::document::{Document, Owner, ShapeRef};
 use crate::geometry::Xform;
 
-/// (JD21) the top-level shapes rebuild makes anew for `shapes`: theirs, and those of the
-/// connectors whose line jumps they change (in painter's order; shapes the drawing does not
-/// show are passed over)
+/// (JD21) the top-level shapes rebuild makes anew for `shapes` (in painter's order; shapes the
+/// drawing does not show are passed over)
 pub fn affected(doc: &Document, d: &Drawing, opts: &Options, shapes: &[ShapeRef]) -> Vec<ShapeRef> {
     let Some(page) = d.page else { return Vec::new() };
     let chain = chain_of(doc, page, opts);
@@ -38,14 +34,6 @@ pub fn affected(doc: &Document, d: &Drawing, opts: &Options, shapes: &[ShapeRef]
         .collect();
     want.sort_unstable();
     want.dedup();
-    if !want.is_empty() {
-        let mut m = ApproxMeasure;
-        let mut b = Builder::with_themes(doc, &mut m, *opts, Vec::new());
-        let plan = jumps::plan(&mut b, &d.tops, &d.jumps, &want);
-        want.extend(jumps::partner_tops(&d.tops, &d.jumps, &plan));
-        want.sort_unstable();
-        want.dedup();
-    }
     want.into_iter().map(|k| d.tops[k].shape).collect()
 }
 
@@ -89,15 +77,6 @@ pub fn rebuild(doc: &Document, d: &mut Drawing, measure: &mut dyn Measure, opts:
     // build them, each in its page's context
     let themes = core::mem::take(&mut d.themes);
     let mut b = Builder::with_themes(doc, measure, *opts, themes);
-    // (JD21) the connectors whose jumps change are made anew too, with the jumps worked out
-    let mut pages = core::mem::take(&mut d.jumps);
-    let plan = jumps::plan(&mut b, &d.tops, &pages, &want);
-    want.extend(jumps::partner_tops(&d.tops, &pages, &plan));
-    want.sort_unstable();
-    want.dedup();
-    jumps::refresh(&mut pages, plan);
-    b.jumps = pages;
-    b.cur_jumps = None;
     let mut made: Vec<(usize, Vec<Item>, Vec<(Note, u32)>)> = Vec::with_capacity(want.len());
     let mut cur = None;
     for &i in &want {
@@ -114,7 +93,6 @@ pub fn rebuild(doc: &Document, d: &mut Drawing, measure: &mut dyn Measure, opts:
         made.push((i, items, notes));
     }
     d.themes = core::mem::take(&mut b.themes);
-    d.jumps = core::mem::take(&mut b.jumps);
     drop(b);
     // into the list
     let mut changes: Vec<(usize, usize, usize)> = Vec::with_capacity(made.len());

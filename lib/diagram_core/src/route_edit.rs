@@ -125,12 +125,14 @@ pub fn orthogonal(pts: &[[f64; 2]]) -> bool {
     pts.windows(2).all(|w| same(w[0], w[1]) || along(w[0], w[1]).is_some())
 }
 
-// the corners of the drawn way: the first Geometry section of MoveTo and LineTo rows only
+// the corners of the drawn way: the first Geometry section of MoveTo and LineTo rows only;
+// (JD21 jumps) line jump rows in it are no corners (glue::path leaves them out)
 fn corners(doc: &Document, c: ShapeRef) -> Option<Vec<[f64; 2]>> {
     let sheet = SheetRef::Shape(c);
     let sk = *doc.geometry(sheet).first()?;
     let rows = doc.rows(sheet, sk);
-    if rows.is_empty() || rows.iter().any(|r| r.kind != Some(names::MOVE_TO) && r.kind != Some(names::LINE_TO)) {
+    let plain = || rows.iter().all(|r| r.kind == Some(names::MOVE_TO) || r.kind == Some(names::LINE_TO));
+    if rows.is_empty() || (!plain() && crate::jumps::way(doc, c).is_none()) {
         return None;
     }
     let mut pts: Vec<[f64; 2]> = Vec::with_capacity(rows.len());
@@ -372,7 +374,11 @@ pub fn set_way(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef, pts: &[[f64;
     let targets = glue::glued(doc, c);
     let sheet = SheetRef::Shape(c);
     let code = num(doc, sheet, "ConFixedCode").unwrap_or(0.0);
+    // (JD21 jumps) laid: its line jumps and its partners' anew (jumps.rs)
+    let mut laid = crate::jumps::Laid::default();
+    laid.note(doc, c);
     glue::write_route(tx, eng, c, &targets, pts, style)?;
+    crate::jumps::lay(tx, eng, &laid)?;
     if code != 1.0 && code != 2.0 {
         let a = tx.single("ConFixedCode");
         tx.set_constant(sheet, &a, Value::Num(1.0), None)?;

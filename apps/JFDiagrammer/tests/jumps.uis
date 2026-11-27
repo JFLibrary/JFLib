@@ -1,7 +1,8 @@
 #!args --no-system-fonts --export-dir build
 # JFDiagrammer, JD21: line jumps (CN-06) -- two connectors drawn across each other with the
 # connector tool (free ends): the horizontal one hops over the vertical one (a new drawing's page
-# has no line jump cells: horizontal lines, arc, up).  Entwurf › Verbinder › Linienübergänge
+# has no line jump cells: horizontal lines, arc, up, 2/3 of 2.5 mm; JD21v: the jump is rows of the
+# connector's Geometry, written when it is laid, as in Visio).  Entwurf › Verbinder › Linienübergänge
 # anzeigen turns them off and on (an undo step each); Seite einrichten › Layout und Routing:
 # Visio's six codes and nine styles, the style Lücke, the size and the direction (undone);
 # Verbinder-Verhalten is in a connector's menu (not in a rectangle's): "Nie" takes the

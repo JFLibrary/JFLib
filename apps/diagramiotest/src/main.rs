@@ -61,6 +61,9 @@
 //   diagramiotest --write-jd21-jumps DIR  (JD21) JD21-Gegenprobe-Linienuebergaenge.vsdx (line
 //                                         jumps: a page per style, code, direction ...) and a PNG
 //                                         of each page (jumps.rs)
+//   diagramiotest --compare-visio-jumps FILE  (JD21v) a drawing Visio saved after laying every
+//                                         connector anew: the same laying here, the rows against
+//                                         Visio's (jumps.rs)
 //   diagramiotest --write-jd21-groups DIR (JD21) jd21-gruppen.vsdx: Shape ändern, a group with its
 //                                         behaviour cells, boundary members (groups.rs)
 //   diagramiotest --write-jd21-route DIR  (JD21) JD21-Gegenprobe-Routing.vsdx (a page per routing
@@ -346,6 +349,10 @@ fn run() -> i32 {
     if let Some(dir) = arg(&args, "--write-jd21-jumps") {
         // (JD21) the line jumps drawing for the Visio counter-check, a PNG per page
         return jumps::write(&dir);
+    }
+    if let Some(file) = arg(&args, "--compare-visio-jumps") {
+        // (JD21v) line jumps laid here against a file Visio laid anew
+        return jumps::compare(&file);
     }
     if let Some(dir) = arg(&args, "--write-jd21-groups") {
         // (JD21) groups, boundary members, Shape ändern for the Visio counter-check
