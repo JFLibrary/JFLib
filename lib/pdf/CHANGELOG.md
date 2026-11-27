@@ -45,6 +45,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - jflib-pdf depends on jflib-crypto (MD5, SHA-2 and AES for the reader's decryption); its license is (MIT OR Apache-2.0) AND BSD-3-Clause AND OFL-1.1 for the Adobe Glyph List and the widths of the Liberation fonts in the reader's tables (lib/pdf/licenses/)
 - pdf depends on rt, text, plat, img_core and img_jpeg (glyph outlines, the system's fonts, JPEG) and is a compute crate (opt-level 2 in development builds: it draws pages); its generated tables gained the glyph names of the standard encodings and CFF's standard strings
 
+### Fixed
+
+- Drawing pages: a soft mask takes the place of the image's `Mask` (ISO 32000-1, Table 89): `SMask` and the opacity channel of a JPEG 2000 image (`SMaskInData`), which stands for it; before, a colour key or stencil mask was applied as well
+
 [Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.1...HEAD
 
 ### Changed

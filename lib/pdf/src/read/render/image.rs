@@ -1,6 +1,7 @@
 // Images (ISO 32000-1, 8.9): the samples of every bit depth through Decode and the colour
 // space into RGBA, stencil masks (ImageMask) painted with the fill colour or pattern, explicit
-// masks (/Mask as a stencil or as colour-key ranges), soft masks (/SMask, with /Matte), inline
+// masks (/Mask as a stencil or as colour-key ranges; a soft mask takes their place), soft masks
+// (/SMask, with /Matte), inline
 // images with their abbreviations; DCTDecode through img_jpeg, CCITTFaxDecode through fax.rs,
 // JPXDecode through img_jp2 (its own size and bit depth, Decode ignored, the colour space from
 // the JP2 header when the dictionary names none, SMaskInData; JBIG2Decode is left out).  Drawing
@@ -477,6 +478,9 @@ impl Img {
             }
         }
         let mut img = Img { w, h, px, stencil: false, interpolate, oc: d.get("OC").cloned() };
+        // a soft mask takes the place of Mask: SMask (ISO 32000-1, 8.9.5, Table 89), and the opacity
+        // of a JPEG 2000 image, which stands for SMask (SMaskInData; SMask is not given then)
+        let soft = jpx_alpha.is_some() || depth == 0 && matches!(doc.key(d, "SMask"), Object::Stream(_));
         if let Some(a) = jpx_alpha {
             let mut mpx = vec![0u8; w * h * 4];
             for (m, &a) in mpx.chunks_exact_mut(4).zip(&a) {
@@ -486,6 +490,7 @@ impl Img {
         }
         // masks
         match doc.key(d, "Mask") {
+            _ if soft => {}
             Object::Array(ranges) if rgb_direct.is_none() => {
                 let mut r: Vec<i64> = ranges.iter().filter_map(|v| doc.resolve(v).as_int()).collect();
                 if r.len() >= 2 * n {

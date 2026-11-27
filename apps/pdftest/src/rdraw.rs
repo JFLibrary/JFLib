@@ -320,7 +320,9 @@ fn render_image(t: &mut T) {
     let mask = img("/Width 2 /Height 2 /ImageMask true /BitsPerComponent 1", &[0b1000_0000, 0b0000_0000]);
     expect(t, "explicit mask", page(b"0 0 0 rg 0 0 100 100 re f q 80 0 0 80 10 10 cm /I Do Q", xo, &[(10, img("/Width 2 /Height 2 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Mask 11 0 R", &quad)), (11, mask)], ""), &[(20.0, 80.0, BLACK), (80.0, 80.0, GREEN), (20.0, 20.0, BLUE)], 0);
     let soft = img("/Width 2 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8", &[0, 128]);
-    expect(t, "soft mask", page(b"0 0 0 rg 0 0 100 100 re f q 80 0 0 80 10 10 cm /I Do Q", xo, &[(10, img("/Width 2 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8 /SMask 11 0 R", &[255, 255])), (11, soft)], ""), &[(20.0, 50.0, BLACK), (80.0, 50.0, [128, 128, 128])], 1);
+    expect(t, "soft mask", page(b"0 0 0 rg 0 0 100 100 re f q 80 0 0 80 10 10 cm /I Do Q", xo, &[(10, img("/Width 2 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8 /SMask 11 0 R", &[255, 255])), (11, soft.clone())], ""), &[(20.0, 50.0, BLACK), (80.0, 50.0, [128, 128, 128])], 1);
+    // the soft mask takes the place of Mask (a colour key of both samples would leave black)
+    expect(t, "soft mask over a colour key", page(b"0 0 0 rg 0 0 100 100 re f q 80 0 0 80 10 10 cm /I Do Q", xo, &[(10, img("/Width 2 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8 /SMask 11 0 R /Mask [255 255]", &[255, 255])), (11, soft)], ""), &[(20.0, 50.0, BLACK), (80.0, 50.0, [128, 128, 128])], 1);
     // an inline image with abbreviations and a filter
     expect(t, "inline image", page(b"q 80 0 0 80 10 10 cm BI /W 2 /H 2 /CS /RGB /BPC 8 /F /AHx ID ff000000ff000000ffffffff> EI Q", "", &[], ""), &corners(0), 0);
     // turned: the middle of the image is where the matrix puts it
@@ -369,6 +371,8 @@ fn render_image(t: &mut T) {
     // premultiplied 2-bit grey 1 under opacity 192 (SMaskInData 2): straight 1/3 * 255/192 = 113 at
     // 8 bits (not 85, the 2-bit 1 again), then 3/4 of it over the white paper
     expect(t, "JPX premultiplied low-precision grey", jpx("/Width 8 /Height 8 /Filter /JPXDecode /SMaskInData 2", JP2_GRAY2_ALPHA), &[(50.0, 50.0, [148, 148, 148])], 2);
+    // its opacity takes the place of Mask (the colour key [1 2] would hide every pixel)
+    expect(t, "JPX opacity over a colour key", jpx("/Width 8 /Height 8 /Filter /JPXDecode /SMaskInData 2 /Mask [1 2]", JP2_GRAY2_ALPHA), &[(50.0, 50.0, [148, 148, 148])], 2);
     // a damaged one leaves the page alone
     expect(t, "JPX damaged", jpx("/Width 2 /Height 2 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /JPXDecode", b"junk"), &[(50.0, 50.0, WHITE)], 0);
     expect(t, "JPX cut short", jpx("/Width 8 /Height 8 /ColorSpace /DeviceRGB /Filter /JPXDecode", &J2K_RGB[..40]), &[(50.0, 50.0, WHITE)], 0);
