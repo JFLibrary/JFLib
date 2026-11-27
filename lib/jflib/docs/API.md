@@ -132,6 +132,8 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
   <br>[lib.rs](#netchan-crate-root) · [src/client.rs](#netchansrcclientrs) · [src/conn.rs](#netchansrcconnrs) · [src/endpoint.rs](#netchansrcendpointrs) · [src/packet.rs](#netchansrcpacketrs) · [src/reliable.rs](#netchansrcreliablers) · [src/seal.rs](#netchansrcsealrs) · [src/server.rs](#netchansrcserverrs) · [src/ws.rs](#netchansrcwsrs)
 - [sheet_io](#sheet_io) -- XLSX and CSV import: workbooks and delimited text as typed tables
   <br>[lib.rs](#sheet_io-crate-root) · [src/csv.rs](#sheet_iosrccsvrs) · [src/xlsx.rs](#sheet_iosrcxlsxrs)
+- [img_jp2](#img_jp2) -- JPEG 2000 decoder
+  <br>[lib.rs](#img_jp2-crate-root)
 
 ## ui
 
@@ -15481,6 +15483,10 @@ IMGF_COUNT: u32 = 55
 /// (svg) SVG: the last slot, outside the static table until img_svg::register fills it
 /// (register_external stops before it)
 IMGF_SVG: u32 = IMGF_COUNT - 1
+/// JPEG 2000 (JP2, JPX, J2K): the slot before SVG's, outside the static table until
+/// img_all::use_all_codecs fills it with img_jp2's codec (register_external stops before it, so
+/// the external codecs keep their numbers)
+IMGF_JP2: u32 = IMGF_COUNT - 2
 ```
 
 *limits*
@@ -16245,7 +16251,8 @@ Extended API:
                                                it does not fit into cap bytes)
   register(fmt, codec) -> 0 / ERR_UNSUPPORTED  register_dyn(name, exts, mime, props, codec)
   register_slot(IMGF_SVG, name, exts, mime, props, codec)   (svg) a built-in format without
-                                               a static entry (img_svg::register)
+                                               a static entry (img_svg::register; IMGF_JP2:
+                                               img_all::use_all_codecs)
   set_file_io(FileIo)                          the file functions of load / save (img_core
                                                does not depend on plat: the app sets them)
 Glue for the core codecs (imgcore.s):
@@ -16285,10 +16292,10 @@ metadata fields stay).
 
 - **`fn register_external(name: &'static str, exts: &'static str, props: u32, c: &'static Codec) -> u32`**
   Separate slots for external codec hosts, preserving the native plugin ABI's IDs (the
-  last slot, IMGF_SVG, is kept for SVG).
+  last two slots, IMGF_JP2 and IMGF_SVG, are kept for JPEG 2000 and SVG).
 
 - **`fn register_slot(fmt: u32, name: &'static str, exts: &'static str, mime: &'static str, props: u32, c: Option<&'static Codec>) -> i32`**
-  (svg) a built-in format that has no entry in the static table (IMGF_SVG): its name,
+  a built-in format that has no entry in the static table (IMGF_SVG, IMGF_JP2): its name,
   extension list, MIME type, properties and codec into slot fmt (None empties the slot)
   -> 0 / ERR_UNSUPPORTED (fmt out of range, or a static / runtime format's slot)
 
@@ -17048,7 +17055,7 @@ img_all -- registration of the codec crates in the format table  [src/img/imgreg
   use_core_codecs()   PNG, JPEG, BMP, GIF (the assembly registers them statically: call it
                       once at start-up, before worker threads decode)
   use_all_codecs()    every codec of the library, the core formats included
-                      (img_use_all_codecs)
+                      (img_use_all_codecs); JPEG 2000 into its slot IMGF_JP2
 
 Each codec crate exports `pub static CODEC: img_core::Codec`; the codec agents add one
 registration line for their crate below.
@@ -65650,7 +65657,7 @@ most Options::max_stream bytes.  Permissions are reported, not enforced: what a 
 allows its user to do with the document is its own decision.
 
 Not here: the image filters for decode_until_image (it stops before DCT, JPX, JBIG2 and
-CCITTFax; drawing decodes DCT and CCITTFax), JPX and JBIG2 images at all, the predefined CMaps
+CCITTFax; drawing decodes DCT, CCITTFax and JPX), JBIG2 images at all, the predefined CMaps
 of East Asian fonts other than Identity and the Unicode ones, verifying signatures, changing
 and saving documents.
 ```
@@ -65986,9 +65993,9 @@ stencil masks, colour-key masks, soft masks, the JPEG filter (through img_jpeg) 
 CCITTFax; shadings of every type (sh and as patterns), tiling patterns coloured and
 uncoloured; form XObjects, transparency groups and soft masks (luminosity and alpha, with
 backdrop and transfer function); the annotations' appearances; optional content (the
-default configuration, membership dictionaries).  Not here: JPXDecode and JBIG2Decode images
-(left out), knockout and non-isolated groups (drawn as isolated ones), overprint, halftones,
-transfer functions outside soft masks.
+default configuration, membership dictionaries); JPXDecode images through img_jp2.  Not here:
+JBIG2Decode images (left out), knockout and non-isolated groups (drawn as isolated ones),
+overprint, halftones, transfer functions outside soft masks.
 
   let doc = read::Document::open(bytes)?;
   let page: gfx::Surface = doc.render(0, &RenderOptions { dpi: 150.0, ..Default::default() })?;
@@ -73886,3 +73893,87 @@ never read; a shared-string index out of range is Invalid.
 - **`fn sheet_table(&self, index: usize, header: bool) -> Result<Table, Error>`**
   The used range of a sheet as a Table (from the first to the last row and column that hold
   a value); an empty sheet gives an empty Table.
+
+## img_jp2
+
+*JPEG 2000 decoder* -- crate root [`lib/img_jp2/src/lib.rs`](../lib/img_jp2/src/lib.rs)
+
+```text
+img_jp2 -- JPEG 2000 decoder (ITU-T T.800 | ISO/IEC 15444-1, the JP2 file format and the parts
+of JPX that JP2 readers meet)
+
+  decode(data, &Options) -> Image / Error     a JP2 / JPX file or a raw codestream (J2K, J2C)
+  probe(data) -> bool                         the JP2 signature or the start of a codestream
+  Image { width, height, components, color, alpha, premultiplied }
+  Component { width, height, dx, dy, precision, signed, data }   samples, row by row
+  CODEC                                       img_core's codec (8-bit ARGB surfaces) for img_all
+
+Modules: boxes (the JP2 boxes), codestream (the markers), tile (geometry, packets, progression,
+dequantisation, assembly), t1 (the code-blocks), mq (the arithmetic decoder), dwt (the wavelets).
+
+What it decodes: every progression order and POC, tiles and tile-parts in any order, precincts,
+layers, SOP / EPH, PPM / PPT, every code-block style (bypass, reset, terminate-all, vertically
+causal, predictable termination, segmentation symbols), ROI max-shift, the 5/3 and 9/7 wavelets
+with any image and tile offsets, RCT and ICT, sub-sampled components, precision 1 to 24 bits,
+signed and unsigned.  From the JP2 header: the colour space (enumerated sRGB, greyscale, sYCC,
+CMYK, CIELab; an ICC profile), the palette with its component mapping (applied here) and the
+channel definitions (colour channels in their order, the opacity channel).  sYCC is converted to
+RGB here.  `Options::reduce` decodes a lower resolution (each level halves the size).
+
+Not here: Part 2 (other wavelets, multiple-component transforms beyond RCT / ICT, trellis
+quantisation), precision above 24 bits.  A file that is cut short gives what was decoded up to
+there (like the common readers); limits (`Options::max_pixels`, code-blocks, precincts) refuse
+hostile files before they cost memory.
+```
+
+### `img_jp2` crate root
+
+- **`enum Error`**
+  why a file could not be decoded
+  - `NotJpeg2000` -- neither a JP2 file nor a codestream
+  - `Truncated` -- the headers end early
+  - `Corrupt` -- a header that breaks the standard
+  - `Unsupported` -- valid, but not decoded here (Part 2, more than 24 bits)
+  - `Limit` -- larger than the limits allow
+
+- **`struct Options`**
+  what to decode
+  - `reduce: u8` -- resolution levels to leave out (each halves width and height)
+  - `max_pixels: u64` -- the largest width \* height (the default: img_core's IMG_MAXPX_DEF)
+
+- **`enum Color`**
+  the colour space the JP2 header names (Unknown for a raw codestream)
+  - `Unknown`
+  - `Gray`
+  - `Srgb` -- sRGB (also sYCC after the conversion here)
+  - `Cmyk`
+  - `Lab` -- CIELab (the enumerated space of JPX)
+  - `Icc(Vec<u8>)` -- an ICC profile
+
+- **`struct Component`**
+  one component (channel) of the image
+  - `width: u32`
+  - `height: u32`
+  - `dx: u32` -- its sub-sampling on the image grid
+  - `dy: u32`
+  - `precision: u8`
+  - `signed: bool`
+  - `data: Vec<i32>` -- width \* height samples, row by row (unsigned: 0 .. 2^precision - 1)
+
+- **`struct Image`**
+  a decoded image: the colour channels first, in their order, then the opacity channel
+  - `width: u32`
+  - `height: u32`
+  - `components: Vec<Component>`
+  - `color: Color`
+  - `alpha: Option<usize>` -- the index of the opacity channel
+  - `premultiplied: bool` -- the colour channels are premultiplied by the opacity
+
+- **`fn probe(d: &[u8]) -> bool`**
+  a JP2 file or a raw codestream
+
+- **`fn decode(d: &[u8], opt: &Options) -> Result<Image, Error>`**
+  decode a JP2 / JPX file or a raw codestream
+
+- **`static CODEC: Codec`**
+  jp2_codec: JP2, JPX and raw codestreams as 8-bit ARGB

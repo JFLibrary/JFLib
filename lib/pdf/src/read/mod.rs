@@ -32,7 +32,7 @@
 // allows its user to do with the document is its own decision.
 //
 // Not here: the image filters for decode_until_image (it stops before DCT, JPX, JBIG2 and
-// CCITTFax; drawing decodes DCT and CCITTFax), JPX and JBIG2 images at all, the predefined CMaps
+// CCITTFax; drawing decodes DCT, CCITTFax and JPX), JBIG2 images at all, the predefined CMaps
 // of East Asian fonts other than Identity and the Unicode ones, verifying signatures, changing
 // and saving documents.
 
