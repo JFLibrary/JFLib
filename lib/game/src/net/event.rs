@@ -89,7 +89,8 @@ pub fn write_section(w: &mut BitWriter, first: u16, events: &[NetEvent], base_ti
 /// read a run (None when malformed: a count or length out of range, the stream too short)
 pub fn read_section(r: &mut BitReader, base_tick: u32) -> Option<(u16, Vec<NetEvent>)> {
     let first = r.u16();
-    let n = r.uvar() as usize + 1;
+    // (saturating: a peer's 0xFFFFFFFF + 1 overflowed on 32 bits)
+    let n = (r.uvar() as usize).saturating_add(1);
     // (an event takes 16 bits at least: no allocation for a count the stream cannot hold)
     if n > MAX_RUN || n * 16 > r.bytes_left() * 8 + 8 {
         return None;

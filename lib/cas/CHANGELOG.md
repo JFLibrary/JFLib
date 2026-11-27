@@ -20,6 +20,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 ### Fixed
 
 - gc deleted every pack when the snapshots folder could not be read (a refused read_dir: the rights, a network share gone): it took the folder for one without snapshots. It now stops with the error, and check fails too (snapshot_ids alone still answers an empty list). gc also keeps a pack whose index file it cannot delete, where it deleted the pack anyway: the index left behind named chunks that were gone, and on the next open it could win over the copies a repack had moved
+- `Folder`: a pack name whose first two bytes are not whole letters is refused instead of panicking
 
 ### Security
 

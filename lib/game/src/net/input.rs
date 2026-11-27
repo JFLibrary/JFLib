@@ -100,7 +100,8 @@ pub fn write_inputs(w: &mut BitWriter, newest: u32, inputs: &[NetInput]) {
 /// read what write_inputs wrote -> (the newest tick, the inputs newest first); None when malformed
 pub fn read_inputs(r: &mut BitReader) -> Option<(u32, Vec<NetInput>)> {
     let newest = r.u32();
-    let n = r.uvar() as usize + 1;
+    // (saturating: a peer's 0xFFFFFFFF + 1 overflowed on 32 bits)
+    let n = (r.uvar() as usize).saturating_add(1);
     if !r.ok() || n > MAX_REDUNDANT {
         return None;
     }
