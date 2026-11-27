@@ -246,8 +246,19 @@ eigenen Fenster (`[NSWindow sendEvent:]` oder direkt an die View), nichts erreic
   Stellvertreter für `NSDraggingInfo`).
 - **Noch offen:** Der Test-Mac hängt an einem 1080p-Bildschirm (Skala 1), Retina ist also nur im Code berücksichtigt,
   nicht geprüft. Tool-Fenster nehmen beim Klick die Tastatur (unter Windows nur ein Textfeld, auf macOS ginge das mit
-  `NSPanel`). Menüleiste, Cmd+Q, `E_POWER` und `E_SESSION_END` folgen mit AP7, Farbwähler und Bildschirmfoto
-  (`screen.rs`) später. Der Monitor des Test-Macs meldet keinen Namen.
+  `NSPanel`). Menüleiste, Cmd+Q, `E_POWER` und `E_SESSION_END` folgen mit AP7. Der Monitor des Test-Macs meldet
+  keinen Namen.
+- **Pipette und Bildschirmfoto (2026-11-27,** [`apple_mac_screen.rs`](../lib/plat/apple_mac_screen.rs)**):**
+  `screen::pick_start` zeigt die Lupe des Systems (`NSColorSampler`): Ein Klick gibt die Farbe in sRGB, Esc bricht ab;
+  dafür braucht die App kein Recht, das System nimmt das Bild. `screen::capture_start` nimmt ab macOS 15.2 über
+  ScreenCaptureKit auf (`SCScreenshotManager captureImageInRect:`), davor über `CGWindowListCreateImage` (zur Laufzeit
+  gesucht, neuere SDKs bieten es nicht mehr). Das braucht die Freigabe „Aufnahme von Bildschirm & Systemaudio“ für das
+  Programm: Ohne sie antwortet es `Denied`, und macOS zeigt einmal seinen Dialog. Ein ad hoc signiertes Programm
+  verliert die Freigabe mit jedem neuen Bau (macOS bindet sie an den Code). Das Bild kommt in sRGB: Ein Monitor, der
+  reines sRGB-Rot nicht zeigen kann, liefert sein eigenes Rot (der PL2745H des Test-Macs `f70a04`). Geprüft mit
+  `plattest --test screen` auf dem Mac mini: Monitore, mit Freigabe das Bild eines Testfensters (Größe, die vier
+  Farben an ihrem Platz), alle Monitore, die Farbe an einem Testpunkt; ohne Freigabe `Denied`; die Lupe von Hand
+  (`jfgui_PICK_HAND=1`, ein Klick gab die Farbe, Esc `Cancelled`). Ungeprüft: Retina, mehrere Monitore.
 
 ### AP5: iOS (M)
 
@@ -341,6 +352,8 @@ Nord (mit Magnetometer, sonst beliebig), der Standort „beim Verwenden“ (`NSL
     Schema (`data://…`) gingen ungeprüft als Pfad an den Dialog, der sie still wegließ (behoben: `plat::share` gibt
     den Pfad dahinter weiter, auch auf macOS und Windows). iOS bietet „In Dateien sichern“ nur an, wenn alles
     Geteilte Dateien sind.
+    Auf macOS von Hand (2026-11-27, `plattest --test share-ui` mit `jfgui_SHARE_HAND=1`): ein gewähltes Ziel gibt
+    `SHARE_DONE`.
 
   Markierter Text der Tastatur (`UITextInput`: Diktat, Vorschläge, Tastaturen mit Zusammensetzung) und Accessibility
   kamen mit VoiceOver ([VOICEOVER.md](VOICEOVER.md) VO4). Das Bild geht bei jedem Frame ganz als Kopie an den Layer;

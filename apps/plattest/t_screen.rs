@@ -19,6 +19,10 @@
 //                        XTEST (pointer to the pattern, a click; Esc), XGrabKey of Ctrl+Alt+K
 //                        pressed with XTEST, the Num Lock / Caps Lock combinations through
 //                        synthetic events, a chord another process grabbed is Conflict
+//                        macOS: the monitors; a window with the pattern captured and picked at
+//                        a test point when the program has the screen recording right (else
+//                        both are Denied); the system's loupe with jfgui_PICK_HAND=1 (by hand:
+//                        a click answers a colour, Esc Cancelled; Busy meanwhile)
 //   --test screen-wl     (Linux, Wayland) the outputs as monitors (wl_output, xdg-output)
 //   --test screen-bus --mode grant|deny|none   (Linux) the Screenshot and GlobalShortcuts
 //                        portals against tools/platshared/screen_bus.py
@@ -573,7 +577,88 @@ fn native(t: &mut T) {
     t.scratch_done();
 }
 
-#[cfg(not(any(windows, target_os = "linux")))]
+// ---------------------------------------------------------------- macOS
+
+/// a colour 0xRRGGBB read back from the screen is the pattern's full or empty channels (macOS:
+/// the window server shows sRGB in the display's profile and the picture comes back in sRGB, so a
+/// display that cannot show pure sRGB red gives its own red: f70a04 on the test Mac's PL2745H)
+#[cfg(target_os = "macos")]
+fn like(a: Option<u32>, want: u32) -> bool {
+    a.is_some_and(|a| (0..3).all(|k| {
+        let (got, full) = ((a >> (8 * k)) & 0xFF, (want >> (8 * k)) & 0xFF == 0xFF);
+        if full { got >= 0xC0 } else { got <= 0x60 }
+    }))
+}
+
+#[cfg(target_os = "macos")]
+fn native(t: &mut T) {
+    let v = screen::monitors();
+    monitors_sane(t, &v, "mac monitors");
+    t.check(screen::pick_available(), "mac pick: available (NSColorSampler)");
+    t.check(screen::capture_available(), "mac capture: available");
+    let Some(m) = v.first().cloned() else { return };
+    let w = plat::win_create("plattest screen", 160, 120, 0, plat::PW_NOOWNER, m.work[0] + 40, m.work[1] + 40);
+    t.check(w >= 0, "mac window: created");
+    if w < 0 {
+        return;
+    }
+    plat::win_show(w, plat::PWS_SHOW);
+    let (pw, ph) = plat::win_size(w);
+    let px = pattern(pw, ph);
+    plat::win_present(w, &plat::Frame { px: &px, w: pw, h: ph, stride: pw * 4 }, None);
+    let _ = screen_wait(600); // the window server shows it
+    let rect = plat::win_get_rect(w).unwrap_or([0, 0, pw, ph]);
+    t.info(&format!("  window at {},{} {}x{}\n", rect[0], rect[1], rect[2], rect[3]));
+    let (rx, ry) = quad_centre(rect, 0);
+    if !plat::mac_screen_access() {
+        // the right is the user's (System Settings > Privacy & Security > Screen & System Audio
+        // Recording): without it pictures and a test point are Denied, the pick still works
+        t.info("  (no screen recording right for this program: pictures are Denied)\n");
+        t.check(screen::capture_start(Some(rect)) == Err(ScreenError::Denied), "mac capture: without the right -> Denied");
+        screen::pick_test_point(Some((rx, ry)));
+        t.check(screen::pick_start() == Err(ScreenError::Denied), "mac pick: a test point without the right -> Denied");
+    } else {
+        t.check(screen::capture_start(Some(rect)) == Ok(()), "mac capture: started");
+        match shot_of(&screen_wait(5000)) {
+            Some(Ok(s)) => {
+                t.check(s.rect == rect && s.w == rect[2] && s.h == rect[3] && s.px.len() == (s.w * s.h * 4) as usize, "mac capture: the size asked for");
+                let local = [0, 0, s.w, s.h];
+                let got: Vec<Option<u32>> = (0..4).map(|q| {
+                    let (x, y) = quad_centre(local, q);
+                    screen::shot_pixel(&s, x, y)
+                }).collect();
+                t.check((0..4).all(|q| like(got[q], QUAD[q])), &format!("mac capture: the window's four colours where they are ({got:x?})"));
+            }
+            other => t.check(false, &format!("mac capture: a picture ({other:?})")),
+        }
+        let mut all = [i32::MAX, i32::MAX, i32::MIN, i32::MIN];
+        for m in &v {
+            all = [all[0].min(m.rect[0]), all[1].min(m.rect[1]), all[2].max(m.rect[0] + m.rect[2]), all[3].max(m.rect[1] + m.rect[3])];
+        }
+        let all = [all[0], all[1], all[2] - all[0], all[3] - all[1]];
+        t.check(screen::capture_start(None) == Ok(()), "mac capture: every monitor");
+        match shot_of(&screen_wait(5000)) {
+            Some(Ok(s)) => t.check(s.rect == all && s.w == all[2] && s.h == all[3], &format!("mac capture: the monitors' size ({:?} {}x{})", s.rect, s.w, s.h)),
+            other => t.check(false, &format!("mac capture: every monitor ({other:?})")),
+        }
+        screen::pick_test_point(Some((rx, ry)));
+        t.check(screen::pick_start() == Ok(()), "mac pick: started (test point)");
+        let c = color_of(&screen_wait(5000));
+        t.check(matches!(c, Some(Ok(c)) if like(Some(c), 0xFF0000)), &format!("mac pick: the red quadrant at the test point ({c:x?})"));
+    }
+    // the loupe needs the user (no way to close it from the app): by hand with jfgui_PICK_HAND=1
+    if plat::env("jfgui_PICK_HAND").is_some() {
+        t.check(screen::pick_start() == Ok(()), "mac pick: the loupe shows (click a colour or press Esc within 60 s)");
+        t.check(screen::pick_start() == Err(ScreenError::Busy), "mac pick: a second one is Busy");
+        let c = color_of(&screen_wait(60_000));
+        t.info(&format!("  the loupe answered {c:x?}\n"));
+        t.check(matches!(c, Some(Ok(_)) | Some(Err(ScreenError::Cancelled))), "mac pick: the loupe answers a colour or Cancelled");
+    }
+    plat::win_destroy(w);
+    let _ = screen_wait(100);
+}
+
+#[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
 fn native(_t: &mut T) {}
 
 // ---------------------------------------------------------------- Linux: Wayland, the portals

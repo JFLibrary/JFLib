@@ -102,6 +102,10 @@ impl Rng {
 
 fn cmd_mutate(p: &str, count: u64, seed: u64) -> i32 {
     let Some(d) = crate::read_file(p) else { return 1 };
+    if d.is_empty() {
+        plat::write_stderr(format!("error: {p} is empty (nothing to damage)\n").as_bytes());
+        return 1;
+    }
     let mut rng = Rng(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1);
     let (mut ok, mut refused, mut slowest) = (0u64, 0u64, 0u64);
     let opt = img_jp2::Options { max_pixels: 1 << 24, ..img_jp2::Options::default() };
