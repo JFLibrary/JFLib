@@ -21,7 +21,8 @@
 //   Identity::new(chain, key) / Identity::from_pem(certs, key): a chain and its key (PrivateKey:
 //   Ed25519, ECDSA, RSA; PKCS #8, SEC 1, PKCS #1)
 //   Trust::Anchors(CAs) / Pinned(SHA-256 of the leaf) / Any (trust on first use: the caller
-//   shows the fingerprint and pins it) / System(extra CAs) (the operating system's CAs)
+//   shows the fingerprint and pins it) / System(extra CAs) (the operating system's check, the
+//   extra CAs under its policy)
 //
 // conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over a Stream.
 
@@ -90,8 +91,13 @@ pub enum Trust {
     Pinned(Vec<[u8; 32]>),
     /// anything (only to read the fingerprint for a trust decision)
     Any,
-    /// the operating system's certificate authorities, and these as well (a company CA);
-    /// allows TLS 1.2 and the public suites (crate::roots)
+    /// the operating system's certificate authorities, and these as well (a company CA): the
+    /// system checks the chain (Windows CryptoAPI, Apple's Security framework with the stapled
+    /// OCSP response; on Linux the distribution's bundle: crate::roots), these under its own
+    /// policy (Windows with them as its roots where its own give no path, Apple as anchors
+    /// beside its own; Linux where the bundle gives no path); the alert follows its reason
+    /// (expired, revoked, another name or usage, unknown CA).  Allows TLS 1.2 and the public
+    /// suites
     System(Vec<Cert>),
     /// a check the program brings (a PKI of its own, keys pinned by their SPKI, Certificate
     /// Transparency, the platform's verifier, a test peer); a client offers with it what it

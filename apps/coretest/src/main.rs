@@ -61,6 +61,8 @@ mod tlst;
 #[cfg(not(target_os = "android"))]
 mod tlsweb;
 #[cfg(not(target_os = "android"))]
+mod systrust;
+#[cfg(not(target_os = "android"))]
 mod ocspt;
 #[cfg(not(target_os = "android"))]
 mod acmesrv;
@@ -192,6 +194,7 @@ fn run() -> i32 {
         native!("cas", cast::run),
         native!("tls", tlst::run),
         native!("tlsweb", tlsweb::run),
+        native!("systrust", systrust::run),
         native!("tlsres", tlsres::run),
         native!("ocsp", ocspt::run),
         native!("acme", acmet::run),

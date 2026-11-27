@@ -20,11 +20,30 @@
 //       n: the number of intermediates (2 bytes); then the DER certificates
 //       -> 01 / 00 + verify_chain's reason (UTF-8) / 02 + 0 (an unreadable leaf: tls/conn.rs
 //          refuses the Certificate message; an unreadable intermediate is left out, as there)
+//   x509system ...                             the same arguments, through the system's checks
+//       with only these anchors (netio::roots::verify_system_roots: Windows CryptoAPI, Apple's
+//       Security framework, on Linux verify_chain; usage is not passed, the system checks a
+//       server's chain) -> 01 / 03 + the reason (reason_byte) + the system's words / 02 + 0
+//
+// reason_byte: 1 unknown CA, 2 expired, 3 name, 4 revoked, 5 usage, 0 another
 
 use alloc::vec::Vec;
 
 use crypto::HashAlg;
+use netio::roots::Reason;
 use netio::x509::{verify_chain, Cert, PubKey, SigAlg, Usage};
+
+/// a refusal's reason as one byte (tools/limbo_check.py --system)
+fn reason_byte(r: Reason) -> u8 {
+    match r {
+        Reason::UnknownCa => 1,
+        Reason::Expired => 2,
+        Reason::Name => 3,
+        Reason::Revoked => 4,
+        Reason::Usage => 5,
+        _ => 0,
+    }
+}
 
 /// hash ids: crate::crypto::hash_of
 fn hash(id: Option<&u8>) -> Option<HashAlg> {
@@ -113,7 +132,7 @@ pub fn op(alg: &str, args: &[Vec<u8>]) -> Option<Vec<u8>> {
             8 => Some(hmac::<crypto::Sha3_512>(arg(1), arg(2))),
             _ => None,
         },
-        "x509chain" => {
+        "x509chain" | "x509system" => {
             let usage = if arg(0).first() == Some(&1) { Usage::Client } else { Usage::Server };
             let now = i64::from_be_bytes(arg(1).try_into().ok()?);
             let name = match arg(2).split_first() {
@@ -131,6 +150,17 @@ pub fn op(alg: &str, args: &[Vec<u8>]) -> Option<Vec<u8>> {
             }
             // anchors that do not parse are left out, as roots::system_anchors does
             let anchors: Vec<Cert> = (5 + n..args.len()).filter_map(|i| Cert::parse(arg(i))).collect();
+            if alg == "x509system" {
+                // the system's checks with only these anchors (a server's chain)
+                return Some(match netio::roots::verify_system_roots(&chain, name.unwrap_or(""), &anchors, now) {
+                    Ok(()) => alloc::vec![1],
+                    Err(e) => {
+                        let mut v = alloc::vec![3, reason_byte(e.reason)];
+                        v.extend_from_slice(e.text.as_bytes());
+                        v
+                    }
+                });
+            }
             Some(match verify_chain(&chain, &anchors, now, name, usage) {
                 Ok(()) => alloc::vec![1],
                 Err(e) => {
