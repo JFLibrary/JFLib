@@ -363,7 +363,7 @@ impl Crypt {
 
     fn dict_strings(&self, r: Ref, d: &mut Dict, depth: u32) {
         let sig = d.contains("ByteRange") && (d.is("Type", "Sig") || d.is("Type", "DocTimeStamp") || d.contains("SubFilter"));
-        for (k, v) in d.0.iter_mut() {
+        for (k, v) in d.map_mut().iter_mut() {
             if sig && k.as_bytes() == b"Contents" {
                 continue;
             }

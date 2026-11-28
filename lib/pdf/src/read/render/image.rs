@@ -243,6 +243,17 @@ fn jpx(data: &[u8], named: Option<usize>, indexed: bool, alpha: Option<bool>, ma
     Some(Jpx { samples: s, w, h, bpc, cs, alpha, scaled })
 }
 
+/// a JPEG's own size (it counts, not /Width and /Height) within max_pixels, its pixels counted
+/// as work; one whose header does not read fails in the decoder
+fn jpeg_allowed(run: &mut Run, data: &[u8]) -> bool {
+    let mut m = img_core::ImgMeta::default();
+    if !img_jpeg::probe(data, &mut m) {
+        return true;
+    }
+    let px = m.w as u64 * m.h as u64;
+    px <= run.opt.max_pixels.min(1 << 28) && run.spend(px)
+}
+
 impl Img {
     pub fn load_xobject(run: &mut Run, o: &Object, res: &Rc<Res>) -> Option<Rc<Img>> {
         let Object::Stream(s) = run.doc.resolve(o) else { return None };
@@ -253,7 +264,7 @@ impl Img {
     pub fn load_inline(run: &mut Run, d: &Dict, data: &[u8], res: &Rc<Res>) -> Option<Rc<Img>> {
         let mut full = Dict::new();
         for (k, v) in d.iter() {
-            full.0.insert(Name(expand_key(&k.0).to_vec()), expand_value(v));
+            full.map_mut().insert(Name(expand_key(&k.0).to_vec()), expand_value(v));
         }
         // the filters of an inline image run here (its data is in the content stream)
         let filters = super::super::filter::chain(&full);
@@ -266,6 +277,11 @@ impl Img {
         let w = doc.key(d, "Width").as_int()?;
         let h = doc.key(d, "Height").as_int()?;
         if w <= 0 || h <= 0 || w > 1 << 20 || h > 1 << 20 || (w as u64) * (h as u64) > run.opt.max_pixels.min(1 << 28) {
+            return None;
+        }
+        // decoding and converting it is work of the page (256 images of 16384 x 16384 at 1 bit,
+        // 32 KB each, were 256 GB)
+        if !run.spend((w as u64) * (h as u64)) {
             return None;
         }
         let (mut w, mut h) = (w as usize, h as usize);
@@ -296,6 +312,9 @@ impl Img {
             match f.0.as_slice() {
                 b"DCTDecode" if n == 4 => {
                     // CMYK: the samples as stored, through Decode and the CMYK conversion
+                    if !jpeg_allowed(run, &samples) {
+                        return None;
+                    }
                     let sf = img_jpeg::decode_fl(&samples, img_core::JDF_RAW_CMYK | img_core::JDF_NO_ORIENT).ok()?;
                     let (sw, sh) = (sf.w.max(0) as usize, sf.h.max(0) as usize);
                     let st = sf.stride as usize;
@@ -326,6 +345,9 @@ impl Img {
                         Some(1) => img_core::JDF_YCC,
                         _ => 0,
                     } | img_core::JDF_NO_ORIENT;
+                    if !jpeg_allowed(run, &samples) {
+                        return None;
+                    }
                     let sf = img_jpeg::decode_fl(&samples, flags).ok()?;
                     let (sw, sh) = (sf.w.max(0) as usize, sf.h.max(0) as usize);
                     if sw != w || sh != h {
@@ -627,42 +649,44 @@ impl Img {
         };
         let xs = spans(w, nw);
         let ys = spans(h, nh);
-        let mut tmp = vec![0u32; nw * h * 4];
-        for y in 0..h {
-            for (i, &(s0, s1, w0, w1)) in xs.iter().enumerate() {
-                let mut acc = [0u64; 4];
-                let mut tot = 0u64;
-                for s in s0..=s1 {
-                    let wt = if s0 == s1 { 65536 } else if s == s0 { w0 } else if s == s1 { w1 } else { 65536 } as u64;
-                    let p = &self.px[(y * w + s) * 4..][..4];
-                    for c in 0..4 {
-                        acc[c] += p[c] as u64 * wt;
-                    }
-                    tot += wt;
-                }
-                for c in 0..4 {
-                    tmp[(y * nw + i) * 4 + c] = ((acc[c] * 256 + tot / 2) / tot.max(1)) as u32;
-                }
-            }
-        }
+        // the pass between the two: 8 bytes for each of its pixels (16 before, and only
+        // across first: an image narrowed little but made much lower took 16 bytes for each of
+        // its own pixels); a large one goes down first when that leaves less
+        let first = |v: u64, tot: u64| ((v * 256 + tot / 2) / tot.max(1)) as u16;
+        let second = |v: u64, tot: u64| ((v / tot.max(1) + 128) >> 8).min(255) as u8;
         let mut px = vec![0u8; nw * nh * 4];
-        for (j, &(s0, s1, w0, w1)) in ys.iter().enumerate() {
-            for x in 0..nw {
-                let mut acc = [0u64; 4];
-                let mut tot = 0u64;
-                for s in s0..=s1 {
-                    let wt = if s0 == s1 { 65536 } else if s == s0 { w0 } else if s == s1 { w1 } else { 65536 } as u64;
-                    for c in 0..4 {
-                        acc[c] += tmp[(s * nw + x) * 4 + c] as u64 * wt;
-                    }
-                    tot += wt;
-                }
-                for c in 0..4 {
-                    px[(j * nw + x) * 4 + c] = ((acc[c] / tot.max(1) + 128) >> 8).min(255) as u8;
-                }
-            }
+        if nw * h > w * nh && nw * h > 1 << 22 {
+            let mut tmp = vec![0u16; w * nh * 4];
+            average(w, &ys, |x, s, c| self.px[(s * w + x) * 4 + c] as u64, |x, j, c, v, t| tmp[(j * w + x) * 4 + c] = first(v, t));
+            average(nh, &xs, |j, s, c| tmp[(j * w + s) * 4 + c] as u64, |j, i, c, v, t| px[(j * nw + i) * 4 + c] = second(v, t));
+        } else {
+            let mut tmp = vec![0u16; nw * h * 4];
+            average(h, &xs, |y, s, c| self.px[(y * w + s) * 4 + c] as u64, |y, i, c, v, t| tmp[(y * nw + i) * 4 + c] = first(v, t));
+            average(nw, &ys, |x, s, c| tmp[(s * nw + x) * 4 + c] as u64, |x, j, c, v, t| px[(j * nw + x) * 4 + c] = second(v, t));
         }
         Img { w: nw, h: nh, px, stencil: self.stencil, interpolate: self.interpolate, oc: None }
+    }
+}
+
+/// one axis averaged: for each of `lines` lines and each span (first and last source pixel and
+/// their weights of 65536), `put(line, span, channel, weighted sum, total weight)` of the values
+/// `get(line, source pixel, channel)`
+fn average(lines: usize, spans: &[(usize, usize, u32, u32)], get: impl Fn(usize, usize, usize) -> u64, mut put: impl FnMut(usize, usize, usize, u64, u64)) {
+    for line in 0..lines {
+        for (i, &(s0, s1, w0, w1)) in spans.iter().enumerate() {
+            let mut acc = [0u64; 4];
+            let mut tot = 0u64;
+            for s in s0..=s1 {
+                let wt = if s0 == s1 { 65536 } else if s == s0 { w0 } else if s == s1 { w1 } else { 65536 } as u64;
+                for (c, a) in acc.iter_mut().enumerate() {
+                    *a += get(line, s, c) * wt;
+                }
+                tot += wt;
+            }
+            for (c, &a) in acc.iter().enumerate() {
+                put(line, i, c, a, tot);
+            }
+        }
     }
 }
 

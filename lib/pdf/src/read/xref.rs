@@ -29,39 +29,55 @@ pub(crate) struct Xref {
     pub repaired: bool,
     /// object streams the scan found (their objects are added once streams can be decoded)
     pub objstms: Vec<u32>,
+    /// entries at an offset so far, and the most the file has room for ("1 0 obj" is 7 bytes)
+    at_count: usize,
+    at_max: usize,
 }
 
 /// at most this many sections through /Prev
 const MAX_SECTIONS: usize = 4096;
-/// the cross-reference stream's own size limit
+/// the decoded cross-reference streams of a file together (each one decoded once)
 const XREF_STREAM_MAX: usize = 1 << 28;
+/// the largest object number (ISO 32000-1, Annex C); entries for larger ones are dropped
+pub(crate) const MAX_NUM: u32 = 8_388_607;
 
 impl Xref {
-    fn new() -> Xref {
-        Xref { entries: BTreeMap::new(), trailer: Dict::new(), repaired: false, objstms: Vec::new() }
+    /// for a file of `len` bytes
+    fn new(len: usize) -> Xref {
+        Xref { entries: BTreeMap::new(), trailer: Dict::new(), repaired: false, objstms: Vec::new(), at_count: 0, at_max: len / 7 + 1 }
     }
 
-    /// a newer section's entry stays; a free one gives way to an older one that is used
-    /// (hybrid files mark their stream objects free in the table)
+    /// a newer section's entry stays.  Free entries are not kept: a free one gives way to an
+    /// older one that is used anyway (hybrid files mark their stream objects free in the table),
+    /// and a missing one reads the same.  Object numbers past MAX_NUM, and more objects in the
+    /// file than "n g obj" headers fit into it, are dropped (a cross-reference stream of a few KB
+    /// can name hundreds of millions)
     fn set(&mut self, num: u32, e: Entry, generation: u16) {
-        match self.entries.get(&num) {
-            None => {
-                self.entries.insert(num, (e, generation));
-            }
-            Some((Entry::Free, _)) if e != Entry::Free => {
-                self.entries.insert(num, (e, generation));
-            }
-            _ => {}
+        if e == Entry::Free || num > MAX_NUM || self.entries.contains_key(&num) {
+            return;
         }
+        if let Entry::At(_) = e {
+            if self.at_count >= self.at_max {
+                return;
+            }
+            self.at_count += 1;
+        }
+        self.entries.insert(num, (e, generation));
     }
 
     fn merge_trailer(&mut self, t: &Dict) {
         for (k, v) in t.iter() {
             if !self.trailer.0.contains_key(k) {
-                self.trailer.0.insert(k.clone(), v.clone());
+                self.trailer.map_mut().insert(k.clone(), v.clone());
             }
         }
     }
+}
+
+/// what the cross-reference streams of one file may still decode, and which ones were read
+struct Budget {
+    left: usize,
+    read: BTreeSet<usize>,
 }
 
 /// the cross-reference of `b`: through startxref, else by a scan
@@ -78,10 +94,11 @@ fn from_startxref(b: &[u8]) -> Option<Xref> {
     let p = lex::rfind(b, b"startxref", b.len())?;
     let mut lx = Lexer::new(b, p + 9);
     let Tok::Int(first) = lx.next() else { return None };
-    let mut x = Xref::new();
+    let mut x = Xref::new(b.len());
     let ends = OnceCell::new();
     let ends = |from: usize| ends.get_or_init(|| lex::Ends::of(b)).after(from);
     let mut seen = BTreeSet::new();
+    let mut budget = Budget { left: XREF_STREAM_MAX, read: BTreeSet::new() };
     let mut next = Some(first);
     let mut sections = 0;
     while let Some(off) = next.take() {
@@ -89,7 +106,7 @@ fn from_startxref(b: &[u8]) -> Option<Xref> {
             break;
         }
         let off = usize::try_from(off).ok().filter(|&o| o < b.len());
-        let t = off.and_then(|o| section(b, o, &mut x, &ends));
+        let t = off.and_then(|o| section(b, o, &mut x, &ends, &mut budget));
         let Some(t) = t else {
             if sections == 0 {
                 return None;
@@ -104,7 +121,7 @@ fn from_startxref(b: &[u8]) -> Option<Xref> {
 }
 
 /// one section at `off`: a table with its trailer, or a cross-reference stream -> its trailer
-fn section(b: &[u8], off: usize, x: &mut Xref, ends: &dyn Fn(usize) -> Option<usize>) -> Option<Dict> {
+fn section(b: &[u8], off: usize, x: &mut Xref, ends: &dyn Fn(usize) -> Option<usize>, budget: &mut Budget) -> Option<Dict> {
     let mut lx = Lexer::new(b, off);
     if lx.next() == Tok::Kw(b"xref") {
         table(&mut lx, x)?;
@@ -112,15 +129,16 @@ fn section(b: &[u8], off: usize, x: &mut Xref, ends: &dyn Fn(usize) -> Option<us
             Ok(Object::Dict(d)) => d,
             _ => return None,
         };
-        // a hybrid file: the stream's entries for the objects in object streams
+        // a hybrid file: the stream's entries for the objects in object streams (once: every
+        // section of a file may name the same stream)
         if let Some(s) = t.get("XRefStm").and_then(Object::as_int).and_then(|o| usize::try_from(o).ok()) {
-            if s < b.len() {
-                stream(b, s, x, ends);
+            if s < b.len() && !budget.read.contains(&s) {
+                stream(b, s, x, ends, budget);
             }
         }
         return Some(t);
     }
-    stream(b, off, x, ends)
+    stream(b, off, x, ends, budget)
 }
 
 /// the subsections of a table after "xref", up to and with "trailer"
@@ -158,12 +176,13 @@ fn table(lx: &mut Lexer, x: &mut Xref) -> Option<()> {
 }
 
 /// a cross-reference stream at `off` -> its dictionary (the trailer)
-fn stream(b: &[u8], off: usize, x: &mut Xref, ends: &dyn Fn(usize) -> Option<usize>) -> Option<Dict> {
-    let (_, obj) = lex::indirect(b, off, &mut |_| None, ends)?;
+fn stream(b: &[u8], off: usize, x: &mut Xref, ends: &dyn Fn(usize) -> Option<usize>, budget: &mut Budget) -> Option<Dict> {
+    let (_, obj) = lex::indirect(b, off, b.len(), &mut |_| None, ends)?;
     let Object::Stream(s) = obj else { return None };
     if !s.dict.is("Type", "XRef") {
         return None;
     }
+    budget.read.insert(off);
     let w: Vec<usize> = s.dict.get("W")?.as_array()?.iter().map(|o| o.as_int().unwrap_or(0).clamp(0, 8) as usize).collect();
     if w.len() < 3 {
         return None;
@@ -174,7 +193,18 @@ fn stream(b: &[u8], off: usize, x: &mut Xref, ends: &dyn Fn(usize) -> Option<usi
         None => alloc::vec![0, size],
     };
     let raw = b.get(s.start..s.end)?.to_vec();
-    let (data, img) = filter::apply(&filter::chain(&s.dict), raw, XREF_STREAM_MAX).ok()?;
+    // what a stream decodes counts against all of them; one that went past the rest used it
+    // all (the filters fail early otherwise)
+    let (data, img) = match filter::apply(&filter::chain(&s.dict), raw, budget.left) {
+        Ok(d) => d,
+        Err(e) => {
+            if let super::Error::Limit(_) = e {
+                budget.left = 0;
+            }
+            return None;
+        }
+    };
+    budget.left -= data.len().min(budget.left);
     if img.is_some() {
         return None;
     }
@@ -248,18 +278,41 @@ pub(crate) fn scan_objects(b: &[u8]) -> BTreeMap<u32, (usize, u16)> {
     out
 }
 
+/// where the objects of a file begin, in order (from scan_objects)
+pub(crate) struct Heads(Vec<usize>);
+
+impl Heads {
+    pub fn of(objs: &BTreeMap<u32, (usize, u16)>) -> Heads {
+        Heads::from_offsets(objs.values().map(|e| e.0))
+    }
+
+    pub fn from_offsets(offs: impl Iterator<Item = usize>) -> Heads {
+        let mut v: Vec<usize> = offs.collect();
+        v.sort_unstable();
+        Heads(v)
+    }
+
+    /// the first header after `off`, else `len`
+    pub fn after(&self, off: usize, len: usize) -> usize {
+        self.0.get(self.0.partition_point(|&p| p <= off)).copied().unwrap_or(len).min(len)
+    }
+}
+
 /// the cross-reference rebuilt from the objects and trailers of the file
 pub(crate) fn scan(b: &[u8]) -> Xref {
-    let mut x = Xref::new();
+    let mut x = Xref::new(b.len());
     x.repaired = true;
     let objs = scan_objects(b);
-    let ends = lex::Ends::of(b);
+    let heads = Heads::of(&objs);
     let mut catalog = None;
     let mut trailers: Vec<(usize, Dict)> = Vec::new();
     for (&num, &(off, generation)) in &objs {
         x.entries.insert(num, (Entry::At(off), generation));
-        // what kind of object: catalogs, object streams, cross-reference streams
-        let Some((_, obj)) = lex::indirect(b, off, &mut |_| None, &|from| ends.after(from)) else { continue };
+        // what kind of object: catalogs, object streams, cross-reference streams.  Only its
+        // dictionary, read up to the next object's header: a string that runs on through the
+        // objects after it ("1 0 obj ( 2 0 obj ( ...") would be read again for each of them
+        let Some((_, pos)) = lex::obj_header(b, off) else { continue };
+        let Ok(obj) = Lexer::new(&b[..heads.after(off, b.len())], pos).object(true) else { continue };
         let Some(d) = obj.as_dict() else { continue };
         if d.is("Type", "Catalog") && catalog.is_none_or(|(o, _)| o < off) {
             catalog = Some((off, Ref { num, generation }));
@@ -292,6 +345,6 @@ pub(crate) fn scan(b: &[u8]) -> Xref {
             x.trailer.insert("Root", Object::Ref(r));
         }
     }
-    x.trailer.0.remove(b"Prev".as_slice());
+    x.trailer.map_mut().remove(b"Prev".as_slice());
     x
 }

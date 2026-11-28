@@ -17,6 +17,8 @@
 //   render_annot     annotation appearances, hidden annotations, states, optional content
 //   render_hostile   recursion in forms, patterns, glyphs and soft masks, huge pages, images
 //                    and meshes, broken font programs and image data, mutated files
+//   render_budget    pages of a few MB that took minutes to hours or many GB (lib review of
+//                    2026-11-27): each within 20 s, with what it should give
 
 use alloc::format;
 use alloc::string::String;
@@ -25,7 +27,7 @@ use alloc::vec::Vec;
 
 use pdf::read::{Document, Error, RenderOptions};
 
-use crate::rcheck::{cat, flate, stream, Mk};
+use crate::rcheck::{cat, flate, stream, timed, Mk};
 use crate::T;
 
 pub const GROUPS: &[(&str, fn(&mut T))] = &[
@@ -37,6 +39,7 @@ pub const GROUPS: &[(&str, fn(&mut T))] = &[
     ("render_text", render_text),
     ("render_annot", render_annot),
     ("render_hostile", render_hostile),
+    ("render_budget", render_budget),
 ];
 
 // ------------------------------------------------------------------ pages and pixels
@@ -900,6 +903,149 @@ fn render_hostile(t: &mut T) {
         }
     }
     t.check(&format!("{total} mutated files drawn without a panic ({drawn} opened)"), total == 300 && drawn > 75);
+}
+
+// ------------------------------------------------------------------ render_budget
+
+/// a page drawn at dpi within 20 s: the result (None when it did not open)
+fn render_timed(t: &mut T, name: &str, data: Vec<u8>, opt: &RenderOptions) -> Option<Result<Px, Error>> {
+    let doc = t.ok(&format!("{name}: opens"), Document::open(data).map_err(|e| format!("{e}")))?;
+    Some(timed(t, name, || doc.render(0, opt).map(|sf| Px::of(&sf))))
+}
+
+/// a Type 1 font whose A calls a subroutine of a megabyte (it returns at once) `calls` times,
+/// then draws a square of 800
+fn type1_big_subr(calls: usize) -> Vec<u8> {
+    let mut plain = vec![11u8];
+    plain.resize(1 << 20, 0);
+    let subr = encrypt(&plain, 4330, 4);
+    let mut ops = vec![0, 1000, HSBW];
+    for _ in 0..calls {
+        ops.extend_from_slice(&[0, CALLSUBR]);
+    }
+    ops.extend_from_slice(&[0, 0, RMOVETO, 800, 0, RLINETO, 0, 800, RLINETO, -800, 0, RLINETO, CLOSEPATH, ENDCHAR]);
+    let a = charstring(&ops);
+    let private = cat(&[
+        b"dup /Private 8 dict dup begin\n/RD {string currentfile exch readstring pop} executeonly def\n/ND {noaccess def} executeonly def\n/NP {noaccess put} executeonly def\n/lenIV 4 def\n/Subrs 1 array\n",
+        format!("dup 0 {} RD ", subr.len()).as_bytes(),
+        &subr,
+        b" NP\nND\n2 index /CharStrings 2 dict dup begin\n",
+        format!("/A {} RD ", a.len()).as_bytes(),
+        &a,
+        b" ND\nend\nend\nmark currentfile closefile\n",
+    ]);
+    let clear = b"%!PS-AdobeFont-1.0: Test 1\n11 dict begin\n/FontName /Test def\n/FontType 1 def\n/PaintType 0 def\n/FontMatrix [0.001 0 0 0.001 0 0] readonly def\n/Encoding StandardEncoding def\n/FontBBox {0 0 1000 1000} readonly def\ncurrentdict end\ncurrentfile eexec\n";
+    let enc = encrypt(&private, 55665, 4);
+    let tail = cat(&["0".repeat(512).as_bytes(), b"\ncleartomark\n"]);
+    flate(&format!("/Length1 {} /Length2 {} /Length3 {}", clear.len(), enc.len(), tail.len()), &cat(&[clear, &enc, &tail]))
+}
+
+fn render_budget(t: &mut T) {
+    let dpi300 = RenderOptions { dpi: 300.0, ..Default::default() };
+    let limited = |r: &Option<Result<Px, Error>>| matches!(r, Some(Ok(_)) | Some(Err(Error::Limit(_))));
+    // a CharProc of 8 MB shown 5000 times (decoded and read for each glyph)
+    let t3 = "/Font << /F << /Type /Font /Subtype /Type3 /FontBBox [0 0 1000 1000] /FontMatrix [0.001 0 0 0.001 0 0] /CharProcs << /a 10 0 R >> /Encoding << /Differences [65 /a] >> /FirstChar 65 /LastChar 65 /Widths [1] >> >>";
+    let proc_ = flate("", &cat(&[b"1 0 d0 ", &vec![b' '; 8 << 20], b" 0 0 1 1 re f"]));
+    let r = render_timed(t, "a CharProc of 8 MB shown 5000 times", page(&cat(&[b"BT /F 1 Tf (", &b"A".repeat(5000), b") Tj ET"]), t3, &[(10, proc_)], ""), &RenderOptions::default());
+    t.check("a CharProc of 8 MB shown 5000 times: drawn or a limit", limited(&r));
+
+    // a form drawn a thousand times that draws a megabyte of white space a thousand times
+    let forms = vec![
+        (10, stream("/Type /XObject /Subtype /Form /BBox [0 0 100 100] /Resources << /XObject << /B 11 0 R >> >>", &b"/B Do ".repeat(1000))),
+        (11, flate("/Type /XObject /Subtype /Form /BBox [0 0 100 100]", &vec![b' '; 1 << 20])),
+    ];
+    let r = render_timed(t, "a megabyte of white space drawn a million times", page(&b"/A Do ".repeat(1000), "/XObject << /A 10 0 R >>", &forms, ""), &RenderOptions::default());
+    t.check("white space drawn a million times: drawn or a limit", limited(&r));
+
+    // 200 000 soft masks of an empty group the size of the page, at 300 dpi
+    let sm = vec![(10, stream("/Type /XObject /Subtype /Form /BBox [0 0 100 100] /Group << /S /Transparency >>", b""))];
+    let r = render_timed(t, "200 000 soft masks", page(&cat(&[&b"/S gs ".repeat(200_000), b"0 0 100 100 re f"]), "/ExtGState << /S << /SMask << /S /Luminosity /G 10 0 R >> >> >>", &sm, ""), &dpi300);
+    t.check("200 000 soft masks: drawn or a limit", limited(&r));
+
+    // 256 clips of a triangle held by q on each of 13 levels, at 300 dpi: 3328 masks of the page
+    let clips = |next: bool| cat(&[&b"q 0 0 m 100 0 l 50 100 l h W n ".repeat(256), if next { b"/N Do " } else { b"" }, &b"Q ".repeat(256)]);
+    let mut forms = Vec::new();
+    for k in 0..12u32 {
+        forms.push((20 + k, flate(&format!("/Type /XObject /Subtype /Form /BBox [0 0 100 100] /Resources << /XObject << /N {} 0 R >> >>", 21 + k), &clips(k < 11))));
+    }
+    let r = render_timed(t, "3328 clip masks held", page(&clips(true), "/XObject << /N 20 0 R >>", &forms, ""), &dpi300);
+    t.check("3328 clip masks held: the masks of a page are a limit", matches!(r, Some(Err(Error::Limit(_)))));
+
+    // a function-based shading whose function is 32 arrays of 32 references to one PostScript
+    // program of 10 000 steps (each of the 1024 had 10 000 steps for each pixel)
+    let calc = format!("{{ pop pop {}0 0 0 }}", "1 pop ".repeat(4990));
+    let inner = "10 0 R ".repeat(32);
+    let outer = format!("[{}]", format!("[{inner}] ").repeat(32));
+    let sh = format!("/Shading << /S << /ShadingType 1 /ColorSpace /DeviceRGB /Domain [0 1 0 1] /Matrix [100 0 0 100 0 0] /Function {outer} >> >>");
+    let r = render_timed(t, "1024 programs for each pixel", page(b"/S sh", &sh, &[(10, stream("/FunctionType 4 /Domain [0 1 0 1] /Range [0 1 0 1 0 1]", calc.as_bytes()))], ""), &RenderOptions::default());
+    t.check("1024 programs for each pixel: drawn", matches!(r, Some(Ok(_))));
+
+    // a Type 1 glyph that calls a subroutine of a megabyte 30 000 times (each call copied and
+    // decrypted it)
+    let t1 = "/Font << /T1 << /Type /Font /Subtype /Type1 /BaseFont /Test /FirstChar 65 /LastChar 65 /Widths [1000] /FontDescriptor 10 0 R >> >>";
+    let objs = vec![
+        (10, String::from("<< /Type /FontDescriptor /FontName /Test /Flags 32 /FontBBox [0 0 1000 1000] /ItalicAngle 0 /Ascent 1000 /Descent 0 /CapHeight 800 /StemV 50 /FontFile 11 0 R >>").into_bytes()),
+        (11, type1_big_subr(30_000)),
+    ];
+    let r = render_timed(t, "a subroutine of a megabyte called 30 000 times", page(b"0 g BT /T1 40 Tf 10 10 Td (A) Tj ET", t1, &objs, ""), &RenderOptions::default());
+    t.eq("a subroutine of a megabyte: the glyph is drawn", r.and_then(|r| r.ok()).map(|px| px.at(26.0, 26.0)), Some(BLACK));
+
+    // a mesh of 200 000 triangles outside the page shaded 5000 times (each sh copied the mesh and
+    // looked at every triangle for nothing)
+    let mut mesh = Vec::with_capacity(200_000 * 24);
+    for i in 0..200_000u32 {
+        for (x, y) in [(0u16, 0u16), (65535, (i % 65535) as u16), (0, 65535)] {
+            mesh.push(0);
+            mesh.extend_from_slice(&x.to_be_bytes());
+            mesh.extend_from_slice(&y.to_be_bytes());
+            mesh.extend_from_slice(&[200, 0, 0]);
+        }
+    }
+    let shading = flate("/ShadingType 4 /ColorSpace /DeviceRGB /BitsPerCoordinate 16 /BitsPerComponent 8 /BitsPerFlag 8 /Decode [1000 2000 1000 2000 0 1 0 1 0 1]", &mesh);
+    let r = render_timed(t, "a mesh outside the page shaded 5000 times", page(&b"/S sh ".repeat(5000), "/Shading << /S 10 0 R >>", &[(10, shading)], ""), &RenderOptions::default());
+    t.check("a mesh outside the page: drawn or a limit", limited(&r));
+
+    // a tiling pattern set 100 000 times: parsed and its tile drawn once, the page drawn
+    let pat = vec![(10, stream("/PatternType 1 /PaintType 1 /TilingType 1 /BBox [0 0 100 100] /XStep 100 /YStep 100", b"1 0 0 rg 0 0 100 100 re f"))];
+    let r = render_timed(t, "a pattern set 100 000 times", page(&cat(&[b"/Pattern cs ", &b"/P scn 0 0 1 1 re f ".repeat(100_000)]), "/Pattern << /P 10 0 R >>", &pat, ""), &RenderOptions::default());
+    t.eq("a pattern set 100 000 times: the page is drawn", r.and_then(|r| r.ok()).map(|px| px.at(0.5, 0.5)), Some(RED));
+
+    // 300 fonts on one embedded program: each draws its glyph
+    let mut fonts = String::from("/Font << ");
+    let mut objs = vec![
+        (10, String::from("<< /Type /FontDescriptor /FontName /Test /Flags 32 /FontBBox [0 0 1000 1000] /ItalicAngle 0 /Ascent 1000 /Descent 0 /CapHeight 800 /StemV 50 /FontFile 11 0 R >>").into_bytes()),
+        (11, type1_big_subr(1)),
+    ];
+    let mut content = Vec::new();
+    for k in 0..300u32 {
+        fonts.push_str(&format!("/F{k} {} 0 R ", 100 + k));
+        objs.push((100 + k, String::from("<< /Type /Font /Subtype /Type1 /BaseFont /Test /FirstChar 65 /LastChar 65 /Widths [1000] /FontDescriptor 10 0 R >>").into_bytes()));
+        content.extend_from_slice(format!("0 g BT /F{k} 40 Tf {} 10 Td (A) Tj ET ", if k == 299 { 10 } else { 60 }).as_bytes());
+    }
+    fonts.push_str(">>");
+    let r = render_timed(t, "300 fonts on one program", page(&content, &fonts, &objs, ""), &RenderOptions::default());
+    t.eq("300 fonts on one program: the last one draws", r.and_then(|r| r.ok()).map(|px| px.at(26.0, 26.0)), Some(BLACK));
+
+    // a JPEG of 1200 x 1200 named 10 x 10: its own size counts against max_pixels
+    let mut sf = gfx::Surface::new(1200, 1200, gfx::FMT_PARGB);
+    for p in sf.px.chunks_exact_mut(4) {
+        p.copy_from_slice(&[0, 0, 0, 255]);
+    }
+    if let Some(jpeg) = img_jpeg::encode(&sf, 50) {
+        let small = RenderOptions { max_pixels: 1 << 20, ..Default::default() };
+        let r = render_timed(t, "a JPEG larger than it says", page(b"q 80 0 0 80 10 10 cm /I Do Q", "/XObject << /I 10 0 R >>", &[(10, img("/Width 10 /Height 10 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode", &jpeg))], ""), &small);
+        t.eq("a JPEG larger than max_pixels is not drawn", r.and_then(|r| r.ok()).map(|px| px.at(50.0, 50.0)), Some(WHITE));
+    }
+
+    // a glyph 2.8 million pixels wide and under a pixel high: filled as a path, the rasterizer
+    // as wide as the page
+    let objs = vec![
+        (10, String::from("<< /Type /FontDescriptor /FontName /Test /Flags 32 /FontBBox [0 0 1000 1000] /ItalicAngle 0 /Ascent 1000 /Descent 0 /CapHeight 800 /StemV 50 /FontFile 11 0 R >>").into_bytes()),
+        (11, type1_font()),
+    ];
+    let wide = format!("/Font << /T1 << /Type /Font /Subtype /Type1 /BaseFont /Test /FirstChar 65 /LastChar 65 /Widths [1000] /FontDescriptor 10 0 R >> >>");
+    let r = render_timed(t, "a glyph of 2.8 million pixels", page(b"0 g BT /T1 1 Tf 350000000 Tz 0 50 Td (A) Tj ET", &wide, &objs, ""), &RenderOptions::default());
+    t.check("a glyph of 2.8 million pixels: drawn", r.and_then(|r| r.ok()).is_some_and(|px| px.at(50.0, 50.4)[0] < 255));
 }
 const J2K_RGB: &[u8] = &[0xFF, 0x4F, 0xFF, 0x51, 0x00, 0x2F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x07, 0x01, 0x01, 0x07, 0x01, 0x01, 0x07, 0x01, 0x01, 0xFF, 0x52, 0x00, 0x0C, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x04, 0x04, 0x00, 0x01, 0xFF, 0x5C, 0x00, 0x07, 0x40, 0x40, 0x48, 0x48, 0x50, 0xFF, 0x64, 0x00, 0x25, 0x00, 0x01, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x64, 0x20, 0x62, 0x79, 0x20, 0x4F, 0x70, 0x65, 0x6E, 0x4A, 0x50, 0x45, 0x47, 0x20, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6F, 0x6E, 0x20, 0x32, 0x2E, 0x35, 0x2E, 0x34, 0xFF, 0x90, 0x00, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x5D, 0x00, 0x01, 0xFF, 0x93, 0xCF, 0xB4, 0x3C, 0x10, 0xCC, 0x4E, 0x0C, 0x04, 0xEC, 0x3D, 0x61, 0xE6, 0x13, 0x9C, 0x5C, 0x52, 0x33, 0x0F, 0xCF, 0xB4, 0x38, 0x06, 0x31, 0x3A, 0xE1, 0xF6, 0xBC, 0x75, 0x91, 0x87, 0x01, 0xE9, 0x44, 0x92, 0x7F, 0xCF, 0xB4, 0x38, 0x13, 0x8C, 0x45, 0x30, 0x14, 0x4D, 0x30, 0x11, 0x36, 0x09, 0x0C, 0x00, 0x02, 0x9F, 0xA3, 0xED, 0x05, 0x00, 0x0C, 0x78, 0x3B, 0x2E, 0x9F, 0xA1, 0xF5, 0x02, 0x80, 0x0F, 0x27, 0x97, 0x3C, 0x5B, 0xA1, 0xF5, 0x02, 0x80, 0x0F, 0x27, 0xA7, 0x14, 0x7F, 0xFF, 0xD9];  // 208 bytes
 const JP2_RGB: &[u8] = &[0x00, 0x00, 0x00, 0x0C, 0x6A, 0x50, 0x20, 0x20, 0x0D, 0x0A, 0x87, 0x0A, 0x00, 0x00, 0x00, 0x14, 0x66, 0x74, 0x79, 0x70, 0x6A, 0x70, 0x32, 0x20, 0x00, 0x00, 0x00, 0x00, 0x6A, 0x70, 0x32, 0x20, 0x00, 0x00, 0x00, 0x2D, 0x6A, 0x70, 0x32, 0x68, 0x00, 0x00, 0x00, 0x16, 0x69, 0x68, 0x64, 0x72, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x08, 0x00, 0x03, 0x07, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0F, 0x63, 0x6F, 0x6C, 0x72, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0xD8, 0x6A, 0x70, 0x32, 0x63, 0xFF, 0x4F, 0xFF, 0x51, 0x00, 0x2F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x07, 0x01, 0x01, 0x07, 0x01, 0x01, 0x07, 0x01, 0x01, 0xFF, 0x52, 0x00, 0x0C, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x04, 0x04, 0x00, 0x01, 0xFF, 0x5C, 0x00, 0x07, 0x40, 0x40, 0x48, 0x48, 0x50, 0xFF, 0x64, 0x00, 0x25, 0x00, 0x01, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x64, 0x20, 0x62, 0x79, 0x20, 0x4F, 0x70, 0x65, 0x6E, 0x4A, 0x50, 0x45, 0x47, 0x20, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6F, 0x6E, 0x20, 0x32, 0x2E, 0x35, 0x2E, 0x34, 0xFF, 0x90, 0x00, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x5D, 0x00, 0x01, 0xFF, 0x93, 0xCF, 0xB4, 0x3C, 0x10, 0xCC, 0x4E, 0x0C, 0x04, 0xEC, 0x3D, 0x61, 0xE6, 0x13, 0x9C, 0x5C, 0x52, 0x33, 0x0F, 0xCF, 0xB4, 0x38, 0x06, 0x31, 0x3A, 0xE1, 0xF6, 0xBC, 0x75, 0x91, 0x87, 0x01, 0xE9, 0x44, 0x92, 0x7F, 0xCF, 0xB4, 0x38, 0x13, 0x8C, 0x45, 0x30, 0x14, 0x4D, 0x30, 0x11, 0x36, 0x09, 0x0C, 0x00, 0x02, 0x9F, 0xA3, 0xED, 0x05, 0x00, 0x0C, 0x78, 0x3B, 0x2E, 0x9F, 0xA1, 0xF5, 0x02, 0x80, 0x0F, 0x27, 0x97, 0x3C, 0x5B, 0xA1, 0xF5, 0x02, 0x80, 0x0F, 0x27, 0xA7, 0x14, 0x7F, 0xFF, 0xD9];  // 293 bytes
