@@ -457,10 +457,13 @@ impl Stream for TlsStream {
                     return Ok(0);
                 }
             }
-            // records without data do not keep a read going past the timeout (the caller's
-            // deadline is checked between reads)
-            if read_ms != u32::MAX && plat::time_us().saturating_sub(t0) >= read_ms as u64 * 1000 {
-                return Err(NetError::new(NetErrorKind::TimedOut, 0));
+            // records without data, or a record that comes in pieces, do not keep a read going
+            // past the timeout: the next bytes are waited for only as long as it has left
+            if read_ms != u32::MAX {
+                let spent = plat::time_us().saturating_sub(t0) / 1000;
+                if spent >= read_ms as u64 || !self.inner.wait_readable((read_ms as u64 - spent) as u32) {
+                    return Err(NetError::new(NetErrorKind::TimedOut, 0));
+                }
             }
             let n = self.inner.read(&mut raw)?;
             if n == 0 {

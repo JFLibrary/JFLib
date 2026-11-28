@@ -16,8 +16,7 @@
 //   (plat::AtomicFile: replaced only by a whole 2xx body), progress and cancel in ctl
 //
 // The fields: connect_ms, timeout_ms (any single read or write), deadline_ms (a whole request,
-// its redirects included, each connect, read and write within the time left; the name lookup has
-// the resolver's own timeouts; 0: none), max_body (the body as it came and after decoding),
+// its redirects included: see below; 0: none), max_body (the body as it came and after decoding),
 // user_agent, redirects (followed at most; 0: a 3xx answer comes back as it is) and decode.
 //
 // decode (on by default): without an Accept-Encoding or Range header of the caller's, a request
@@ -39,6 +38,14 @@
 // Transfer-Encoding: chunked, else Content-Length, else up to the end of the connection.
 // A connection carries another request (the pool, Session) only after a body of known length
 // that was read to its end with no byte beyond it, and when neither side said close.
+//
+// deadline_ms: each address connected to gets connect_ms or the time left, whichever is less;
+// every read waits for bytes only until the deadline (a TLS record that arrives in pieces too);
+// a request is written in pieces of 16 KiB, each with the time left as its timeout -- a server
+// that takes a piece byte by byte can still keep that piece's write going past the deadline.
+// Outside the deadline: the name lookup (the resolver's own timeouts) and the TLS handshake (the
+// connector's: each of its reads and writes waits at most the time left when it begins, and a
+// handshake that ends past the deadline is TimedOut).
 
 use alloc::boxed::Box;
 use alloc::format;
@@ -144,9 +151,8 @@ pub struct Client {
     /// the longest wait for any read or write
     pub timeout_ms: u32,
     /// the longest a whole request may take, from connecting to the last byte of the body,
-    /// redirects and retries included: the connect and every read and write wait at most the
-    /// time left; the name lookup has the resolver's own timeouts (0: no limit beyond
-    /// timeout_ms per read)
+    /// redirects and retries included; what it bounds and what not: the module header (0: no
+    /// limit beyond timeout_ms per read)
     pub deadline_ms: u32,
     pub max_body: usize,
     pub user_agent: String,
@@ -221,14 +227,71 @@ fn reset() -> HttpError {
     HttpError::Net(NetError::new(NetErrorKind::Reset, 0))
 }
 
-/// `ms`, or less when the deadline comes sooner (TimedOut when it has passed)
-fn within(ms: u32, deadline: Option<u64>) -> Result<u32, HttpError> {
-    let Some(d) = deadline else { return Ok(ms) };
+fn timed_out() -> NetError {
+    NetError::new(NetErrorKind::TimedOut, 0)
+}
+
+/// `ms`, or less when the deadline comes sooner; None when it has passed
+fn left(ms: u32, deadline: Option<u64>) -> Option<u32> {
+    let Some(d) = deadline else { return Some(ms) };
     let left = d.saturating_sub(plat::time_us()) / 1000;
-    if left == 0 {
-        return Err(HttpError::Net(NetError::new(NetErrorKind::TimedOut, 0)));
+    (left > 0).then(|| ms.min(left.min(u32::MAX as u64) as u32))
+}
+
+/// left(), TimedOut when the deadline has passed
+fn within(ms: u32, deadline: Option<u64>) -> Result<u32, HttpError> {
+    left(ms, deadline).ok_or_else(|| HttpError::Net(timed_out()))
+}
+
+/// Writes go out in pieces of this size, the deadline checked before each
+const WRITE_PIECE: usize = 16 << 10;
+
+/// A stream whose reads and writes keep to a deadline: before each read and each piece of a
+/// write, its timeouts become the time left (at most `ms`), and past the deadline they fail with
+/// TimedOut.  Without a deadline it passes everything on as it is
+struct Bounded<'a> {
+    s: &'a dyn Stream,
+    ms: u32,
+    deadline: Option<u64>,
+}
+
+impl Bounded<'_> {
+    fn limit(&self) -> plat::net::NetResult<()> {
+        if self.deadline.is_some() {
+            let ms = left(self.ms, self.deadline).ok_or_else(timed_out)?;
+            self.s.set_timeouts(Some(ms), Some(ms));
+        }
+        Ok(())
     }
-    Ok(ms.min(left.min(u32::MAX as u64) as u32))
+}
+
+impl Stream for Bounded<'_> {
+    fn read(&self, buf: &mut [u8]) -> plat::net::NetResult<usize> {
+        self.limit()?;
+        self.s.read(buf)
+    }
+    fn write_all(&self, buf: &[u8]) -> plat::net::NetResult<()> {
+        if self.deadline.is_none() {
+            return self.s.write_all(buf);
+        }
+        for piece in buf.chunks(WRITE_PIECE) {
+            self.limit()?;
+            self.s.write_all(piece)?;
+        }
+        Ok(())
+    }
+    fn set_timeouts(&self, read_ms: Option<u32>, write_ms: Option<u32>) {
+        self.s.set_timeouts(read_ms, write_ms);
+    }
+    fn shutdown(&self) {
+        self.s.shutdown();
+    }
+    fn wait_readable(&self, ms: u32) -> bool {
+        self.s.wait_readable(ms)
+    }
+    fn end_is_clean(&self) -> bool {
+        self.s.end_is_clean()
+    }
 }
 
 fn is_redirect(status: u16) -> bool {
@@ -512,12 +575,23 @@ impl Client {
     }
 
     // A TCP connection, within the deadline: the name lookup has the resolver's own timeouts
-    // (the deadline is checked before and after it), the connect and every later read and
-    // write wait at most the time that is left
+    // (the deadline is checked before and after it); each address tried gets connect_ms or the
+    // time left, whichever is less
     fn tcp(&self, url: &Url, deadline: Option<u64>) -> Result<TcpStream, HttpError> {
         within(self.connect_ms, deadline)?;
         let addrs = crate::dns::resolve(&url.host, url.port)?;
-        let tcp = TcpStream::connect_any(&addrs, within(self.connect_ms, deadline)?)?;
+        let mut last = NetError::new(NetErrorKind::NotFound, 0);
+        let mut got = None;
+        for a in &addrs {
+            match TcpStream::connect(a, within(self.connect_ms, deadline)?) {
+                Ok(s) => {
+                    got = Some(s);
+                    break;
+                }
+                Err(e) => last = e,
+            }
+        }
+        let tcp = got.ok_or(HttpError::Net(last))?;
         let _ = tcp.set_nodelay(true);
         self.bound(&tcp, deadline)?;
         Ok(tcp)
@@ -550,10 +624,11 @@ impl Client {
         if let Some(a) = ep.authorization() {
             h.set("Proxy-Authorization", a);
         }
-        if !http::write_request(tcp, "CONNECT", &url.authority(), &h, &[]) {
+        let s = Bounded { s: tcp, ms: self.timeout_ms, deadline };
+        if !http::write_request(&s, "CONNECT", &url.authority(), &h, &[]) {
             return Err(reset());
         }
-        let mut rd = Reader::new(tcp);
+        let mut rd = Reader::new(&s);
         rd.set_deadline(deadline);
         let head = read_head(&mut rd).map_err(read_err)?;
         if !(200..300).contains(&head.status) {
@@ -570,15 +645,24 @@ impl Client {
     fn open(&self, url: &Url, deadline: Option<u64>) -> Result<(Box<dyn Stream>, Option<Endpoint>), HttpError> {
         let Some(ep) = self.proxy.as_ref().and_then(|p| p.for_url(url)).cloned() else {
             let tcp = self.tcp(url, deadline)?;
-            return Ok((if url.is_https() { self.tls(url, tcp)? } else { Box::new(tcp) }, None));
+            return Ok((if url.is_https() { self.tls_within(url, tcp, deadline)? } else { Box::new(tcp) }, None));
         };
         let tcp = self.tcp(&ep.url(), deadline)?;
         if !url.is_https() {
             return Ok((Box::new(tcp), Some(ep)));
         }
         self.tunnel(&tcp, &ep, url, deadline)?;
+        Ok((self.tls_within(url, tcp, deadline)?, None))
+    }
+
+    // The TLS layer over tcp within the deadline.  The handshake is the connector's: each of its
+    // reads and writes waits at most the time left when it begins (the socket's timeouts), and
+    // a handshake that ends past the deadline is TimedOut
+    fn tls_within(&self, url: &Url, tcp: TcpStream, deadline: Option<u64>) -> Result<Box<dyn Stream>, HttpError> {
         self.bound(&tcp, deadline)?;
-        Ok((self.tls(url, tcp)?, None))
+        let s = self.tls(url, tcp)?;
+        within(self.timeout_ms, deadline)?;
+        Ok(s)
     }
 
     // What tells kept connections apart: the origin, the proxy with its credentials (a hash:
@@ -624,6 +708,8 @@ impl Client {
     /// whether the connection may carry another request, or the error and whether the
     /// connection ended before any answer (a kept one the server had closed: worth a retry)
     fn on_stream(&self, s: &dyn Stream, req: &Hop, via: Option<&Endpoint>, keep: bool, deadline: Option<u64>, read: ReadFn) -> Result<(Response, bool), (HttpError, bool)> {
+        let b = Bounded { s, ms: self.timeout_ms, deadline };
+        let s: &dyn Stream = &b;
         let mut h = req.headers.clone();
         if h.get("host").is_none() {
             h.set("Host", &req.url.host_header());
@@ -782,7 +868,8 @@ impl Client {
 
     /// One request over a connection the caller opened (a socket of its own, a test's stream):
     /// the client's headers, cookies and decoding, no proxy, pool or redirects; the request asks
-    /// to close the connection, and the stream is left as it is
+    /// to close the connection, and the stream stays open (with deadline_ms, its timeouts are
+    /// the time left as the request goes)
     pub fn request_on(&self, s: &dyn Stream, method: &str, url: &Url, headers: &Headers, body: &[u8]) -> Result<Response, HttpError> {
         let max = self.max_body;
         let req = Hop { method, url, headers, body };
