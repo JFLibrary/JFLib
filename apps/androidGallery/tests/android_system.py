@@ -21,13 +21,16 @@ its state in data://system-state.txt, read with run-as) and works it as a user w
 - printing (docs/ANDROID.md AN4): the button "Drucken" (plat::print: a test picture as a PDF) -> 0
   and the system's print dialog (the print spooler's PrintActivity) in front with our page (A4,
   1/1); Back closes it -> the job cancelled (logcat "print: ... -> -4"), the gallery in front;
-  then "Save as PDF" through the system's save dialog -> the job done ("-> 2") and
-  Download/JFLib Galerie.pdf holds the test picture (removed again; on a phone only with
-  --save-pdf, an emulator always);
+  then "Save as PDF" through the system's save dialog -> the job done ("-> 2") and the new
+  "JFLib Galerie*.pdf" holds the test picture (removed again; on a phone only with --save-pdf, an
+  emulator always; the dialog's button only with "Save as PDF" chosen, never a real printer);
 - the lifecycle: `input keyevent KEYCODE_HOME` -> UIC_ACTIVE 0, UIC_SUSPEND 2; started again from
   the launcher's intent -> UIC_SUSPEND 0, UIC_ACTIVE 1.
 Every setting it changes is restored at the end (also after a failure or Ctrl+C): night mode,
 font scale, animator scale, high-contrast text, the app's notification permission and its flags.
+--only print: the start and the printing alone (no setting of the system changes); --package NAME:
+a test build under another package (jfgui_ANDROID_PACKAGE=NAME, tools/android.py) beside the
+installed gallery; --pdf-out FILE: a copy of the PDF "Save as PDF" wrote.
 Runs unchanged on a phone (any serial, any ABI): without --apk it installs
 build/android/androidGallery-<ro.product.cpu.abi>-debug.apk when that exists.  The phone must be
 unlocked (a screen lock with a PIN cannot be dismissed from adb).  The APK must be a debug build
@@ -37,6 +40,7 @@ ANDROID_HOME / %LOCALAPPDATA%\\Android\\Sdk.
 import argparse
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -45,7 +49,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 PKG = "org.jflib.gallery"
-ACTIVITY = f"{PKG}/.GalleryActivity"
+ACTIVITY = f"{PKG}/org.jflib.gallery.GalleryActivity"
 STATE = "files/fs/data/androidGallery/system-state.txt"
 PERM = "android.permission.POST_NOTIFICATIONS"
 DUMP = "/data/local/tmp/jfgui_system_ui.xml"
@@ -93,6 +97,10 @@ class Device:
         return self.sh("getprop", name).strip()
 
 
+class SkipToPrint(Exception):
+    """--only print: past the parts before printing (and the end after it)"""
+
+
 def test_picture():
     """the gallery's print picture (system.rs test_picture) as R, G, B rows"""
     w, h = 480, 320
@@ -134,9 +142,16 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--serial", help="adb device (default: the only one)")
     ap.add_argument("--apk", help="install this APK first (default: build/android/androidGallery-<abi>-debug.apk if it exists)")
+    ap.add_argument("--package", default="org.jflib.gallery", help="the APK's package (a test build: jfgui_ANDROID_PACKAGE)")
+    ap.add_argument("--only", choices=["print"], help="only this part (print: no setting of the system changes)")
+    ap.add_argument("--pdf-out", help="write the PDF \"Save as PDF\" made here as well")
     ap.add_argument("--save-pdf", action="store_true",
                     help="on a phone too: print to \"Save as PDF\" into its Download folder (removed again)")
     a = ap.parse_args()
+    global PKG, ACTIVITY
+    PKG = a.package
+    ACTIVITY = f"{PKG}/org.jflib.gallery.GalleryActivity"  # (a test build keeps the classes' names)
+    only_print = a.only == "print"
     d = Device(a.serial)
     sdk = int(d.prop("ro.build.version.sdk") or "0")
     abi = d.prop("ro.product.cpu.abi")
@@ -190,6 +205,10 @@ def main():
 
     def restore():
         no_dialog()
+        if only_print:
+            d.sh("am", "force-stop", PKG)
+            d.sh("rm", "-f", DUMP)
+            return
         if saved["night"] in ("yes", "no", "auto", "custom"):
             d.sh("cmd", "uimode", "night", saved["night"])
         for ns, key, value in (saved["font_scale"], saved["animator"], saved["contrast"]):
@@ -289,13 +308,13 @@ def main():
         return False
 
     def focused():
-        return ACTIVITY.replace("/.", "/" + PKG + ".") in "".join(
+        return ACTIVITY in "".join(
             line for line in d.sh("dumpsys", "window").splitlines() if "mCurrentFocus" in line or "mFocusedApp" in line)
 
     def window_flags():
         out = d.sh("dumpsys", "window", "windows")
         for block in out.split("Window #"):
-            if f"{PKG}/{PKG}.GalleryActivity" in block.split("\n", 1)[0]:
+            if ACTIVITY in block.split("\n", 1)[0]:
                 return block
         return ""
 
@@ -359,19 +378,24 @@ def main():
                 return True
         return False
 
+    stopped = False
     try:
-        if sdk >= 33:
+        if only_print:
+            start()
+        if not only_print and sdk >= 33:
             # not asked yet (before the start: revoking a runtime permission ends the app's process)
             d.sh("am", "force-stop", PKG)
             d.sh("pm", "revoke", PKG, PERM)
             d.sh("pm", "clear-permission-flags", PKG, PERM, "user-set", "user-fixed")
-        s = start()
+        s = start() if not only_print else {}
         base = num(s, "settings")
-        print(f"  start: dark_system={s['dark_system']} scale={s['scale']} motion={s['motion']} contrast={s['contrast']} accent={s['accent']}")
-        if sdk >= 31:
+        print(f"  start: dark_system={s.get('dark_system')} scale={s.get('scale')} motion={s.get('motion')} contrast={s.get('contrast')} accent={s.get('accent')}")
+        if sdk >= 31 and not only_print:
             ok(re.fullmatch(r"[0-9A-F]{6}", s.get("accent", "")) is not None, f"the system's accent (dynamic colours): #{s.get('accent')}")
 
         # ------------------------------------------------------------ settings live
+        if only_print:
+            raise SkipToPrint
         print("settings:", flush=True)
         # the first step has to change something: the phone may already be dark
         modes = (("yes", "1"), ("no", "0"))
@@ -473,7 +497,7 @@ def main():
         s = wait(lambda s: s["keep"] == "1" and num(s, "inhibited") == 3, "kept on")
         ok(s is not None, "plat::inhibit(INHIBIT_IDLE) holds idle and suspend")
         ok(keeps_screen_on() is True, "dumpsys window: the activity's window has FLAG_KEEP_SCREEN_ON")
-        ok(f"jfgui:{PKG}" in wake_locks(), "dumpsys power: the partial WakeLock jfgui:org.jflib.gallery")
+        ok(f"jfgui:{PKG}" in wake_locks(), f"dumpsys power: the partial WakeLock jfgui:{PKG}")
         ok(tap_label("Bildschirm anlassen"), "tap \"Bildschirm anlassen\" again")
         ok(wait(lambda s: s["keep"] == "0" and num(s, "inhibited") == 0, "released") is not None, "the guard dropped")
         ok(keeps_screen_on() is False, "dumpsys window: no FLAG_KEEP_SCREEN_ON")
@@ -499,6 +523,15 @@ def main():
         ok(s is not None, "closed with Back: SHARE_CANCELLED (no target chosen)")
         ok(focused(), "the gallery is in front again")
 
+    except SkipToPrint:
+        pass
+    except (RuntimeError, KeyboardInterrupt) as e:
+        failures.append(str(e) or type(e).__name__)
+        print(f"stopped: {e!r}")
+        stopped = True
+    try:
+        if stopped:
+            raise SkipToPrint  # (to the end)
         # ------------------------------------------------------------ printing
         print("printing:", flush=True)
 
@@ -545,40 +578,75 @@ def main():
             line = job_line()
             ok(line.endswith("-> -4"), f"the job ended cancelled ({line or 'no line'})")
 
-        # "Save as PDF" (the spooler's own printer) through the system's save dialog into
-        # Download/: an emulator always, a phone only with --save-pdf (it writes into its Downloads)
+        # "Save as PDF" (the spooler's own printer) through the system's save dialog: an emulator
+        # always, a phone only with --save-pdf (it writes into its storage; the new file is removed)
+        PDF_NAMES = ("save as pdf", "als pdf speichern")
         if a.save_pdf or d.prop("ro.kernel.qemu") == "1" or (a.serial or "").startswith("emulator-"):
-            saved_pdf = "/sdcard/Download/JFLib Galerie.pdf"
-            d.sh("rm", "-f", saved_pdf)
+            def saved_files():
+                # (Samsung's My Files saves "JFLib Galerie.PDF", in the storage's root by default)
+                # (adb hands the words to the device's shell as they are: quoted here)
+                out = d.sh(f"find /sdcard/ -maxdepth 3 -iname {shlex.quote('JFLib Galerie*.pdf')}", timeout=60)
+                return {line.strip() for line in out.splitlines() if line.strip().lower().endswith(".pdf")}
+            before = saved_files()
             if print_round(2):
-                dest = find(spooler("title"), "the printer", timeout=10)
-                if dest is not None and dest.get("text") != "Save as PDF":
+                def dest_is_pdf():
+                    n = find(spooler("title"), "the printer", timeout=10)
+                    return n is not None and (n.get("text") or "").strip().lower() in PDF_NAMES
+                if not dest_is_pdf():
                     spin = find(spooler("destination_spinner"), "the printer list")
                     if spin is not None:
                         tap(spin)
-                        pdf_item = find(label("Save as PDF"), '"Save as PDF"')
-                        if pdf_item is not None:
-                            tap(pdf_item)
-                button = find(spooler("print_button"), "the dialog's print button")
-                ok(button is not None, f"the dialog's button \"{button is not None and button.get('content-desc')}\"")
+                        item = find(lambda n: (n.get("text") or "").strip().lower() in PDF_NAMES, '"Save as PDF"')
+                        if item is not None:
+                            tap(item)
+                pdf_chosen = ok(dest_is_pdf(), "the dialog's printer is \"Save as PDF\" (never a real one)")
+                button = find(spooler("print_button"), "the dialog's print button") if pdf_chosen else None
                 if button is not None:
+                    ok(True, f"the dialog's button \"{button.get('content-desc')}\"")
                     tap(button)
-                save = find(lambda n: (n.get("text") or "").lower() == "save" and n.get("clickable") == "true"
-                            and "documentsui" in n.get("resource-id", "") + n.get("package", ""), "the save dialog's button")
-                ok(save is not None, "the system's save dialog (DocumentsUI) is in front")
-                if save is not None:
-                    tap(save)
+                    def save_button(n):
+                        # DocumentsUI's "Save" (AOSP, Google), Samsung's My Files picker: "OK" (menu_done)
+                        label = ((n.get("text") or "") or (n.get("content-desc") or "")).strip().lower()
+                        rid = n.get("resource-id", "")
+                        where = rid + n.get("package", "")
+                        return n.get("clickable") == "true" and (
+                            ("documentsui" in where and label in ("save", "speichern"))
+                            or ("myfiles" in where and (rid.endswith(":id/menu_done") or label in ("ok", "save", "speichern"))))
+                    save = find(save_button, "the save dialog's button")
+                    ok(save is not None, "the system's save dialog (DocumentsUI, Samsung's My Files) is in front")
+                    if save is not None:
+                        tap(save)
+                else:
+                    for _ in range(3):  # no button: close the dialog without printing
+                        if focused():
+                            break
+                        d.sh("input", "keyevent", "KEYCODE_BACK")
+                        time.sleep(1.5)
                 end = time.time() + 15
                 while time.time() < end and not focused():
                     time.sleep(0.3)
-                ok(focused(), "saved: the gallery is in front again")
-                line = job_line()
-                ok(line.endswith("-> 2"), f"the job ended done ({line or 'no line'})")
-                pdf = d.raw("exec-out", "cat", saved_pdf)
-                ok(saved_pdf_ok(pdf), f"Download/JFLib Galerie.pdf: {len(pdf)} bytes, A4, our test picture (480 x 320) in it")
-                d.sh("rm", "-f", saved_pdf)
+                ok(focused(), "the gallery is in front again")
+                if button is not None:
+                    line = job_line()
+                    ok(line.endswith("-> 2"), f"the job ended done ({line or 'no line'})")
+                    end, new = time.time() + 10, set()
+                    while time.time() < end and not new:
+                        new = saved_files() - before
+                        time.sleep(0.5)
+                    path = sorted(new)[0] if new else ""
+                    pdf = d.raw("exec-out", f"cat {shlex.quote(path)}") if path else b""
+                    if a.pdf_out and pdf:
+                        try:
+                            Path(a.pdf_out).write_bytes(pdf)
+                        except OSError as e:
+                            notes.append(f"--pdf-out {a.pdf_out}: {e}")
+                    ok(saved_pdf_ok(pdf), f"{path or 'no new JFLib Galerie*.pdf'}: {len(pdf)} bytes, A4, our test picture (480 x 320) in it")
+                    for f in new:  # only the file this run made
+                        d.sh(f"rm -f {shlex.quote(f)}")
 
         # ------------------------------------------------------------ the lifecycle
+        if only_print:
+            raise SkipToPrint  # (the end)
         print("the lifecycle:", flush=True)
         # (the print dialog and the save dialog covered the gallery: it was stopped and started before)
         before = state()
@@ -603,18 +671,25 @@ def main():
             time.sleep(1)
             dialog_up = any(x.get("resource-id", "").endswith("permission_allow_button") for x in nodes())
             ok(s is not None and not dialog_up and not posted(1), "denied for good: no dialog, notification 1 gone at once, nothing posted")
+    except SkipToPrint:
+        pass
     except (RuntimeError, KeyboardInterrupt) as e:
         failures.append(str(e) or type(e).__name__)
         print(f"stopped: {e!r}")
     finally:
         restore()
-        after = [d.sh("settings", "get", ns, key).strip() for ns, key, _ in (saved["font_scale"], saved["animator"], saved["contrast"])]
-        same = after == [v for _, _, v in (saved["font_scale"], saved["animator"], saved["contrast"])]
-        night = (re.search(r"Night mode:\s*(\w+)", d.sh("cmd", "uimode", "night")) or [None, None])[1]
-        print(f"restored: night mode {night}, font_scale {after[0]}, animator_duration_scale {after[1]}, "
-              f"high_text_contrast_enabled {after[2]}" + ("" if same and night == saved["night"] else "  (DIFFERENT from before!)"))
-        if not (same and night == saved["night"]):
-            failures.append("settings not restored")
+    if only_print:
+        for n in notes:
+            print("note:", n)
+        print(f"android_system: {checks} checks, " + ("ok" if not failures else f"{len(failures)} failed: " + "; ".join(failures)))
+        return 1 if failures else 0
+    after = [d.sh("settings", "get", ns, key).strip() for ns, key, _ in (saved["font_scale"], saved["animator"], saved["contrast"])]
+    same = after == [v for _, _, v in (saved["font_scale"], saved["animator"], saved["contrast"])]
+    night = (re.search(r"Night mode:\s*(\w+)", d.sh("cmd", "uimode", "night")) or [None, None])[1]
+    print(f"restored: night mode {night}, font_scale {after[0]}, animator_duration_scale {after[1]}, "
+          f"high_text_contrast_enabled {after[2]}" + ("" if same and night == saved["night"] else "  (DIFFERENT from before!)"))
+    if not (same and night == saved["night"]):
+        failures.append("settings not restored")
     for n in notes:
         print("note:", n)
     print(f"android_system: {checks} checks, " + ("ok" if not failures else f"{len(failures)} failed: " + "; ".join(failures)))

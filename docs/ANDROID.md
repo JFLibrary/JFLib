@@ -1,6 +1,6 @@
 # Android-Plan: Android so weit wie Windows, Linux und Apple
 
-Stand 2026-11-28, auf Basis von `main` 7cdabce4. AN0, AN1 und AN2 sind umgesetzt (Emulator und A56), AN3 und AN4 auf dem Emulator, AN5 nicht; die Aufwände sind geschätzt. Der Plan wartete auf ARM1 bis ARM3 ([ARM64.md](ARM64.md)): die Kernel-Tabellen
+Stand 2026-11-28, auf Basis von `main` 7cdabce4. AN0 bis AN4 sind umgesetzt (Emulator und A56; AN3 auf dem A56 seit dem Lauf von AN4), AN5 nicht; die Aufwände sind geschätzt. Der Plan wartete auf ARM1 bis ARM3 ([ARM64.md](ARM64.md)): die Kernel-Tabellen
 und `plat` auf Linux ARM64 ohne libc.
 
 ## Ziel
@@ -538,6 +538,7 @@ und `cas` im Test-APK grün sind und `android_files.py` unverändert besteht.
 Offen nach AN3:
 
 - Das A56 (ARM64: die andere `struct stat` im App-Prozess, `openat2` dort erlaubt, aber ungenutzt), nur auf Zuruf.
+  (Mit AN4 gelaufen: `coretest` und `plattest --test all` auf dem A56 grün, siehe dort.)
 - `plattest --test dirs` prüft auf Android die XDG-Ordner von Linux (25 Fehler, schon vor AN3; nicht in `all`).
   Android kennt nur `/documents` und `/data` als Ordner der Logs; der Test braucht einen eigenen Zweig.
 - Unix-Sockets von `net` (mit `fs::socket_id`): nach dem Mischen von AN2 und AN3 sind beide Teile da, die Sockets
@@ -556,8 +557,8 @@ Offen nach AN3:
 Druckdialog von Android öffnet und „Als PDF speichern“ das richtige Dokument schreibt (von Hand) und `fontdb` die
 Schriften des Systems findet (Roboto, Noto CJK).
 
-**Stand 2026-11-28:** umgesetzt und auf dem Emulator grün (beide Modi, dazu der Druckdialog aus der `androidGallery`);
-das A56 war nicht dran (nur auf Zuruf), die Handprüfung dort steht aus.
+**Stand 2026-11-28:** fertig. Auf dem Emulator und dem A56 grün (beide Modi), und auf beiden öffnet die
+`androidGallery` den Druckdialog von Android und „Als PDF speichern“ schreibt das richtige Dokument (unten).
 
 - **Drucken:** [`android_print.rs`](../lib/plat/android_print.rs) (neu, aus `web.rs` eingebunden) legt den Auftrag wie
   überall als PDF an (`print_pdf`, Papier und Lage des Auftrags) und gibt ihn mit der neuen Anfrage `REQUEST_PRINT`
@@ -572,9 +573,12 @@ das A56 war nicht dran (nur auf Zuruf), die Handprüfung dort steht aus.
   `CAP_SYSTEM_FONTS` (fest, wie `CAP_SHARE`).
 - **Die Antwort des Dialogs:** `REQUEST_PRINT` ist eine „detached“ Anfrage. Der Host lehnt sofort ab (-3, `print`
   sieht `ERR_UNSUPPORTED`) oder meldet in `onFinish` 2 (das System hat den Auftrag), -4 (abgebrochen) oder einen
-  Fehler. Wer den Dialog mit Zurück schließt, hinterlässt einen Auftrag im Zustand CREATED (der Spooler vergisst ihn,
-  die App behält den Zustand von `print()`); „Als PDF speichern“ endet mit COMPLETED. CREATED und CANCELED zählen als
-  abgebrochen. Eine App liest die Antwort heute nicht (es gibt kein `print_poll` wie `share_poll`).
+  Fehler. Wer den Dialog mit Zurück schließt, hinterlässt auf AOSP einen Auftrag im Zustand CREATED (der Spooler
+  vergisst ihn, die App behält den Zustand von `print()`), „Als PDF speichern“ endet dort gleich mit COMPLETED. Auf
+  dem A56 (One UI) steht der Auftrag in `onFinish` in beiden Fällen noch auf CREATED und erst einen Moment später auf
+  CANCELED oder COMPLETED: ein CREATED fragt `GalleryPrint` deshalb nach 1,5 s noch einmal, was dann noch CREATED ist,
+  zählt wie CANCELED als abgebrochen. Eine App liest die Antwort heute nicht (es gibt kein `print_poll` wie
+  `share_poll`).
 - **Systemschriften:** `policy::font_dirs()` nennt auf Android `/system/fonts` und `/product/fonts` (echte Pfade, Regel
   `SYSTEM` aus AN3); mit Manifest darf die App auch `/system/etc/fonts.xml` lesen. [`fontconf.rs`](../lib/text/fontconf.rs)
   liest diese Datei wie eine fontconfig-Datei (erkannt an `<familyset>`, auch über `jfgui_FONTCONF`): eine benannte
@@ -601,7 +605,10 @@ das A56 war nicht dran (nur auf Zuruf), die Handprüfung dort steht aus.
   Reihenfolge, dann die Ersatzschrift je Zeichen); sein Selbsttest liest eine `fonts.xml` über die Testschriften (auf
   jedem Ziel). `coretest`: die Gruppe `plat` prüft `process` und `service` auf Android. Die `androidGallery` druckt aus
   ihrer Karte 06 ein Testbild (vier Farbbänder, A4, 15 mm Rand), `android_system.py` prüft den Dialog, Zurück und
-  „Als PDF speichern“ (auf einem Telefon nur mit `--save-pdf`, es schreibt in dessen Downloads und löscht danach).
+  „Als PDF speichern“ (auf einem Telefon nur mit `--save-pdf`: es speichert dort und löscht danach nur die neue Datei;
+  der Knopf des Dialogs nur bei „Als PDF speichern“, nie bei einem echten Drucker). Für das Telefon hat das Skript
+  `--package` (ein Test-Build mit `jfgui_ANDROID_PACKAGE` neben der installierten Galerie), `--only print` (nur der
+  Druck, keine Einstellung des Systems ändert sich) und `--pdf-out DATEI` (eine Kopie des gespeicherten PDFs).
 
 | Lauf (Emulator x86-64, API 35) | `adb shell` | App (`untrusted_app`, seccomp 2) |
 |---|---|---|
@@ -623,6 +630,25 @@ bleiben.
 `GalleryInstrumentation`, `GalleryA11yInstrumentation` und `android_files.py` bleiben grün (`android_files.py` im
 zweiten Lauf; der erste scheiterte an der Zeit, wie in den Fallen von AN3).
 
+**Auf dem A56** (SM-A566B, arm64, Android 16, One UI; auf Zuruf des Nutzers, danach alles deinstalliert und gelöscht):
+
+| Lauf | `adb shell` | App |
+|---|---|---|
+| `fonttest --scan` | 289 Gesichter, 236 Familien in 14 ms (im APK 10 ms), darunter Roboto, Noto Sans CJK, Samsungs SEC CJK (JP, KR, SC, TC, HK), Noto Color Emoji, SamsungColorEmoji | dasselbe |
+| `fonttest --fallback -` | 159 Familien aus Samsungs `fonts.xml`; U+4E2D SEC CJK SC, U+0627 SEC Naskh Arabic, U+05D0 Noto Sans Hebrew, U+0E01 Noto Sans Thai, U+0915 SEC Devanagari, U+1F600 SamsungColorEmoji, U+2603 Noto Sans Symbols, U+AC00 One UI Sans KR, A Roboto | dasselbe |
+| `fonttest --conf` | sans-serif → Roboto (für ja zuerst SEC CJK JP, dann Noto Sans CJK JP), serif → Noto Serif, monospace → Droid Sans Mono, emoji → SamsungColorEmoji | dasselbe |
+| `plattest --test print`, `printdoc` | 12 von 12, 16 von 16 | dasselbe |
+| `plattest --test all` | 219 bestanden, 0 Fehler | dasselbe |
+| `coretest` | 5554 von 5554 (`plat` 106) | 5551 von 5551 |
+
+`android_system.py --package org.jflib.gallery.an4 --only print --save-pdf`: 19 von 19. Der Dialog des Spoolers zeigt
+ISO A4 und 1/1, Zurück → -4 (CREATED, dann CANCELED); „Als PDF speichern“ geht dort über Samsungs „Eigene Dateien“
+(`com.sec.android.app.myfiles`, Knopf „OK“), nicht über DocumentsUI, und legt `JFLib Galerie.PDF` in die Wurzel des
+Speichers (Endung groß). Der Auftrag endet mit 2 (CREATED, dann COMPLETED), die Datei (4374 Bytes, MediaBox
+595 × 841, `/Producer(jfguiLib)`) enthält unser Bild Pixel für Pixel, wie auf dem Emulator. Die ersten Läufe fanden den
+Knopf von „Eigene Dateien“ und die Datei nicht (das Skript suchte DocumentsUI, `.pdf` klein, und adb reicht die Wörter
+ungequotet an die Shell weiter); das Skript kennt beides jetzt.
+
 Geprüft außerdem: `cargo check -p jflib` mit und ohne `std` ohne Warnung für Windows (x86-64, ARM64), Linux (x86-64,
 ARM64), wasm32, Android (x86-64, ARM64) und macOS (ARM64); `build_rs.py check` (Lint, Clippy für Windows und Linux);
 Clippy mit denselben Regeln über `plat` und `text` für `aarch64-linux-android` (für x86-64 bricht es wie in AN2, Fund
@@ -632,7 +658,6 @@ Worktree).
 
 Offen nach AN4:
 
-- Das A56 (ARM64, Android 16, One UI): die Handprüfung „Als PDF speichern“ und `fonttest`, nur auf Zuruf.
 - `NotoSansSymbols-Regular-Subsetted2.ttf` (`und-Zsym`) heißt wie `…-Subsetted.ttf` und fällt im Scan als Doppel weg;
   seine 125 Symbole fehlen der Ersatzkette, bis FontDb gleichnamige Dateien verschiedenen Inhalts behält.
 - Die Familien des Herstellers (`/product/etc/fonts_customization.xml`) liest `fontconf` nicht, `/product/fonts` wird
@@ -722,7 +747,7 @@ Fassade). AN4 braucht AN3 für die Schriften des Systems.
 | Logik im App-Prozess | Test-APK auf Emulator und A56 | A56 nur auf Zuruf und unbedient |
 | Netz ins Internet | A56 im WLAN, Emulator | nur mit Zustimmung, nur öffentliche Prüfserver wie in `tls_web_check.py` |
 | Oberfläche | Skripte der `androidGallery`, `GalleryInstrumentation` | keine echte Eingabe, solange der Nutzer das Telefon bedient |
-| Drucken | Emulator per Skript (`android_system.py`: Dialog, Zurück, „Als PDF speichern“), A56 von Hand | „Als PDF speichern“, kein echter Drucker nötig |
+| Drucken | Emulator und A56 per Skript (`android_system.py`: Dialog, Zurück, „Als PDF speichern“; das A56 mit `--package --only print --save-pdf`) | „Als PDF speichern“, kein echter Drucker nötig; der Speicherdialog ist auf Samsung „Eigene Dateien“ |
 | CI | Ubuntu-Runner mit KVM und Emulator (AN5) | kein echtes Gerät |
 
 Die Regel gegen Fenster-Fluten gilt auch hier: höchstens drei Runden pro Variante, keine echte Eingabe unter dem

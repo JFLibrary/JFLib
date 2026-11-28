@@ -14,6 +14,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.os.Bundle;
 import android.os.CancellationSignal;
+import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelFileDescriptor;
 import android.print.PageRange;
@@ -150,20 +151,33 @@ final class GalleryPrint {
             }
         }
 
-        // The dialog is done: a job still CREATED never went anywhere (closed with Back: the
-        // spooler forgets it, so its state stays the one cached at print()), CANCELED was
-        // cancelled, FAILED failed; QUEUED, STARTED, BLOCKED and COMPLETED (saved as a PDF) are the
-        // system's now
+        // The dialog is done: CANCELED was cancelled, FAILED failed; QUEUED, STARTED, BLOCKED and
+        // COMPLETED (AOSP's "Save as PDF") are the system's now.  A job still CREATED: closed with
+        // Back (AOSP's spooler forgets it, so the state stays the one cached at print()) -- or,
+        // on Samsung's, saved as a PDF all the same; it is asked once more a moment later, and
+        // still CREATED counts as cancelled
         @Override public void onFinish() {
             pdf.delete();
-            int state = job == null ? PrintJobInfo.STATE_CREATED : job.getInfo().getState();
+            int state = state();
+            if (state == PrintJobInfo.STATE_CREATED) {
+                new Handler(Looper.getMainLooper()).postDelayed(() -> finish(state(), state), 1500);
+            } else {
+                finish(state, state);
+            }
+        }
+
+        private int state() {
+            return job == null ? PrintJobInfo.STATE_CREATED : job.getInfo().getState();
+        }
+
+        private void finish(int state, int first) {
             int status;
             switch (state) {
                 case PrintJobInfo.STATE_CREATED: case PrintJobInfo.STATE_CANCELED: status = GalleryHost.CANCELLED; break;
                 case PrintJobInfo.STATE_FAILED: status = GalleryHost.FAILED; break;
                 default: status = GalleryHost.DONE;
             }
-            Log.i(TAG, "print: " + name + " done, job " + state + " -> " + status);
+            Log.i(TAG, "print: " + name + " done, job " + (first == state ? "" : first + " then ") + state + " -> " + status);
             answer(status);
         }
     }
