@@ -1,0 +1,70 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD21: Gruppe öffnen (SP-15) -- the group's members alone on the canvas (the page
+# dimmed around them): one click selects a member, a shape drawn in the view joins the group, a
+# page shape dragged into the group's frame joins it, a shape dropped from the Shapes panel too;
+# Gruppe schließen fits the group's box around its members (SP-16, one undo step); a double click
+# opens a group whose Verhalten says so (EventDblClick OPENGROUPWIN)
+click button:"Weitere Shapes"
+click "Allgemein"
+click "Standard-Shapes"
+cmd 4404
+drag 500,330 640,420
+drag 700,330 800,420
+drag 900,500 1000,560
+cmd 4400
+click 560,380
+click 750,380 shift
+cmd 4453
+expect listitem:"Sheet.7" selected
+click button:"Gruppieren"
+click menuitem:"Gruppe öffnen"
+expect button:"Gruppe schließen" exists
+a11y expect announced "Gruppe „Sheet.7“ geöffnet"
+expect listitem:"Sheet.7" missing
+expect listitem:"Sheet.4" exists
+# one click selects a member, it moves on its own
+click 560,400
+expect listitem:"Sheet.4" selected
+wait 600
+drag 560,400 560,470
+expect listitem:"Sheet.4" rect 500 414 151 101
+# a rectangle drawn in the view joins the group
+cmd 4404
+drag 660,470 760,520
+cmd 4400
+expect listitem:"Sheet.8" selected
+# the page shape dragged into the group's frame joins it
+drag 950,530 750,390
+# a shape dropped from the Shapes panel joins it too
+drag button:"Dreieck" 720,560
+expect listitem:"Dreieck" selected
+click button:"Gruppe schließen"
+expect button:"Gruppe schließen" missing
+expect listitem:"Sheet.7" selected
+expect listitem:"Sheet.6" missing
+expect listitem:"Sheet.8" missing
+expect listitem:"Dreieck" missing
+expect listitem:"Sheet.7" rect 500 324 302 254
+# a member moved out of the group's box in the view: closing fits the box (one undo step; the
+# record's rectangle is what is drawn, the status bar shows the box)
+click button:"Gruppieren"
+click menuitem:"Gruppe öffnen"
+click 750,400
+wait 600
+drag 750,400 950,400
+click button:"Gruppe schließen"
+expect button:"Breite: 200 mm  Höhe: 101 mm  Winkel: 0°" exists
+key ctrl+z
+expect button:"Breite: 120 mm  Höhe: 101 mm  Winkel: 0°" exists
+key ctrl+y
+# Verhalten: a double click opens the group
+click button:"Gruppieren"
+click menuitem:"Verhalten..."
+expect checkbox:"Doppelklick öffnet die Gruppe" unchecked
+click checkbox:"Doppelklick öffnet die Gruppe"
+click button:"OK"
+click 1100,650
+dblclick 560,450
+expect button:"Gruppe schließen" exists
+click button:"Gruppe schließen"
+expect button:"Gruppe schließen" missing

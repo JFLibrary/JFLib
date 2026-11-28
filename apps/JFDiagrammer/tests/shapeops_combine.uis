@@ -1,0 +1,24 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD21 (SP-08): Kombinieren -- a rectangle and an ellipse over its corner become one
+# shape with both outlines (the overlap is a hole, Visio fills its sections even-odd); one shape
+# alone cannot be combined
+cmd 4404
+drag 500,330 640,420
+cmd 4405
+drag 600,380 760,470
+cmd 4400
+click 520,340
+click button:"Gruppieren"
+expect menuitem:"Kombinieren" disabled
+expect menuitem:"Gesamtmenge" enabled
+key esc
+key ctrl+a
+click button:"Gruppieren"
+click menuitem:"Kombinieren"
+expect listitem:"Sheet.6" selected
+expect listitem:"Sheet.4" missing
+expect listitem:"Sheet.5" missing
+expect button:"Breite: 100 mm  Höhe: 60 mm  Winkel: 0°" exists
+key ctrl+z
+expect listitem:"Sheet.4" exists
+expect listitem:"Sheet.5" exists

@@ -294,7 +294,7 @@ commands! {
     FORMAT_SHADOW = 0x1605, "Schatten formatieren", 0, 0;
     CONN_RESET = 0x1606, "Verbinder zurücksetzen", 0, 0;
     ADD_TO_MY_SHAPES = 0x1607, "Zu meinen Shapes hinzufügen", 0, 0;
-    COMMENT_NEW = 0x1608, "Neuer Kommentar", 0, 0;
+    COMMENT_NEW = 0x1608, "Neuer Kommentar", 0, JD_COMMENT_NEW_L;
     // (JD15, SP-01) the dialog Shape-Name (dlg_shape_name.rs)
     SHAPE_NAME = 0x1609, "Shape-Name", 0, 0;
     // the stencil's menu (Shapes sidebar)
@@ -361,6 +361,118 @@ commands! {
     DATA_AUTO_LINK_REFRESH = 0x1920, "Nach Aktualisierung automatisch verknüpfen", 0, 0;
     // (JD18, AB-11) the pane Externe Daten's Verknüpfung aufheben: the selected rows' shapes
     DATA_UNLINK_ROWS = 0x1960, "Verknüpfung aufheben", 0, 0;
+    // (JD21 layout) Entwurf › Layout › Seitenlayout neu anordnen with its styles, Start ›
+    // Anordnen › Positionieren: spacing, distribution, page breaks, Diagramm drehen
+    // (layout_cmds.rs, dlg_layout.rs)
+    RELAYOUT = 0x1C40, "Seitenlayout neu anordnen", JD_RELAYOUT, JD_RELAYOUT_L;
+    LAYOUT_FLOW_DOWN = 0x1C41, "Flussdiagramm (von oben nach unten)", JD_LAYOUT_FLOW_DOWN, 0;
+    LAYOUT_FLOW_UP = 0x1C42, "Flussdiagramm (von unten nach oben)", JD_LAYOUT_FLOW_UP, 0;
+    LAYOUT_FLOW_RIGHT = 0x1C43, "Flussdiagramm (von links nach rechts)", JD_LAYOUT_FLOW_RIGHT, 0;
+    LAYOUT_FLOW_LEFT = 0x1C44, "Flussdiagramm (von rechts nach links)", JD_LAYOUT_FLOW_LEFT, 0;
+    LAYOUT_HIER_DOWN = 0x1C45, "Hierarchie (von oben nach unten)", JD_LAYOUT_HIERARCHY, 0;
+    LAYOUT_HIER_UP = 0x1C46, "Hierarchie (von unten nach oben)", JD_LAYOUT_HIERARCHY, 0;
+    LAYOUT_HIER_RIGHT = 0x1C47, "Hierarchie (von links nach rechts)", JD_LAYOUT_HIERARCHY, 0;
+    LAYOUT_HIER_LEFT = 0x1C48, "Hierarchie (von rechts nach links)", JD_LAYOUT_HIERARCHY, 0;
+    LAYOUT_TREE_DOWN_RIGHT = 0x1C49, "Kompakte Struktur (nach unten, dann rechts)", JD_LAYOUT_COMPACT, 0;
+    LAYOUT_TREE_RIGHT_DOWN = 0x1C4A, "Kompakte Struktur (nach rechts, dann unten)", JD_LAYOUT_COMPACT, 0;
+    LAYOUT_TREE_DOWN_LEFT = 0x1C4B, "Kompakte Struktur (nach unten, dann links)", JD_LAYOUT_COMPACT, 0;
+    LAYOUT_TREE_LEFT_DOWN = 0x1C4C, "Kompakte Struktur (nach links, dann unten)", JD_LAYOUT_COMPACT, 0;
+    LAYOUT_RADIAL = 0x1C4D, "Radial", JD_LAYOUT_RADIAL, 0;
+    LAYOUT_CIRCULAR = 0x1C4E, "Kreisförmig", JD_LAYOUT_CIRCULAR, 0;
+    LAYOUT_MORE = 0x1C4F, "Weitere Layoutoptionen...", 0, 0;
+    AUTO_SPACE = 0x1C50, "Automatischer Abstand", JD_AUTO_SPACE, 0;
+    AUTO_ALIGN_SPACE = 0x1C51, "Automatische Ausrichtung und Abstände", JD_AUTO_ALIGN_SPACE, 0;
+    SPACING_OPTIONS = 0x1C52, "Abstandsoptionen...", JD_SPACING_OPTIONS, 0;
+    DISTRIBUTE_MORE = 0x1C53, "Weitere Verteilungsoptionen...", 0, 0;
+    MOVE_OFF_BREAKS = 0x1C54, "Von Seitenumbrüchen verschieben", JD_MOVE_OFF_BREAKS, 0;
+    AVOID_BREAKS = 0x1C55, "Seitenumbrüche vermeiden", 0, 0;
+    DIAGRAM_ROTATE_LEFT = 0x1C56, "Diagramm um 90° nach links drehen", JD_ROTATE_LEFT, 0;
+    DIAGRAM_ROTATE_RIGHT = 0x1C57, "Diagramm um 90° nach rechts drehen", JD_ROTATE_RIGHT, 0;
+    DIAGRAM_FLIP_V = 0x1C58, "Diagramm vertikal spiegeln", JD_FLIP_V, 0;
+    DIAGRAM_FLIP_H = 0x1C59, "Diagramm horizontal spiegeln", JD_FLIP_H, 0;
+    // (JD21 jumps) the dialog Verbinder-Verhalten (line jumps per connector, jumps_ui.rs)
+    CONN_BEHAVIOR = 0x1C20, "Verbinder-Verhalten", 0, 0;
+    // (JD21 ops) the shape operations, Entwicklertools › Shape-Design › Vorgänge in Visio, until
+    // JD23 in Start › Anordnen › Gruppieren › Vorgänge (shapeops_cmds.rs)
+    OP_UNION = 0x1C00, "Gesamtmenge", JD_OP_UNION, 0;
+    OP_COMBINE = 0x1C01, "Kombinieren", JD_OP_COMBINE, 0;
+    OP_FRAGMENT = 0x1C02, "In Einzelmengen zerlegen", JD_OP_FRAGMENT, 0;
+    OP_INTERSECT = 0x1C03, "Schnittmenge bilden", JD_OP_INTERSECT, 0;
+    OP_SUBTRACT = 0x1C04, "Subtrahieren", JD_OP_SUBTRACT, 0;
+    UPDATE_ALIGN_BOX = 0x1C08, "Ausrichtungsfeld aktualisieren", 0, 0;
+    // (JD21 autoconn) the connector tool for one connector, then the pointer (CN-11; the
+    // shape's menu, JD22's mini toolbar)
+    CONNECTOR_ONCE = 0x1C60, "Einen Verbinder zeichnen", JD_CONNECTOR, 0;
+    // (JD21 tools) Ansicht › Add-Ons: Shapes nummerieren, vervielfältigen (Array), Maßlinien;
+    // Kategorien; container styles 7-14 and Einfügen › Container in them (addons.rs)
+    DIMENSIONS = 0x1CA0, "Maßlinien", JD_DIMENSION, JD_DIMENSION_L;
+    NUMBER_SHAPES = 0x1CA1, "Shapes nummerieren", JD_NUMBER_SHAPES, JD_NUMBER_SHAPES_L;
+    NUMBER_ON_DROP = 0x1CA2, "Beim Ablegen weiterzählen", 0, 0;
+    ARRAY_SHAPES = 0x1CA3, "Shapes vervielfältigen", JD_ARRAY_SHAPES, JD_ARRAY_SHAPES_L;
+    DIM_HORIZONTAL = 0x1CA4, "Maßlinie horizontal", JD_DIMENSION, 0;
+    DIM_VERTICAL = 0x1CA5, "Maßlinie vertikal", JD_DIMENSION, 0;
+    DIM_ALIGNED = 0x1CA6, "Maßlinie ausgerichtet", JD_DIMENSION, 0;
+    CATEGORIES = 0x1CA7, "Kategorien", JD_SHOW_TAGS, 0;
+    CT_STYLE_7 = 0x1CA8, "Leiste|Container", JD_CONTAINER, 0;
+    CT_STYLE_8 = 0x1CA9, "Doppelrahmen|Container", JD_CONTAINER, 0;
+    CT_STYLE_9 = 0x1CAA, "Schiefer|Container", JD_CONTAINER, 0;
+    CT_STYLE_10 = 0x1CAB, "Reiter|Container", JD_CONTAINER, 0;
+    CT_STYLE_11 = 0x1CAC, "Kopflinie|Container", JD_CONTAINER, 0;
+    CT_STYLE_12 = 0x1CAD, "Klammer|Container", JD_CONTAINER, 0;
+    CT_STYLE_13 = 0x1CAE, "Signal|Container", JD_CONTAINER, 0;
+    CT_STYLE_14 = 0x1CAF, "Kopf unten|Container", JD_CONTAINER, 0;
+    CONTAINER_7 = 0x1CB0, "Leiste|Container", JD_CONTAINER, 0;
+    CONTAINER_8 = 0x1CB1, "Doppelrahmen|Container", JD_CONTAINER, 0;
+    CONTAINER_9 = 0x1CB2, "Schiefer|Container", JD_CONTAINER, 0;
+    CONTAINER_10 = 0x1CB3, "Reiter|Container", JD_CONTAINER, 0;
+    CONTAINER_11 = 0x1CB4, "Kopflinie|Container", JD_CONTAINER, 0;
+    CONTAINER_12 = 0x1CB5, "Klammer|Container", JD_CONTAINER, 0;
+    CONTAINER_13 = 0x1CB6, "Signal|Container", JD_CONTAINER, 0;
+    CONTAINER_14 = 0x1CB7, "Kopf unten|Container", JD_CONTAINER, 0;
+    // (JD21 groups) Shape ändern (Start › Bearbeiten), Zu Gruppe hinzufügen, Aus Gruppe entfernen,
+    // Gruppe öffnen / schließen, Verhalten (change_shape.rs, groups_cmds.rs, groups_view.rs)
+    CHANGE_SHAPE = 0x1C80, "Shape ändern", 0, JD_CHANGE_SHAPE_L;
+    ADD_TO_GROUP = 0x1C81, "Zu Gruppe hinzufügen", 0, 0;
+    REMOVE_FROM_GROUP = 0x1C82, "Aus Gruppe entfernen", 0, 0;
+    OPEN_GROUP = 0x1C83, "Gruppe öffnen", 0, 0;
+    CLOSE_GROUP = 0x1C84, "Gruppe schließen", 0, 0;
+    GROUP_BEHAVIOR = 0x1C85, "Verhalten...", 0, 0;
+    // (JD21 glue) Start › Tools › Verbindungspunkt (RS-17, CN-01) and the kinds of a chosen
+    // connection point (its context menu)
+    CONN_POINT_TOOL = 0x1CC0, "Verbindungspunkt|Tool", JD_CONNECTION_POINT, JD_CONNECTION_POINT_L;
+    CPOINT_INWARD = 0x1CC1, "Nach innen", 0, 0;
+    CPOINT_OUTWARD = 0x1CC2, "Nach außen", 0, 0;
+    CPOINT_BOTH = 0x1CC3, "Nach innen und außen", 0, 0;
+    // (JD19) data graphics (data_graphics*.rs): Legende einfügen ▾, Erweiterte Datengrafiken ▾,
+    // the shape's menu Daten ▸ Datengrafik bearbeiten, Position ▾
+    DG_LEGEND_H = 0x1980, "Horizontal|Legende", 0, 0;
+    DG_LEGEND_V = 0x1981, "Vertikal|Legende", 0, 0;
+    DG_NEW = 0x1982, "Neue Datengrafik erstellen ...", 0, 0;
+    DG_EDIT_GRAPHIC = 0x1983, "Datengrafik bearbeiten ...", 0, 0;
+    DG_RENAME = 0x1984, "Umbenennen|Datengrafik", 0, 0;
+    DG_DUPLICATE = 0x1985, "Duplizieren|Datengrafik", 0, 0;
+    DG_DELETE = 0x1986, "Löschen|Datengrafik", 0, 0;
+    DG_SELECT_SHAPES = 0x1987, "Shapes mit dieser Grafik auswählen", 0, 0;
+    DG_NONE = 0x1988, "Keine Datengrafik", 0, 0;
+    DG_POS_H0 = 0x1990, "Weit links|Position", 0, 0;
+    DG_POS_H1 = 0x1991, "Linker Rand|Position", 0, 0;
+    DG_POS_H2 = 0x1992, "Links|Position", 0, 0;
+    DG_POS_H3 = 0x1993, "Zentriert|Position", 0, 0;
+    DG_POS_H4 = 0x1994, "Rechts|Position", 0, 0;
+    DG_POS_H5 = 0x1995, "Rechter Rand|Position", 0, 0;
+    DG_POS_H6 = 0x1996, "Weit rechts|Position", 0, 0;
+    DG_POS_V0 = 0x1998, "Unterhalb|Position", 0, 0;
+    DG_POS_V1 = 0x1999, "Unterer Rand|Position", 0, 0;
+    DG_POS_V2 = 0x199A, "Unten|Position", 0, 0;
+    DG_POS_V3 = 0x199B, "Mittig|Position", 0, 0;
+    DG_POS_V4 = 0x199C, "Oben|Position", 0, 0;
+    DG_POS_V5 = 0x199D, "Oberer Rand|Position", 0, 0;
+    DG_POS_V6 = 0x199E, "Oberhalb|Position", 0, 0;
+    // (JD19) Überprüfen › Berichte, the report table's menu, Datei › Exportieren › Daten
+    // exportieren (reports*.rs)
+    REPORTS = 0x19C0, "Shape-Berichte", JD_SHAPE_REPORTS, JD_SHAPE_REPORTS_L;
+    REPORT_REFRESH = 0x19C1, "Bericht aktualisieren", JD_REPORT_REFRESH, 0;
+    DATA_EXPORT = 0x19C2, "Daten exportieren", JD_DATA_EXPORT, JD_DATA_EXPORT_L;
 }
 
 /// a command's handler: what it does (the function behind it exists)
@@ -596,6 +708,100 @@ static HANDLERS: &[(u32, Handler)] = &[
     (DATA_CONFLICTS, crate::data_refresh::conflicts_open),
     (DATA_AUTO_LINK_REFRESH, crate::data_refresh::toggle_auto_link),
     (DATA_UNLINK_ROWS, crate::data_pane::unlink_rows),
+    // (JD21 layout) Seitenlayout neu anordnen, Positionieren (layout_cmds.rs, dlg_layout.rs)
+    (RELAYOUT, |a, ui| crate::cmds_shell::open_menu(a, ui, RELAYOUT)),
+    (LAYOUT_FLOW_DOWN, |a, ui| crate::layout_cmds::gallery(a, ui, LAYOUT_FLOW_DOWN)),
+    (LAYOUT_FLOW_UP, |a, ui| crate::layout_cmds::gallery(a, ui, LAYOUT_FLOW_UP)),
+    (LAYOUT_FLOW_RIGHT, |a, ui| crate::layout_cmds::gallery(a, ui, LAYOUT_FLOW_RIGHT)),
+    (LAYOUT_FLOW_LEFT, |a, ui| crate::layout_cmds::gallery(a, ui, LAYOUT_FLOW_LEFT)),
+    (LAYOUT_HIER_DOWN, |a, ui| crate::layout_cmds::gallery(a, ui, LAYOUT_HIER_DOWN)),
+    (LAYOUT_HIER_UP, |a, ui| crate::layout_cmds::gallery(a, ui, LAYOUT_HIER_UP)),
+    (LAYOUT_HIER_RIGHT, |a, ui| crate::layout_cmds::gallery(a, ui, LAYOUT_HIER_RIGHT)),
+    (LAYOUT_HIER_LEFT, |a, ui| crate::layout_cmds::gallery(a, ui, LAYOUT_HIER_LEFT)),
+    (LAYOUT_TREE_DOWN_RIGHT, |a, ui| crate::layout_cmds::gallery(a, ui, LAYOUT_TREE_DOWN_RIGHT)),
+    (LAYOUT_TREE_RIGHT_DOWN, |a, ui| crate::layout_cmds::gallery(a, ui, LAYOUT_TREE_RIGHT_DOWN)),
+    (LAYOUT_TREE_DOWN_LEFT, |a, ui| crate::layout_cmds::gallery(a, ui, LAYOUT_TREE_DOWN_LEFT)),
+    (LAYOUT_TREE_LEFT_DOWN, |a, ui| crate::layout_cmds::gallery(a, ui, LAYOUT_TREE_LEFT_DOWN)),
+    (LAYOUT_RADIAL, |a, ui| crate::layout_cmds::gallery(a, ui, LAYOUT_RADIAL)),
+    (LAYOUT_CIRCULAR, |a, ui| crate::layout_cmds::gallery(a, ui, LAYOUT_CIRCULAR)),
+    (LAYOUT_MORE, crate::dlg_layout::open_layout),
+    (AUTO_SPACE, |a, ui| crate::layout_cmds::auto(a, ui, false, true, true)),
+    (AUTO_ALIGN_SPACE, |a, ui| crate::layout_cmds::auto(a, ui, true, true, true)),
+    (SPACING_OPTIONS, crate::dlg_layout::open_spacing),
+    (DISTRIBUTE_MORE, crate::dlg_layout::open_distribute),
+    (MOVE_OFF_BREAKS, crate::layout_cmds::off_breaks),
+    (AVOID_BREAKS, crate::layout_cmds::toggle_avoid),
+    (DIAGRAM_ROTATE_LEFT, |a, ui| crate::layout_cmds::turn(a, ui, diagram_core::layout::Turn::Left)),
+    (DIAGRAM_ROTATE_RIGHT, |a, ui| crate::layout_cmds::turn(a, ui, diagram_core::layout::Turn::Right)),
+    (DIAGRAM_FLIP_V, |a, ui| crate::layout_cmds::turn(a, ui, diagram_core::layout::Turn::FlipV)),
+    (DIAGRAM_FLIP_H, |a, ui| crate::layout_cmds::turn(a, ui, diagram_core::layout::Turn::FlipH)),
+    // (JD21 jumps) Linienübergänge anzeigen, Verbinder-Verhalten (jumps_ui.rs)
+    (LINE_JUMPS, crate::jumps_ui::toggle),
+    (CONN_BEHAVIOR, crate::jumps_ui::open),
+    // (JD21 ops) Vorgänge (shapeops_cmds.rs)
+    (OP_UNION, |a, ui| crate::shapeops_cmds::run(a, ui, OP_UNION)),
+    (OP_COMBINE, |a, ui| crate::shapeops_cmds::run(a, ui, OP_COMBINE)),
+    (OP_FRAGMENT, |a, ui| crate::shapeops_cmds::run(a, ui, OP_FRAGMENT)),
+    (OP_INTERSECT, |a, ui| crate::shapeops_cmds::run(a, ui, OP_INTERSECT)),
+    (OP_SUBTRACT, |a, ui| crate::shapeops_cmds::run(a, ui, OP_SUBTRACT)),
+    (UPDATE_ALIGN_BOX, |a, ui| crate::shapeops_cmds::run(a, ui, UPDATE_ALIGN_BOX)),
+    // (JD21 autoconn) Verbinder (einmal) (autoconn.rs)
+    (CONNECTOR_ONCE, crate::autoconn::once),
+    // (JD21 tools) Ansicht › Add-Ons, Kategorien (addons.rs; the container styles: structures_cmds)
+    (DIMENSIONS, |a, ui| crate::cmds_shell::open_menu(a, ui, DIMENSIONS)),
+    (NUMBER_SHAPES, crate::dlg_number::open),
+    (NUMBER_ON_DROP, crate::dlg_number::toggle_drop),
+    (ARRAY_SHAPES, crate::dlg_array::open),
+    (DIM_HORIZONTAL, |a, ui| crate::tools_dim::run(a, ui, DIM_HORIZONTAL)),
+    (DIM_VERTICAL, |a, ui| crate::tools_dim::run(a, ui, DIM_VERTICAL)),
+    (DIM_ALIGNED, |a, ui| crate::tools_dim::run(a, ui, DIM_ALIGNED)),
+    (CATEGORIES, crate::dlg_categories::open),
+    // (JD21 groups) Shape ändern opens its gallery; the group commands (groups_cmds.rs)
+    (CHANGE_SHAPE, |a, ui| crate::cmds_shell::open_menu(a, ui, CHANGE_SHAPE)),
+    (ADD_TO_GROUP, crate::groups_cmds::add),
+    (REMOVE_FROM_GROUP, crate::groups_cmds::remove),
+    (OPEN_GROUP, crate::groups_cmds::open),
+    (CLOSE_GROUP, crate::groups_cmds::close),
+    (GROUP_BEHAVIOR, crate::groups_cmds::behavior),
+    // (JD21 glue) the connection point tool and its points' kinds (glue_tools.rs)
+    (CONN_POINT_TOOL, |a, _| crate::glue_tools::tool(a)),
+    (CPOINT_INWARD, |a, ui| crate::glue_tools::set_kind(a, ui, CPOINT_INWARD)),
+    (CPOINT_OUTWARD, |a, ui| crate::glue_tools::set_kind(a, ui, CPOINT_OUTWARD)),
+    (CPOINT_BOTH, |a, ui| crate::glue_tools::set_kind(a, ui, CPOINT_BOTH)),
+    // (JD19) data graphics (data_graphics*.rs)
+    (DATA_GRAPHICS, |a, ui| crate::cmds_shell::open_menu(a, ui, DATA_GRAPHICS)),
+    (DG_POSITION, |a, ui| crate::cmds_shell::open_menu(a, ui, DG_POSITION)),
+    (DG_CONFIGURE, crate::data_graphics::configure),
+    (DATA_LEGEND, |a, ui| crate::cmds_shell::open_menu(a, ui, DATA_LEGEND)),
+    (PANE_DG_FIELDS, |a, _| a.panes.toggle(crate::panes::P_DG_FIELDS)),
+    (DATA_ADVANCED_DG, |a, ui| crate::cmds_shell::open_menu(a, ui, DATA_ADVANCED_DG)),
+    (DG_LEGEND_H, |a, ui| crate::data_graphics::insert_legend(a, ui, true)),
+    (DG_LEGEND_V, |a, ui| crate::data_graphics::insert_legend(a, ui, false)),
+    (DG_NEW, crate::data_graphics_dlg::new_graphic),
+    (DG_EDIT_GRAPHIC, crate::data_graphics_dlg::edit_graphic),
+    (DG_RENAME, crate::data_graphics_dlg::open_rename),
+    (DG_DUPLICATE, crate::data_graphics::duplicate),
+    (DG_DELETE, crate::data_graphics::delete),
+    (DG_SELECT_SHAPES, crate::data_graphics::select_shapes),
+    (DG_NONE, crate::data_graphics::none),
+    (DG_POS_H0, |a, ui| crate::data_graphics::position(a, ui, DG_POS_H0)),
+    (DG_POS_H1, |a, ui| crate::data_graphics::position(a, ui, DG_POS_H1)),
+    (DG_POS_H2, |a, ui| crate::data_graphics::position(a, ui, DG_POS_H2)),
+    (DG_POS_H3, |a, ui| crate::data_graphics::position(a, ui, DG_POS_H3)),
+    (DG_POS_H4, |a, ui| crate::data_graphics::position(a, ui, DG_POS_H4)),
+    (DG_POS_H5, |a, ui| crate::data_graphics::position(a, ui, DG_POS_H5)),
+    (DG_POS_H6, |a, ui| crate::data_graphics::position(a, ui, DG_POS_H6)),
+    (DG_POS_V0, |a, ui| crate::data_graphics::position(a, ui, DG_POS_V0)),
+    (DG_POS_V1, |a, ui| crate::data_graphics::position(a, ui, DG_POS_V1)),
+    (DG_POS_V2, |a, ui| crate::data_graphics::position(a, ui, DG_POS_V2)),
+    (DG_POS_V3, |a, ui| crate::data_graphics::position(a, ui, DG_POS_V3)),
+    (DG_POS_V4, |a, ui| crate::data_graphics::position(a, ui, DG_POS_V4)),
+    (DG_POS_V5, |a, ui| crate::data_graphics::position(a, ui, DG_POS_V5)),
+    (DG_POS_V6, |a, ui| crate::data_graphics::position(a, ui, DG_POS_V6)),
+    // (JD19) shape reports, Daten exportieren (reports*.rs)
+    (REPORTS, crate::reports::open),
+    (REPORT_REFRESH, crate::reports::refresh),
+    (DATA_EXPORT, crate::reports_export::open),
 ];
 
 // toggles: whether the command is on
@@ -668,6 +874,36 @@ static CHECKED: &[(u32, fn(&Diagrammer) -> bool)] = &[
     (PANE_SHAPE_DATA_WINDOW, |a| a.panes.visible(crate::panes::P_DATA)),
     (PANE_EXTERNAL_DATA, |a| a.panes.visible(crate::panes::P_EXTERNAL)),
     (DATA_AUTO_LINK_REFRESH, crate::data_refresh::auto_link_on),
+    // (JD21 layout) Positionieren › Seitenumbrüche vermeiden
+    (AVOID_BREAKS, crate::layout_cmds::avoid_on),
+    // (JD21 jumps) the page shown has line jumps
+    (LINE_JUMPS, crate::jumps_ui::shown),
+    // (JD21 tools) the page numbers dropped shapes; a dimension tool is on
+    (NUMBER_ON_DROP, crate::dlg_number::drop_on),
+    (DIM_HORIZONTAL, |a| a.tool == DIM_HORIZONTAL),
+    (DIM_VERTICAL, |a| a.tool == DIM_VERTICAL),
+    (DIM_ALIGNED, |a| a.tool == DIM_ALIGNED),
+    // (JD21 glue) the connection point tool, the chosen point's kind
+    (CONN_POINT_TOOL, |a| a.tool == CONN_POINT_TOOL),
+    (CPOINT_INWARD, |a| crate::glue_tools::kind_checked(a, CPOINT_INWARD)),
+    (CPOINT_OUTWARD, |a| crate::glue_tools::kind_checked(a, CPOINT_OUTWARD)),
+    (CPOINT_BOTH, |a| crate::glue_tools::kind_checked(a, CPOINT_BOTH)),
+    // (JD19) the pane Datengrafikfelder, the chosen field's position
+    (PANE_DG_FIELDS, |a| a.panes.visible(crate::panes::P_DG_FIELDS)),
+    (DG_POS_H0, |a| crate::data_graphics::position_on(a, DG_POS_H0)),
+    (DG_POS_H1, |a| crate::data_graphics::position_on(a, DG_POS_H1)),
+    (DG_POS_H2, |a| crate::data_graphics::position_on(a, DG_POS_H2)),
+    (DG_POS_H3, |a| crate::data_graphics::position_on(a, DG_POS_H3)),
+    (DG_POS_H4, |a| crate::data_graphics::position_on(a, DG_POS_H4)),
+    (DG_POS_H5, |a| crate::data_graphics::position_on(a, DG_POS_H5)),
+    (DG_POS_H6, |a| crate::data_graphics::position_on(a, DG_POS_H6)),
+    (DG_POS_V0, |a| crate::data_graphics::position_on(a, DG_POS_V0)),
+    (DG_POS_V1, |a| crate::data_graphics::position_on(a, DG_POS_V1)),
+    (DG_POS_V2, |a| crate::data_graphics::position_on(a, DG_POS_V2)),
+    (DG_POS_V3, |a| crate::data_graphics::position_on(a, DG_POS_V3)),
+    (DG_POS_V4, |a| crate::data_graphics::position_on(a, DG_POS_V4)),
+    (DG_POS_V5, |a| crate::data_graphics::position_on(a, DG_POS_V5)),
+    (DG_POS_V6, |a| crate::data_graphics::position_on(a, DG_POS_V6)),
 ];
 
 /// the handler of a command (None: not available yet)
@@ -695,6 +931,22 @@ pub(crate) fn usable(app: &Diagrammer, id: u32) -> bool {
         // (JD18) the data commands
         && crate::data_cmds::available(app, id)
         && crate::data_pane::available(app, id)
+        // (JD21 layout) the layout commands
+        && crate::layout_cmds::available(app, id)
+        // (JD21 jumps) Linienübergänge anzeigen, Verbinder-Verhalten
+        && crate::jumps_ui::available(app, id)
+        // (JD21 ops) the shape operations
+        && crate::shapeops_cmds::available(app, id)
+        // (JD21 tools) Add-Ons, Kategorien, the container styles a master has
+        && crate::addons::available(app, id)
+        // (JD21 groups) Shape ändern, the group commands
+        && crate::groups_cmds::available(app, id)
+        // (JD21 glue) a connection point's kind
+        && crate::glue_tools::available(app, id)
+        // (JD19) data graphics
+        && crate::data_graphics::available(app, id)
+        // (JD19) the report commands
+        && crate::reports::available(app, id)
 }
 
 /// the toggle is on

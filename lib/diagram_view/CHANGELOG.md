@@ -12,6 +12,7 @@ First release on crates.io.
 
 ### Added
 
+- (JD21, CN-06) Line jumps on the screen and in every export (rows of the connectors' Geometry, diagram_core::jumps: a connector whose jumps change is a changed shape)
 - (JD8 rest) GIF (the first frame) and BMP pictures are decoded and drawn (`image::decode`, through
   img_gif and img_bmp); they were placeholders
 

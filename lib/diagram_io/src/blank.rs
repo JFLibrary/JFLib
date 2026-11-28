@@ -12,18 +12,30 @@
 // on 2026-11-17); an empty Windows element with the client size is enough (windows_xml).
 //
 // The styles (universal names as Visio knows them, so that formulas and Visio's connector
-// detection find them):
+// detection find them), with the IDs of Visio's own: Visio 16 names the styles 1, 2 and 3 of a
+// file it opens Text Only, None and Normal whatever their names, and gives a style that then
+// has a taken name another ("Style.4"); its new drawing has 0 No Style, 1 Text Only, 2 None,
+// 3 Normal, 4 Guide, 6 Theme, and its connector tool adds 7 Connector based on Normal unless
+// there is a Connector already (JD26 Visio check, 2026-11-27: with Connector at 2 and Guide at
+// 3, Visio's connector tool drew in our guide's look).  Files written before keep their IDs.
 //   0 No Style   the root: every line, fill, text block, character and paragraph cell with a
 //                plain value -- the NetLab look without a design (Signalblau 1 pt line, light
 //                blue fill, anthracite Inter 10 pt, centred text); themed cells fall back to it
-//   5 Theme      based on No Style (JD11): every cell a design sets is THEMEVAL() (V "Themed"),
+//   6 Theme      based on No Style (JD11): every cell a design sets is THEMEVAL() (V "Themed"),
 //                the QuickStyle cells 100 (the variant's colour 1 and style 1), the theme index
 //                cells 65534 (the page's design)
-//   1 Normal     based on Theme: what shapes use
-//   2 Connector  based on Normal: the connector scheme's style 1 (line with its arrow, text),
-//                no fill, the background colour behind the text
-//   3 Guide      based on No Style: thin light blue dashed line, no fill
-//   4 Text Only  based on Normal: no line, no fill, the dark text of font style 1, with
+//   3 Normal     based on Theme: what shapes use
+//   2 None       based on Normal: no line, no fill (as Visio's)
+//   7 Connector  based on Normal: the connector scheme's style 1 (line with its arrow, text),
+//                no fill, the background colour behind the text; the line in the variant's
+//                colour 7 (QuickStyleLineColor 106): NetLab's connector line is dk2 (slate),
+//                which Visio 16 does not take from a theme's style lists -- there it draws the
+//                shape's quick style colour instead (as for phClr; also a fixed srgbClr, and
+//                transforms on dk1 it drops), and colour 7 is that slate in NetLab's variants
+//                1 .. 3 (JD26 Visio check, 2026-11-27).  JFDiagrammer reads dk2 as dk2; the
+//                designs whose connector line is dk1 look the same with any colour
+//   4 Guide      based on No Style: thin light blue dashed line, no fill
+//   1 Text Only  based on Normal: no line, no fill, the dark text of font style 1, with
 //                Visio's contrast rule for text (QuickStyleVariation 2)
 // DocumentSettings name Normal as the default text, line and fill style and Guide as the
 // default guide style.  The page is A4 (metric, millimetres) or Letter (US, inches), landscape,
@@ -251,7 +263,15 @@ fn themed() -> V {
     V::F("Themed", "THEMEVAL()")
 }
 
-// 5 Theme (see the module comment)
+// the style IDs (see the module comment)
+const TEXT_ONLY: u32 = 1;
+const NONE: u32 = 2;
+const NORMAL: u32 = 3;
+const GUIDE: u32 = 4;
+const THEME: u32 = 6;
+const CONNECTOR: u32 = 7;
+
+// 6 Theme (see the module comment)
 fn theme_style(doc: &mut Document) -> Style {
     let mut list: Vec<(&str, V)> = THEMED.iter().map(|n| (*n, themed())).collect();
     list.extend(QUICK.iter().map(|n| (*n, num(100.0))));
@@ -262,7 +282,7 @@ fn theme_style(doc: &mut Document) -> Style {
     sh.cells = cells(doc, list);
     let character = one_row(doc, "Character", alloc::vec![("Font", themed()), ("Color", themed()), ("Style", themed())]);
     sh.sections.push(character);
-    style(doc, 5, "Theme", Some(0), sh)
+    style(doc, THEME, "Theme", Some(0), sh)
 }
 
 fn styles(doc: &mut Document) -> Vec<Style> {
@@ -273,6 +293,8 @@ fn styles(doc: &mut Document) -> Vec<Style> {
     connector.cells = cells(
         doc,
         alloc::vec![
+            // variant colour 7 (see the module comment)
+            ("QuickStyleLineColor", num(106.0)),
             ("QuickStyleLineMatrix", num(1.0)),
             ("QuickStyleFillMatrix", num(1.0)),
             ("QuickStyleEffectsMatrix", num(1.0)),
@@ -295,13 +317,17 @@ fn styles(doc: &mut Document) -> Vec<Style> {
         doc,
         alloc::vec![("LinePattern", num(0.0)), ("FillPattern", num(0.0)), ("QuickStyleFontMatrix", num(1.0)), ("QuickStyleVariation", num(2.0))],
     );
+    let mut none = Sheet::new();
+    none.cells = cells(doc, alloc::vec![("LinePattern", num(0.0)), ("FillPattern", num(0.0))]);
+    // in the order of the IDs, as Visio writes them
     alloc::vec![
         root,
+        style(doc, TEXT_ONLY, "Text Only", Some(NORMAL), text_only),
+        style(doc, NONE, "None", Some(NORMAL), none),
+        style(doc, NORMAL, "Normal", Some(THEME), normal),
+        style(doc, GUIDE, "Guide", Some(0), guide),
         theme,
-        style(doc, 1, "Normal", Some(5), normal),
-        style(doc, 2, "Connector", Some(1), connector),
-        style(doc, 3, "Guide", Some(0), guide),
-        style(doc, 4, "Text Only", Some(1), text_only),
+        style(doc, CONNECTOR, "Connector", Some(NORMAL), connector),
     ]
 }
 
@@ -352,10 +378,10 @@ pub fn new_document(kind: DocKind, measure: Measure) -> Document {
     }
     doc.settings = DocSettings {
         top_page: Some(0),
-        default_text_style: Some(1),
-        default_line_style: Some(1),
-        default_fill_style: Some(1),
-        default_guide_style: Some(3),
+        default_text_style: Some(NORMAL),
+        default_line_style: Some(NORMAL),
+        default_fill_style: Some(NORMAL),
+        default_guide_style: Some(GUIDE),
         ..DocSettings::default()
     };
     for (i, rgb) in COLORS.iter().enumerate() {

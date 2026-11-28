@@ -1,0 +1,52 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD21: the connector tool's automatics -- (CN-10) with the connector tool active a
+# shape dragged from the Shapes panel is connected to the shape selected before and becomes the
+# selection (a chain); (CN-11) Einen Verbinder zeichnen (the shape's menu): the connector tool
+# for one connector, then the pointer; (CN-16) Einfügen › Verbinder with a connector master
+# marked in the Shapes panel draws instances of it (the tile stays marked; Esc: the dynamic
+# connector again)
+click button:"Weitere Shapes"
+click "Allgemein"
+click "Standard-Shapes"
+drag button:"Rechteck" 400,260
+cmd 4401
+expect button:"Verbinder" checked
+wait 600
+click 400,260
+wait 600
+drag button:"Raute" 400,420
+expect listitem:"Raute" selected
+expect listitem:"Sheet.6" rect 397 285 6 97
+wait 600
+drag button:"Ellipse" 400,580
+expect listitem:"Ellipse" selected
+expect listitem:"Sheet.8" rect 397 458 6 97
+shot build/JFDiagrammer-autoconn-chain.png
+# the connector tool for one connector
+cmd 4400
+wait 600
+drag button:"Quadrat" 700,580
+wait 600
+rclick 400,580
+click menuitem:"Einen Verbinder zeichnen"
+expect button:"Verbinder" checked
+drag 400,580 700,580
+expect listitem:"Sheet.10" rect 438 577 224 6
+expect button:"Zeigertool" checked
+expect button:"Verbinder" unchecked
+# Einfügen › Verbinder with Verbinder › Kurvenverbinder marked
+cmd 4616
+click button:"Weitere Shapes"
+click "Extras"
+click menuitem:"Verbinder"
+click button:"Kurvenverbinder"
+expect button:"Kurvenverbinder" checked
+drag 400,260 700,580
+expect listitem:"Kurvenverbinder" exists
+expect button:"Kurvenverbinder" checked
+expect button:"Verbinder" checked
+key esc
+expect button:"Kurvenverbinder" unchecked
+wait 600
+drag 700,580 400,420
+expect listitem:"Sheet.12" exists

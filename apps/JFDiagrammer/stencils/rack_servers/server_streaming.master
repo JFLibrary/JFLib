@@ -21,6 +21,9 @@ size: 482.6 mm x 44.45 mm
 size.us: 19 in x 1.75 in
 include: ../net_common/rackdev.inc, ../net_common/asset.inc, ../net_common/network.inc, ../net_common/computer.inc
 
+[Shape]
+ObjType = 1
+
 [Property]
 RackUnits: Value = 1
 ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"

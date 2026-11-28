@@ -1,30 +1,37 @@
 // platx -- the server-side parts of plat: sync (threads, channel), rand, net (loopback TCP /
 // UDP over IPv4 and IPv6, Unix sockets, timeouts, refused connections), fs (private files, metadata, listing,
-// links, times, free space), the local time zone; on Android sync and rand (AN1)
+// links, times, free space), the local time zone; on Android sync and rand (AN1), net without Unix
+// sockets (AN2: and the app without android.permission.INTERNET, android_net), fs, watch and the
+// zone (AN3)
 
-#[cfg(not(target_os = "android"))]
 use alloc::format;
-#[cfg(not(target_os = "android"))]
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-#[cfg(not(target_os = "android"))]
 use plat::fs;
-#[cfg(not(target_os = "android"))]
 use plat::net::{IpAddr, NetErrorKind, SocketAddr, TcpListener, TcpStream, UdpSocket};
 use plat::sync::{channel, Condvar, Mutex, RecvError, RwLock};
 
 use crate::T;
 
 pub fn run(t: &mut T) {
-    // Android (docs/ANDROID.md): threads and sync since AN1, the rest waits for AN2 to AN4
+    // Android (docs/ANDROID.md): threads and sync since AN1, files, watch and the zone since AN3;
+    // net waits for AN2, service for AN4
     #[cfg(target_os = "android")]
     {
         sync(t);
         rand(t);
-        t.later("net: TCP, UDP, Unix sockets (AN2)");
-        t.later("fs, watch, the local zone (AN3)");
+        if android_net(t) {
+            addrs(t);
+            tcp(t, IpAddr::LOCALHOST_V4);
+            tcp(t, IpAddr::LOCALHOST_V6);
+            udp(t);
+        }
+        t.later("net: Unix sockets");
+        files(t);
+        watch(t);
+        zone(t);
         t.later("service (AN4: Unsupported)");
     }
     #[cfg(not(target_os = "android"))]
@@ -43,12 +50,16 @@ fn run_all(t: &mut T) {
     unix(t);
     files(t);
     watch(t);
+    zone(t);
+}
+
+/// the local zone's name, one datetime knows (Android: the system's setting persist.sys.timezone)
+fn zone(t: &mut T) {
     let z = fs::local_zone_id();
     t.check("local zone id", z.as_deref().is_some_and(|z| !z.is_empty()));
     t.check("local zone known to datetime", z.as_deref().and_then(zone_of).is_some());
 }
 
-#[cfg(not(target_os = "android"))]
 fn zone_of(id: &str) -> Option<datetime::Zone> {
     match id.strip_prefix("win:") {
         Some(k) => datetime::Zone::from_windows(k),
@@ -139,7 +150,6 @@ fn rand(t: &mut T) {
     t.check("random balance", (ones as i64 - 262_144).abs() < 2600);
 }
 
-#[cfg(not(target_os = "android"))]
 fn addrs(t: &mut T) {
     t.eq("parse v4", SocketAddr::parse("10.0.0.5:9443"), Some(SocketAddr::new(IpAddr::V4([10, 0, 0, 5]), 9443)));
     t.eq("parse v6", SocketAddr::parse("[::1]:80").map(|a| format!("{}", a)), Some(String::from("[::1]:80")));
@@ -154,7 +164,6 @@ fn addrs(t: &mut T) {
     t.check("resolve localhost", r.is_ok_and(|v| v.iter().any(|a| a.ip.is_loopback())));
 }
 
-#[cfg(not(target_os = "android"))]
 fn tcp(t: &mut T, ip: IpAddr) {
     let fam = if matches!(ip, IpAddr::V4(_)) { "v4" } else { "v6" };
     let Ok(l) = TcpListener::bind(&SocketAddr::new(ip, 0)) else {
@@ -227,7 +236,6 @@ fn tcp(t: &mut T, ip: IpAddr) {
     }
 }
 
-#[cfg(not(target_os = "android"))]
 fn udp(t: &mut T) {
     let a = UdpSocket::bind(&SocketAddr::new(IpAddr::LOCALHOST_V4, 0));
     let b = UdpSocket::bind(&SocketAddr::new(IpAddr::LOCALHOST_V4, 0));
@@ -333,7 +341,6 @@ fn unix_names(t: &mut T, path: &str) {
 }
 
 /// plat::watch: new, changed, renamed and deleted files, a new folder and a file in it
-#[cfg(not(target_os = "android"))]
 fn watch(t: &mut T) {
     let base = fs::join(&plat::temp_dir().unwrap_or_else(|| String::from(".")), &format!("coretest-watch-{}", plat::random_u64() % 1_000_000));
     t.check("watch dir", fs::mkdir_private(&base) && fs::mkdir_private(&fs::join(&base, "sub")));
@@ -387,7 +394,6 @@ fn watch(t: &mut T) {
 }
 
 /// true once cond holds (polled every 50 ms), false after ms
-#[cfg(not(target_os = "android"))]
 fn wait_until(ms: u64, mut cond: impl FnMut() -> bool) -> bool {
     let dl = plat::time_us() + ms * 1000;
     loop {
@@ -402,14 +408,12 @@ fn wait_until(ms: u64, mut cond: impl FnMut() -> bool) -> bool {
 }
 
 /// a change whose path ends with suffix comes within ms
-#[cfg(not(target_os = "android"))]
 fn seen_within(w: &plat::watch::Watcher, suffix: &str, ms: u64) -> bool {
     wait_until(ms, || w.take(100).paths.iter().any(|p| p.replace('\\', "/").ends_with(suffix)))
 }
 
-/// the watcher's gaps: a change right after new, a root deleted and made again, (Linux) a root
-/// moved away, a folder whose listing failed
-#[cfg(not(target_os = "android"))]
+/// the watcher's gaps: a change right after new, a root deleted and made again, (Linux, Android)
+/// a root moved away, a folder whose listing failed
 fn watch_gaps(t: &mut T) {
     use plat::watch::Watcher;
     let base = fs::join(&plat::temp_dir().unwrap_or_else(|| String::from(".")), &format!("coretest-watch2-{}", plat::random_u64() % 1_000_000));
@@ -427,7 +431,7 @@ fn watch_gaps(t: &mut T) {
         plat::delete(&f);
     }
     t.check("watch: a change right after new is seen (10 watchers)", missed == 0);
-    #[cfg(any(windows, target_os = "linux"))]
+    #[cfg(any(windows, target_os = "linux", target_os = "android"))]
     {
         // a root deleted: lost (overflow at every take, watching() false); made again: watched
         // again, its changes are seen
@@ -438,7 +442,7 @@ fn watch_gaps(t: &mut T) {
             return;
         };
         t.check("watch: watching() after new", w.watching());
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         {
             // (Linux) moved away: its changes there are not reported under the old path; a new
             // folder at the path is watched
@@ -465,7 +469,7 @@ fn watch_gaps(t: &mut T) {
         plat::delete(&fs::join(&root, "neu.txt"));
         plat::delete(&root);
     }
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     {
         // the first listing of a folder fails: its folders are watched a second later
         let list = fs::join(&base, "liste");
@@ -490,7 +494,6 @@ fn watch_gaps(t: &mut T) {
     plat::delete(&base);
 }
 
-#[cfg(not(target_os = "android"))]
 fn files(t: &mut T) {
     let base = fs::join(&plat::temp_dir().unwrap_or_else(|| String::from(".")), &format!("coretest-{}", plat::random_u64() % 1_000_000));
     t.check("mkdir_private", fs::mkdir_private(&base));
@@ -499,16 +502,18 @@ fn files(t: &mut T) {
     t.eq("private file content", plat::read_file(&f).as_deref(), Some(&b"0123456789"[..]));
     let m = fs::stat(&f);
     t.check("stat file", m.is_some_and(|m| m.is_file() && m.size == 10 && m.ino != 0 && m.nlink >= 1));
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     t.check("private mode", m.is_some_and(|m| m.mode & 0o777 == 0o600));
     t.check("stat dir", fs::stat(&base).is_some_and(|m| m.is_dir()));
     // times
     let when = 1_700_000_000_123_456_700i64;
     t.check("set_times", fs::set_times(&f, when, when));
     t.check("mtime kept", fs::stat(&f).is_some_and(|m| m.mtime_ns == when));
-    // hard link: same file id
+    // hard link: same file id (Android: none, SELinux refuses apps every hard link)
     let h = fs::join(&base, "hard");
-    if fs::hard_link(&f, &h) {
+    if cfg!(target_os = "android") {
+        t.check("hard link: none on Android, nothing made", !fs::hard_link(&f, &h) && fs::lstat(&h).is_none());
+    } else if fs::hard_link(&f, &h) {
         let (a, b) = (fs::stat(&f), fs::stat(&h));
         t.check("hard link id", a.is_some_and(|a| b.is_some_and(|b| a.ino == b.ino && a.dev == b.dev && b.nlink == 2)));
     } else {
@@ -541,14 +546,20 @@ fn files(t: &mut T) {
     remove_tree(&base);
 }
 
-/// '\' separates on Windows (and in vfs names); on Linux and macOS it is part of a name. The
-/// private writer's sibling is always a new file: a file of that name stays as it was.
-#[cfg(not(target_os = "android"))]
+/// '\' separates on Windows, on Android (as in its names) and in vfs names; on Linux and macOS it
+/// is part of a name. The private writer's sibling is always a new file: a file of that name stays
+/// as it was.
 fn names_and_siblings(t: &mut T, base: &str) {
     t.eq("parent of a vfs name with a backslash", fs::parent("mem://a\\b"), "mem://a");
     if cfg!(windows) {
         t.eq("join after a backslash", fs::join("C:\\a\\", "f"), String::from("C:\\a\\f"));
         t.eq("parent across a backslash", fs::parent("C:\\a\\b"), "C:\\a");
+    } else if cfg!(target_os = "android") {
+        t.eq("join after a backslash (Android: a separator)", fs::join("/tmp/a\\", "f"), String::from("/tmp/a\\f"));
+        t.eq("parent across a backslash (Android)", fs::parent("/tmp/a\\b"), "/tmp/a");
+        let xy = fs::join(base, "x\\y");
+        t.check("mkdir_private of x\\y makes the folder y in x (Android)",
+                fs::mkdir_private(&xy) && plat::file_exists(&fs::join(base, "x")) == 2 && fs::stat(&fs::join(base, "x/y")).is_some_and(|m| m.is_dir()));
     } else {
         t.eq("join after a backslash in a name", fs::join("/tmp/a\\", "f"), String::from("/tmp/a\\/f"));
         t.eq("parent of a name with a backslash", fs::parent("/tmp/a\\b"), "/tmp");
@@ -571,7 +582,6 @@ fn names_and_siblings(t: &mut T, base: &str) {
     plat::delete(&planted);
 }
 
-#[cfg(not(target_os = "android"))]
 fn remove_tree(path: &str) {
     if let Some(list) = fs::read_dir(path) {
         for e in list {
@@ -599,4 +609,44 @@ fn service(t: &mut T) {
     let u = plat::service::unit_text(&spec);
     t.check("unit: control characters in the description are spaces", u.contains("Description=Ein ExecStartPre=/bin/evil  Dienst\n") && !u.contains('\r'));
     t.check("not a service: no stop request", !plat::service::stop_requested());
+}
+
+/// Android (docs/ANDROID.md AN2) -> whether the app may use the network.  With
+/// android.permission.INTERNET: getaddrinfo (Bionic, netd) through the system's hosts file, the
+/// device's interfaces and addresses without netlink, its name.  Without it every IPv4 and IPv6
+/// socket and every lookup is refused with NetError::no_internet and a word on the manifest; the
+/// line "plat: no network: ..." shows it (tools/android_console.py --no-internet expects it)
+#[cfg(target_os = "android")]
+fn android_net(t: &mut T) -> bool {
+    use plat::net::{if_index, local_addrs, resolve, NetError};
+    let any4 = SocketAddr::new(IpAddr::LOCALHOST_V4, 0);
+    if let Err(e) = UdpSocket::bind(&any4) {
+        if !e.no_internet() {
+            t.check(&format!("net: a UDP socket ({})", e), false);
+            return false;
+        }
+        plat::write_stdout(format!("plat: no network: {}\n", e).as_bytes());
+        let text = format!("{}", e);
+        t.check("no INTERNET: the message names the manifest's permission", text.contains("android.permission.INTERNET") && e.kind == NetErrorKind::Denied);
+        let none = |r: Result<(), NetError>| r.is_err_and(|e| e.no_internet());
+        t.check("no INTERNET: TCP listener", none(TcpListener::bind(&any4).map(|_| ())));
+        t.check("no INTERNET: TCP connection", none(TcpStream::connect(&SocketAddr::new(IpAddr::LOCALHOST_V4, 9), 2000).map(|_| ())));
+        t.check("no INTERNET: IPv6", none(UdpSocket::bind(&SocketAddr::new(IpAddr::LOCALHOST_V6, 0)).map(|_| ())));
+        t.check("no INTERNET: a name through the system's resolver", none(resolve("example.org", 443).map(|_| ())));
+        // numbers and localhost need no lookup
+        t.check("no INTERNET: localhost still resolves", resolve("localhost", 80).is_ok());
+        return false;
+    }
+    // Android's /system/etc/hosts names ::1 ip6-localhost: getaddrinfo without a name server
+    let r = resolve("ip6-localhost", 80);
+    t.check(&format!("getaddrinfo: ip6-localhost through the system's hosts file ({:?})", r), r.as_ref().is_ok_and(|v| v.contains(&SocketAddr::new(IpAddr::LOCALHOST_V6, 80))));
+    let r = resolve("no-such-name.invalid", 80);
+    t.check(&format!("getaddrinfo: an unknown name -> NotFound ({:?})", r), r.is_err_and(|e| e.kind == NetErrorKind::NotFound));
+    let addrs = local_addrs();
+    t.check(&format!("local addresses: loopback among them ({:?})", addrs), addrs.iter().any(|a| a.ip == IpAddr::LOCALHOST_V4));
+    plat::write_stdout(format!("plat: local addresses {}\n", addrs.iter().map(|a| format!("{}", a.ip)).collect::<Vec<_>>().join(" ")).as_bytes());
+    t.check("if_index lo", if_index("lo").is_some_and(|i| i > 0));
+    t.check("hostname", !plat::net::hostname().is_empty());
+    t.check("dns_servers: netd keeps them", plat::net::dns_servers().is_empty());
+    true
 }

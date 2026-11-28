@@ -61,6 +61,8 @@ BeginArrow = 0
 EndArrow = 0
 # die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
 QuickStyleType = 3
+QuickStyleLineMatrix = 2
+QuickStyleLineColor = 100
 LinePattern = 2
 
 [Geometry]
@@ -91,6 +93,8 @@ BeginArrow = 0
 EndArrow = 0
 # die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
 QuickStyleType = 3
+QuickStyleLineMatrix = 2
+QuickStyleLineColor = 100
 
 [Geometry]
 NoFill = TRUE
@@ -153,6 +157,8 @@ BeginArrow = 0
 EndArrow = 0
 # die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3)
 QuickStyleType = 3
+QuickStyleLineMatrix = 2
+QuickStyleLineColor = 100
 
 [Geometry]
 NoFill = TRUE

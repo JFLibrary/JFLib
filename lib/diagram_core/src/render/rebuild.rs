@@ -12,13 +12,30 @@
 // changed.  false (nothing changed in the drawing): a shape came or went, the top-level order
 // changed, the page's size or scale changed, a named shape of the page is not in the drawing
 // -- the caller builds anew.  Changes the shapes do not show (the page's layers, styles,
-// masters, themes) are the caller's to know: they need build.
+// masters, themes) are the caller's to know: they need build.  (JD21) Line jumps are rows of
+// the connectors' Geometry: a connector whose jumps changed is a changed shape like any other.
 
 use alloc::vec::Vec;
 
 use super::{chain_of, fonts_of, merge_notes, page_frame, Builder, Drawing, Item, Measure, Note, Options};
 use crate::document::{Document, Owner, ShapeRef};
 use crate::geometry::Xform;
+
+/// (JD21) the top-level shapes rebuild makes anew for `shapes` (in painter's order; shapes the
+/// drawing does not show are passed over)
+pub fn affected(doc: &Document, d: &Drawing, opts: &Options, shapes: &[ShapeRef]) -> Vec<ShapeRef> {
+    let Some(page) = d.page else { return Vec::new() };
+    let chain = chain_of(doc, page, opts);
+    let mut want: Vec<usize> = shapes
+        .iter()
+        .filter(|s| matches!(s.owner, Owner::Page(p) if chain.contains(&p)))
+        .filter_map(|&s| top_of(doc, s))
+        .filter_map(|top| d.tops.iter().position(|t| t.shape == top))
+        .collect();
+    want.sort_unstable();
+    want.dedup();
+    want.into_iter().map(|k| d.tops[k].shape).collect()
+}
 
 /// the items of the top-level shapes of `shapes` made anew in `d` -> false: build anew
 pub fn rebuild(doc: &Document, d: &mut Drawing, measure: &mut dyn Measure, opts: &Options, shapes: &[ShapeRef]) -> bool {

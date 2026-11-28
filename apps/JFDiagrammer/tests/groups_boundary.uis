@@ -1,0 +1,28 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD21: boundary members (ST-03) -- a shape dropped across a container's edge sits on
+# it (its middle on the edge, the container does not grow around it); the container resized, the
+# member goes with its edge; moved with the container; slid along the edge it stays on it
+cmd 4404
+drag 500,330 640,420
+# Einfügen › Container › Klar
+cmd 5409
+expect listitem:"Container" rect 488 291 176 146
+cmd 4404
+drag 900,500 940,530
+cmd 4400
+# onto the right edge of the container
+drag 920,515 668,370
+expect listitem:"Sheet.6" rect 638 351 51 26
+expect listitem:"Container" rect 488 291 176 146
+# the container wider by its right handle: the member goes with the edge
+click 520,300
+expect listitem:"Container" selected
+drag button:"Größengriff rechts" 764,364
+expect listitem:"Container" rect 488 291 289 146
+expect listitem:"Sheet.6" rect 752 351 50 26
+key ctrl+z
+expect listitem:"Sheet.6" rect 638 351 51 26
+key ctrl+y
+# the container moved by its heading: the member comes along
+drag 520,300 520,400
+expect listitem:"Sheet.6" rect 752 452 50 25

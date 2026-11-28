@@ -201,6 +201,22 @@ pub(crate) fn call(ev: &mut Ev, f: Func, start: u32, n: u32, sheet: u32) -> R {
             let (ca, x, cb, y) = (num(ev, 0)?, num(ev, 1)?, num(ev, 2)?, num(ev, 3)?);
             Ok(Val::Num(math::sqrt((ca * x) * (ca * x) + (cb * y) * (cb * y))))
         }
+        // (JD21) INTERSECTX/Y(x1, y1, angle1, x2, y2, angle2): where the line through (x1, y1) at
+        // angle1 meets the one through (x2, y2) at angle2 ([MS-VSDX] 2.5.3.72, .73); parallel
+        // lines meet nowhere (#NUM!)
+        IntersectX | IntersectY => {
+            need!(n, 6, 6);
+            let (x1, y1, a1) = (num(ev, 0)?, num(ev, 1)?, num(ev, 2)?);
+            let (x2, y2, a2) = (num(ev, 3)?, num(ev, 4)?, num(ev, 5)?);
+            let ((s1, c1), (s2, c2)) = (math::sincos(a1), math::sincos(a2));
+            let cross = c1 * s2 - s1 * c2;
+            if cross.abs() < 1e-12 {
+                return Err(CellError::Num);
+            }
+            // p1 + t d1 = p2 + u d2 -> t = ((p2 - p1) x d2) / (d1 x d2)
+            let t = ((x2 - x1) * s2 - (y2 - y1) * c2) / cross;
+            finite(if f == IntersectX { x1 + t * c1 } else { y1 + t * s1 })
+        }
         Ang360 => n1(ev, |x| math::modulus(x, core::f64::consts::TAU)),
         Deg => n1(ev, |x| x * 180.0 / core::f64::consts::PI),
         Rad => n1(ev, |x| x),
@@ -457,7 +473,14 @@ pub(crate) fn call(ev: &mut Ev, f: Func, start: u32, n: u32, sheet: u32) -> R {
                 _ => Err(CellError::Value),
             }
         }
-        Format | FormatEx | EvalText => Err(ev.keep(Keep::NotComputed(f.name().unwrap_or("")))),
+        // (JD19) FORMAT(value, picture), FORMATEX(value, picture, lang in, lang out): the
+        // picture of field.rs; a value that may carry a length, angle or duration is kept (its
+        // unit is not known here)
+        Format | FormatEx => {
+            need!(n, 2, if f == Format { 2 } else { 4 });
+            format_value(ev, a[0], a[1], f)
+        }
+        EvalText => Err(ev.keep(Keep::NotComputed(f.name().unwrap_or("")))),
 
         // ---- document and shape information
         MasterName | PageName | Name | TypeDesc | Data1 | Data2 | Data3 | Id | Type | Is1D | PageNumber | PageCount => {
@@ -662,6 +685,68 @@ fn formula_of(v: &Val) -> Result<String, CellError> {
         }
         other => other.text()?,
     })
+}
+
+// (JD19) FORMAT and FORMATEX: a number, a date or a text in a format picture (field::format,
+// the document's Env: decimal sign, month names).  Computed only when every cell the value
+// reads is a shape data or user cell holding a plain number, a date, an amount of money or a
+// text (or the value reads no cell): a length or angle shows in units the engine does not
+// carry (Visio formats it in its cell's unit), so such a formula keeps its stored value.
+fn format_value(ev: &mut Ev, value: u32, picture: u32, f: Func) -> R {
+    let mut unit = None;
+    if !plain_inputs(ev, value, &mut unit, 0) {
+        return Err(ev.keep(Keep::NotComputed(f.name().unwrap_or(""))));
+    }
+    let pic = ev.text(picture)?;
+    let v = ev.eval(value)?;
+    let s = match v.plain() {
+        Val::Num(x) => crate::field::format(&crate::field::Shown::Num(*x, unit), &pic, &ev.doc.fields),
+        Val::Str(t) => crate::field::format(&crate::field::Shown::Text(t), &pic, &ev.doc.fields),
+        Val::Missing => String::new(),
+        Val::Err(e) => return Err(*e),
+        other => {
+            let t = other.text()?;
+            crate::field::format(&crate::field::Shown::Text(&t), &pic, &ev.doc.fields)
+        }
+    };
+    Ok(Val::Str(Rc::from(s)))
+}
+
+// whether the cells node i reads are shape data or user cells without a length, angle or
+// duration; `unit` gets the unit of a single such cell (a date, an amount)
+fn plain_inputs(ev: &mut Ev, i: u32, unit: &mut Option<crate::units::Unit>, depth: u32) -> bool {
+    use crate::units::Dimension;
+    if depth > 64 {
+        return false;
+    }
+    match ev.node(i) {
+        Node::Num(_) | Node::Str(_) | Node::Bool(_) | Node::Err(_) | Node::Missing => true,
+        Node::Neg(a) | Node::Pct(a) => plain_inputs(ev, a, unit, depth + 1),
+        Node::Bin(_, a, b) => plain_inputs(ev, a, unit, depth + 1) && plain_inputs(ev, b, unit, depth + 1),
+        Node::Call(_, start, n, _) => {
+            let args: Vec<u32> = ev.args(start, n).to_vec();
+            args.into_iter().all(|x| plain_inputs(ev, x, unit, depth + 1))
+        }
+        Node::Ref(r) => {
+            let p = ev.p.clone();
+            let Some(cr) = p.refs.get(r as usize) else { return false };
+            let super::parse::CellPart::Named { section, .. } = &cr.cell else { return false };
+            if !matches!(*section, "Prop" | "Property" | "User") {
+                return false;
+            }
+            let Ok((sheet, Some(addr))) = ev.target(cr) else { return false };
+            let u = ev.doc.resolve(sheet, &addr).unit();
+            match u.map(|u| u.dimension()) {
+                None | Some(Dimension::Number | Dimension::Date | Dimension::Typed) => {
+                    if u.is_some() {
+                        *unit = u;
+                    }
+                    true
+                }
+                _ => false,
+            }
+        }
+    }
 }
 
 // the document information of text fields (field.rs): the app's clock and the file's path

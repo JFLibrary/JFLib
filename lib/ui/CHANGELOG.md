@@ -10,6 +10,11 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ### Added
 
+- (JD21) `ui.shape_edit`: `SP_SEGMENT`, the midpoint of a piece of a connector's way (Visio's midpoint handle): a small diamond, dragged like a vertex (`SeEv::Point`), hidden while the piece is shorter than 24 DIP on the screen, the pointer shows the move across the piece unless `SPF_FREE`; one `K_BUTTON` per shown midpoint ("Mittelpunkt n", counted per connector); Ctrl + click with the line tool also adds a vertex to a shape that lists midpoints; LIB_TEXTS "Mittelpunkt" (9 languages); nothing changes for apps that list none
+- (JD21) `ui.shape_edit`: the quick shapes bar at a hot connection arrow (Visio's mini toolbar of the AutoConnect arrows): `SeState::quick` (`SeQuick`: name, preview, version; the first four show), the arrow stays hot while the pointer is on the bar, `SeEv::QuickHover` (the tile under the pointer, for a live preview), `SeEv::Quick` (a click), `SeState::quick_hover()`; one `K_BUTTON` per tile ("Schnell-Shape: <name>"); nothing changes for apps that list no quick shapes
+
+- (JD21) `ui.shape_edit`: `SEF_UP` -- a second, slow click on a selected member with this flag selects its group
+  (Visio's "members first" groups)
 - (JD8 rest) `ui.shape_edit`: the freeform tool `SE_FREEFORM` (the pointer's way, reported as
   `SeEv::Stroke` with the glue of both ends) and the arc tool `SE_ARC` (a quarter ellipse as the
   rubber band, bowing the way the drag started, reported as `SeEv::Arc`); both glue to connection
@@ -78,6 +83,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - (JD15) `ui.tooltips_set(on)` / `ui.tooltips_on()`: every tooltip of the app off and on again, for an app's option "no ScreenTips" (JFDiagrammer's QuickInfos › Keine QuickInfos)
 - (JD15) `ui.shape_edit`: `SeState::partial` (the marquee and the lasso also take the shapes they only touch), `SeState::snap` and `snap_guides` (moves snap to guides and to the dynamic grid at all, to guides; for a page that inhibits snapping and the targets of a snap dialog), `SPF_OUTWARD` (a connection point that points outward only: shown, no target for ends), `SeEv::MoveCopy` (a drag of the selection that starts with Ctrl + Shift moves a copy of it, live like Move), `SeState::right_taken()` (the last right release was the magnifier's or a pan's: the app opens no context menu)
 - (JD15) `StencilState::no_search`: the Shapes window shows no search box (Visio's option to hide the shape search); the query stays until the app clears it
+- (JD21) `ui.shape_edit`: the connection point tool `SE_CPOINT` (the selection's connection points are its handles: a drag moves one, a click or a right click chooses it, Del takes it out, Ctrl + click on, inside or outside the selected shape adds one); `SP_TARGET` (more glue targets of the app: vertices, handles, control points; shown only while they are the target) and `SeGlue::Guide` (an end dropped near a guide goes onto it; `SeState::glue_guides`, on); several vertices chosen with Shift (`SeState::chosen`) move together (`SeEv::Points`) and go together (`SeEv::PointsDelete`); arcs' control points `SP_ARC` and eccentricity handles `SP_ECC` in vertex editing (records "Bogengriff N", "Exzentrizitätsgriff N", with the tool "Verbindungspunkt N"); the freeform tool takes back what the pointer goes back over. `SeGlue` has a variant more: a `match` without a wildcard arm needs it
 
 ### Changed
 

@@ -60,7 +60,7 @@ fn data_round_trip() {
     // the shape data written by link survive with their link
     let shape = back.data_shape(doc.data_ids(a).unwrap().0, doc.data_ids(a).unwrap().1).unwrap();
     assert_eq!(back.data_link(shape, 1), Some(1));
-    let ports = back.shape_data(SheetRef::Shape(shape)).into_iter().find(|r| r.name() == Some("Ports")).unwrap();
+    let ports = back.shape_data(SheetRef::Shape(shape)).into_iter().find(|r| r.name() == Some("_VisDM_Ports")).unwrap();
     assert_eq!(ports.num("Value"), Some(24.0));
     assert_eq!(ports.num("DataLinked"), Some(1.0));
     // written again: the same bytes

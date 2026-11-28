@@ -1,0 +1,102 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD21 (CN-13, RW-09): Seitenlayout neu anordnen › Weitere Layoutoptionen -- the
+# dialog Layout konfigurieren: placement (style, direction, alignment, spacing), connectors
+# (style, appearance, Routing-Stil auf Verbinder anwenden), the selection or the page, Seite
+# vergrößern, Seitenumbrüche vermeiden, a preview; OK is one undo step that also keeps the
+# settings in the page (shown again next time); with three shapes selected only those move
+cmd 4404
+drag 700,560 790,600
+drag 420,330 510,370
+drag 760,400 850,440
+drag 450,460 540,500
+drag 650,280 740,320
+cmd 4400
+click 745,580
+type "Start"
+click 1100,700
+click 465,350
+type "Schritt"
+click 1100,700
+click 805,420
+type "Prüfen"
+click 1100,700
+click 495,480
+type "Ja"
+click 1100,700
+click 695,300
+type "Nein"
+click 1100,700
+cmd 4401
+drag 745,580 465,350
+drag 465,350 805,420
+drag 805,420 495,480
+drag 805,420 695,300
+drag 695,300 465,350
+cmd 4400
+click 1100,700
+# (JD21v) "Prüfen" was not placeable yet when Start -> Schritt was laid (ObjType 0 until a
+# connector is glued to it): the L's upright leg runs through Start's middle, close past it
+expect listitem:"Sheet.9" rect 500 346 252 204
+cmd 7247
+expect dialog:"Layout konfigurieren" exists
+expect combo:"Flussdiagramm" exists
+# (JD21 route) the placement's direction by its id: the routing's direction shows the same text
+expect #2107637763 text "Von oben nach unten"
+expect #2107637764 disabled
+expect textbox:"75" exists
+expect radio:"Auswahl" disabled
+expect radio:"Aktuelle Seite" checked
+expect checkbox:"Routing-Stil auf Verbinder anwenden" unchecked
+expect text:"Vorschau" exists
+# a hierarchy left to right, aligned at the top, 15 mm apart, straight connectors on all
+click #2107637762
+click "Hierarchie"
+click #2107637763
+click "Von links nach rechts"
+expect #2107637764 enabled
+click #2107637764
+click "Oben"
+click #2107637765
+key ctrl+a
+type "150"
+click #2107637766
+click "Gerade"
+click checkbox:"Routing-Stil auf Verbinder anwenden"
+shot build/JFDiagrammer-layout-options.png
+click button:"OK"
+expect dialog:"Layout konfigurieren" missing
+expect listitem:"Start" rect 425 273 100 51
+expect listitem:"Schritt" rect 563 273 75 51
+expect listitem:"Prüfen" rect 689 273 100 51
+expect listitem:"Ja" rect 840 374 100 50
+expect listitem:"Nein" rect 840 273 100 51
+# the connectors straight lines now (JD21v: Visio's straight style runs corner to corner)
+expect listitem:"Sheet.9" rect 525 296 38 6
+expect listitem:"Sheet.11" rect 789 324 51 50
+# the page keeps what the dialog set
+cmd 7247
+expect combo:"Hierarchie" exists
+expect combo:"Von links nach rechts" exists
+expect combo:"Oben" exists
+expect textbox:"150" exists
+click button:"Abbrechen"
+# one undo step: shapes, connectors and the page's settings
+key ctrl+z
+expect listitem:"Start" rect 701 550 101 50
+expect listitem:"Prüfen" rect 752 399 100 50
+expect listitem:"Sheet.9" rect 500 346 252 204
+cmd 7247
+expect combo:"Flussdiagramm" exists
+click button:"Abbrechen"
+# three shapes selected: the dialog lays out the selection, the others stay
+click 805,420
+click 495,480 shift
+click 695,300 shift
+cmd 7247
+expect radio:"Auswahl" checked
+click button:"OK"
+expect listitem:"Start" rect 701 550 101 50
+expect listitem:"Schritt" rect 425 324 75 50
+expect listitem:"Prüfen" rect 588 273 101 51
+expect listitem:"Ja" rect 525 349 101 50
+expect listitem:"Nein" rect 651 349 101 50

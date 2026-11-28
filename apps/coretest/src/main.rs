@@ -21,8 +21,8 @@
 //                                     tools/wycheproof_check.py, tools/limbo_check.py)
 //   (build_rs.py test runs it through tests/all.uis; --script is ignored)
 //   Android (docs/ANDROID.md, AN0): a program without a UI, python tools/android_console.py coretest;
-//   the groups and parts that need what plat lacks there so far (fs, net: AN2, AN3) say "not on
-//   Android yet" instead
+//   the groups and parts that need what plat lacks there so far (processes: ssh) say "not on
+//   Android yet" instead (the network groups since AN2; fs, watch, datastore and cas since AN3)
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
@@ -32,15 +32,12 @@ extern crate alloc;
 use alloc::format;
 use alloc::string::String;
 
-#[cfg(not(target_os = "android"))]
 mod cast;
 mod crypto;
 mod dhcpt;
 mod dnsmsgt;
-#[cfg(not(target_os = "android"))]
 mod dnst;
 mod dt;
-#[cfg(not(target_os = "android"))]
 mod httpt;
 mod httpclientt;
 mod charsett;
@@ -55,27 +52,17 @@ mod platx;
 mod rngt;
 #[cfg(not(target_os = "android"))]
 mod sshd;
-#[cfg(not(target_os = "android"))]
 mod store;
-#[cfg(not(target_os = "android"))]
 mod tlst;
-#[cfg(not(target_os = "android"))]
 mod tlsweb;
-#[cfg(not(target_os = "android"))]
 mod systrust;
-#[cfg(not(target_os = "android"))]
 mod ocspt;
-#[cfg(not(target_os = "android"))]
 mod acmesrv;
-#[cfg(not(target_os = "android"))]
 mod acmet;
-#[cfg(not(target_os = "android"))]
 mod tlsres;
-#[cfg(not(target_os = "android"))]
 mod suitevec;
 mod sshcoret;
 mod cookiet;
-#[cfg(not(target_os = "android"))]
 mod tlscoret;
 mod snmpv3t;
 mod cmdtreet;
@@ -97,8 +84,7 @@ mod patternt;
 mod eapt;
 mod imapt;
 
-/// a group that needs what plat lacks on Android so far: fs, net (docs/ANDROID.md, AN2, AN3) ->
-/// (name, None) there
+/// a group that needs what plat lacks on Android so far: processes (ssh) -> (name, None) there
 #[cfg(not(target_os = "android"))]
 macro_rules! native {
     ($name:literal, $f:path) => {
@@ -180,7 +166,6 @@ fn run() -> i32 {
         let rest: alloc::vec::Vec<String> = args.iter().skip_while(|a| a.as_str() != "--encoding").skip(2).cloned().collect();
         return charsett::cli(&op, &rest);
     }
-    #[cfg(not(target_os = "android"))]
     if let Some(code) = server_modes(&args) {
         return code;
     }
@@ -189,19 +174,19 @@ fn run() -> i32 {
         ("crypto", Some(crypto::run)),
         ("compress", Some(lz::run)),
         ("stream", Some(lzs::run)),
-        ("plat", Some(platx::run)), // (Android: sync and rand, AN1)
-        native!("datastore", store::run),
-        native!("http", httpt::run),
-        native!("httpclient", httpclientt::run),
-        native!("cas", cast::run),
-        native!("tls", tlst::run),
-        native!("tlsweb", tlsweb::run),
-        native!("systrust", systrust::run),
-        native!("tlsres", tlsres::run),
-        native!("ocsp", ocspt::run),
-        native!("acme", acmet::run),
+        ("plat", Some(platx::run)),
+        ("datastore", Some(store::run)),
+        ("http", Some(httpt::run)),
+        ("httpclient", Some(httpclientt::run)),
+        ("cas", Some(cast::run)),
+        ("tls", Some(tlst::run)),
+        ("tlsweb", Some(tlsweb::run)),
+        ("systrust", Some(systrust::run)),
+        ("tlsres", Some(tlsres::run)),
+        ("ocsp", Some(ocspt::run)),
+        ("acme", Some(acmet::run)),
         native!("ssh", sshd::run),
-        native!("dns", dnst::run),
+        ("dns", Some(dnst::run)),
         ("netpkt", Some(netpktt::run)),
         ("rng", Some(rngt::run)),
         ("jmap", Some(jmapt::run)),
@@ -230,7 +215,7 @@ fn run() -> i32 {
         ("sshcore", Some(sshcoret::run)),
         ("eap", Some(eapt::run)),
         ("cookie", Some(cookiet::run)),
-        native!("tlscore", tlscoret::run),
+        ("tlscore", Some(tlscoret::run)),
     ];
     let mut failed = 0;
     let mut total = 0;
@@ -252,8 +237,8 @@ fn run() -> i32 {
     if failed == 0 { 0 } else { 1 }
 }
 
-/// the servers and clients of other programs' tests (tools/tls_check.py, tools/ssh_interop.py ...)
-#[cfg(not(target_os = "android"))]
+/// the servers and clients of other programs' tests (tools/tls_check.py, tools/ssh_interop.py ...;
+/// Android: without the SSH ones)
 fn server_modes(args: &[String]) -> Option<i32> {
     if let Some(d) = plat::arg_value("--tls-pki") {
         return Some(tlst::write_pki(&d));
@@ -291,12 +276,15 @@ fn server_modes(args: &[String]) -> Option<i32> {
     if let Some(p) = plat::arg_value("--tls-core-get").and_then(|p| p.parse().ok()) {
         return Some(tlscoret::get(p));
     }
+    #[cfg(not(target_os = "android"))]
     if let Some(p) = plat::arg_value("--ssh-serve").and_then(|p| p.parse().ok()) {
         return Some(sshd::serve(p));
     }
+    #[cfg(not(target_os = "android"))]
     if let Some(p) = plat::arg_value("--ssh-core-serve").and_then(|p| p.parse().ok()) {
         return Some(sshcoret::serve(p));
     }
+    #[cfg(not(target_os = "android"))]
     if let Some(f) = plat::arg_value("--ssh-key") {
         return Some(sshd::key_line(&f));
     }

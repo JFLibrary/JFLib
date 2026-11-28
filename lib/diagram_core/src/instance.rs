@@ -37,6 +37,9 @@
 //                                      ColorTrans) and every shape of the instance its own
 //                                      LayerMember with the page's indices (the master's name
 //                                      the rows of its own Layer section)
+//   detach(&mut tx, shape)             (JD21, SP-06) an instance made plain shapes: what it
+//                                      inherits from its master shapes becomes its own, the link
+//                                      to the master goes (before it is ungrouped; detach.rs)
 //
 // The JFD_ cells are JFDiagrammer's own (apps/JFDiagrammer/stencils/README.md); diagram_io's
 // stencil builder writes them, the Shapes panel reads them.  Visio keeps them as ordinary User
@@ -57,6 +60,9 @@ use crate::shape::{ForeignData, ForeignPayload, ShapeData, ShapeKind, ShapeTree,
 use crate::sheet::{CellAddr, Extra, ExtraItem, Extras, Row, RowKey, SecKey, Section, Sheet, Trigger};
 use crate::strings::Sym;
 use crate::units::Unit;
+
+mod detach;
+pub use detach::detach;
 
 /// the five languages, in the order of every five-language value
 pub const LANGS: [&str; 5] = ["de", "en", "es", "it", "fr"];
@@ -614,7 +620,7 @@ pub fn place(tx: &mut Transaction, page: PageRef, master: MasterRef, x: f64, y: 
         localize_parts(tx, shape, lang)?;
         // (LY-03) the master's layers onto the page
         bring_layers(tx, page, master, shape)?;
-        // translated cells (Controls.Row_1.Tip ...) in this language
+        // translated cells (Control.Row_1.Prompt: a control point's tip ...) in this language
         let ms = tx.doc().master(master).and_then(|m| m.master_shape()).map(|slot| SheetRef::Shape(ShapeRef { owner: Owner::Master(master), slot }));
         for (cell, values) in &texts.translated {
             let Some(v) = values.get(lang).filter(|v| !v.is_empty()) else { continue };

@@ -4,10 +4,11 @@
 //                                    texts measured with the fonts drawn), the scene made of
 //                                    it, pictures decoded
 //   view.update(&doc, &mut fonts, &shapes) -> Option<[f64; 4]>   (JD7) the named shapes (their
-//                                    top-level shapes) made anew in the list and the scene; the
-//                                    box of what changed, old and new place (paper inches;
-//                                    a zero box: nothing drawn either way); None: shapes came,
-//                                    went or changed their order -- the page was built anew
+//                                    top-level shapes, render::affected) made anew in the list
+//                                    and the scene; the box of what changed, old and new place
+//                                    (paper inches; a zero box: nothing drawn either way); None:
+//                                    shapes came, went or changed their order -- the page was
+//                                    built anew
 //   view.draw(dc, sf, r, &cam)       the page on the CPU into the rectangle r of a surface
 //                                    (render2d's CPU path; gradients and pictures in between)
 //   view.render(w, h) -> Surface     the page fitted into w x h pixels on its colour (XRGB)
@@ -169,8 +170,7 @@ impl PageView {
         let page = self.drawing.page?;
         // the top-level shapes named and their items now
         let mut olds: Vec<(ShapeRef, Range<usize>)> = Vec::new();
-        for &s in shapes {
-            let Some(top) = top_of(doc, s) else { continue };
+        for top in render::affected(doc, &self.drawing, &self.opts, shapes) {
             if olds.iter().any(|o| o.0 == top) {
                 continue;
             }
@@ -716,18 +716,6 @@ fn between(lo: Option<i64>, hi: Option<i64>, n: usize) -> Option<Vec<i32>> {
         }
     };
     v.iter().all(|o| (i32::MIN as i64 / 2..=i32::MAX as i64 / 2).contains(o)).then(|| v.into_iter().map(|o| o as i32).collect())
-}
-
-/// the top-level shape a shape lies in (itself at the top)
-fn top_of(doc: &Document, s: ShapeRef) -> Option<ShapeRef> {
-    let mut cur = s;
-    for _ in 0..1024 {
-        match doc.shape(cur)?.parent() {
-            Some(p) => cur = p,
-            None => return Some(cur),
-        }
-    }
-    None
 }
 
 fn union(a: [f64; 4], b: [f64; 4]) -> [f64; 4] {

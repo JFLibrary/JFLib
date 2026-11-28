@@ -92,8 +92,10 @@ pub(crate) fn cut(app: &mut Diagrammer, ui: &mut Ui) {
     app.clip_offset = 0;
     let shapes = selected(app);
     let ow = owner(app);
+    // (JD21 autoconn, CN-09) Verbinder mit Shapes löschen
+    let heal = crate::autoconn::heal_on(app);
     let (Some(o), Some(ow)) = (app.opened.as_mut(), ow) else { return };
-    if edit_canvas::delete(o, ow, &shapes).is_ok() {
+    if crate::structures::delete_healing(o, ow, &shapes, heal).is_ok() {
         app.se.select(&[]);
     }
     ui.repass();
@@ -111,10 +113,13 @@ pub(crate) fn paste(app: &mut Diagrammer, ui: &mut Ui) {
     let step = if app.canvas.grid > 0.0 { app.canvas.grid } else { 16.0 };
     let n = app.clip_offset as f32;
     let d = geo.page_vec([step * n, step * n]);
+    // (JD21 autoconn, CN-08) one shape pasted onto a connector splits it
+    let rules = crate::autoconn::DropRules { split: crate::autoconn::split_on(app), chain: None };
     let r = match app.opened.as_mut() {
         Some(o) => edit_doc::edit(o, t("Einfügen"), true, |tx, eng| {
             let new = ops::paste(tx, eng, ow, &clip, d)?;
             crate::structures::pasted(tx, eng, ow, &new)?;
+            crate::autoconn::dropped(tx, eng, ow, &new, &rules)?;
             Ok(new)
         }),
         None => Ok(Vec::new()),
@@ -190,26 +195,10 @@ pub(crate) fn group(app: &mut Diagrammer, ui: &mut Ui) {
     ui.repass();
 }
 
-/// Gruppierung aufheben
+/// Gruppierung aufheben: (JD21) Visio's warning first when the groups are instances of masters or
+/// formulas name them (groups_cmds.rs)
 pub(crate) fn ungroup(app: &mut Diagrammer, ui: &mut Ui) {
-    let shapes = selected(app);
-    let Some(o) = app.opened.as_mut() else { return };
-    let r = edit_doc::edit(o, t("Gruppierung aufheben"), true, |tx, eng| {
-        let mut all = Vec::new();
-        for &s in &shapes {
-            if tx.doc().shape(s).is_some_and(|x| x.header().kind == diagram_core::ShapeKind::Group) {
-                all.extend(ops::ungroup(tx, eng, s)?);
-            } else {
-                all.push(s);
-            }
-        }
-        Ok(all)
-    });
-    if let Ok(kids) = r {
-        let keys: Vec<u64> = kids.iter().map(|&s| key_of(s)).collect();
-        app.se.select(&keys);
-    }
-    ui.repass();
+    crate::groups_cmds::ungroup(app, ui);
 }
 
 // the box of the selection on the page (drawing units): x0, y0, x1, y1
@@ -349,7 +338,8 @@ pub(crate) fn conn_style(app: &mut Diagrammer, ui: &mut Ui, style: diagram_core:
 pub(crate) fn conn_reset(app: &mut Diagrammer, ui: &mut Ui) {
     change(app, ui, t("Verbinder zurücksetzen"), |tx, eng, _, shapes| {
         let conns: Vec<ShapeRef> = shapes.iter().copied().filter(|&s| diagram_core::glue::is_connector(tx.doc(), s)).collect();
-        diagram_core::glue::reset(tx, eng, &conns)
+        // (JD21 route) a way by hand is free again (ConFixedCode 1 -> 0)
+        diagram_core::route_edit::reset(tx, eng, &conns)
     });
 }
 

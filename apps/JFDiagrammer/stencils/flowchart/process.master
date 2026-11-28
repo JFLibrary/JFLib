@@ -22,6 +22,8 @@ Width = 36 mm
 Width.us = 1.5 in
 Height = 24 mm
 Height.us = 1 in
+ShapeSplit = 1
+ObjType = 1
 
 [User]
 msvShapeCategories:  Value = "Flowchart"

@@ -30,6 +30,7 @@ TxtPinX = Width*0.5
 TxtPinY = (Height+User.Body)*0.5
 TxtLocPinX = TxtWidth*0.5
 TxtLocPinY = TxtHeight*0.5
+ShapeSplit = 1
 
 [User]
 # die Unterkante des Kastens (= Länge des Pfeils), die halbe Breite und die Länge der Spitze,

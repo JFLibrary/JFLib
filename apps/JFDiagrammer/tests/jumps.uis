@@ -1,0 +1,127 @@
+#!args --no-system-fonts --export-dir build
+# JFDiagrammer, JD21: line jumps (CN-06) -- two connectors drawn across each other with the
+# connector tool (free ends): the horizontal one hops over the vertical one (a new drawing's page
+# has no line jump cells: horizontal lines, arc, up, 2/3 of 2.5 mm; JD21v: the jump is rows of the
+# connector's Geometry, written when it is laid, as in Visio).  Entwurf › Verbinder › Linienübergänge
+# anzeigen turns them off and on (an undo step each); Seite einrichten › Layout und Routing:
+# Visio's six codes and nine styles, the style Lücke, the size and the direction (undone);
+# Verbinder-Verhalten is in a connector's menu (not in a rectangle's): "Nie" takes the
+# connector's jump away, "Immer" with a square downwards brings its own.  The page goes out as
+# SVG (clipboard) and PNG with its jumps; the files' contents are diagramiotest's (group jumps).
+# New references: "shot FILE X Y W H" in place of "expect same" (look first)
+theme light
+# a rectangle: its menu has no Verbinder-Verhalten
+cmd 4404
+drag 450,520 560,580
+rclick 500,550
+expect menuitem:"Layout-Verhalten" exists
+expect menuitem:"Verbinder-Verhalten" missing
+key esc
+cmd 4401
+drag 500,400 900,400
+drag 700,300 700,540
+cmd 4400
+key esc
+# zoomed in around the crossing (400 %)
+wheel 700,400 120 ctrl
+wheel 700,400 120 ctrl
+wheel 700,400 120 ctrl
+wheel 700,400 120 ctrl
+wheel 700,400 120 ctrl
+wheel 700,400 120 ctrl
+wheel 700,400 120 ctrl
+wheel 700,400 120 ctrl
+shot build/JFDiagrammer-jumps.png
+expect same apps/JFDiagrammer/tests/golden/jumps_arc.png 640 340 120 120
+# Linienübergänge anzeigen: off, on, undo, redo
+click tab:"Entwurf"
+click #4880
+expect menuitem:"Linienübergänge anzeigen" checked
+click menuitem:"Linienübergänge anzeigen"
+expect same apps/JFDiagrammer/tests/golden/jumps_none.png 640 340 120 120
+click #4880
+expect menuitem:"Linienübergänge anzeigen" unchecked
+click menuitem:"Linienübergänge anzeigen"
+expect same apps/JFDiagrammer/tests/golden/jumps_arc.png 640 340 120 120
+key ctrl+z
+expect same apps/JFDiagrammer/tests/golden/jumps_none.png 640 340 120 120
+key ctrl+y
+expect same apps/JFDiagrammer/tests/golden/jumps_arc.png 640 340 120 120
+# Seite einrichten › Layout und Routing: the codes and styles, the style Lücke
+cmd 4886
+expect dialog:"Seite einrichten" exists
+click #25917
+expect "Zuletzt verlegte Linie" exists
+expect "Zuletzt angezeigte Linie" exists
+expect "Zuerst angezeigte Linie" exists
+key esc
+click #25918
+expect "Bogen" exists
+expect "7 Seiten" exists
+click "Lücke"
+click button:"OK"
+expect same apps/JFDiagrammer/tests/golden/jumps_gap.png 640 340 120 120
+key ctrl+z
+expect same apps/JFDiagrammer/tests/golden/jumps_arc.png 640 340 120 120
+# the horizontal size 1.5 (Visio's 2/3), downwards: a wider arc below the line
+cmd 4886
+expect combo:"Bogen" exists
+click #25928
+key ctrl+a
+type "1,5"
+click #25930
+click "Nach unten"
+click button:"OK"
+expect same apps/JFDiagrammer/tests/golden/jumps_big_down.png 620 330 170 140
+cmd 4886
+expect combo:"Nach unten" exists
+expect textbox:"1,50" exists
+click button:"Abbrechen"
+key ctrl+z
+expect same apps/JFDiagrammer/tests/golden/jumps_arc.png 640 340 120 120
+# Verbinder-Verhalten of the horizontal connector: never
+rclick 560,392
+expect menuitem:"Verbinder-Verhalten" exists
+click menuitem:"Verbinder-Verhalten"
+expect dialog:"Verbinder-Verhalten" exists
+click #2032205826
+expect "Der andere Verbinder springt" exists
+click "Nie"
+click button:"OK"
+key esc
+# (JD21 route) nothing selected: a selected connector shows its midpoints
+click 400,600
+expect same apps/JFDiagrammer/tests/golden/jumps_none.png 640 340 120 120
+# always, a square, downwards (its own look)
+rclick 560,392
+click menuitem:"Verbinder-Verhalten"
+expect combo:"Nie" exists
+click #2032205826
+click "Immer"
+click #2032205827
+click "Quadrat"
+click #2032205828
+click "Nach unten"
+click button:"OK"
+key esc
+click 400,600
+expect same apps/JFDiagrammer/tests/golden/jumps_square_down.png 640 340 120 120
+# nothing selected: the page goes out
+click 400,600
+# exported with the jumps: SVG on the clipboard, PNG into build/
+click tab:"Datei"
+click button:"Exportieren"
+click button:"SVG-Grafik"
+click #26162
+expect text:"Die Seite ist als SVG in der Zwischenablage." exists
+clip expect text
+clip save build/JFDiagrammer-jumps.svg text
+click button:"PNG-Grafik"
+click combo:"Alle Seiten"
+click "Aktuelle Seite"
+click #26160
+wait 600
+expect dialog:"Speichern unter" exists
+click button:"Speichern"
+wait 600
+expect text:"Gespeichert: Zeichnung1.png" exists

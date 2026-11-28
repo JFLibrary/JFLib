@@ -1,0 +1,62 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD21 (AS-11): Ansicht › Add-Ons › Maßlinien -- between two selected shapes of the
+# standard stencil (horizontal: the sides that face each other, glued to their connection points),
+# along a drawn rectangle without connection points (vertical: tied to its box by formula), and
+# as a tool with nothing selected (aligned, from point to point); the field shows the length, the
+# dimensions follow when the shapes move; each one undo step
+theme light
+click button:"Weitere Shapes"
+click "Allgemein"
+click "Standard-Shapes"
+drag button:"Rechteck" 500,330
+click 1100,700
+drag button:"Rechteck" 800,330
+click 500,330
+click 800,330 shift
+click tab:"Ansicht"
+click button:"Maßlinien"
+click menuitem:"Maßlinie horizontal"
+expect listitem:"79 mm" selected
+expect button:"Anfangspunkt" exists
+expect button:"Endpunkt" exists
+# the right one moves right and down: the dimension's end comes along, the field counts
+click 1100,700
+drag 800,330 850,380
+expect listitem:"100 mm" rect 550 280 252 100
+key ctrl+z
+expect listitem:"79 mm" exists
+# a drawn rectangle without connection points: vertical along its height
+cmd 4404
+drag 450,500 540,580
+cmd 4400
+click 495,540
+click button:"Maßlinien"
+click menuitem:"Maßlinie vertikal"
+expect listitem:"30 mm" selected
+expect listitem:"30 mm" rect 425 500 75 75
+expect button:"Anfangspunkt" rect 495 570 10 10
+expect button:"Endpunkt" rect 495 495 10 10
+# the rectangle moves: the ends are tied to its box and come along
+click 1100,700
+drag 495,540 645,640
+expect #1505263375 rect 601 600 100 76
+expect listitem:"30 mm" rect 576 600 75 76
+# nothing selected: Maßlinie ausgerichtet is a tool, a line drawn with it a dimension
+click 1100,700
+click button:"Maßlinien"
+click menuitem:"Maßlinie ausgerichtet"
+click button:"Maßlinien"
+expect menuitem:"Maßlinie ausgerichtet" checked
+key esc
+drag 900,450 1000,550
+expect listitem:"57 mm" selected
+expect listitem:"57 mm" rect 899 446 108 108
+shot build/JFDiagrammer-tools-dimension.png
+# the tool stays until another is chosen
+click tab:"Start"
+expect button:"Zeigertool" unchecked
+cmd 4400
+expect button:"Zeigertool" checked
+key ctrl+z
+expect listitem:"57 mm" missing
+expect listitem:"30 mm" exists

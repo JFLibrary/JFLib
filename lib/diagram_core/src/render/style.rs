@@ -4,8 +4,8 @@
 //   PALETTE[i]                      the colours of index 0 .. 23 (the document's Colors table
 //                                   comes first)
 //   dash(pattern) -> &[f64]         LinePattern 2 .. 23 in multiples of the line's weight
-//   fill_pattern(p) -> FillKind     FillPattern 2 .. 24 as hatches, 25 .. 40 as the old
-//                                   two-colour gradients
+//   fill_pattern(p) -> FillKind     FillPattern 2 .. 24 as Visio draws them (hatches, dot
+//                                   patterns as a tint), 25 .. 40 as the old two-colour gradients
 //   arrow(kind, size, weight)       BeginArrow / EndArrow 1 .. 45 with the size 0 (very small)
 //                                   .. 6 (colossal): JFDiagrammer's own line ends, pointing to
 //                                   +x with the tip at the origin, and how far the line stops
@@ -65,6 +65,8 @@ pub enum FillKind {
     /// lines in the foreground colour over the background colour: up to two families (angle in
     /// degrees, spacing in inches)
     Hatch(&'static [(f64, f64)]),
+    /// a dot pattern too fine to draw: the foreground's share (0 .. 1) mixed over the background
+    Tint(f64),
     /// the old gradients from the foreground to the background colour
     Legacy(Legacy),
 }
@@ -79,46 +81,57 @@ pub enum Legacy {
     Radial(f64, f64),
 }
 
+/// FillPattern 2 .. 24 as Visio draws them (JD26 Visio check: its SVG export holds each as an
+/// 8 x 8 bitmap tiled every 6 pt, a pixel 1/96 inch): the line patterns as hatches with Visio's
+/// directions and spacings (hatch lines are a pixel wide), the dot patterns as their share of the
+/// foreground over the background; 25 .. 40 the old gradients (36 .. 39 from the corners)
 pub fn fill_pattern(p: u32) -> FillKind {
-    const FINE: f64 = 0.04;
-    const WIDE: f64 = 0.08;
+    // spacings in inches: along the axes every 8, 4 or 2 pixels, across the diagonals the same
+    // divided by the square root of 2
+    const P8: f64 = 8.0 / 96.0;
+    const P4: f64 = 4.0 / 96.0;
+    const P2: f64 = 2.0 / 96.0;
+    const D8: f64 = P8 * core::f64::consts::FRAC_1_SQRT_2;
+    const D4: f64 = P4 * core::f64::consts::FRAC_1_SQRT_2;
+    // two diagonal families covering half the area: 1 - (1 - w/s)^2 = 0.5
+    const HALF: f64 = 1.0 / 96.0 / (1.0 - core::f64::consts::FRAC_1_SQRT_2);
     match p {
         0 => FillKind::None,
         1 => FillKind::Solid,
-        2 => FillKind::Hatch(&[(90.0, WIDE)]),
-        3 => FillKind::Hatch(&[(0.0, WIDE)]),
-        4 => FillKind::Hatch(&[(45.0, WIDE)]),
-        5 => FillKind::Hatch(&[(135.0, WIDE)]),
-        6 => FillKind::Hatch(&[(0.0, WIDE), (90.0, WIDE)]),
-        7 => FillKind::Hatch(&[(45.0, WIDE), (135.0, WIDE)]),
-        8 => FillKind::Hatch(&[(90.0, FINE)]),
-        9 => FillKind::Hatch(&[(0.0, FINE)]),
-        10 => FillKind::Hatch(&[(45.0, FINE)]),
-        11 => FillKind::Hatch(&[(135.0, FINE)]),
-        12 => FillKind::Hatch(&[(0.0, FINE), (90.0, FINE)]),
-        13 => FillKind::Hatch(&[(45.0, FINE), (135.0, FINE)]),
-        14 => FillKind::Hatch(&[(30.0, WIDE)]),
-        15 => FillKind::Hatch(&[(150.0, WIDE)]),
-        16 => FillKind::Hatch(&[(60.0, WIDE)]),
-        17 => FillKind::Hatch(&[(120.0, WIDE)]),
-        18 => FillKind::Hatch(&[(0.0, 0.025), (90.0, 0.025)]),
-        19 => FillKind::Hatch(&[(45.0, 0.025), (135.0, 0.025)]),
-        20 => FillKind::Hatch(&[(0.0, 0.12)]),
-        21 => FillKind::Hatch(&[(90.0, 0.12)]),
-        22 => FillKind::Hatch(&[(45.0, 0.12)]),
-        23 => FillKind::Hatch(&[(135.0, 0.12)]),
-        24 => FillKind::Hatch(&[(0.0, 0.12), (90.0, 0.12)]),
+        2 => FillKind::Hatch(&[(45.0, D8)]),
+        3 => FillKind::Hatch(&[(0.0, P8), (90.0, P8)]),
+        4 => FillKind::Hatch(&[(45.0, D8), (135.0, D8)]),
+        5 => FillKind::Hatch(&[(135.0, D8)]),
+        6 => FillKind::Hatch(&[(0.0, P8)]),
+        7 => FillKind::Hatch(&[(90.0, P8)]),
+        8 => FillKind::Tint(0.75),
+        9 => FillKind::Tint(0.5),
+        10 => FillKind::Tint(0.25),
+        11 => FillKind::Tint(0.125),
+        12 => FillKind::Tint(0.0625),
+        13 => FillKind::Hatch(&[(0.0, P2)]),
+        14 => FillKind::Hatch(&[(90.0, P2)]),
+        15 => FillKind::Hatch(&[(135.0, P2)]),
+        16 => FillKind::Hatch(&[(45.0, P2)]),
+        17 => FillKind::Hatch(&[(45.0, HALF), (135.0, HALF)]),
+        18 => FillKind::Hatch(&[(45.0, P2), (135.0, P2)]),
+        19 => FillKind::Hatch(&[(0.0, P4)]),
+        20 => FillKind::Hatch(&[(90.0, P4)]),
+        21 => FillKind::Hatch(&[(135.0, D4)]),
+        22 => FillKind::Hatch(&[(45.0, D4)]),
+        23 => FillKind::Hatch(&[(0.0, P4), (90.0, P4)]),
+        24 => FillKind::Hatch(&[(45.0, D4), (135.0, D4)]),
         25 => FillKind::Legacy(Legacy::Linear(0.0, false)),
         26 => FillKind::Legacy(Legacy::Linear(0.0, true)),
         27 => FillKind::Legacy(Legacy::Linear(180.0, false)),
         28 => FillKind::Legacy(Legacy::Linear(270.0, false)),
         29 => FillKind::Legacy(Legacy::Linear(90.0, true)),
         30 => FillKind::Legacy(Legacy::Linear(90.0, false)),
-        31 => FillKind::Legacy(Legacy::Radial(0.0, 1.0)),
-        32 => FillKind::Legacy(Legacy::Radial(1.0, 1.0)),
-        33 => FillKind::Legacy(Legacy::Radial(0.0, 0.0)),
-        34 => FillKind::Legacy(Legacy::Radial(1.0, 0.0)),
-        35..=40 => FillKind::Legacy(Legacy::Radial(0.5, 0.5)),
+        31 | 36 => FillKind::Legacy(Legacy::Radial(0.0, 1.0)),
+        32 | 37 => FillKind::Legacy(Legacy::Radial(1.0, 1.0)),
+        33 | 38 => FillKind::Legacy(Legacy::Radial(0.0, 0.0)),
+        34 | 39 => FillKind::Legacy(Legacy::Radial(1.0, 0.0)),
+        35 | 40 => FillKind::Legacy(Legacy::Radial(0.5, 0.5)),
         _ => FillKind::Solid,
     }
 }
@@ -358,5 +371,15 @@ mod tests {
         assert!(dash(1).is_none() && dash(2).is_some() && dash(24).is_none());
         assert_eq!(fill_pattern(0), FillKind::None);
         assert!(matches!(fill_pattern(29), FillKind::Legacy(Legacy::Linear(_, true))));
+        // Visio's bitmaps (JD26 Visio check): 6 horizontal, 7 vertical lines every 8 pixels, 4 the
+        // diagonal cross, 10 a quarter of the pixels, 36 dark from the top left corner
+        assert_eq!(fill_pattern(6), FillKind::Hatch(&[(0.0, 8.0 / 96.0)]));
+        assert_eq!(fill_pattern(7), FillKind::Hatch(&[(90.0, 8.0 / 96.0)]));
+        assert!(matches!(fill_pattern(4), FillKind::Hatch(f) if f.len() == 2 && f[0].0 == 45.0 && f[1].0 == 135.0));
+        assert_eq!(fill_pattern(10), FillKind::Tint(0.25));
+        assert_eq!(fill_pattern(36), FillKind::Legacy(Legacy::Radial(0.0, 1.0)));
+        for p in 2..=24 {
+            assert!(matches!(fill_pattern(p), FillKind::Hatch(_) | FillKind::Tint(_)), "{p}");
+        }
     }
 }

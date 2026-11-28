@@ -56,11 +56,14 @@ TxtLocPinX = TxtWidth*0.5
 TxtLocPinY = TxtHeight*0.5
 TxtAngle = 0 deg
 # Linie, Füllung und Text aus der Verbinder-Liste des Designs (QuickStyleType 3, ausdrücklich:
-# Visio wählt sonst nach der Art des Shapes); Füll- und Schriftstil der Variante wie Normal (100)
-# statt Stil 1 aus Connector
+# Visio wählt sonst nach der Art des Shapes); Linie, Füll- und Schriftstil der Variante wie
+# Normal (100) statt Stil 1 aus Connector, alle drei ausdrücklich: Visio nimmt die
+# Schnellformatzellen aus der Füll-Formatvorlage, JFDiagrammer die Linie aus der Linien-Formatvorlage
 QuickStyleType = 3
 QuickStyleFillMatrix = 100
 QuickStyleFontMatrix = 100
+QuickStyleLineMatrix = 100
+QuickStyleLineColor = 100
 
 [User]
 # der Kasten der Kategorie: Breite und Höhe
@@ -69,19 +72,20 @@ Bw:  Value = 30 mm
 Bh:  Value = 8 mm
      Value.us = 0.3 in
 
-# 1 die Gräte vom Anfang zum Ende
-[Geometry]
-NoFill = TRUE
-MoveTo  X = 0; Y = 0
-LineTo  X = Width; Y = Height
-
-# 2 der Kasten über dem Anfang
+# 1 der Kasten über dem Anfang
 [Geometry]
 MoveTo  X = -User.Bw*0.5; Y = 0
 LineTo  X = User.Bw*0.5; Y = 0
 LineTo  X = User.Bw*0.5; Y = User.Bh
 LineTo  X = -User.Bw*0.5; Y = User.Bh
 LineTo  X = -User.Bw*0.5; Y = 0
+
+# 2 die Gräte vom Anfang zum Ende, als letzte Geometrie: die Pfeilspitze am Ende des
+# letzten Pfads (in Visio wie in JFDiagrammer)
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = Height
 
 [Connection]
 Row  X = Width*0.1; Y = Height*0.1; DirX = 0; DirY = 0

@@ -23,6 +23,7 @@ Width.us = 1.5 in
 Height = 20 mm
 Height.us = 0.75 in
 Rounding = MIN(MAX(Controls.Row_1, 0), Width*0.5, Height*0.5)
+ShapeSplit = 1
 
 [Geometry]
 MoveTo  X = 0; Y = 0

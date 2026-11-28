@@ -2906,7 +2906,8 @@ crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)
   pieces). `agent_core::json` / `jmap` and `base::xml` / `encoding` are the same
   modules under their names until 0.2.1.
 * `plat::watch::Watcher::new(&roots)` / `take(ms)` -- the changed paths below folders
-  (ReadDirectoryChangesW / inotify, recursive; `overflow` when events were lost). Every change
+  (ReadDirectoryChangesW / inotify, recursive; `overflow` when events were lost; Android: inotify
+  on the app's folders, `/data`, `/documents` ...). Every change
   after `new` returned is seen. A root that is deleted or moved away (Linux: also a folder that
   could not be watched or listed yet) is tried again every second; until it is watched again
   `watching()` is false and every `take` reports `overflow` after its wait, so a caller that

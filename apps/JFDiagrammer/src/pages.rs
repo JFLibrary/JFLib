@@ -320,8 +320,26 @@ fn name_problem(doc: &Document, page: PageRef, name: &str) -> Option<&'static st
     if n.is_empty() {
         return Some(t("Der Name darf nicht leer sein."));
     }
-    let taken = doc.pages().filter(|p| *p != page).any(|p| doc.page(p).is_some_and(|pg| [pg.header.name, pg.header.name_u].iter().flatten().any(|s| doc.str(*s).to_lowercase() == n.to_lowercase())));
-    taken.then(|| t("Eine andere Seite hat diesen Namen schon."))
+    let same = |s: &str| s.to_lowercase() == n.to_lowercase();
+    let taken = doc.pages().filter(|p| *p != page).any(|p| doc.page(p).is_some_and(|pg| [pg.header.name, pg.header.name_u].iter().flatten().any(|s| same(doc.str(*s)))));
+    if taken {
+        return Some(t("Eine andere Seite hat diesen Namen schon."));
+    }
+    // (JD21) Visio refuses a page name a style of the document has -- its Name, its NameU, the
+    // name Visio's interface gives a built-in style -- and renames such a page when it opens the
+    // file (Visio check visio-run3 [names]: "Standard", "Normal", "Ohne", "Nur Text" refused)
+    let style = doc.styles().filter_map(|s| doc.style(s)).any(|st| {
+        let u = st.header.name_u.map(|x| doc.str(x));
+        [st.header.name.map(|x| doc.str(x)), u, u.and_then(visio_style_name)].iter().flatten().any(|s| same(s))
+    });
+    style.then(|| t("Eine Formatvorlage hat diesen Namen; Visio würde die Seite umbenennen."))
+}
+
+// the names Visio's German interface gives the built-in styles (Visio check visio-run3 [names])
+fn visio_style_name(name_u: &str) -> Option<&'static str> {
+    const NAMES: [(&str, &str); 6] =
+        [("No Style", "Keine Format"), ("Text Only", "Nur Text"), ("None", "Ohne"), ("Normal", "Standard"), ("Guide", "Führungslinie"), ("Theme", "Design")];
+    NAMES.iter().find(|(u, _)| *u == name_u).map(|(_, n)| *n)
 }
 
 fn rename_dialog(app: &mut Diagrammer, ui: &mut Ui) {

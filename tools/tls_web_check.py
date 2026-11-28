@@ -2,6 +2,8 @@
 
     python tools/tls_web_check.py [--internet]      (runs in WSL / Linux: needs openssl)
     python tools/tls_web_check.py --internet-only [--target linux|win|mac]   (any system, no openssl)
+    python tools/tls_web_check.py --internet-only --target android [--serial SERIAL] [--mode shell|app|both]
+                                  [--allow-install]               (a device or emulator by adb, android_checks)
 
 A test PKI made with openssl (an RSA root, an ECDSA intermediate, server certificates with
 RSA-2048, RSA-PSS, ECDSA P-256 and P-384 keys) and `openssl s_server -www` in one setting at a
@@ -18,7 +20,7 @@ or refuse with the expected reason:
            TLS 1.1, a server certificate signed with SHA-1
 
 --internet adds public servers (Trust::System: the system's checks on Windows and macOS, the
-bundle on Linux; the Windows build too when run from Windows): www.google.com, github.com, and
+bundle on Linux, the system's CA folder on Android; the Windows build too when run from Windows): www.google.com, github.com, and
 badssl.com's TLS 1.2-only, RSA-2048/4096, P-256/384 hosts (must work) and its expired /
 wrong-host / self-signed / untrusted-root hosts (must fail, each with its reason: expired,
 another name, not trusted); revoked and incomplete-chain are shown, not counted (what a system
@@ -112,6 +114,10 @@ def main():
     if "--internet-only" in sys.argv:
         i = sys.argv.index("--target") + 1 if "--target" in sys.argv else 0
         target = sys.argv[i] if i else "win" if os.name == "nt" else "mac" if sys.platform == "darwin" else "linux"
+        if target == "android":
+            bad = android_checks(sys.argv)
+            print("tls_web_check --internet-only --target android:", "all ok" if not bad else f"{bad} failures")
+            return 1 if bad else 0
         exe = ROOT / "build" / target / ("coretest.exe" if target == "win" else "coretest")
         if not exe.exists():
             sys.exit(f"tls_web_check: {exe.relative_to(ROOT)} is missing (python build_rs.py app coretest --target {target})")
@@ -208,7 +214,8 @@ def main():
 NET_FAILURE = re.compile(r"connection reset|connection refused|connection aborted|timed out|^timeout$|unreachable|os error \d+", re.I)
 
 
-def internet_checks(cmd, tag):
+def internet_checks(cmd, tag, run=None):
+    """cmd: coretest's command line; run(url) -> its output instead (Android, android_checks)"""
     ok_hosts = ["https://www.google.com/", "https://github.com/", "https://tls-v1-2.badssl.com:1012/", "https://rsa2048.badssl.com/",
                 "https://rsa4096.badssl.com/", "https://ecc256.badssl.com/", "https://ecc384.badssl.com/"]
     # refused, with the reason (tls/conn.rs check_trust); sha384.badssl.com: its certificate
@@ -227,7 +234,8 @@ def internet_checks(cmd, tag):
         # from GitHub's runners) are tried again, up to four times; a TLS answer never is
         for pause in (3, 8, 15, 30, None):
             try:
-                out = subprocess.run(cmd + ["--tls-web", u], capture_output=True, text=True, timeout=40).stdout.strip()
+                out = (run(u) if run else
+                       subprocess.run(cmd + ["--tls-web", u], capture_output=True, text=True, timeout=40).stdout.strip())
             except subprocess.TimeoutExpired:
                 out = "timeout"
             if pause is None or not NET_FAILURE.search(out):
@@ -251,6 +259,73 @@ def internet_checks(cmd, tag):
         print(f"[{tag}] {unreachable} of {counted} hosts unreachable after every try: not counted")
     # more than half unreachable: too little was checked to call it a pass
     return bad + (1 if unreachable * 2 > counted else 0)
+
+
+def android_checks(argv):
+    """--internet-only --target android: the public servers from a device or emulator by adb
+    (docs/ANDROID.md AN2), with build/android/coretest-<the device's ABI> and its test APK
+    (python build_rs.py app coretest --target android --android-abi ABI).  shell: the executable
+    in /data/local/tmp from `adb shell`; app: in the test APK's process (untrusted_app, seccomp,
+    android.permission.INTERNET), the APK installed once for every host and uninstalled at the end,
+    on a device that is no emulator only with --allow-install (tools/android_console.py).  Both
+    with Trust::System: the CA folder of the system (plat::certs::ANDROID_CA_DIRS), names through
+    netd."""
+    import base64
+    import android_console as ac
+
+    def opt(name, default=None):
+        return argv[argv.index(name) + 1] if name in argv else default
+
+    dev = ac.Device(opt("--serial"))
+    if dev.run("get-state", check=False)[0].strip() != "device":
+        sys.exit("tls_web_check: no Android device (adb devices)")
+    abi = dev.prop("ro.product.cpu.abi")
+    emulator = dev.prop("ro.kernel.qemu") == "1" or dev.prop("ro.boot.qemu") == "1"
+    print(f"device: {abi}, {dev.prop('ro.product.model')}, Android {dev.prop('ro.build.version.release')} "
+          f"(API {dev.prop('ro.build.version.sdk')}){', emulator' if emulator else ''}")
+    mode = opt("--mode", "both")
+    build = f"(python build_rs.py app coretest --target android --android-abi {abi})"
+    bad = 0
+    for m in ["shell", "app"] if mode == "both" else [mode]:
+        if m == "shell":
+            exe = ROOT / "build" / "android" / f"coretest-{abi}"
+            if not exe.is_file():
+                sys.exit(f"tls_web_check: {exe.relative_to(ROOT)} is missing {build}")
+            remote = "/data/local/tmp/jfgui_coretest"
+            dev.shell(f"rm -rf {remote} && mkdir -p {remote}/files {remote}/cache")
+            try:
+                dev.run("push", str(exe), f"{remote}/coretest")
+                dev.shell(f"chmod 755 {remote}/coretest")
+
+                def run(u):
+                    return dev.shell(f"cd {remote} && env jfgui_ANDROID_FILES={remote}/files jfgui_ANDROID_CACHE={remote}/cache "
+                                     f"./coretest --tls-web {ac.quote(u)}", check=False, timeout=60)[0].strip()
+                bad += internet_checks(None, "android shell", run)
+            finally:
+                dev.shell(f"rm -rf {remote}", check=False)
+        else:
+            apk = ROOT / "build" / "android" / f"coretest-{abi}-console.apk"
+            if not apk.is_file():
+                sys.exit(f"tls_web_check: {apk.relative_to(ROOT)} is missing {build}")
+            if not emulator and "--allow-install" not in argv:
+                sys.exit("tls_web_check: installing the test APK on a device that is no emulator needs --allow-install")
+            pkg = ac.package("coretest")
+            dev.run("install", "-r", str(apk), timeout=300)
+            try:
+                def run(u):
+                    dev.shell(f"run-as {pkg} rm -f files/console.txt", check=False)
+                    args = base64.b64encode(f"--tls-web\n{u}".encode()).decode()
+                    dev.shell(f"am instrument -w -r -e args64 {args} {pkg}/{ac.INSTRUMENTATION}", check=False, timeout=60)
+                    text = dev.shell(f"run-as {pkg} cat files/console.txt", check=False)[0]
+                    # (a run outside an app's process proves nothing: android_console.py run_app)
+                    where = re.search(r"^jfgui-console: context (\S+), seccomp (\w+),", text, re.M)
+                    if not where or "untrusted_app" not in where.group(1) or where.group(2) != "2":
+                        return f"not in an app's process under seccomp ({where.group(0) if where else 'no context line'})"
+                    return "\n".join(ln for ln in text.splitlines() if not ln.startswith(("jfgui-console:", "exit="))).strip()
+                bad += internet_checks(None, "android app", run)
+            finally:
+                dev.run("uninstall", pkg, check=False, timeout=120)
+    return bad
 
 
 if __name__ == "__main__":

@@ -104,16 +104,18 @@ style_kde.workspace = true
 style_macos.workspace = true
 style_netlab.workspace = true
 
-# plat has no fs and net there
+# update: not in the browser, not on Android (apps update through their store)
 [target.'cfg(not(any(target_arch = "wasm32", target_os = "android")))'.dependencies]
-cas.workspace = true
-datastore.workspace = true
-netio.workspace = true
 update.workspace = true
 
-# takes about 25 minutes for wasm32 (docs/CRATES.md, "Risiken"); who needs it there names it directly
+# img_jxl_enc: takes about 25 minutes for wasm32 (docs/CRATES.md, "Risiken"); who needs it there names
+# it directly; netio: the browser has no sockets (Android since AN2); cas and datastore: plat has no fs
+# in the browser (Android since AN3, docs/ANDROID.md)
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 img_jxl_enc.workspace = true
+netio.workspace = true
+cas.workspace = true
+datastore.workspace = true
 
 # docs.rs: Linux, Windows, the browser and Android, not docs.rs's five defaults (32-bit Windows is none
 # of JFLib's targets; macOS and iOS are, their pages are not built on docs.rs yet);

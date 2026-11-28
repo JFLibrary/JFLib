@@ -11,10 +11,12 @@
 //     (app.se.dyn_grid, also Ansicht › Dynamisches Gitter)
 //   Ausrichten an: Raster (app.snap_grid), Führungslinien (app.se.snap_guides)
 //   Anzeigen: Verbindungspunkte anzeigen (app.se.show_points, also Ansicht › Verbindungspunkte)
+//   (JD21 glue) Kleben an: Führungslinien (app.se.glue_guides, on), Shape-Ziehpunkte and
+//     Shape-Scheitelpunkte (app.glue, off: Visio's defaults); connection points always glue
 // They hold for the window, not the drawing: Visio keeps them in the document (DocumentSettings
 // Snap and Glue), here they stay as long as the app runs (DM-03, JD22).  Visio's further targets
-// (ruler subdivisions, alignment box, shape geometry, handles, vertices, intersections), the
-// glue targets and the snap strength are not offered yet (JD22).  The page's InhibitSnap turns
+// (ruler subdivisions, alignment box, shape geometry, intersections; glue to shape geometry and
+// the switch for connection points) and the snap strength are not offered yet (JD22).  The page's InhibitSnap turns
 // snapping off whatever the dialog says (edit_canvas.rs).
 
 use ui::i18n::t;
@@ -27,20 +29,22 @@ const ID: u32 = 0x7A50_0000;
 /// the dialog's state
 pub(crate) struct SnapDialog {
     pub dlg: Shared<i32>,
-    // Ausrichten, Kleben, Dynamisches Gitter, Raster, Führungslinien, Verbindungspunkte anzeigen
-    v: [i32; 6],
+    // Ausrichten, Kleben, Dynamisches Gitter, Raster, Führungslinien, Verbindungspunkte anzeigen;
+    // (JD21 glue) Kleben an Führungslinien, Shape-Ziehpunkten, Shape-Scheitelpunkten
+    v: [i32; 9],
 }
 
 impl Default for SnapDialog {
     fn default() -> SnapDialog {
-        SnapDialog { dlg: Shared::new(0), v: [1; 6] }
+        SnapDialog { dlg: Shared::new(0), v: [1, 1, 1, 1, 1, 1, 1, 0, 0] }
     }
 }
 
 /// Ausrichten und Kleben (SNAP_GLUE, Alt+F9, the launcher of Visuelle Unterstützung)
 pub(crate) fn open(app: &mut Diagrammer, ui: &mut Ui) {
     let se = &app.se;
-    app.snap_dlg.v = [app.snap, se.glue, se.dyn_grid, app.snap_grid, se.snap_guides, se.show_points].map(|b| b as i32);
+    let g = &app.glue;
+    app.snap_dlg.v = [app.snap, se.glue, se.dyn_grid, app.snap_grid, se.snap_guides, se.show_points, se.glue_guides, g.handles, g.vertices].map(|b| b as i32);
     app.snap_dlg.dlg.set(1);
     ui.repass();
 }
@@ -69,6 +73,17 @@ pub(crate) fn dialog(app: &mut Diagrammer, ui: &mut Ui) {
     ui.separator();
     ui.text(TS_BODY_STRONG, t("Anzeigen"));
     ui.checkbox(ID + 7, t("Verbindungspunkte anzeigen"), &mut v[5]);
+    // (JD21 glue) what ends and control points glue to besides connection points (while
+    // Kleben is on)
+    ui.separator();
+    ui.text(TS_BODY_STRONG, t("Kleben an"));
+    let off = if v[1] == 0 { ST_DISABLED } else { 0 };
+    ui.next_flags(off);
+    ui.checkbox(ID + 8, t("Führungslinien"), &mut v[6]);
+    ui.next_flags(off);
+    ui.checkbox(ID + 9, t("Shape-Ziehpunkte"), &mut v[7]);
+    ui.next_flags(off);
+    ui.checkbox(ID + 10, t("Shape-Scheitelpunkte"), &mut v[8]);
     ui.box_end();
     let r = ui.dialog_buttons(Some(t("OK")), None, Some(t("Abbrechen")));
     ui.dialog_end();
@@ -80,6 +95,12 @@ pub(crate) fn dialog(app: &mut Diagrammer, ui: &mut Ui) {
         app.snap_grid = v[3];
         app.se.snap_guides = v[4];
         app.se.show_points = v[5];
+        app.se.glue_guides = v[6];
+        if (app.glue.handles, app.glue.vertices) != (v[7], v[8]) {
+            app.glue.handles = v[7];
+            app.glue.vertices = v[8];
+            crate::glue_tools::options_changed(app);
+        }
     }
     if r != DLG_NONE {
         app.snap_dlg.dlg.set(0);

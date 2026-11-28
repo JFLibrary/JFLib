@@ -1,4 +1,4 @@
-# Gemusterter Block (SH-030, JD26): ein Rechteck mit festem Füllmuster 7 (Kreuzschraffur schräg,
+# Gemusterter Block (SH-030, JD26): ein Rechteck mit festem Füllmuster 4 (Kreuzschraffur schräg,
 # weit).  Die Farben kommen aus dem Design: der Grund ist die Füllung der Formatvorlage
 # (THEMEVAL("FillColor")), die Schraffur dieselbe Farbe dunkler (SHADE(…,50)), beide mit
 # THEMEGUARD.  Ausnahme von der Stilregel (Muster im Master), begründet durch den Zweck.
@@ -24,7 +24,7 @@ Width = 40 mm
 Width.us = 1.5 in
 Height = 20 mm
 Height.us = 0.75 in
-FillPattern = 7
+FillPattern = 4
 FillForegnd = THEMEGUARD(SHADE(THEMEVAL("FillColor"),50))
 FillBkgnd = THEMEGUARD(THEMEVAL("FillColor"))
 

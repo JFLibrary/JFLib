@@ -33,20 +33,47 @@
 //                                         every master for the Visio counter-check
 //   diagramiotest --write-templates DIR  (JD13) every form of JFDiagrammer's templates as .vstx,
 //                                         metric and US (templates.rs)
+//   diagramiotest --write-all-stencils DIR   every stencil of JFDiagrammer as .vssx, metric
+//                                         and US, for visio_check (templates.rs)
+//   diagramiotest --data-dump FILE       (JD18) a file's connections, recordsets, rows, links and
+//                                         conflicts as diagram_io reads them (a check of files
+//                                         Visio wrote; nothing of them goes into the repository)
 //   diagramiotest --write-data DIR [--xlsx PATH]   (JD18) jd18-verknuepft.vsdx: a drawing with
 //                                         linked data for the Visio counter-check (data.rs)
 //   diagramiotest --write-link-fixture DIR   (JD18) jd18-link.vsdx and jd18-link.csv, the fixture
 //                                         of JFDiagrammer's data_link.uis and
 //                                         data_refresh_conflict.uis (data_fixture.rs)
+//   diagramiotest --write-dg DIR         (JD19) jd19-datengrafik.vsdx: data graphics of all four kinds
+//                                         and a legend for the Visio counter-check, jd19-dg.vsdx: the
+//                                         fixture of JFDiagrammer's data_graphics*.uis (datagraphics.rs)
+//   diagramiotest --write-report DIR     (JD19) jd19-bericht.vsdx: shapes with shape data, two
+//                                         report definitions and a report table for the Visio
+//                                         counter-check (reports.rs); --write-report-fixture DIR
+//                                         jd19-geraete.vsdx, the fixture of JFDiagrammer's
+//                                         report scripts
 //   diagramiotest --write-vdx DIR        (JD16) the self-written .vdx / .vsx files and the .vsdx /
 //                                         .vssx JFDiagrammer writes from them (vdx.rs)
 //   diagramiotest --write-vss DIR        (JD17) the sample stencil jd17-schablone.vss (three masters
 //                                        with geometry formulas; JFDiagrammer's binary_stencil.uis)
 //   diagramiotest --write-vss-hostile DIR (JD17) the synthetic .vss files and their hostile
 //                                         variants (vss.rs)
+//   diagramiotest --write-jd21-ops DIR   (JD21) jd21-vorgaenge.vsdx: input sets of the shape
+//                                         operations and JFDiagrammer's results for the Visio
+//                                         counter-check (shapeops.rs)
 //   diagramiotest --write-vss-overview DIR [--corpus DIR]   (JD17) every master of each local .vss
 //                                         on one sheet (<stem>-alle.png), and of each .vssx Visio
 //                                         saved from them (<stem>-visio-alle.png; vss.rs)
+//   diagramiotest --write-jd21-jumps DIR  (JD21) JD21-Gegenprobe-Linienuebergaenge.vsdx (line
+//                                         jumps: a page per style, code, direction ...) and a PNG
+//                                         of each page (jumps.rs)
+//   diagramiotest --compare-visio-jumps FILE  (JD21v) a drawing Visio saved after laying every
+//                                         connector anew: the same laying here, the rows against
+//                                         Visio's (jumps.rs)
+//   diagramiotest --write-jd21-groups DIR (JD21) jd21-gruppen.vsdx: Shape ändern, a group with its
+//                                         behaviour cells, boundary members (groups.rs)
+//   diagramiotest --write-jd21-route DIR  (JD21) JD21-Gegenprobe-Routing.vsdx (a page per routing
+//                                         style and direction, permeable shapes, a way by hand)
+//                                         and a PNG of each page (route.rs)
 //
 // Groups:
 //   samples   self-built files of all six formats: what lands where in the model (fields,
@@ -89,13 +116,36 @@
 //   data      (JD18, data.rs) external data: recordsets and connections written and read back,
 //             a package as Visio writes one, a refresh saved, parts not understood kept, hostile
 //             data parts
+//   datagraphics  (JD19, datagraphics.rs) data graphics: the callout masters of
+//             stencils/datagraphics, a graphic of all four kinds and a legend written and read
+//             back with the values they show, a refresh reaching the callouts, removal; a graphic
+//             stored the way Visio stores one read, kept and applied
+//   reports   (JD19, reports.rs) shape report definitions in the document sheet (visPropRptN)
+//             written and read back, one as Visio writes it, a broken one kept; the report table
+//             shape's marks and layer; the report run on the read drawing
 //   vdx       (JD16, vdx.rs) the XML formats of 2003-2010: the self-written drawing, stencil and
 //             bitmap read into the model and written as .vsdx / .vssx, hostile files and
 //             limits; macro projects passed through unchanged; document properties
+//   shapeops  (JD21, shapeops.rs) the shape operations on rectangles, an ellipse, a turned
+//             rectangle, an ArcTo shape and a shape with a hole: arcs stay arcs, the results
+//             written and read back with the same rows, formulas and frames, stretched results
 //   vss       (JD17, vss.rs) the binary stencils of 2003-2010: compound files (cfbkit.rs) and
 //             VisioDocument streams (vsskit.rs) built here, hostile variants of both, cut and
 //             mutated files; the local .vss of SWDB_DE read, written as .vssx and read back, and
 //             drawn against Visio's .vssx of them (skipped without the files)
+//   jumps     (JD21, jumps.rs) line jumps: crossing connectors per style, code, direction, size;
+//             the jumps in the display list, the cells written and read back (no geometry), the
+//             SVG and PNG export
+//   groups    (JD21, groups.rs) the Group Properties cells, IsDropSource and the double click
+//             read back, boundary members (Relationships 7 .. 10), Change Shape Behavior cells
+//             and shapes replaced by a master's instances (text, data, copied cells, glue)
+//   route     (JD21, route.rs) routing styles with directions, permeable shapes, a way by hand:
+//             the sides the ways use, the routing cells and ways written and read back, routed
+//             again after reading; the local corpus' connectors (right angles, ConFixedCode 0, 3 .. 6)
+//   pointglue (JD21 glue, pointglue.rs) a control point glued to a connection point, new
+//             connection points and their kinds, points made at a vertex and a handle, an end on
+//             a guide: Connect entries, rows and formulas written and read back, following after
+//             reading
 //
 // Why an app of its own and not codectest: codectest is the image codecs' runner (with the
 // assembly-parity protocol and every image codec linked); the diagram codecs grow with JD5
@@ -116,6 +166,8 @@ mod corpus;
 // (JD18) external data: connections, recordsets, linked shapes
 mod data;
 mod data_fixture;
+// (JD19) data graphics
+mod datagraphics;
 mod designs;
 mod drawings;
 mod dump;
@@ -125,13 +177,25 @@ mod formulas;
 mod gegenprobe;
 mod hostile;
 mod hostile_write;
+// (JD21) line jumps
+mod jumps;
+// (JD21 glue) control points, connection points, vertices, handles and guides glued
+mod pointglue;
 mod pkg;
 // (JD12) pdftest's independent PDF reader checks the exported PDFs
 #[path = "../../pdftest/src/reader.rs"]
 mod pdfreader;
 mod render;
+// (JD19) shape reports
+mod reports;
 mod roundtrip;
+// (JD21) routing styles, permeable shapes, a way by hand
+mod route;
 mod samples;
+// (JD21) the shape operations
+mod shapeops;
+// (JD21) groups, boundary members, Shape ändern
+mod groups;
 mod stencil_business;
 mod stencil_network;
 mod stencil_overview;
@@ -251,6 +315,9 @@ fn run() -> i32 {
     if let Some(dir) = arg(&args, "--write-templates") {
         return templates::write(&dir);
     }
+    if let Some(dir) = arg(&args, "--write-all-stencils") {
+        return templates::write_stencils(&dir);
+    }
     if let Some(dir) = arg(&args, "--write-vdx") {
         // (JD16) the self-written .vdx / .vsx and what JFDiagrammer writes from them
         return vdx::write(&dir);
@@ -259,9 +326,25 @@ fn run() -> i32 {
         // (JD18) the drawing and the text file of JFDiagrammer's data scripts
         return data_fixture::write(&dir);
     }
+    if let Some(file) = arg(&args, "--data-dump") {
+        // (JD18) the data parts of a file as diagram_io reads them (Visio's own files, locally)
+        return data::dump(&file);
+    }
     if let Some(dir) = arg(&args, "--write-data") {
         // (JD18) the drawing with linked data for the Visio counter-check
         return data::write_check(&dir, arg(&args, "--xlsx").as_deref());
+    }
+    if let Some(dir) = arg(&args, "--write-dg") {
+        // (JD19) the data graphics for the Visio counter-check and JFDiagrammer's scripts
+        return datagraphics::write(&dir);
+    }
+    if let Some(dir) = arg(&args, "--write-report-fixture") {
+        // (JD19) the drawing of JFDiagrammer's report scripts
+        return reports::write_fixture(&dir);
+    }
+    if let Some(dir) = arg(&args, "--write-report") {
+        // (JD19) the drawing with report definitions and a report table for the Visio counter-check
+        return reports::write_check(&dir);
     }
     if let Some(dir) = arg(&args, "--write-vss-overview") {
         // (JD17) every master of each local .vss on one sheet
@@ -274,6 +357,26 @@ fn run() -> i32 {
     if let Some(dir) = arg(&args, "--write-vss-hostile") {
         // (JD17) the synthetic .vss files and their hostile variants
         return vss::write_hostile(&dir);
+    }
+    if let Some(dir) = arg(&args, "--write-jd21-jumps") {
+        // (JD21) the line jumps drawing for the Visio counter-check, a PNG per page
+        return jumps::write(&dir);
+    }
+    if let Some(file) = arg(&args, "--compare-visio-jumps") {
+        // (JD21v) line jumps laid here against a file Visio laid anew
+        return jumps::compare(&file);
+    }
+    if let Some(dir) = arg(&args, "--write-jd21-groups") {
+        // (JD21) groups, boundary members, Shape ändern for the Visio counter-check
+        return groups::write(&dir);
+    }
+    if let Some(dir) = arg(&args, "--write-jd21-route") {
+        // (JD21) the routing styles drawing for the Visio counter-check, a PNG per page
+        return route::write(&dir);
+    }
+    if let Some(dir) = arg(&args, "--write-jd21-ops") {
+        // (JD21) the shape operations for the Visio counter-check
+        return shapeops::write(&dir);
     }
     if let Some(dir) = arg(&args, "--write-probe") {
         return roundtrip::write_probe(&dir, arg(&args, "--corpus").as_deref());
@@ -334,9 +437,37 @@ fn run() -> i32 {
         if h.on("data") {
             data::run(&mut h);
         }
+        // (JD21) the shape operations
+        if h.on("shapeops") {
+            shapeops::check(&mut h);
+        }
+        // (JD21) groups, boundary members, Shape ändern
+        if h.on("groups") {
+            groups::check(&mut h);
+        }
+        // (JD19) data graphics
+        if h.on("datagraphics") {
+            datagraphics::run(&mut h);
+        }
+        // (JD19) shape reports (DA-09)
+        if h.on("reports") {
+            reports::run(&mut h);
+        }
         // (JD17) the binary stencils of 2003-2010 (subgroups vss/cfb, vss/stream ...)
         vss::run(&mut h);
         vss_sample::run(&mut h);
+        // (JD21) line jumps
+        if h.on("jumps") {
+            jumps::check(&mut h);
+        }
+        // (JD21) routing styles, permeable shapes, a way by hand
+        if h.on("route") {
+            route::check(&mut h, corpus_dir.clone());
+        }
+        // (JD21 glue) glue of control points, to vertices, handles, guides; new connection points
+        if h.on("pointglue") {
+            pointglue::check(&mut h);
+        }
     }
     if h.on("corpus") {
         corpus::run(&mut h, corpus_dir.clone());

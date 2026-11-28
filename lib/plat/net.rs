@@ -7,10 +7,12 @@
 //             /sys/class/net/NAME/ifindex, else ioctl SIOCGIFINDEX; Windows: if_nametoindex) or
 //             by number ("%2")
 //   local_addrs() -> this computer's addresses (port 0, link-local ones with their scope):
-//             Windows GetAdaptersAddresses; Linux SIOCGIFCONF (IPv4), /proc/net/if_inet6 (IPv6)
+//             Windows GetAdaptersAddresses; Linux and Android SIOCGIFCONF (IPv4),
+//             /proc/net/if_inet6 (IPv6; an Android app may not read it: then IPv4 only)
 //   dns_servers() -> (Windows) the DNS servers of the adapters that are up, with their scope
 //             (the well-known site-local fec0:0:0:ffff::1..3 Windows lists without IPv6 DNS
-//             are left out); Linux: empty (netio::dns reads /etc/resolv.conf)
+//             are left out); Linux: empty (netio::dns reads /etc/resolv.conf); Android: empty
+//             (netd keeps them, names go through getaddrinfo)
 //   TcpListener::bind(&addr) / accept() / accept_timeout(ms) / local_addr()
 //   TcpStream::connect(&addr, timeout_ms) / read / write / write_all / read_exact,
 //             set_read_timeout / set_write_timeout (ms, None = block), set_nodelay,
@@ -20,17 +22,24 @@
 //   UnixListener::bind(path) / accept() / accept_timeout(ms); connect_unix(path, timeout_ms)
 //             (bind removes only a socket file nobody listens on; the drop only its own)
 //             -> UnixStream (the stream calls of TcpStream; addresses and nodelay do not apply)
-//             Linux, and Windows 10 1803 and later (AF_UNIX)
+//             Linux, and Windows 10 1803 and later (AF_UNIX); not on Android yet (plat::fs, AN3)
 //   resolve(host, port): numeric addresses, "localhost" and names under .localhost (the loopback
-//             addresses, RFC 6761; with a final dot as well); Windows, macOS and iOS also the
-//             system resolver (GetAddrInfoW, getaddrinfo).  Linux: other names NotFound, since
+//             addresses, RFC 6761; with a final dot as well); Windows, macOS, iOS and Android
+//             also the system resolver (GetAddrInfoW, getaddrinfo; on Android Bionic's, which asks
+//             netd: private DNS, VPNs, the network of the app).  Linux: other names NotFound, since
 //             there is no libc here: netio::dns resolves them (/etc/hosts, the name servers).
 //   NetError: the kinds callers act on, with the OS code
 //
 // (G7d) Everywhere: the addresses, NetError and host_port.  The sockets, names and interfaces are
-// Windows', Linux's and Apple's; the browser has WebSocket instead (web_net.rs: the page's
-// WebSocket through the JS host, net.connect checked on the URL's host and port), Android nothing
-// yet (docs/ANDROID.md).
+// Windows', Linux's, Apple's and Android's; the browser has WebSocket instead (web_net.rs: the
+// page's WebSocket through the JS host, net.connect checked on the URL's host and port).
+//
+// Android (docs/ANDROID.md AN2) takes the Linux sockets with rt::kernel's numbers, names through
+// Bionic's getaddrinfo (there is no /etc/resolv.conf), interfaces without netlink and without MAC
+// addresses.  An app whose manifest lacks android.permission.INTERNET gets no IPv4 or IPv6 socket:
+// socket() answers EACCES where the kernel checks the group inet, EPERM where netd's eBPF program
+// checks (Android 15 on the emulator).  Either becomes NetErrorKind::Denied with that code and a
+// word on the manifest (NetError::no_internet; a lookup that fails checks for it as well).
 //
 // The app's permissions (policy.rs, net.connect / net.listen) are checked before connect,
 // bind, send_to and a name lookup; Unix sockets follow the file rules (fs.write on the path).
@@ -47,7 +56,7 @@ use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 use core::sync::atomic::{AtomicU32, Ordering};
 
 // ------------------------------------------------------------------ addresses
@@ -263,12 +272,12 @@ pub fn if_index(name: &str) -> Option<u32> {
     if name.is_empty() || name.len() > 255 || name.bytes().any(|b| b == 0 || b == b'/') || name == "." || name == ".." {
         return None;
     }
-    #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+    #[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
     {
         sys::if_index(name).filter(|i| *i != 0)
     }
-    // (the browser, Android: no interfaces to name; a zone by number still parses)
-    #[cfg(not(any(windows, target_os = "linux", target_vendor = "apple")))]
+    // (the browser: no interfaces to name; a zone by number still parses)
+    #[cfg(not(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android")))]
     {
         None
     }
@@ -276,7 +285,7 @@ pub fn if_index(name: &str) -> Option<u32> {
 
 /// this computer's addresses (port 0; link-local IPv6 addresses with their scope), see the top
 /// of this file
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 pub fn local_addrs() -> Vec<SocketAddr> {
     let mut v = sys::local_addrs();
     v.dedup();
@@ -285,8 +294,8 @@ pub fn local_addrs() -> Vec<SocketAddr> {
 
 /// (Windows) the DNS servers of the network adapters that are up (port 53, link-local ones
 /// with their scope), in the system's adapter order; Linux: empty (netio::dns reads
-/// /etc/resolv.conf)
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+/// /etc/resolv.conf); Android: empty (netd keeps them)
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 pub fn dns_servers() -> Vec<SocketAddr> {
     let mut out: Vec<SocketAddr> = Vec::new();
     for a in sys::dns_servers() {
@@ -313,7 +322,9 @@ pub enum NetErrorKind {
     NotFound,
     /// the peer closed the connection before all bytes arrived (read_exact)
     Eof,
-    /// the app's permissions (apps/NAME/PERMISSIONS) do not allow the address or name
+    /// the app's permissions (apps/NAME/PERMISSIONS) do not allow the address or name; on
+    /// Android with code 13 (EACCES) or 1 (EPERM): the app's manifest lacks
+    /// android.permission.INTERNET (NetError::no_internet)
     Denied,
     Other,
 }
@@ -325,14 +336,31 @@ pub struct NetError {
     pub code: i32,
 }
 
+/// what socket() answers an Android app without the INTERNET permission: EACCES where the kernel
+/// checks the group inet, EPERM where netd's eBPF program does (Android 15 on the emulator)
+const EACCES: i32 = 13;
+const EPERM: i32 = 1;
+
 impl NetError {
     pub const fn new(kind: NetErrorKind, code: i32) -> NetError {
         NetError { kind, code }
+    }
+
+    /// (Android) the app's manifest lacks android.permission.INTERNET: Android refuses it every
+    /// IPv4 and IPv6 socket (EACCES or EPERM), and the system's resolver every name.  The manifest
+    /// `cargo jflib android` writes has it when the app has no PERMISSIONS or names net.connect
+    /// or net.listen there; an own AndroidManifest.xml needs it too.  Always false elsewhere
+    pub fn no_internet(&self) -> bool {
+        cfg!(target_os = "android") && self.kind == NetErrorKind::Denied && (self.code == EACCES || self.code == EPERM)
     }
 }
 
 impl fmt::Display for NetError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.no_internet() {
+            return write!(f, "not allowed: the app's Android manifest lacks android.permission.INTERNET (PERMISSIONS without \
+                              net.connect or net.listen, or an own AndroidManifest.xml without it) (os error {})", self.code);
+        }
         let what = match self.kind {
             NetErrorKind::TimedOut => "timed out",
             NetErrorKind::Refused => "connection refused",
@@ -351,12 +379,12 @@ impl fmt::Display for NetError {
 
 pub type NetResult<T> = Result<T, NetError>;
 
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 fn timed_out() -> NetError {
     NetError::new(NetErrorKind::TimedOut, 0)
 }
 
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 fn denied() -> NetError {
     NetError::new(NetErrorKind::Denied, 0)
 }
@@ -684,7 +712,9 @@ mod sys {
     }
 }
 
-#[cfg(target_os = "linux")]
+// Linux and Android: the kernel's calls with rt::kernel's numbers (Android: docs/ANDROID.md
+// decision 2); Android's names come from Bionic's getaddrinfo (resolve_system)
+#[cfg(any(target_os = "linux", target_os = "android"))]
 mod sys {
     use super::{NetError, NetErrorKind, NetResult};
     use rt::os::{syscall3, syscall6, O_NONBLOCK, SYS_ACCEPT4, SYS_BIND, SYS_CLOSE, SYS_CONNECT, SYS_FCNTL, SYS_GETPEERNAME, SYS_GETSOCKNAME, SYS_GETSOCKOPT, SYS_IOCTL, SYS_LISTEN, SYS_RECVFROM, SYS_SENDTO, SYS_SETSOCKOPT, SYS_SHUTDOWN, SYS_SOCKET};
@@ -708,10 +738,22 @@ mod sys {
     const SIOCGIFINDEX: usize = 0x8933;
     const EINTR: isize = 4;
 
+    /// a file of /sys or /proc (Android: the real path, not one of the app's own names)
+    fn sys_file(path: &str) -> Option<alloc::vec::Vec<u8>> {
+        #[cfg(target_os = "linux")]
+        {
+            crate::read_file_raw(path)
+        }
+        #[cfg(target_os = "android")]
+        {
+            crate::proc_file(&alloc::format!("{path}\0")).map(alloc::string::String::into_bytes)
+        }
+    }
+
     /// /sys/class/net/NAME/ifindex, else ioctl SIOCGIFINDEX (struct ifreq: 16 bytes of name,
     /// the index)
     pub fn if_index(name: &str) -> Option<u32> {
-        if let Some(b) = crate::read_file_raw(&alloc::format!("/sys/class/net/{name}/ifindex")) {
+        if let Some(b) = sys_file(&alloc::format!("/sys/class/net/{name}/ifindex")) {
             if let Ok(i) = core::str::from_utf8(&b).unwrap_or("").trim().parse::<u32>() {
                 return Some(i);
             }
@@ -749,7 +791,8 @@ mod sys {
                 }
             }
         }
-        let text = crate::read_file_raw("/proc/net/if_inet6").unwrap_or_default();
+        // (Android: an app may not read /proc/net since Android 10; then its IPv6 addresses stay unknown)
+        let text = sys_file("/proc/net/if_inet6").unwrap_or_default();
         for line in core::str::from_utf8(&text).unwrap_or("").lines() {
             let f: alloc::vec::Vec<&str> = line.split_whitespace().collect();
             if f.len() < 6 || f[0].len() != 32 {
@@ -766,7 +809,8 @@ mod sys {
         out
     }
 
-    /// (Windows only: Linux names its servers in /etc/resolv.conf, netio::dns)
+    /// (Windows only: Linux names its servers in /etc/resolv.conf, netio::dns; Android's netd
+    /// keeps them to itself)
     pub fn dns_servers() -> alloc::vec::Vec<super::SocketAddr> {
         alloc::vec::Vec::new()
     }
@@ -811,7 +855,29 @@ mod sys {
 
     pub fn socket(af: i32, ty: i32, proto: i32) -> NetResult<Raw> {
         // SAFETY: plain socket creation.
-        call(|| unsafe { syscall3(SYS_SOCKET, af as usize, ty as usize | SOCK_CLOEXEC, proto as usize) })
+        let r = call(|| unsafe { syscall3(SYS_SOCKET, af as usize, ty as usize | SOCK_CLOEXEC, proto as usize) });
+        // Android: an app without android.permission.INTERNET gets no IPv4 or IPv6 socket --
+        // EACCES from the kernel (the group inet) or EPERM from netd's eBPF program
+        #[cfg(target_os = "android")]
+        if let Err(e) = r {
+            if (e.code == super::EACCES || e.code == super::EPERM) && (af == AF_INET || af == AF_INET6) {
+                return Err(NetError::new(NetErrorKind::Denied, e.code));
+            }
+        }
+        r
+    }
+
+    /// (Android) the refusal of an IPv4 socket when the app lacks android.permission.INTERNET (a
+    /// lookup that failed asks: getaddrinfo cannot say so itself)
+    #[cfg(target_os = "android")]
+    pub fn no_internet() -> Option<NetError> {
+        match socket(AF_INET, 2, 0) {
+            Ok(s) => {
+                close(s);
+                None
+            }
+            Err(e) => e.no_internet().then_some(e),
+        }
     }
 
     pub fn close(s: Raw) {
@@ -900,6 +966,68 @@ mod sys {
         let (p, n) = (fds.as_mut_ptr() as usize, fds.len());
         // SAFETY: fds is a valid array.
         call(|| unsafe { rt::os::poll(p, n, ms) })
+    }
+
+    // Bionic's struct addrinfo: the BSD order (the canonical name before the address)
+    #[cfg(target_os = "android")]
+    #[repr(C)]
+    struct AddrInfo {
+        flags: i32,
+        family: i32,
+        socktype: i32,
+        protocol: i32,
+        addrlen: u32,
+        canonname: *mut u8,
+        addr: *const u8,
+        next: *mut AddrInfo,
+    }
+
+    #[cfg(target_os = "android")]
+    #[link(name = "c")]
+    unsafe extern "C" {
+        fn getaddrinfo(host: *const core::ffi::c_char, service: *const core::ffi::c_char, hints: *const AddrInfo, res: *mut *mut AddrInfo) -> i32;
+        fn freeaddrinfo(res: *mut AddrInfo);
+    }
+
+    /// (Android) the system resolver: Bionic's getaddrinfo, which asks netd (private DNS, VPNs,
+    /// the app's network; port 0, a link-local IPv6 address with its zone).  A failure is
+    /// NotFound with the EAI code, or Denied when the app lacks android.permission.INTERNET
+    #[cfg(target_os = "android")]
+    pub fn resolve_system(host: &str) -> NetResult<alloc::vec::Vec<super::SocketAddr>> {
+        let mut z = host.as_bytes().to_vec();
+        z.push(0);
+        let hints = AddrInfo { flags: 0, family: 0, socktype: 1, protocol: 6, addrlen: 0, canonname: core::ptr::null_mut(),
+                               addr: core::ptr::null(), next: core::ptr::null_mut() };
+        let mut res: *mut AddrInfo = core::ptr::null_mut();
+        // SAFETY: a NUL-terminated name and valid hints; the result list is freed below.
+        let r = unsafe { getaddrinfo(z.as_ptr().cast(), core::ptr::null(), &hints, &mut res) };
+        if r != 0 {
+            // without INTERNET netd answers EAI_NODATA like for a name without addresses
+            if let Some(e) = no_internet() {
+                return Err(e);
+            }
+            return Err(NetError::new(NetErrorKind::NotFound, r));
+        }
+        let mut out = alloc::vec::Vec::new();
+        let mut p = res;
+        while !p.is_null() {
+            // SAFETY: p walks the list getaddrinfo returned.
+            let ai = unsafe { &*p };
+            if !ai.addr.is_null() && ai.addrlen >= 8 {
+                // SAFETY: ai.addr points to ai.addrlen bytes.
+                let raw = unsafe { core::slice::from_raw_parts(ai.addr, ai.addrlen as usize) };
+                if let Some(a) = super::decode_sockaddr(raw) {
+                    let a = super::SocketAddr::with_scope(a.ip, 0, a.scope);
+                    if !out.contains(&a) {
+                        out.push(a);
+                    }
+                }
+            }
+            p = ai.next;
+        }
+        // SAFETY: the list from getaddrinfo, freed once.
+        unsafe { freeaddrinfo(res) };
+        Ok(out)
     }
 }
 
@@ -1247,7 +1375,7 @@ fn decode_sockaddr(b: &[u8]) -> Option<SocketAddr> {
     }
 }
 
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_os = "android"))]
 fn encode_sockaddr(a: &SocketAddr) -> Vec<u8> {
     match a.ip {
         IpAddr::V4(ip) => {
@@ -1268,7 +1396,7 @@ fn encode_sockaddr(a: &SocketAddr) -> Vec<u8> {
     }
 }
 
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_os = "android"))]
 fn decode_sockaddr(b: &[u8]) -> Option<SocketAddr> {
     if b.len() < 8 {
         return None;
@@ -1287,23 +1415,23 @@ fn decode_sockaddr(b: &[u8]) -> Option<SocketAddr> {
     }
 }
 
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 fn family(a: &SocketAddr) -> i32 {
     if matches!(a.ip, IpAddr::V4(_)) { sys::AF_INET } else { sys::AF_INET6 }
 }
 
 /// an owned socket
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 struct Sock(sys::Raw);
 
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 impl Drop for Sock {
     fn drop(&mut self) {
         sys::close(self.0);
     }
 }
 
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 impl Sock {
     /// wait until readable (or closed) -> false on timeout; ms None: no wait at all
     fn wait(&self, events: i16, ms: Option<u32>) -> NetResult<bool> {
@@ -1320,19 +1448,19 @@ impl Sock {
     }
 }
 
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 fn ms_opt(v: u32) -> Option<u32> {
     if v == 0 { None } else { Some(v) }
 }
 
 // ------------------------------------------------------------------ TCP
 
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 pub struct TcpListener {
     s: Sock,
 }
 
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 impl TcpListener {
     /// listen on an address (port 0: any free port, see local_addr)
     pub fn bind(addr: &SocketAddr) -> NetResult<TcpListener> {
@@ -1371,14 +1499,14 @@ impl TcpListener {
     }
 }
 
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 pub struct TcpStream {
     s: Sock,
     read_ms: AtomicU32,
     write_ms: AtomicU32,
 }
 
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 impl TcpStream {
     fn from_raw(s: sys::Raw) -> TcpStream {
         TcpStream { s: Sock(s), read_ms: AtomicU32::new(0), write_ms: AtomicU32::new(0) }
@@ -1589,7 +1717,7 @@ impl AnswerSet {
     }
 }
 
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 pub struct UdpSocket {
     s: Sock,
     /// the address it was bound to (a plugin's scope checks its own net.listen against it)
@@ -1599,12 +1727,12 @@ pub struct UdpSocket {
     answers: Option<crate::sync::Mutex<AnswerSet>>,
 }
 
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 fn now_ms() -> u64 {
     crate::time_us() / 1000
 }
 
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 impl UdpSocket {
     /// a socket on addr; a fixed port needs net.listen, port 0 (a client's) does not.  A socket whose address
     /// net.listen allows (a fixed port through the check, port 0 when a rule covers it: checked quietly) may answer
@@ -1813,11 +1941,11 @@ pub fn connect_unix(path: &str, timeout_ms: u32) -> NetResult<UnixStream> {
 
 /// the addresses of a host: numeric forms, "localhost" and names under .localhost, with a final
 /// dot as well (both loopback addresses, RFC 6761 6.3, as netio::dns answers them) everywhere;
-/// on Windows, macOS and iOS other names through the system resolver, on Linux NotFound for them
-/// (no libc here: netio::dns::resolve reads /etc/hosts and asks the name servers).  The
+/// on Windows, macOS, iOS and Android other names through the system resolver, on Linux NotFound
+/// for them (no libc here: netio::dns::resolve reads /etc/hosts and asks the name servers).  The
 /// addresses of a name are registered with the app's rules (policy::net_resolved), so a rule
 /// for the name (app.localhost:8080) covers connections to them
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 pub fn resolve(host: &str, port: u16) -> NetResult<Vec<SocketAddr>> {
     let h = host.trim_start_matches('[').trim_end_matches(']');
     if let Some((ip, scope)) = ip_scope_parse(h) {
@@ -1831,7 +1959,7 @@ pub fn resolve(host: &str, port: u16) -> NetResult<Vec<SocketAddr>> {
         crate::policy::net_resolved(h, &addrs);
         return Ok(addrs);
     }
-    #[cfg(any(windows, target_vendor = "apple"))]
+    #[cfg(any(windows, target_vendor = "apple", target_os = "android"))]
     {
         // the system resolver reads the name up to a NUL: a name with control characters would
         // be checked whole but looked up shortened
@@ -1857,7 +1985,7 @@ pub fn resolve(host: &str, port: u16) -> NetResult<Vec<SocketAddr>> {
 }
 
 /// the host name of this computer
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 pub fn hostname() -> String {
     #[cfg(windows)]
     {
@@ -1870,9 +1998,10 @@ pub fn hostname() -> String {
             .filter(|s| !s.is_empty())
             .unwrap_or_else(|| String::from("localhost"))
     }
-    #[cfg(target_vendor = "apple")]
+    #[cfg(any(target_vendor = "apple", target_os = "android"))]
     {
-        #[link(name = "System")]
+        #[cfg_attr(target_vendor = "apple", link(name = "System"))]
+        #[cfg_attr(target_os = "android", link(name = "c"))]
         unsafe extern "C" {
             fn gethostname(name: *mut u8, len: usize) -> i32;
         }

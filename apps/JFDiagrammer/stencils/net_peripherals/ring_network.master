@@ -29,6 +29,7 @@ LineColor = #2E343B
 FillForegnd = #4F7396
 FillBkgnd = #4F7396
 FillPattern = 1
+ObjType = 1
 
 [User]
 Ring:  Value = 3 mm

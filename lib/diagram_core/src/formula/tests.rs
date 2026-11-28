@@ -715,6 +715,21 @@ fn atan2_takes_y_first() {
     assert_near!(f.n("ATAN2(-1,-1)"), -3.0 * PI / 4.0);
 }
 
+// (JD21) Visio 16 glues an end to a guide with INTERSECTX/Y(guide pin, guide angle, the end's
+// own point, guide angle + 90 deg): the foot of the end on the guide (Visio check
+// visio-run2 [glue]: a horizontal guide at y 4.314, the point (3, 4.2) -> (3, 4.314))
+#[test]
+fn intersect_is_where_two_lines_meet() {
+    let f = fx();
+    assert_near!(f.n("INTERSECTX(0,4.314,0,3,4.2,0+90 deg)"), 3.0);
+    assert_near!(f.n("INTERSECTY(0,4.314,0,3,4.2,0+90 deg)"), 4.314);
+    // a guide turned 45 degrees through (1, 1): the foot of (3, 1) is (2, 2)
+    assert_near!(f.n("INTERSECTX(1,1,45 deg,3,1,135 deg)"), 2.0);
+    assert_near!(f.n("INTERSECTY(1,1,45 deg,3,1,135 deg)"), 2.0);
+    // parallel lines meet nowhere
+    assert_eq!(f.e("INTERSECTX(0,0,0,1,1,0)"), CellError::Num);
+}
+
 #[test]
 fn math_domain_errors() {
     let f = fx();
@@ -1232,7 +1247,9 @@ fn text_sizes_with_the_apps_metrics() {
 fn not_computed_functions_are_kept() {
     let (mut doc, sh) = one(&[]);
     let cases = [
-        (r#"FORMAT(1,"0.0")"#, Keep::NotComputed("FORMAT")),
+        (r#"EVALTEXT("1+1")"#, Keep::NotComputed("EVALTEXT")),
+        // (JD19) a length's unit is not known here: FORMAT keeps its stored value
+        (r#"FORMAT(Width,"0.0")"#, Keep::NotComputed("FORMAT")),
         ("_WALKGLUE(1)", Keep::NotComputed("_WALKGLUE")),
         (r#"FONT("Calibri")"#, Keep::NotComputed("FONT")),
         ("Reviewer.X1", Keep::Reference),
@@ -1247,6 +1264,31 @@ fn not_computed_functions_are_kept() {
         Engine::new().evaluate_text(&doc, sh, &font, r#"FONT("Calibri")"#),
         Ok(Outcome::Value(Val::Font(Rc::from("Calibri"))))
     );
+}
+
+#[test]
+fn format_pictures() {
+    // (JD19) FORMAT and FORMATEX of numbers, texts, dates and shape data in field.rs's pictures
+    let (mut doc, sh) = one(&[("Cost", "", 1999.5), ("Load", "", 0.35)]);
+    let date = crate::field::ole_days(2026, 11, 24, 0, 0, 0);
+    let s = |doc: &Document, t: &str| match eval_in(doc, sh, t) {
+        Val::Str(s) => String::from(&*s),
+        other => panic!("{t}: {other:?}"),
+    };
+    assert_eq!(s(&doc, r##"FORMAT(1234.5,"#,##0.00")"##), "1,234.50");
+    assert_eq!(s(&doc, r#"FORMAT(User.Cost,"0")"#), "2000");
+    assert_eq!(s(&doc, r#"FORMAT(User.Cost*2,"0.0")"#), "3999.0");
+    assert_eq!(s(&doc, r#"FORMAT(User.Load,"0%")"#), "35%");
+    assert_eq!(s(&doc, r#"FORMAT("ok","@+")"#), "OK");
+    assert_eq!(s(&doc, r#"FORMATEX(2.5,"0.00",1031,1031)"#), "2.50");
+    assert_eq!(s(&doc, &format!("FORMAT({date},\"{{{{dd.MM.yyyy}}}}\")")), "24.11.2026");
+    // the document's decimal sign
+    doc.fields.decimal = ',';
+    doc.fields.group = '.';
+    assert_eq!(s(&doc, r##"FORMAT(1234.5,"#,##0.00")"##), "1.234,50");
+    // errors pass through, a wrong count of arguments is an error
+    assert!(matches!(eval_in(&doc, sh, r#"FORMAT(1/0,"0")"#), Val::Err(CellError::DivZero)));
+    assert!(matches!(eval_in(&doc, sh, "FORMAT(1)"), Val::Err(CellError::Value)));
 }
 
 #[test]
@@ -1600,6 +1642,39 @@ fn recalc_updates_dependents_and_undo_restores() {
     assert_eq!(number(&t.doc, t.b, &dep), 8.0);
     assert!(ch.undo(&mut t.doc));
     eng.refresh(&t.doc, &ch.sheets());
+}
+
+// (JD19) a Value cell's result carries the unit Visio marks its type with: a string STR, a
+// colour COLOR, a point PNT ("PNT(6,3)"); a number after a colour or point drops the mark.
+// Without it Visio read "Wert" and "#c6e0b4" back as 0 and PNT(6,3) as 6.
+#[test]
+fn value_cells_mark_strings_colours_and_points() {
+    let mut t = tiny(4.0);
+    let dep = user_addr(&t.doc, "Dep");
+    let mut eng = Engine::new();
+    let _ = eng.calculate(&t.doc);
+    let mut tx = t.doc.transaction("Typ");
+    let cases: [(&str, Option<&str>, Option<Unit>); 5] = [
+        ("\"Wert\"", Some("Wert"), Some(Unit::Str)),
+        ("RGB(198,224,180)", Some("#c6e0b4"), Some(Unit::Color)),
+        ("PNT(6,3)", Some("PNT(6,3)"), Some(Unit::Point)),
+        ("PNT(1.5,-0.25)", Some("PNT(1.5,-0.25)"), Some(Unit::Point)),
+        ("5", None, None),
+    ];
+    for (f, text, unit) in cases {
+        tx.set_formula(t.b, &dep, f).unwrap();
+        eng.recalc(&mut tx, &[t.b]).unwrap();
+        let r = tx.doc().resolve(t.b, &dep);
+        assert_eq!(r.unit(), unit, "{f}");
+        match text {
+            Some(s) => assert!(r.value().text().is_some_and(|x| tx.doc().str(x).eq_ignore_ascii_case(s)), "{f}"),
+            None => assert_eq!(r.num(), Some(5.0), "{f}"),
+        }
+    }
+    // a cell typed by its name keeps its unit: Width stays a length
+    tx.set_formula(t.a, &single(names::WIDTH), "3 in").unwrap();
+    eng.recalc(&mut tx, &[t.a]).unwrap();
+    assert_ne!(tx.doc().resolve(t.a, &single(names::WIDTH)).unit(), Some(Unit::Str));
 }
 
 #[test]

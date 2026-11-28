@@ -23,6 +23,7 @@ Width = 40 mm
 Width.us = 1.5 in
 Height = 30 mm
 Height.us = 1.125 in
+ShapeSplit = 1
 
 [User]
 # die Rahmenbreite

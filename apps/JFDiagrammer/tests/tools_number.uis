@@ -1,0 +1,101 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD21 (AS-11, RA-09): Ansicht › Add-Ons › Shapes nummerieren -- the dialog numbers
+# the selection in the order it was selected (start 10, step 5, prefix "S-", before the text),
+# then the whole page from left to right and top to bottom after the text (the old numbers go,
+# one number per shape), undo takes a run back as one step; "Beim Ablegen weiterzählen" lets the
+# page number a shape dropped later with the next number (the master has no text: the number is
+# its text), the check box in the ribbon turns it off.  The dialog's ids: 0x7EB0_0000 (2125463552) + 4 order, + 5 start, + 6 step, + 7 prefix
+theme light
+cmd 4404
+drag 450,320 540,360
+drag 600,320 690,360
+drag 750,320 840,360
+drag 450,460 540,500
+cmd 4400
+click 495,340
+type "A"
+click 1100,700
+click 645,340
+type "B"
+click 1100,700
+click 795,340
+type "C"
+click 1100,700
+click 495,480
+type "D"
+click 1100,700
+# the selection in the order B, D, A
+click 645,340
+click 495,480 shift
+click 495,340 shift
+click tab:"Ansicht"
+expect button:"Shapes nummerieren" enabled
+click button:"Shapes nummerieren"
+expect dialog:"Shapes nummerieren" exists
+expect radio:"Ausgewählte Shapes" checked
+expect radio:"Vor dem Text" checked
+click #2125463556
+click "Auswahlreihenfolge"
+click #2125463557
+key ctrl+a
+type "10"
+click #2125463558
+key ctrl+a
+type "5"
+click #2125463559
+type "S-"
+expect text:"Beispiel: S-10 Text" exists
+shot build/JFDiagrammer-tools-number.png
+click button:"OK"
+expect dialog:"Shapes nummerieren" missing
+expect listitem:"S-10 B" exists
+expect listitem:"S-15 D" exists
+expect listitem:"S-20 A" exists
+expect listitem:"C" exists
+# the whole page, left to right and top to bottom, after the text, from 1
+click 1100,700
+click button:"Shapes nummerieren"
+expect radio:"Alle Shapes der Seite" checked
+expect radio:"Ausgewählte Shapes" disabled
+click #2125463556
+click "Von links nach rechts, dann von oben nach unten"
+click #2125463557
+key ctrl+a
+type "1"
+click #2125463558
+key ctrl+a
+type "1"
+click #2125463559
+key ctrl+a
+key backspace
+click radio:"Nach dem Text"
+click button:"OK"
+expect listitem:"A 1" exists
+expect listitem:"B 2" exists
+expect listitem:"C 3" exists
+expect listitem:"D 4" exists
+# one undo step back to the first run
+key ctrl+z
+expect listitem:"S-20 A" exists
+expect listitem:"C" exists
+key ctrl+y
+expect listitem:"A 1" exists
+# numbering on drop: the page goes on with 5
+click button:"Shapes nummerieren"
+click checkbox:"Beim Ablegen weiterzählen"
+click button:"OK"
+expect checkbox:"Beim Ablegen weiterzählen" checked
+click button:"Weitere Shapes"
+click "Allgemein"
+click "Standard-Shapes"
+drag button:"Rechteck" 800,480
+expect listitem:"5" rect 750 455 100 50
+drag button:"Kreis" 950,480
+expect listitem:"6" selected
+# off again: the next one stays as it is
+click tab:"Ansicht"
+click checkbox:"Beim Ablegen weiterzählen"
+expect checkbox:"Beim Ablegen weiterzählen" unchecked
+drag button:"Rechteck" 950,600
+a11y expect announced "„Rechteck.10“ abgelegt"
+expect listitem:"7" missing

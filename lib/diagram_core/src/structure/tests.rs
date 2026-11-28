@@ -541,3 +541,54 @@ fn flowchart_layout() {
 fn lanes(doc: &Document, c: &cff::Cff) -> Vec<ShapeRef> {
     cff::lanes(doc, c)
 }
+
+// (JD21, ST-03) a shape dropped across a container's edge sits on it, follows it when the
+// container is resized, and does not size the container
+#[test]
+fn boundary_members_follow_their_edge() {
+    let mut f = fx();
+    let c = f.container([0.0, 0.0, 4.0, 3.0], "Container", 0.0, 1.0);
+    let s = f.rect([5.0, 1.0, 6.0, 2.0]);
+    // across the right edge, a little off its line
+    f.move_by(&[s], [-1.4, 0.0]);
+    assert_eq!(members(&f.doc, c), alloc::vec![s]);
+    assert_eq!(edge::edge_of(&f.doc, s, c), Some(Edge::Right));
+    let (is, ic) = (f.id(s), f.id(c));
+    assert_eq!(f.rel_text(s), alloc::format!("SUM(DEPENDSON(4,Sheet.{ic}!SheetRef()),DEPENDSON(8,Sheet.{ic}!SheetRef()))"));
+    assert_eq!(f.rel_text(c), alloc::format!("SUM(DEPENDSON(1,Sheet.{is}!SheetRef()))"));
+    // put onto the edge's line; the container does not grow around it
+    assert_box!(shape_box(&f.doc, s), [3.5, 1.0, 4.5, 2.0]);
+    assert_box!(shape_box(&f.doc, c), [0.0, 0.0, 4.0, 3.0]);
+    // slid along the edge it stays, within the edge's ends
+    f.move_by(&[s], [0.0, 1.4]);
+    assert_eq!(edge::edge_of(&f.doc, s, c), Some(Edge::Right));
+    assert_box!(shape_box(&f.doc, s), [3.5, 2.4, 4.5, 3.4]);
+    // the container resized: the member goes with its edge
+    let owner = f.owner;
+    f.edit(|tx, eng| {
+        ops::set_frame(tx, eng, c, &Frame::from_box([0.0, 0.0, 6.0, 3.0]))?;
+        settle(tx, eng, owner, &[c], false)
+    });
+    assert_box!(shape_box(&f.doc, s), [5.5, 2.4, 6.5, 3.4]);
+    // moved with the container
+    f.move_by(&[c], [1.0, 0.0]);
+    assert_box!(shape_box(&f.doc, s), [6.5, 2.4, 7.5, 3.4]);
+    // wholly inside: a plain member, off the edge
+    f.move_by(&[s], [-3.0, -1.0]);
+    assert_eq!(members(&f.doc, c), alloc::vec![s]);
+    assert_eq!(edge::edge_of(&f.doc, s, c), None);
+    // a plain member moved partly out stays one, the container grows (JD10)
+    f.move_by(&[s], [0.0, 1.0]);
+    assert_eq!(edge::edge_of(&f.doc, s, c), None);
+    assert_box!(shape_box(&f.doc, c), [1.0, 0.0, 7.0, 3.5]);
+    // wholly out: it leaves; dropped onto the top edge from outside: an edge member
+    f.move_by(&[s], [0.0, 3.0]);
+    assert!(members(&f.doc, c).is_empty());
+    assert_eq!(f.rel_text(s), "");
+    f.move_by(&[s], [0.0, -2.4]);
+    assert_eq!(edge::edge_of(&f.doc, s, c), Some(Edge::Top));
+    assert_box!(shape_box(&f.doc, s), [3.5, 3.0, 4.5, 4.0]);
+    // a deleted container lets go of its edge member
+    f.edit(|tx, eng| forget(tx, eng, &[c]).map(|_| ()));
+    assert_eq!(f.rel_text(s), "");
+}
