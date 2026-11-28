@@ -8,6 +8,7 @@
 // at its ends; a signal of one sample is the sample (a single odd one is half of it).  The columns
 // are lifted as whole rows: each step adds two neighbouring rows into one.
 
+use alloc::vec;
 use alloc::vec::Vec;
 
 /// the lifting constants of the 9/7 filter (Table F.4) and the scaling of the bands: the low-pass
@@ -28,29 +29,27 @@ pub(crate) fn split(a0: u32, a1: u32) -> (usize, usize) {
 }
 
 /// the next resolution, rx0..rx1 x ry0..ry1, from the one below and the bands HL, LH and HH (each
-/// row by row)
+/// row by row; an empty one is zero)
 pub(crate) fn interleave<T: Copy + Default>(ll: &[T], hl: &[T], lh: &[T], hh: &[T], rx0: u32, ry0: u32, rx1: u32, ry1: u32) -> Vec<T> {
     let (w, h) = ((rx1 - rx0) as usize, (ry1 - ry0) as usize);
     let (lw, hw) = split(rx0, rx1);
-    let mut out = Vec::with_capacity(w * h);
-    let x_low_first = rx0 & 1 == 0;
-    for v in 0..h {
+    let mut out = vec![T::default(); w * h];
+    if w == 0 {
+        return out;
+    }
+    // the columns of the low-pass and of the high-pass samples
+    let (lo_x, hi_x) = if rx0 & 1 == 0 { (0, 1) } else { (1, 0) };
+    for (v, row) in out.chunks_exact_mut(w).enumerate() {
         let y = ry0 + v as u32;
-        let (lo, hi) = if y & 1 == 0 {
-            let r = (y / 2 - ry0.div_ceil(2)) as usize;
-            (&ll[r * lw..][..lw], &hl[r * hw..][..hw])
-        } else {
-            let r = (y / 2 - ry0 / 2) as usize;
-            (&lh[r * lw..][..lw], &hh[r * hw..][..hw])
-        };
-        let (mut i, mut j) = (0, 0);
-        for u in 0..w {
-            if (u & 1 == 0) == x_low_first {
-                out.push(lo[i]);
-                i += 1;
-            } else {
-                out.push(hi[j]);
-                j += 1;
+        let (r, lo, hi) = if y & 1 == 0 { ((y / 2 - ry0.div_ceil(2)) as usize, ll, hl) } else { ((y / 2 - ry0 / 2) as usize, lh, hh) };
+        if !lo.is_empty() {
+            for (d, &s) in row.iter_mut().skip(lo_x).step_by(2).zip(&lo[r * lw..][..lw]) {
+                *d = s;
+            }
+        }
+        if !hi.is_empty() {
+            for (d, &s) in row.iter_mut().skip(hi_x).step_by(2).zip(&hi[r * hw..][..hw]) {
+                *d = s;
             }
         }
     }

@@ -77932,8 +77932,9 @@ resolution (each level halves the size).
 Not here: Part 2 (other wavelets, multiple-component transforms beyond RCT / ICT, trellis
 quantisation), precision above 24 bits.  A file that is cut short gives what was decoded up to
 there (like the common readers); limits (`Options::max_pixels` also for the channels a palette
-makes, tiles times components, code-blocks, precincts, the packets the progression looks at)
-refuse hostile files before they cost memory or time.
+makes, tiles times components, code-blocks, precincts, the packets and the layer-resolution
+passes the progression looks at, the bytes a tile's structures hold, `Options::max_mem` for all
+of it) refuse hostile files before they cost memory or time.
 ```
 
 ### `img_jp2` crate root
@@ -77952,6 +77953,9 @@ refuse hostile files before they cost memory or time.
   - `max_pixels: u64` -- the largest width \* height (the default: img_core's IMG_MAXPX_DEF)
   - `convert_sycc: bool` -- convert sYCC to sRGB (the default); false leaves the components as they are coded, with
     `Color::Unknown` (a reader that takes the colour space from elsewhere, like PDF)
+  - `max_mem: u64` -- the most bytes the decode may hold at once: the samples, a tile's planes and its structures
+    (0, the default: no limit beyond `max_pixels`; the structures of a tile then stay within the
+    size of the samples, at least 64 MB)
 
 - **`enum Color`**
   the colour space the JP2 header names (Unknown for a raw codestream)

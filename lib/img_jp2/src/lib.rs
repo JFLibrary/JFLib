@@ -24,8 +24,9 @@
 // Not here: Part 2 (other wavelets, multiple-component transforms beyond RCT / ICT, trellis
 // quantisation), precision above 24 bits.  A file that is cut short gives what was decoded up to
 // there (like the common readers); limits (`Options::max_pixels` also for the channels a palette
-// makes, tiles times components, code-blocks, precincts, the packets the progression looks at)
-// refuse hostile files before they cost memory or time.
+// makes, tiles times components, code-blocks, precincts, the packets and the layer-resolution
+// passes the progression looks at, the bytes a tile's structures hold, `Options::max_mem` for all
+// of it) refuse hostile files before they cost memory or time.
 #![no_std]
 #![forbid(unsafe_code)]
 
@@ -69,13 +70,20 @@ pub struct Options {
     /// convert sYCC to sRGB (the default); false leaves the components as they are coded, with
     /// `Color::Unknown` (a reader that takes the colour space from elsewhere, like PDF)
     pub convert_sycc: bool,
+    /// the most bytes the decode may hold at once: the samples, a tile's planes and its structures
+    /// (0, the default: no limit beyond `max_pixels`; the structures of a tile then stay within the
+    /// size of the samples, at least 64 MB)
+    pub max_mem: u64,
 }
 
 impl Default for Options {
     fn default() -> Options {
-        Options { reduce: 0, max_pixels: IMG_MAXPX_DEF, convert_sycc: true }
+        Options { reduce: 0, max_pixels: IMG_MAXPX_DEF, convert_sycc: true, max_mem: 0 }
     }
 }
+
+/// the least a tile's structures may hold (resolutions, precincts, code-blocks, the coded data)
+const MIN_STRUCT_BYTES: u64 = 1 << 26;
 
 /// the colour space the JP2 header names (Unknown for a raw codestream)
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -148,16 +156,35 @@ pub fn decode(d: &[u8], opt: &Options) -> Result<Image, Error> {
         return Err(Error::Limit);
     }
     let red = opt.reduce.min(32) as u32;
-    let mut out: Vec<tile::OutComp> = siz
+    let dims: Vec<(u32, u32, u32, u32)> = siz
         .comps
         .iter()
         .map(|c| {
             let (x0, y0) = (tile::ceil_shift(codestream::div_ceil(siz.x0, c.dx), red), tile::ceil_shift(codestream::div_ceil(siz.y0, c.dy), red));
             let (x1, y1) = (tile::ceil_shift(codestream::div_ceil(siz.x1, c.dx), red), tile::ceil_shift(codestream::div_ceil(siz.y1, c.dy), red));
-            tile::OutComp { w: x1 - x0, h: y1 - y0, x0, y0, data: vec![0; (x1 - x0) as usize * (y1 - y0) as usize] }
+            (x0, y0, x1, y1)
         })
         .collect();
-    let mut budget = tile::Budget::default();
+    // what is held at once: the samples of the image, a tile's planes (the one being made twice
+    // its size; under a multiple-component transform the first three wait for each other) and the
+    // coded data copied out of the file; then a tile's structures
+    let out_bytes: u64 = dims.iter().map(|d| (d.2 - d.0) as u64 * (d.3 - d.1) as u64 * 4).sum();
+    let plane = |c: &codestream::CompSiz| -> u64 {
+        // a tile-component is at most this wide and high (+1: a tile need not start on its grid)
+        let side = |t: u32, s: u32, d: u32| ((t.min(s) as u64).div_ceil(d as u64) + 1).div_ceil(1u64 << red);
+        side(siz.tw, siz.x1 - siz.x0, c.dx).saturating_mul(side(siz.th, siz.y1 - siz.y0, c.dy)).saturating_mul(4)
+    };
+    let largest = siz.comps.iter().map(plane).max().unwrap_or(0);
+    let mct = cs.main.global.is_some_and(|g| g.mct != 0) || cs.tiles.iter().flatten().any(|t| t.params.global.is_some_and(|g| g.mct != 0));
+    let held: u64 = if mct { siz.comps.iter().take(3).map(plane).fold(0, u64::saturating_add) } else { 0 };
+    let need = out_bytes.saturating_add(held).saturating_add(largest.saturating_mul(2)).saturating_add(d.len() as u64);
+    if opt.max_mem != 0 && need > opt.max_mem {
+        return Err(Error::Limit);
+    }
+    let cap = samples.saturating_mul(4).max(MIN_STRUCT_BYTES);
+    let max_bytes = if opt.max_mem != 0 { cap.min(opt.max_mem - need) } else { cap };
+    let mut out: Vec<tile::OutComp> = dims.iter().map(|&(x0, y0, x1, y1)| tile::OutComp { w: x1 - x0, h: y1 - y0, x0, y0, data: vec![0; (x1 - x0) as usize * (y1 - y0) as usize] }).collect();
+    let mut budget = tile::Budget { max_bytes, ..tile::Budget::default() };
     let mut t1 = t1::T1::new();
     for t in 0..cs.tiles.len() {
         tile::decode(&cs, t, red, &mut budget, &mut out, &mut t1)?;
@@ -179,7 +206,7 @@ pub fn decode(d: &[u8], opt: &Options) -> Result<Image, Error> {
         if !jp2.cmap.is_empty() {
             // each channel is a copy as large as its component: the same budget as the samples
             let total: u64 = jp2.cmap.iter().map(|e| comps.get(e.0 as usize).map_or(0, |c| c.data.len() as u64)).sum();
-            if total > opt.max_pixels.saturating_mul(4) {
+            if total > opt.max_pixels.saturating_mul(4) || opt.max_mem != 0 && out_bytes + total * 4 > opt.max_mem {
                 return Err(Error::Limit);
             }
             let mut mapped = Vec::with_capacity(jp2.cmap.len());
@@ -229,6 +256,12 @@ pub fn decode(d: &[u8], opt: &Options) -> Result<Image, Error> {
         Some(boxes::Colr::Enum(12)) => Color::Cmyk,
         Some(boxes::Colr::Enum(14)) => Color::Lab,
         Some(boxes::Colr::Enum(18)) => {
+            // the conversion makes the chroma as large as the luma and two new channels
+            let luma = comps.first().map_or(0, |c| c.data.len() as u64);
+            let held: u64 = comps.iter().map(|c| c.data.len() as u64 * 4).sum();
+            if comps.len() >= 3 && opt.convert_sycc && opt.max_mem != 0 && held + luma * 16 > opt.max_mem {
+                return Err(Error::Limit);
+            }
             if comps.len() >= 3 && opt.convert_sycc {
                 sycc_to_rgb(&mut comps);
                 Color::Srgb
@@ -315,7 +348,18 @@ fn codec_probe(d: &[u8], m: &mut ImgMeta) -> bool {
 }
 
 fn codec_decode(d: &[u8], sf: &mut Surface, dec: &ImgDec, m: &mut ImgMeta) -> i32 {
-    let img = match decode(d, &Options { max_pixels: dec.max_pixels(), ..Options::default() }) {
+    // dec.maxmem holds the decode and the ARGB surface made from it (rows of 64 bytes)
+    let mut max_mem = 0;
+    if dec.maxmem != 0 {
+        let mut size = ImgMeta::default();
+        codec_probe(d, &mut size);
+        let surface = (size.w as u64 * 4).div_ceil(64) * 64 * size.h as u64;
+        if surface >= dec.maxmem {
+            return ERR_LIMIT;
+        }
+        max_mem = dec.maxmem - surface;
+    }
+    let img = match decode(d, &Options { max_pixels: dec.max_pixels(), max_mem, ..Options::default() }) {
         Ok(i) => i,
         Err(Error::NotJpeg2000) | Err(Error::Corrupt) => return ERR_HDR,
         Err(Error::Truncated) => return ERR_TRUNC,
