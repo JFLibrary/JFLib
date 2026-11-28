@@ -494,7 +494,10 @@ Gemergt wird nach grünen gezielten Prüfungen, gepusht nach Rückfrage.
 - **Referenzbilder:** Der Nutzer exportiert die lokalen Dateien in Visio als SVG (nur lokal).
   Die Tests vergleichen Geometrie und Position mit Toleranz.
 - **Visio-Gegenprobe:** Je Meilenstein öffnet der Nutzer einige von JFDiagrammer geschriebene
-  Dateien in Visio.
+  Dateien in Visio. Was sich ohne Hand prüfen lässt, macht `visio_check/` (seit 2026-11-27): ein
+  unsichtbares Visio auf einem anderen Windows-Rechner per SSH öffnet die Dateien und liefert
+  Bericht, Seiten als PNG/SVG, Shape-Liste und von Visio gespeicherte Kopien; eigene Prüfschritte
+  als VBScript (README dort).
 - **Dauer:** Je Etappe nur gezielte Prüfungen, eine volle Suite je gepushtem Stand. Echte Fenster
   nur in Maßen, keine Wiederholungsschleifen.
 

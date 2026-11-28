@@ -23,7 +23,9 @@
 //                                   click and drag them, screen readers name them (a screen
 //                                   reader's click on an arrow or a mark reports it as a click)
 //   tools SE_POINTER, SE_CONNECT, SE_LINE, SE_RECT, SE_ELLIPSE, SE_TEXT, SE_PLACE, SE_FREEFORM,
-//         SE_ARC
+//         SE_ARC, SE_CPOINT (JD21, the connection point tool)
+//   SeState::quick: Vec<SeQuick>    (JD21) the quick shapes the bar at a hot connection arrow
+//                                   offers (see below)
 //
 // Model (SeModel, borrowed per call; world units are the canvas's, y down):
 //   SeShape { key, parent, bx, ends, pin, bbox, flags, points }
@@ -34,7 +36,14 @@
 //   SePoint { at, kind, tag, dir, flags }   SP_CONTROL (yellow), SP_CONN (connection points:
 //                       shown while connecting, with SeState::show_points those of every
 //                       visible shape, RA-06; SPF_OUTWARD: shown, no target), SP_VERTEX (shown
-//                       for a single selection when the app lists them: vertex editing)
+//                       for a single selection when the app lists them: vertex editing);
+//                       (JD21) SP_SEGMENT (a midpoint of a connector's piece, a small diamond:
+//                       dragged like a vertex, chosen by no click; dir = half the piece; shown
+//                       while the piece is at least SEG_MIN DIP long on the screen; the pointer
+//                       shows the move across it unless SPF_FREE), SP_TARGET (another glue target the app offers: a vertex, a handle,
+//                       a control point; shown only as the target under a dragged end), SP_ARC
+//                       (an arc's control point, a circle), SP_ECC (an eccentricity handle, a
+//                       circle; pairs on a dashed line)
 //   SeGuide { key, vertical, at }   guides (blue, dashed, across the canvas); moves snap to them
 //                       (SeState::snap and snap_guides; an app hides guides by leaving them out)
 //   SeMark { at, dir, tag, owner }  the app's insertion marks (Visio's blue triangle between two
@@ -63,9 +72,10 @@
 // Input (pointer tool): a press on a handle of the selection starts its drag; on a shape it
 // selects it (Shift adds, Ctrl toggles) and a drag moves the selection (grid, dynamic grid,
 // guides; Alt: free); a second, slow click on a selected group selects the child under the
-// pointer; a double click edits the text (SeEv::Text); on the background a drag draws a marquee
-// or, with SeState::lasso, a free outline (shapes fully inside, with SeState::partial also those
-// it touches, ZF-06; Shift adds, Ctrl toggles).  Corner handles keep the aspect ratio, edge
+// pointer, on a selected child with SEF_UP its group (Visio's "members first"); a double click
+// edits the text (SeEv::Text); on the background a drag draws a marquee or, with
+// SeState::lasso, a free outline (shapes fully inside, with SeState::partial also those it
+// touches, ZF-06; Shift adds, Ctrl toggles).  Corner handles keep the aspect ratio, edge
 // handles change one side (a locked aspect: both), Ctrl resizes about the middle; locked handles
 // are drawn grey and do nothing.  The rotation handle turns about the pin (one shape) or the
 // middle of the selection: in 15-degree steps near the shape, in single degrees farther away.
@@ -74,6 +84,22 @@
 // shape's frame is highlighted); with Ctrl held a dynamic end swaps the two (CN-03): over a
 // connection point it glues to that point's shape as a whole, over a shape to the shape's
 // nearest connection point.  Connection points with SPF_OUTWARD are no target for ends (SS-29).
+// (JD21, CN-02) Without a connection point in reach an SP_TARGET point of the app is the next
+// target (ends, control points, the connector and line tools; not the freeform and the arc
+// tool), then (ends and the connector and line tools, SeState::glue_guides) a guide within
+// reach: SeGlue::Guide, the end on its line, the guide drawn green.
+//
+// (JD21, SP-05) Vertex editing: a click chooses a vertex (filled), Shift + click adds one to the
+// chosen ones or takes it away (SeState::chosen); a drag on one of several chosen moves them
+// together (SeEv::Points, live), Del takes them out (SeEv::PointsDelete; one: PointDelete).  An
+// arc's control point (SP_ARC) is chosen alike (the app may list its eccentricity handles then);
+// the freeform tool takes back what the pointer goes back over (2 px back along the last piece,
+// within 3 px of it).  (JD21, CN-01) The connection point tool (SE_CPOINT): the selection's
+// connection points show and are its only handles; a click chooses one (magenta), a drag moves
+// it (SeEv::Point), Del takes it out (SeEv::PointDelete), Ctrl + click on, inside or outside the
+// single selected shape adds one there (SeEv::PointInsert); a right click on one reports
+// SeEv::Context with it chosen (the app's menu of its kind).  Another tool forgets the chosen
+// point.
 // Ctrl + Shift + click zooms in at the pointer (on a selected shape too), + drag zooms to the
 // rectangle (from a selected shape: the copy above), + right click zooms out (ZF-22), + right
 // drag pans the view (KB-04).  Keys while the canvas has the focus: Esc
@@ -110,6 +136,18 @@
 // Insertion marks (SeModel::marks): with the pointer tool and no gesture each mark shows while
 // the pointer is on its owner (the shape under the pointer, or inside the owner's box) or
 // within MARK_NEAR (16) DIP of it; a click reports SeEv::Mark { tag }, a drag does nothing.
+//
+// (JD21) Quick shapes bar (SeState::quick, Visio's mini toolbar of an AutoConnect arrow, CN-07):
+// while an arrow is under the pointer and the app lists quick shapes, a bar with the first
+// QUICK_MAX (4) of them shows beside the arrow where the new shape does not go (above the box
+// for the arrows left and right, right of it for those up and down): a row of QUICK_TILE (28)
+// DIP tiles with their previews (the app's Draw, like the Shapes panel's tiles), on the flyout
+// colour with a thin frame, square.  The arrow stays hot while the pointer is on the bar or
+// between it and the arrow; the tile under the pointer is drawn hot and each change of it is
+// SeEv::QuickHover { key, dir, tile } once (tile 255: on no tile any more; the app's live
+// preview), a click on a tile SeEv::Quick { key, dir, tile }; the bar goes with the arrows.
+// Screen readers and scripts get a K_BUTTON per tile named "Schnell-Shape: <name>" (value: the
+// tile's index).
 
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;
@@ -118,7 +156,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::ops::Range;
 
-use crate::cmd::{Draw, Gfx};
+use crate::cmd::{Draw, DrawRef, Gfx};
 use crate::consts::*;
 use crate::diagram::{dist, fl, fx, inside, ipx, node_sem_id, overlaps, snapv, DiagramState, ExtIn};
 use crate::keys::*;
@@ -145,6 +183,10 @@ pub const SE_FREEFORM: u32 = 7;
 /// draw a quarter ellipse from the press to the release, reported as SeEv::Arc (its ends glue
 /// like a line's)
 pub const SE_ARC: u32 = 8;
+/// (JD21) the connection point tool: the connection points of the single selection are
+/// handles (a drag moves one, SeEv::Point; a click chooses it, Del takes it out,
+/// SeEv::PointDelete), Ctrl + click on the selected shape adds one (SeEv::PointInsert)
+pub const SE_CPOINT: u32 = 9;
 
 /// shape flags (SeShape::flags)
 pub const SEF_1D: u32 = 1; // the two ends instead of the eight handles
@@ -166,16 +208,38 @@ pub const SEF_END_DYN: u32 = 0x8000;
 pub const SEF_LOCK_PIN: u32 = 0x1_0000; // no rotation pin handle
 pub const SEF_NOARROWS: u32 = 0x2_0000; // no connection arrows around it (see the file header)
 pub const SEF_NOSNAP: u32 = 0x4_0000; // moves do not snap to it (the dynamic grid leaves it out)
+/// (JD21) a member of a "members first" group: a second, slow click on it selects its group
+/// (SeShape::parent)
+pub const SEF_UP: u32 = 0x8_0000;
 
 /// kinds of SePoint
 pub const SP_CONTROL: u8 = 0;
 pub const SP_CONN: u8 = 1;
 pub const SP_VERTEX: u8 = 2;
+/// (JD21) another place an end or a control point glues to (a vertex, a handle or a control
+/// point of a shape: the app makes a connection point there, CN-02): not drawn, never a handle;
+/// the target under a dragged end shows like a connection point
+pub const SP_TARGET: u8 = 3;
+/// (JD21) the control point of an arc in vertex editing (a small circle; a drag reports
+/// SeEv::Point, a click chooses it like a vertex)
+pub const SP_ARC: u8 = 4;
+/// (JD21) an eccentricity handle of an elliptical arc (a small circle on a dashed line through
+/// the arc's control point; a drag reports SeEv::Point)
+pub const SP_ECC: u8 = 5;
+/// (JD21) a midpoint of a piece of a connector's way (Visio's midpoint handle): `dir` is half
+/// the piece (world, from the handle to the piece's end); dragging it reports SeEv::Point like a
+/// vertex; hidden (and not hit) while the piece is shorter than SEG_MIN DIP on the screen
+pub const SP_SEGMENT: u8 = 6;
 /// point flags (SePoint::flags)
 pub const SPF_GLUE: u32 = 1; // a control point that glues to connection points (SP-04)
 /// a connection point that points outward only (Visio's Type 1): shown, but no end glues to it
 /// (SS-29)
 pub const SPF_OUTWARD: u32 = 2;
+/// (JD21) a midpoint that moves anywhere (a straight way: a new vertex); without it the
+/// pointer shows that the piece moves across
+pub const SPF_FREE: u32 = 4;
+// (JD21) the shortest piece on the screen whose midpoint shows
+const SEG_MIN: i32 = 24;
 
 /// a frame in world units: the point o + fx u + fy v for fx, fy in 0..1
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -291,6 +355,23 @@ pub struct SeModel<'a> {
     pub hit: &'a dyn Fn([f32; 2], f32, u64) -> u64,
 }
 
+/// (JD21) a tile of the quick shapes bar at a hot connection arrow (SeState::quick)
+#[derive(Clone)]
+pub struct SeQuick {
+    /// its name (the button's name for screen readers and scripts)
+    pub name: String,
+    /// its preview, drawn into the tile (None: a generic shapes icon)
+    pub draw: Option<DrawRef>,
+    /// the preview's version (cmd_custom: change it when the drawing changes)
+    pub ver: u32,
+}
+
+impl core::fmt::Debug for SeQuick {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("SeQuick").field("name", &self.name).field("ver", &self.ver).finish()
+    }
+}
+
 /// what an end or a control point is glued to
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub enum SeGlue {
@@ -300,6 +381,8 @@ pub enum SeGlue {
     Point { key: u64, tag: u32 },
     /// a whole shape: dynamic glue
     Shape(u64),
+    /// (JD21) a guide (its key): the end lies on its line (SeState::glue_guides)
+    Guide(u64),
 }
 
 /// what the user did (ui.shape_edit's result, in order)
@@ -321,12 +404,20 @@ pub enum SeEv {
     Pin { key: u64, at: [f32; 2], done: bool },
     /// end 0 (begin) or 1 of a 1D shape goes to `at`, glued to `glue`
     End { key: u64, end: u8, at: [f32; 2], glue: SeGlue, done: bool },
-    /// a control point or a vertex (index `idx` of SeModel::points, the app's tag) goes to `at`
+    /// a control point or a vertex (index `idx` of SeModel::points, the app's tag) goes to `at`;
+    /// (JD21) also an arc's control point, an eccentricity handle, a connection point
+    /// (SE_CPOINT)
     Point { key: u64, idx: u32, tag: u32, at: [f32; 2], glue: SeGlue, done: bool },
-    /// Ctrl + click on the outline of a shape with vertices listed: add a vertex at `at`
+    /// Ctrl + click on the outline of a shape with vertices listed: add a vertex at `at`;
+    /// (JD21) with SE_CPOINT on the selected shape: add a connection point there
     PointInsert { key: u64, at: [f32; 2] },
-    /// Del with a vertex chosen: remove it
+    /// Del with a vertex chosen: remove it; (JD21) with SE_CPOINT the chosen connection point
     PointDelete { key: u64, tag: u32 },
+    /// (JD21) the vertices chosen with Shift (their tags, SeState::chosen) move together by
+    /// `total` (world units, from the start of the drag; live like Point)
+    Points { key: u64, tags: Vec<u32>, total: [f32; 2], done: bool },
+    /// (JD21) Del with several vertices chosen: remove them
+    PointsDelete { key: u64, tags: Vec<u32> },
     /// Esc during a live gesture: take the preview back
     Cancel,
     /// the connector or line tool drew from a to b
@@ -353,6 +444,12 @@ pub enum SeEv {
     ArrowHover { key: u64, dir: u8 },
     /// a click on the insertion mark with this tag (SeModel::marks)
     Mark { tag: u32 },
+    /// (JD21) a click on tile `tile` of the quick shapes bar at the connection arrow `dir` of
+    /// shape `key`; the selection stays as it was
+    Quick { key: u64, dir: u8, tile: u8 },
+    /// (JD21) the pointer went onto tile `tile` of the quick shapes bar of arrow `dir` of shape
+    /// `key`, or off the tiles (tile 255, dir 255); once per change (a live preview)
+    QuickHover { key: u64, dir: u8, tile: u8 },
 }
 
 // what a point of the canvas shows
@@ -375,6 +472,8 @@ enum SHit {
     Arrow(u64, u8),
     /// an insertion mark: index into SeModel::marks, its tag
     Mark(u32, u32),
+    /// (JD21) a tile of the quick shapes bar: the shape, the arrow's direction, the tile
+    Quick(u64, u8, u8),
 }
 
 // handle positions: top left, top, top right, right, bottom right, bottom, bottom left, left
@@ -398,6 +497,11 @@ const ARROW_MIN: i32 = 16; // no arrows around a shape smaller than this on the 
 const MARK_LEN: i32 = 9; // an insertion mark from its base to its tip
 const MARK_HALF: i32 = 5; // half its base
 const MARK_NEAR: i32 = 16; // a mark shows while the pointer is this near to it
+const QUICK_MAX: usize = 4; // (JD21) the tiles of the quick shapes bar
+const QUICK_TILE: i32 = 28; // a tile of it (DIP)
+const QUICK_PAD: i32 = 3; // the bar's padding around the tiles
+const QUICK_GAP: i32 = 2; // from the arrow's tip to the bar
+const QUICK_NAME: &str = "Schnell-Shape"; // i18n (library texts): a tile's name before its own
 // the directions 0 right, 1 down, 2 left, 3 up (y down)
 const DIRS: [[f32; 2]; 4] = [[1.0, 0.0], [0.0, 1.0], [-1.0, 0.0], [0.0, -1.0]];
 
@@ -446,6 +550,43 @@ impl ArrowSet {
             t >= self.base[d] - tol && t <= self.base[d] + self.len + tol && l.abs() <= self.half + tol
         })
         .map(|d| d as u8)
+    }
+
+    // (JD21) the quick shapes bar of arrow d with n tiles (tile, pad, gap in px): x0, y0, x1, y1,
+    // a row beside the arrow where the new shape does not go: above the box's top edge for the
+    // arrows left and right (from the arrow's base outwards), right of the box for those up and
+    // down (beside the arrow); never more than two tiles away from the arrow
+    fn quick_rect(&self, d: usize, n: usize, tile: f32, pad: f32, gap: f32) -> [f32; 4] {
+        let e = self.edge(d);
+        let b = self.b;
+        let base = self.base[d & 3];
+        let (w, h) = (n as f32 * tile + pad * 2.0, tile + pad * 2.0);
+        match d & 3 {
+            0 | 2 => {
+                let y1 = (b[1] - gap).max(e[1] - self.half - gap - tile * 2.0).min(e[1] - self.half - gap);
+                let x0 = if d & 3 == 0 { e[0] + base } else { e[0] - base - w };
+                [x0, y1 - h, x0 + w, y1]
+            }
+            _ => {
+                let mid = if d & 3 == 1 { e[1] + base + self.len * 0.5 } else { e[1] - base - self.len * 0.5 };
+                let x0 = (b[2] + gap).min(e[0] + self.half + gap + tile * 2.0).max(e[0] + self.half + gap);
+                [x0, mid - h * 0.5, x0 + w, mid + h * 0.5]
+            }
+        }
+    }
+
+    // (JD21) where the pointer keeps the bar of arrow d: the bar and the arrow and what lies
+    // between them
+    fn quick_zone(&self, d: usize, bar: [f32; 4]) -> [f32; 4] {
+        let t = self.tri(d);
+        let (mut x0, mut y0, mut x1, mut y1) = (bar[0], bar[1], bar[2], bar[3]);
+        for p in t {
+            x0 = x0.min(p[0]);
+            y0 = y0.min(p[1]);
+            x1 = x1.max(p[0]);
+            y1 = y1.max(p[1]);
+        }
+        [x0, y0, x1, y1]
     }
 
     // p on the box, on an arrow or in the strip between them
@@ -523,6 +664,8 @@ enum G {
     Pin { key: u64, at: [f32; 2] },
     End { key: u64, end: u8, at: [f32; 2], glue: SeGlue, dynamic: bool },
     Point { key: u64, idx: u32, tag: u32, at: [f32; 2], glue: SeGlue, glues: bool },
+    /// (JD21) the chosen vertices: the grabbed one's place at the start, the move so far
+    Points { key: u64, tags: Vec<u32>, from: [f32; 2], start: [f32; 2], total: [f32; 2] },
     Marquee { start: [f32; 2], cur: [f32; 2], mods: u32, base: BTreeSet<u64> },
     /// the lasso: the pointer's way so far
     Lasso { pts: Vec<[f32; 2]>, mods: u32, base: BTreeSet<u64> },
@@ -577,8 +720,14 @@ pub struct SeState {
     pub snap: bool,
     /// moves snap to guides (Ausrichten und Kleben › Führungslinien)
     pub snap_guides: bool,
-    /// the vertex chosen with a click (Del removes it): its shape and tag
+    /// the vertex chosen with a click (Del removes it): its shape and tag; (JD21) also an arc's
+    /// control point, and with SE_CPOINT the chosen connection point
     pub vertex: Option<(u64, u32)>,
+    /// (JD21) the tags of every vertex chosen of that shape (Shift + click adds and takes away;
+    /// the one in `vertex` among them): a drag moves them together, Del takes them out
+    pub chosen: BTreeSet<u32>,
+    /// (JD21) ends glue to guides (Ausrichten und Kleben › Kleben an Führungslinien)
+    pub glue_guides: bool,
     /// connection arrows around the shape under the pointer (Ansicht › Verbindungspfeile; see
     /// the file header)
     pub arrows: bool,
@@ -587,6 +736,13 @@ pub struct SeState {
     arrow_key: u64,
     arrow_hot: u8,
     arrow_said: (u64, u8),
+    /// (JD21) the quick shapes the bar at a hot connection arrow offers (the first QUICK_MAX;
+    /// empty: no bar); the app sets them (Visio: the active stencil's quick shapes)
+    pub quick: Vec<SeQuick>,
+    // the arrow whose bar shows, the tile under the pointer (255: none), what QuickHover said
+    quick_at: Option<(u64, u8)>,
+    quick_hot: u8,
+    quick_said: (u64, u8, u8),
     // the pointer (world) while insertion marks may show, the mark under it (index, tag)
     mark_p: Option<[f32; 2]>,
     mark_hot: Option<(u32, u32)>,
@@ -615,6 +771,8 @@ pub struct SeState {
     pending_sel: bool,
     ver: u32,
     ix: BTreeMap<u64, usize>,
+    // (JD21) the tool of the last call (the handles' records name connection points with it)
+    tool: u32,
 }
 
 impl Default for SeState {
@@ -638,10 +796,16 @@ impl SeState {
             snap: true,
             snap_guides: true,
             vertex: None,
+            chosen: BTreeSet::new(),
+            glue_guides: true,
             arrows: true,
             arrow_key: 0,
             arrow_hot: 255,
             arrow_said: (0, 255),
+            quick: Vec::new(),
+            quick_at: None,
+            quick_hot: 255,
+            quick_said: (0, 255, 255),
             mark_p: None,
             mark_hot: None,
             quiet: None,
@@ -660,6 +824,7 @@ impl SeState {
             pending_sel: false,
             ver: u32::MAX,
             ix: BTreeMap::new(),
+            tool: SE_POINTER,
         }
     }
 
@@ -670,7 +835,7 @@ impl SeState {
 
     /// a live gesture is in progress (the app shows a preview of it)
     pub fn live(&self) -> bool {
-        matches!(self.g, G::Move { .. } | G::Resize { .. } | G::Rotate { .. } | G::Pin { .. } | G::End { .. } | G::Point { .. })
+        matches!(self.g, G::Move { .. } | G::Resize { .. } | G::Rotate { .. } | G::Pin { .. } | G::End { .. } | G::Point { .. } | G::Points { .. })
     }
 
     /// the right button's release in the last call of ui.shape_edit belonged to Ctrl + Shift
@@ -691,7 +856,29 @@ impl SeState {
         self.arrow_hot = 255;
         self.mark_p = None;
         self.mark_hot = None;
+        self.quick_at = None;
+        self.quick_hot = 255;
         self.say_arrow(out);
+        self.say_quick(out);
+    }
+
+    // (JD21) SeEv::QuickHover when the tile under the pointer changed
+    fn say_quick(&mut self, out: &mut Vec<SeEv>) {
+        let now = match self.quick_at {
+            Some((k, d)) if self.quick_hot != 255 => (k, d, self.quick_hot),
+            _ => (0, 255, 255),
+        };
+        if now != self.quick_said {
+            let key = if now.2 == 255 { self.quick_said.0 } else { now.0 };
+            out.push(SeEv::QuickHover { key, dir: now.1, tile: now.2 });
+            self.quick_said = now;
+        }
+    }
+
+    /// (JD21) the tile of the quick shapes bar under the pointer: the shape's key, the arrow's
+    /// direction, the tile's index
+    pub fn quick_hover(&self) -> Option<(u64, u8, u8)> {
+        self.quick_at.filter(|_| self.quick_hot != 255).map(|(k, d)| (k, d, self.quick_hot))
     }
 
     // SeEv::ArrowHover when the arrow under the pointer changed
@@ -712,6 +899,7 @@ impl SeState {
             self.focus = k;
         }
         self.vertex = None;
+        self.chosen.clear();
     }
 
     fn shape<'m>(&self, m: &SeModel<'m>, key: u64) -> Option<&'m SeShape> {
@@ -735,6 +923,7 @@ impl SeState {
         }
         if self.vertex.is_some_and(|(k, _)| !self.ix.contains_key(&k)) {
             self.vertex = None;
+            self.chosen.clear();
         }
         n != self.sel.len()
     }
@@ -780,6 +969,14 @@ impl SeState {
 
 fn len(v: [f32; 2]) -> f32 {
     sqrt(v[0] * v[0] + v[1] * v[1])
+}
+
+// the distance of p from the piece a..b
+fn seg_dist(p: [f32; 2], a: [f32; 2], b: [f32; 2]) -> f32 {
+    let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+    let l2 = dx * dx + dy * dy;
+    let t = if l2 > 0.0 { (((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2).clamp(0.0, 1.0) } else { 0.0 };
+    dist(p, [a[0] + dx * t, a[1] + dy * t])
 }
 
 fn unit(v: [f32; 2]) -> [f32; 2] {
@@ -971,6 +1168,12 @@ impl Ui {
     pub fn shape_edit(&mut self, id: u32, st: &mut SeState, dg: &mut DiagramState, m: &SeModel, tool: u32) -> Vec<SeEv> {
         let _src = self.src_scope();
         let mut out = Vec::new();
+        // (JD21) another tool: the chosen vertex or connection point is no longer one
+        if st.tool != tool {
+            st.vertex = None;
+            st.chosen.clear();
+        }
+        st.tool = tool;
         if st.update_index(m) {
             out.push(SeEv::Select);
         }
@@ -1055,7 +1258,7 @@ impl Ui {
                 dg.vp.step(-1, i.px[0] as f32 + 0.5, i.px[1] as f32 + 0.5);
             } else {
                 let k = match st.hover {
-                    SHit::Shape(k) | SHit::Handle(k, _) | SHit::Rotate(k) | SHit::Pin(k) | SHit::End(k, _) | SHit::Point(k, _) | SHit::Arrow(k, _) => k,
+                    SHit::Shape(k) | SHit::Handle(k, _) | SHit::Rotate(k) | SHit::Pin(k) | SHit::End(k, _) | SHit::Point(k, _) | SHit::Arrow(k, _) | SHit::Quick(k, ..) => k,
                     // a mark lies on a shape: that one
                     SHit::Mark(..) => st.shape(m, st.hover_shape).filter(|s| s.flags & SEF_NOSELECT == 0).map_or(0, |s| s.key),
                     _ => 0,
@@ -1063,6 +1266,14 @@ impl Ui {
                 if k != 0 && !st.sel.contains(&k) {
                     st.select(&[k]);
                     out.push(SeEv::Select);
+                }
+                // (JD21) the connection point tool: a right click on a point chooses it (its menu)
+                if let SHit::Point(pk, idx) = st.hover {
+                    if let Some(q) = m.points.get(idx as usize).filter(|q| tool == SE_CPOINT && q.kind == SP_CONN) {
+                        st.vertex = Some((pk, q.tag));
+                        st.chosen.clear();
+                        st.chosen.insert(q.tag);
+                    }
                 }
                 out.push(SeEv::Context { key: k, at: [i.wx, i.px[1]] });
             }
@@ -1076,7 +1287,7 @@ impl Ui {
         if !was_idle && matches!(st.g, G::Idle) {
             st.quiet = Some(i.px);
         }
-        if st.quiet.is_some() || !matches!(st.g, G::Idle | G::Press { hit: SHit::Arrow(..) | SHit::Mark(..), .. }) {
+        if st.quiet.is_some() || !matches!(st.g, G::Idle | G::Press { hit: SHit::Arrow(..) | SHit::Mark(..) | SHit::Quick(..), .. }) {
             st.extras_off(&mut out);
         }
         // the cursor for the next call of ui.diagram
@@ -1106,13 +1317,16 @@ impl Ui {
         let hr = w(HANDLE_DIP + 2);
         // the drawing tools keep the handles of the shape just drawn (Visio's)
         let frame_tool = matches!(tool, SE_POINTER | SE_RECT | SE_ELLIPSE | SE_TEXT);
-        if frame_tool || matches!(tool, SE_LINE | SE_FREEFORM | SE_ARC) {
+        if frame_tool || matches!(tool, SE_LINE | SE_FREEFORM | SE_ARC | SE_CPOINT) {
             if let Some(sh) = st.single(m) {
-                // points first (they lie on the frame), then ends, rotation, pin, handles
+                // points first (they lie on the frame), then ends, rotation, pin, handles;
+                // (JD21) the connection point tool: its points and nothing else
                 let mut best: Option<(f32, u32)> = None;
                 for k in range_of(&sh.points, m.points.len()) {
                     let q = &m.points[k];
-                    if q.kind == SP_CONN {
+                    // (JD21) a connector's midpoint only while it shows
+                    let handle = if tool == SE_CPOINT { q.kind == SP_CONN } else { !matches!(q.kind, SP_CONN | SP_TARGET) && self.seg_shown(q, s) };
+                    if !handle {
                         continue;
                     }
                     let d = dist(p, q.at);
@@ -1123,7 +1337,8 @@ impl Ui {
                 if let Some((_, k)) = best {
                     return SHit::Point(sh.key, k);
                 }
-                if sh.flags & SEF_1D != 0 {
+                if tool == SE_CPOINT {
+                } else if sh.flags & SEF_1D != 0 {
                     for e in 0..2u8 {
                         if dist(p, sh.ends[e as usize]) <= hr {
                             return SHit::End(sh.key, e);
@@ -1196,6 +1411,18 @@ impl Ui {
         Some(set)
     }
 
+    // (JD21) the quick shapes bar that shows: its rectangle (canvas px) and its tiles
+    fn se_quick_bar(&self, st: &SeState, dg: &DiagramState, m: &SeModel) -> Option<([f32; 4], usize)> {
+        let (k, d) = st.quick_at?;
+        if st.quick.is_empty() || !st.arrows {
+            return None;
+        }
+        let a = self.se_arrow_set(st, dg, m, k)?;
+        let n = st.quick.len().min(QUICK_MAX);
+        let r = a.quick_rect(d as usize, n, self.dp(QUICK_TILE) as f32, self.dp(QUICK_PAD) as f32, self.dp(QUICK_GAP) as f32);
+        r.iter().all(|v| v.is_finite()).then_some((r, n))
+    }
+
     // the triangle of an insertion mark (canvas px)
     fn se_mark_tri(&self, dg: &DiagramState, mk: &SeMark) -> [[f32; 2]; 3] {
         tri_at(dg.vp.to_screen(mk.at), mk.dir as usize, self.dp(MARK_LEN) as f32, self.dp(MARK_HALF) as f32)
@@ -1223,7 +1450,7 @@ impl Ui {
         if st.quiet.is_some_and(|q| q != i.px) {
             st.quiet = None;
         }
-        if let G::Press { hit: hit @ (SHit::Arrow(..) | SHit::Mark(..)), .. } = st.g {
+        if let G::Press { hit: hit @ (SHit::Arrow(..) | SHit::Mark(..) | SHit::Quick(..)), .. } = st.g {
             // held on one: it stays as it was
             st.hover = hit;
             return;
@@ -1236,6 +1463,35 @@ impl Ui {
         }
         let p = dg.vp.to_screen(i.p);
         let tol = self.dp(2) as f32;
+        // (JD21) on the quick shapes bar of the hot arrow: the arrow stays hot, the tile under
+        // the pointer is the hover
+        if let Some((qk, qd)) = st.quick_at.filter(|_| st.arrows && !st.quick.is_empty()) {
+            if let Some(a) = self.se_arrow_set(st, dg, m, qk) {
+                let n = st.quick.len().min(QUICK_MAX);
+                let (tile, pad) = (self.dp(QUICK_TILE) as f32, self.dp(QUICK_PAD) as f32);
+                let r = a.quick_rect(qd as usize, n, tile, pad, self.dp(QUICK_GAP) as f32);
+                let z = a.quick_zone(qd as usize, r);
+                let on_arrow = a.hit(p, tol) == Some(qd);
+                if !on_arrow && p[0] >= z[0] - tol && p[0] <= z[2] + tol && p[1] >= z[1] - tol && p[1] <= z[3] + tol {
+                    st.arrow_key = qk;
+                    st.arrow_hot = qd;
+                    st.mark_p = None;
+                    st.mark_hot = None;
+                    let x = p[0] - r[0] - pad;
+                    let k = if x >= 0.0 && p[0] <= r[2] { (x / tile) as usize } else { n };
+                    let inside = p[1] >= r[1] + pad && p[1] <= r[3] - pad && k < n;
+                    st.quick_hot = if inside { k as u8 } else { 255 };
+                    if inside {
+                        st.hover = SHit::Quick(qk, qd, k as u8);
+                    } else {
+                        st.hover = SHit::None;
+                    }
+                    st.say_arrow(out);
+                    st.say_quick(out);
+                    return;
+                }
+            }
+        }
         // the arrows: the current shape's while the pointer is on one of them, on one of its
         // handles or in their zone; else those of the top-level shape under the pointer
         let (mut key, mut hot) = (0u64, 255u8);
@@ -1295,14 +1551,20 @@ impl Ui {
         } else if hot != 255 {
             st.hover = SHit::Arrow(key, hot);
         }
+        // (JD21) a hot arrow opens its quick shapes bar; it stays while the pointer is on it
+        st.quick_at = (st.arrow_hot != 255 && st.arrow_key != 0 && !st.quick.is_empty()).then_some((st.arrow_key, st.arrow_hot));
+        st.quick_hot = 255;
         st.say_arrow(out);
+        st.say_quick(out);
     }
 
     // what an end or a control point at p would glue to; the point it would go to.  `swap`
     // (Ctrl held, a dynamic end): a connection point under p gives its shape as a whole, a shape
-    // under p its nearest connection point (CN-03)
+    // under p its nearest connection point (CN-03).  (JD21) Without a connection point in reach
+    // the app's other targets (SP_TARGET; `more` & 1) come next, then (`more` & 2,
+    // SeState::glue_guides) a guide within reach: the point goes onto its line
     #[allow(clippy::too_many_arguments)]
-    fn se_glue(&self, st: &SeState, dg: &DiagramState, m: &SeModel, p: [f32; 2], exclude: u64, dynamic: bool, swap: bool) -> (SeGlue, [f32; 2]) {
+    fn se_glue(&self, st: &SeState, dg: &DiagramState, m: &SeModel, p: [f32; 2], exclude: u64, dynamic: bool, swap: bool, more: u8) -> (SeGlue, [f32; 2]) {
         if !st.glue {
             return (SeGlue::None, p);
         }
@@ -1313,6 +1575,7 @@ impl Ui {
         // connection points of the shapes near p (those pointing outward only are no target)
         let target = |q: &SePoint| q.kind == SP_CONN && q.flags & SPF_OUTWARD == 0;
         let mut best: Option<(f32, u64, u32, [f32; 2])> = None;
+        let mut other: Option<(f32, u64, u32, [f32; 2])> = None;
         for sh in m.shapes {
             if sh.key == exclude || sh.flags & SEF_NOGLUE != 0 || sh.points.is_empty() {
                 continue;
@@ -1323,12 +1586,16 @@ impl Ui {
             }
             for k in range_of(&sh.points, m.points.len()) {
                 let q = &m.points[k];
-                if !target(q) {
+                let d = dist(p, q.at);
+                if d > reach {
                     continue;
                 }
-                let d = dist(p, q.at);
-                if d <= reach && best.is_none_or(|bb| d < bb.0) {
-                    best = Some((d, sh.key, q.tag, q.at));
+                if target(q) {
+                    if best.is_none_or(|bb| d < bb.0) {
+                        best = Some((d, sh.key, q.tag, q.at));
+                    }
+                } else if q.kind == SP_TARGET && more & 1 != 0 && other.is_none_or(|bb| d < bb.0) {
+                    other = Some((d, sh.key, q.tag, q.at));
                 }
             }
         }
@@ -1337,6 +1604,15 @@ impl Ui {
                 return (SeGlue::Shape(key), p);
             }
             return (SeGlue::Point { key, tag }, at);
+        }
+        if let (Some((_, key, tag, at)), false) = (other, swap) {
+            return (SeGlue::Point { key, tag }, at);
+        }
+        if more & 2 != 0 && st.glue_guides {
+            let near = m.guides.iter().map(|g| (if g.vertical { (p[0] - g.at).abs() } else { (p[1] - g.at).abs() }, g)).filter(|x| x.0 <= reach).min_by(|a, b| a.0.total_cmp(&b.0));
+            if let Some((_, g)) = near {
+                return (SeGlue::Guide(g.key), if g.vertical { [g.at, p[1]] } else { [p[0], g.at] });
+            }
         }
         if dynamic {
             let k = (m.hit)(p, self.dp(2) as f32 / s, 0);
@@ -1367,7 +1643,7 @@ impl Ui {
         match st.g {
             G::Move { .. } => return CUR_MOVE,
             G::Resize { h, ref to, .. } => return size_cursor([to.at(HANDLES[h as usize][0], HANDLES[h as usize][1])[0] - to.at(0.5, 0.5)[0], to.at(HANDLES[h as usize][0], HANDLES[h as usize][1])[1] - to.at(0.5, 0.5)[1]]),
-            G::Rotate { .. } | G::Pin { .. } | G::End { .. } | G::Point { .. } | G::Connect { .. } | G::Draw { .. } | G::Zoom { .. } | G::Stroke { .. } | G::Arc { .. } => return CUR_CROSS,
+            G::Rotate { .. } | G::Pin { .. } | G::End { .. } | G::Point { .. } | G::Points { .. } | G::Connect { .. } | G::Draw { .. } | G::Zoom { .. } | G::Stroke { .. } | G::Arc { .. } => return CUR_CROSS,
             _ => {}
         }
         let frame_cursor = |b: &SeBox, h: u8| {
@@ -1381,6 +1657,11 @@ impl Ui {
                 _ => CUR_ARROW,
             },
             SHit::SelHandle(h) => st.multi_box(m).map_or(CUR_ARROW, |b| frame_cursor(&b, h)),
+            // (JD21) a connector's midpoint moves its piece across
+            SHit::Point(_, idx) if m.points.get(idx as usize).is_some_and(|q| q.kind == SP_SEGMENT && q.flags & SPF_FREE == 0) => {
+                let d = m.points[idx as usize].dir;
+                size_cursor([-d[1], d[0]])
+            }
             SHit::Rotate(_) | SHit::SelRotate | SHit::Pin(_) | SHit::End(..) | SHit::Point(..) => CUR_CROSS,
             SHit::Shape(_) if tool == SE_POINTER => CUR_MOVE,
             _ if tool != SE_POINTER => CUR_CROSS,
@@ -1420,6 +1701,14 @@ impl Ui {
             st.last_ms = i.now;
             st.last_px = i.px;
         }
+        // (JD21) the connection point tool: Ctrl + click adds a point to the single selection,
+        // on it, inside or outside it (Visio's)
+        if tool == SE_CPOINT && i.mods & MOD_CTRL != 0 && !matches!(hit, SHit::Point(..)) {
+            if let Some(sh) = st.single(m) {
+                out.push(SeEv::PointInsert { key: sh.key, at: i.p });
+                return G::Hold;
+            }
+        }
         let mut was = false;
         if let SHit::Shape(k) = hit {
             was = st.sel.contains(&k);
@@ -1450,15 +1739,32 @@ impl Ui {
             }
             st.focus = k;
         }
-        // a vertex: chosen (Del removes it)
+        // a vertex: chosen (Del removes it); (JD21) Shift adds it to the chosen ones or takes it
+        // away, a press on one of several chosen keeps them (a drag moves them together); an
+        // arc's control point and (SE_CPOINT) a connection point are chosen alike, alone
         if let SHit::Point(k, idx) = hit {
-            if let Some(q) = m.points.get(idx as usize).filter(|q| q.kind == SP_VERTEX) {
-                st.vertex = Some((k, q.tag));
+            let choosable = |q: &&SePoint| matches!(q.kind, SP_VERTEX | SP_ARC) || (tool == SE_CPOINT && q.kind == SP_CONN);
+            if let Some(q) = m.points.get(idx as usize).filter(choosable) {
+                let same = st.vertex.is_some_and(|v| v.0 == k);
+                if q.kind == SP_VERTEX && same && i.mods & MOD_SHIFT != 0 {
+                    if st.chosen.contains(&q.tag) && st.chosen.len() > 1 {
+                        st.chosen.remove(&q.tag);
+                        st.vertex = st.chosen.iter().next().map(|&t| (k, t));
+                    } else {
+                        st.chosen.insert(q.tag);
+                        st.vertex = Some((k, q.tag));
+                    }
+                } else if !(q.kind == SP_VERTEX && same && st.chosen.contains(&q.tag)) {
+                    st.chosen.clear();
+                    st.chosen.insert(q.tag);
+                    st.vertex = Some((k, q.tag));
+                }
             }
         }
-        // Ctrl + click on a selected shape with vertices: a new vertex
+        // Ctrl + click on a selected shape with vertices (or, JD21, a connector's midpoints): a
+        // new vertex
         if let (SHit::Shape(k), true) = (hit, i.mods & MOD_CTRL != 0 && tool == SE_LINE) {
-            if st.shape(m, k).is_some_and(|s| range_of(&s.points, m.points.len()).any(|j| m.points[j].kind == SP_VERTEX)) {
+            if st.shape(m, k).is_some_and(|s| range_of(&s.points, m.points.len()).any(|j| matches!(m.points[j].kind, SP_VERTEX | SP_SEGMENT))) {
                 st.sel.insert(k);
                 out.push(SeEv::PointInsert { key: k, at: i.p });
                 return G::Hold;
@@ -1492,6 +1798,12 @@ impl Ui {
                     } else if st.sel.len() > 1 {
                         st.select(&[k]);
                         out.push(SeEv::Select);
+                    } else if let Some(p) = st.shape(m, k).filter(|s| s.flags & SEF_UP != 0 && s.parent != 0).map(|s| s.parent) {
+                        // (JD21) a member of a "members first" group: now the group
+                        if st.shape(m, p).is_some_and(|s| s.flags & SEF_NOSELECT == 0) {
+                            st.select(&[p]);
+                            out.push(SeEv::Select);
+                        }
                     }
                 }
             }
@@ -1500,12 +1812,22 @@ impl Ui {
                     st.sel.clear();
                     st.primary = 0;
                     st.vertex = None;
+                    st.chosen.clear();
                     out.push(SeEv::Select);
                 }
             }
             // the selection stays: the app selects what it makes
             SHit::Arrow(key, dir) => out.push(SeEv::Arrow { key, dir }),
             SHit::Mark(_, tag) => out.push(SeEv::Mark { tag }),
+            SHit::Quick(key, dir, tile) => out.push(SeEv::Quick { key, dir, tile }),
+            // (JD21) a click (no drag) on one of several chosen vertices: it alone stays chosen
+            SHit::Point(k, idx) if mods & MOD_SHIFT == 0 => {
+                if let Some(q) = m.points.get(idx as usize).filter(|q| q.kind == SP_VERTEX && st.chosen.len() > 1) {
+                    st.chosen.clear();
+                    st.chosen.insert(q.tag);
+                    st.vertex = Some((k, q.tag));
+                }
+            }
             _ => {}
         }
         G::Idle
@@ -1528,8 +1850,8 @@ impl Ui {
                 };
                 return G::Connect { tool: SE_CONNECT, a, ga: SeGlue::Shape(k), b: a };
             }
-            // a mark is for clicks only
-            SHit::Mark(..) => return G::Hold,
+            // a mark and a quick shape are for clicks only
+            SHit::Mark(..) | SHit::Quick(..) => return G::Hold,
             _ => {}
         }
         if tool == SE_PLACE {
@@ -1542,7 +1864,7 @@ impl Ui {
         // the freeform and the arc tool start glued like a line (CN-12); the stroke starts where
         // the press was, the arc on the grid
         if matches!(tool, SE_FREEFORM | SE_ARC) && !matches!(hit, SHit::Point(..) | SHit::End(..)) {
-            let (ga, a) = self.se_glue(st, dg, m, at, 0, false, false);
+            let (ga, a) = self.se_glue(st, dg, m, at, 0, false, false, 0);
             if tool == SE_FREEFORM {
                 return G::Stroke { pts: alloc::vec![a], ga };
             }
@@ -1551,7 +1873,7 @@ impl Ui {
         }
         if tool == SE_CONNECT || (tool == SE_LINE && !matches!(hit, SHit::Point(..) | SHit::End(..))) {
             let dynamic = tool == SE_CONNECT;
-            let (ga, a) = self.se_glue(st, dg, m, at, 0, dynamic, mods & MOD_CTRL != 0);
+            let (ga, a) = self.se_glue(st, dg, m, at, 0, dynamic, mods & MOD_CTRL != 0, 3);
             let a = if ga == SeGlue::None { self.se_snap_pt(dg, a, mods) } else { a };
             return G::Connect { tool, a, ga, b: a };
         }
@@ -1614,6 +1936,10 @@ impl Ui {
                 _ => G::Hold,
             },
             SHit::Point(k, idx) => match m.points.get(idx as usize) {
+                // (JD21) one of several chosen vertices: they move together
+                Some(q) if q.kind == SP_VERTEX && st.chosen.len() > 1 && st.chosen.contains(&q.tag) && st.vertex.is_some_and(|v| v.0 == k) => {
+                    G::Points { key: k, tags: st.chosen.iter().copied().collect(), from: q.at, start: at, total: [0.0; 2] }
+                }
                 Some(q) => G::Point { key: k, idx, tag: q.tag, at: q.at, glue: SeGlue::None, glues: q.kind == SP_CONTROL && q.flags & SPF_GLUE != 0 },
                 None => G::Hold,
             },
@@ -1697,7 +2023,7 @@ impl Ui {
                 if done { G::Idle } else { G::Pin { key, at: a } }
             }
             G::End { key, end, at, glue, dynamic } => {
-                let (gl, p) = self.se_glue(st, dg, m, i.p, key, dynamic, i.mods & MOD_CTRL != 0);
+                let (gl, p) = self.se_glue(st, dg, m, i.p, key, dynamic, i.mods & MOD_CTRL != 0, 3);
                 let a = if gl == SeGlue::None { self.se_snap_pt(dg, p, i.mods) } else { p };
                 st.glue_now = gl;
                 if a != at || gl != glue || done {
@@ -1706,13 +2032,23 @@ impl Ui {
                 if done { G::Idle } else { G::End { key, end, at: a, glue: gl, dynamic } }
             }
             G::Point { key, idx, tag, at, glue, glues } => {
-                let (gl, p) = if glues { self.se_glue(st, dg, m, i.p, key, false, false) } else { (SeGlue::None, i.p) };
+                let (gl, p) = if glues { self.se_glue(st, dg, m, i.p, key, false, false, 1) } else { (SeGlue::None, i.p) };
                 let a = if gl == SeGlue::None { self.se_snap_pt(dg, p, i.mods) } else { p };
                 st.glue_now = gl;
                 if a != at || gl != glue || done {
                     out.push(SeEv::Point { key, idx, tag, at: a, glue: gl, done });
                 }
                 if done { G::Idle } else { G::Point { key, idx, tag, at: a, glue: gl, glues } }
+            }
+            G::Points { key, tags, from, start, total } => {
+                // the grabbed vertex snaps to the grid, the others keep their distance to it
+                let raw = [i.p[0] - start[0], i.p[1] - start[1]];
+                let a = self.se_snap_pt(dg, [from[0] + raw[0], from[1] + raw[1]], i.mods);
+                let t = [a[0] - from[0], a[1] - from[1]];
+                if t != total || done {
+                    out.push(SeEv::Points { key, tags: tags.clone(), total: t, done });
+                }
+                if done { G::Idle } else { G::Points { key, tags, from, start, total: t } }
             }
             G::Marquee { start, mods, base, .. } => {
                 let cur = i.p;
@@ -1792,7 +2128,7 @@ impl Ui {
                 }
             }
             G::Connect { tool, a, ga, .. } => {
-                let (gb, p) = self.se_glue(st, dg, m, i.p, 0, tool == SE_CONNECT, i.mods & MOD_CTRL != 0);
+                let (gb, p) = self.se_glue(st, dg, m, i.p, 0, tool == SE_CONNECT, i.mods & MOD_CTRL != 0, 3);
                 // an end does not glue to the shape the other end glues to as a whole
                 let gb = match (ga, gb) {
                     (SeGlue::Shape(x), SeGlue::Shape(y)) if x == y => SeGlue::None,
@@ -1827,10 +2163,20 @@ impl Ui {
                 }
             }
             G::Stroke { mut pts, ga } => {
+                // (JD21, SP-05) going back over the stroke takes it back: while the pointer lies
+                // on the last piece (3 px), 2 px or more back from its end towards its start
+                while pts.len() >= 2 {
+                    let (a, b) = (pts[pts.len() - 2], pts[pts.len() - 1]);
+                    if seg_dist(i.p, a, b) * s <= 3.0 && dist(i.p, b) * s >= 2.0 && dist(i.p, a) < dist(b, a) {
+                        pts.pop();
+                    } else {
+                        break;
+                    }
+                }
                 if pts.last().is_none_or(|q| dist(*q, i.p) * s >= 2.0) && pts.len() < 8192 {
                     pts.push(i.p);
                 }
-                let (gb, p) = self.se_glue(st, dg, m, i.p, 0, false, false);
+                let (gb, p) = self.se_glue(st, dg, m, i.p, 0, false, false, 0);
                 st.glue_now = gb;
                 if done {
                     st.glue_now = SeGlue::None;
@@ -1847,7 +2193,7 @@ impl Ui {
                 }
             }
             G::Arc { a, ga, h, .. } => {
-                let (gb, p) = self.se_glue(st, dg, m, i.p, 0, false, false);
+                let (gb, p) = self.se_glue(st, dg, m, i.p, 0, false, false, 0);
                 let b = if gb == SeGlue::None { self.se_snap_pt(dg, p, i.mods) } else { p };
                 // the bow: the axis the pointer left the threshold along
                 let raw = [(i.p[0] - a[0]) * s, (i.p[1] - a[1]) * s];
@@ -1937,6 +2283,7 @@ impl Ui {
                         st.sel.clear();
                         st.primary = 0;
                         st.vertex = None;
+                        st.chosen.clear();
                         out.push(SeEv::Select);
                     }
                     st.g = G::Idle;
@@ -1968,8 +2315,13 @@ impl Ui {
         if let Some((i, _)) = self.dg_key_find(VK_DELETE, 0, MOD_CTRL | MOD_ALT) {
             if let Some((k, tag)) = st.vertex {
                 self.dg_key_take(i);
-                out.push(SeEv::PointDelete { key: k, tag });
+                if st.chosen.len() > 1 {
+                    out.push(SeEv::PointsDelete { key: k, tags: st.chosen.iter().copied().collect() });
+                } else {
+                    out.push(SeEv::PointDelete { key: k, tag });
+                }
                 st.vertex = None;
+                st.chosen.clear();
             } else if !st.sel.is_empty() {
                 self.dg_key_take(i);
                 out.push(SeEv::Delete);
@@ -2063,6 +2415,10 @@ impl Ui {
         for gd in m.guides {
             let (a, b) = if gd.vertical { ([gd.at, wr[1]], [gd.at, wr[3]]) } else { ([wr[0], gd.at], [wr[2], gd.at]) };
             self.dg_dashed(vp.to_screen(a), vp.to_screen(b), hairf, guide);
+            // (JD21) the guide an end would glue to
+            if st.glue_now == SeGlue::Guide(gd.key) {
+                self.dg_poly(&vp, &[a, b], (hairf * 3.0).max(3.0), 0xA02E_9E44);
+            }
         }
         // selection outlines
         let anchor_t = (hairf * 2.0).max(2.0);
@@ -2099,6 +2455,30 @@ impl Ui {
                     let hot = st.mark_hot.is_some_and(|h| h.0 == k as u32);
                     let t = self.se_mark_tri(dg, mk);
                     self.se_tri(&t, if hot { full } else { soft });
+                }
+            }
+            // (JD21) the quick shapes bar of the hot arrow
+            if let Some((r, n)) = self.se_quick_bar(st, dg, m) {
+                let (tile, pad) = (self.dp(QUICK_TILE), self.dp(QUICK_PAD));
+                let (x0, y0) = (fl(r[0]), fl(r[1]));
+                let (w, h) = (fl(r[2]) - x0, fl(r[3]) - y0);
+                let (bg, line) = (self.color(T_FLYOUT) | 0xFF00_0000, self.color(T_FLYOUT_STROKE) | 0xFF00_0000);
+                self.cmd_rrect(x0, y0, w, h, 0, self.hair().max(1), bg, line, line);
+                for k in 0..n {
+                    let (tx, ty) = (x0 + pad + k as i32 * tile, y0 + pad);
+                    if st.quick_hot == k as u8 {
+                        self.cmd_rrect(tx, ty, tile, tile, 0, self.hair().max(1), self.color(T_SUBTLE_HOVER) | 0xFF00_0000, full, full);
+                    }
+                    let q = &st.quick[k];
+                    let inset = self.dp(3);
+                    match &q.draw {
+                        Some(d) => self.cmd_custom(tx + inset, ty + inset, tile - inset * 2, tile - inset * 2, Some(d.clone()), 0, q.ver),
+                        None => {
+                            let c = self.color(T_TEXT2) | 0xFF00_0000;
+                            self.draw_color(c);
+                            self.draw_frame(tx + inset * 2, ty + inset * 2, tile - inset * 4, tile - inset * 4, 0, self.hair().max(1));
+                        }
+                    }
                 }
             }
         }
@@ -2145,20 +2525,37 @@ impl Ui {
                     self.cmd_rrect(x, y, e * 2, e * 2, 0, hair, if free { bg } else { locked }, accent, accent);
                 }
             }
-            // control points (yellow diamonds as small squares turned) and vertices
+            // control points (yellow diamonds as small squares turned) and vertices; (JD21) the
+            // eccentricity handles of an arc on a dashed line, arcs' control points as circles
+            let ecc: Vec<[f32; 2]> = range_of(&sh.points, m.points.len()).map(|k| &m.points[k]).filter(|q| q.kind == SP_ECC).map(|q| q.at).collect();
+            for w in ecc.chunks_exact(2) {
+                self.dg_dashed(vp.to_screen(w[0]), vp.to_screen(w[1]), hairf, accent);
+            }
+            let same = st.vertex.is_some_and(|v| v.0 == sh.key);
             for k in range_of(&sh.points, m.points.len()) {
                 let q = &m.points[k];
                 let p = vp.to_screen(q.at);
+                let hot = st.hover == SHit::Point(sh.key, k as u32);
                 match q.kind {
                     SP_CONTROL => {
-                        let e = hs as f32 + if st.hover == SHit::Point(sh.key, k as u32) { hairf } else { 0.0 };
+                        let e = hs as f32 + if hot { hairf } else { 0.0 };
                         self.se_diamond(p, e, 0xFFFF_D21F, 0xFF5A_4A00, hairf);
                     }
                     SP_VERTEX => {
-                        let chosen = st.vertex == Some((sh.key, q.tag));
-                        let e = self.dp(3) + if st.hover == SHit::Point(sh.key, k as u32) { hair } else { 0 };
+                        let chosen = same && (st.chosen.contains(&q.tag) || st.vertex == Some((sh.key, q.tag)));
+                        let e = self.dp(3) + if hot { hair } else { 0 };
                         let (x, y) = (fl(p[0] + 0.5) - e, fl(p[1] + 0.5) - e);
                         self.cmd_rrect(x, y, e * 2, e * 2, 0, hair, if chosen { accent } else { bg }, accent, accent);
+                    }
+                    // (JD21) a midpoint of a connector's piece: a small diamond
+                    SP_SEGMENT if self.seg_shown(q, vp.scale() as f32) => {
+                        let e = self.dp(4) as f32 + if st.hover == SHit::Point(sh.key, k as u32) { hairf } else { 0.0 };
+                        self.se_diamond(p, e, bg, accent, hairf);
+                    }
+                    SP_ARC | SP_ECC => {
+                        let chosen = q.kind == SP_ARC && st.vertex == Some((sh.key, q.tag));
+                        let e = self.dp(3) + if hot { hair } else { 0 };
+                        self.dg_dot(p, e, hair, if chosen { accent } else { bg }, accent);
                     }
                     _ => {}
                 }
@@ -2184,10 +2581,14 @@ impl Ui {
         // connection points: while connecting or moving an end, with the connector tool (the
         // shapes under the pointer and glued to), or always those of every visible shape (RA-06)
         let connecting = matches!(st.g, G::Connect { .. } | G::End { .. } | G::Stroke { .. } | G::Arc { .. }) || matches!(st.g, G::Point { glues: true, .. }) || matches!(tool, SE_CONNECT | SE_LINE | SE_FREEFORM | SE_ARC);
-        if connecting && st.glue || st.show_points {
+        if connecting && st.glue || st.show_points || tool == SE_CPOINT {
             let mut keys: Vec<u64> = Vec::new();
             if st.show_points {
                 keys.extend(m.shapes.iter().filter(|s| !s.points.is_empty() && overlaps(s.bbox, wr)).map(|s| s.key));
+            }
+            // (JD21) the connection point tool: the selection's points
+            if tool == SE_CPOINT {
+                keys.extend(st.sel.iter().copied());
             }
             if st.hover_shape != 0 {
                 keys.push(st.hover_shape);
@@ -2214,19 +2615,23 @@ impl Ui {
                 }
                 for j in range_of(&sh.points, m.points.len()) {
                     let q = &m.points[j];
-                    if q.kind != SP_CONN {
+                    let target = st.glue_now == SeGlue::Point { key: k, tag: q.tag };
+                    // (JD21) another target (a vertex, a handle ...) shows only while it is one
+                    if q.kind != SP_CONN && !(q.kind == SP_TARGET && target) {
                         continue;
                     }
                     let p = vp.to_screen(q.at);
-                    let target = st.glue_now == SeGlue::Point { key: k, tag: q.tag };
                     if target {
                         let e = self.dp(5);
                         let (x, y) = (fl(p[0] + 0.5) - e, fl(p[1] + 0.5) - e);
                         self.cmd_rrect(x, y, e * 2, e * 2, 0, hair * 2, 0, ok, ok);
                     }
-                    let e = self.dp(3) as f32;
-                    self.draw_color(if target { ok } else { 0xFF3D_6FB5 });
-                    let t = fx(hairf.max(1.0) * 1.5);
+                    // (JD21) the connection point tool: the chosen point magenta, larger
+                    let chosen = tool == SE_CPOINT && st.vertex == Some((k, q.tag));
+                    let hot = tool == SE_CPOINT && st.hover == SHit::Point(k, j as u32);
+                    let e = self.dp(if chosen || hot { 4 } else { 3 }) as f32;
+                    self.draw_color(if target { ok } else if chosen { 0xFFD0_30C0 } else { 0xFF3D_6FB5 });
+                    let t = fx(hairf.max(1.0) * if chosen { 2.5 } else { 1.5 });
                     self.draw_line(fx(p[0] - e), fx(p[1] - e), fx(p[0] + e), fx(p[1] + e), t);
                     self.draw_line(fx(p[0] - e), fx(p[1] + e), fx(p[0] + e), fx(p[1] - e), t);
                 }
@@ -2289,6 +2694,12 @@ impl Ui {
         let b = tri_box(t);
         let pts = t.map(|p| [p[0] - b[0] as f32, p[1] - b[1] as f32]);
         self.cmd_custom(b[0], b[1], b[2], b[3], Some(Rc::new(Tri { pts, c })), 0, 0);
+    }
+
+    // (JD21) whether a point shows at this scale: a connector's midpoint only on a piece at least
+    // SEG_MIN DIP long on the screen; every other kind always
+    fn seg_shown(&self, q: &SePoint, scale: f32) -> bool {
+        q.kind != SP_SEGMENT || 2.0 * len(q.dir) * scale >= self.dp(SEG_MIN) as f32
     }
 
     // a diamond (a square turned by 45 degrees) of half-diagonal e px at p
@@ -2371,6 +2782,25 @@ impl Ui {
                 extra.push((self.se_mark_tri(dg, mk), sid, MARK_NAME, mk.tag as i32, SeEv::Mark { tag: mk.tag }));
             }
         }
+        // (JD21) the tiles of the quick shapes bar
+        if let (Some((qr, n)), Some((qk, qd))) = (self.se_quick_bar(st, dg, m), st.quick_at) {
+            let (tile, pad) = (self.dp(QUICK_TILE), self.dp(QUICK_PAD));
+            for k in 0..n {
+                let (x, y) = (fl(qr[0]) + pad + k as i32 * tile, fl(qr[1]) + pad);
+                let Some(mut rect) = clip([x, y, tile, tile]) else { continue };
+                if self.rtl {
+                    rect[0] = self.rtl_map(rect[0] + rect[2] - 1, r[0], r[2]);
+                }
+                let sid = node_sem_id(id ^ 0x5143, qk.wrapping_mul(16).wrapping_add(qd as u64 * 4 + k as u64));
+                if self.m.a11y.pending() && self.a11y_click(sid) {
+                    st.pend.push(SeEv::Quick { key: qk, dir: qd, tile: k as u8 });
+                    self.repass();
+                }
+                self.last_set(rect, 0);
+                let name = format!("{}: {}", crate::i18n::tr(QUICK_NAME), st.quick[k].name);
+                self.sem(K_BUTTON, sid, Some(&name), k as i32);
+            }
+        }
         for (t, sid, name, value, ev) in extra {
             let Some(mut rect) = clip(tri_box(&t)) else { continue };
             if self.rtl {
@@ -2401,16 +2831,41 @@ impl Ui {
                 recs.push((String::from(crate::i18n::tr("Drehgriff")), rot_point(&sh.bx, self.dp(ROT_DIP) as f32 / s), 11));
             }
         }
-        let mut nc = 0;
+        // control points and vertices counted together; (JD21) arcs' control points,
+        // eccentricity handles, (SE_CPOINT) connection points and a connector's midpoints each on
+        // their own
+        let (mut nc, mut na, mut ne, mut np, mut ns) = (0, 0, 0, 0, 0);
         for k in range_of(&sh.points, m.points.len()) {
             let q = &m.points[k];
-            let name = match q.kind {
-                SP_CONTROL => crate::i18n::tr("Steuerpunkt"),
-                SP_VERTEX => crate::i18n::tr("Scheitelpunkt"),
+            // (JD21) "Mittelpunkt 1" is the first piece's (those hidden on the screen are left
+            // out, the count goes on)
+            if q.kind == SP_SEGMENT {
+                ns += 1;
+                if self.seg_shown(q, s) {
+                    recs.push((format!("{} {ns}", crate::i18n::tr("Mittelpunkt")), q.at, 16 + k as u32));
+                }
+                continue;
+            }
+            let (name, n) = match q.kind {
+                SP_CONTROL | SP_VERTEX => {
+                    nc += 1;
+                    (crate::i18n::tr(if q.kind == SP_CONTROL { "Steuerpunkt" } else { "Scheitelpunkt" }), nc)
+                }
+                SP_ARC => {
+                    na += 1;
+                    (crate::i18n::tr("Bogengriff"), na)
+                }
+                SP_ECC => {
+                    ne += 1;
+                    (crate::i18n::tr("Exzentrizitätsgriff"), ne)
+                }
+                SP_CONN if st.tool == SE_CPOINT => {
+                    np += 1;
+                    (crate::i18n::tr("Verbindungspunkt"), np)
+                }
                 _ => continue,
             };
-            nc += 1;
-            recs.push((format!("{name} {nc}"), q.at, 16 + k as u32));
+            recs.push((format!("{name} {n}"), q.at, 16 + k as u32));
         }
         for (name, at, n) in recs {
             let p = vp.to_screen(at);

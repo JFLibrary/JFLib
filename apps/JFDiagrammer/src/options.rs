@@ -22,6 +22,9 @@
 // (JD15) Teilweise umschlossene Shapes auswählen works: the marquee and the lasso take touched
 // shapes (ZF-06).
 // (JD15) Shape-Suche anzeigen and Shape-Suche: ein Wort genügt act on the Shapes panel (SL-04).
+// (JD21 autoconn) Verbinder teilen (a shape dropped, pasted or moved onto a connector splits it,
+// CN-08) and Verbinder mit Shapes löschen (a deleted shape's connectors go along, the flow heals,
+// CN-09) act (autoconn.rs).
 
 use alloc::string::String;
 use base::settings::{Key, Schema, Settings};

@@ -18,6 +18,9 @@ keywords.fr: Nuage, site, WAN
 svg: ../../symbols/network/cloud_internet.svg
 include: ../net_common/symbol.inc, ../net_common/location.inc
 
+[Shape]
+ObjType = 1
+
 [Property]
 ShapeType: Type = 0; Invisible = TRUE; Label = "ShapeType"
     Value.de = Standort

@@ -2,7 +2,8 @@
 //
 //   connection_points(doc, shape) -> Vec<ConnPoint>   the Connection rows on the page: point,
 //                                    direction (into the shape, as DirX/DirY mean it), Type
-//   glued(doc, shape) -> [Target; 2]  what Begin and End are glued to (the Connect entries)
+//   glued(doc, shape) -> [Target; 2]  what Begin and End are glued to (the Connect entries; glue
+//                                    to a guide reads as None: pointglue.rs)
 //   ends(doc, shape)                 Begin and End on the page
 //   is_one_d / is_connector          a 1-D shape / one that routes (ObjType routable)
 //   style(doc, shape) -> Style       right angle, straight or curved (its cells, else the page's)
@@ -43,17 +44,28 @@
 // way.  Rows of a master keep their indices where their type fits; else they get a Del mark
 // and new rows follow.
 //
-// Dynamic glue docks in the middle of a side of the target, on its outline (the farthest point
-// of its geometry on the line through its middle), on the side that gives the cheapest way
-// among the obstacles (length + bends; one search over the sides of both ends, route::best);
-// where the other end lies within a side's reach, the point straight opposite it is offered
-// too (Visio's files show such straight connections).  (JD15, SS-18) WalkPreference bit 1 / 2
-// (visWalkPrefBegNS / EndNS): that end prefers top and bottom -- a way from there wins when it is
-// as short and has as few bends as the cheapest one.  The straight style docks where the line
-// between the two ends leaves the outline.  Obstacles are the boxes of the page's top-level
-// shapes that are not 1-D (route.rs keeps the page's LineToNodeX/Y as clearance, else 1/8 in).
-// ConFixedCode 1 and 2 (reroute manually / never) keep the corners and only move the first and
-// last pieces; reset() routes them anew.
+// Dynamic glue docks on the outline of the target (the farthest point of its geometry on a line
+// through it).  (JD21v) Where on it, and the way, the connector's routing style decides as Visio
+// 16 does (route_styles::route, checked against Visio's own ways): right angles straight across
+// in the middle of the overlap of two shapes beside each other, else an L leaving the begin's top
+// or bottom; around obstacles in the free part of the sides; else the cheapest way over the sides
+// (length + bends; route::best_through, which is also all ends glued to points or free get); where
+// the other end lies within a side's reach, the point straight opposite it is offered too.
+// (JD15, SS-18) WalkPreference changes none of these ways in Visio: kept, not read.  Obstacles
+// are, as in Visio 16 (JD21v), the placeable shapes (ObjType with bit 1, not 4; a group with 8 by
+// its placeable members; obstacles()), and for each connector the shapes its ends are glued to;
+// the clearance is half the page's AvenueSize (opts_for).  The legs of Visio's right-angle router
+// keep out of the way of the other connectors glued to the same shapes (related_lines: Visio
+// spreads connectors leaving one side); after a move the connectors a placeable shape now crowds
+// route again (crowded).  After routing ConFixedCode becomes 6 or 0 as
+// Visio writes it (route_styles::mark).  ConFixedCode 1 and 2 (reroute manually / never) keep the
+// corners and only move the first and last pieces; reset() routes them anew.  (JD21) 1 is laid
+// anew when the kept way runs through a shape (route_edit.rs); 3 .. 6 route freely (Visio writes
+// them for the connectors it routes itself); ShapePermeableX/Y let ways cross a shape.
+//
+// (JD21v) After routing, the line jumps of the connectors laid and of the connectors they cross
+// go into their Geometry (jumps.rs, as Visio writes them); detach takes the jumps over deleted
+// connectors away; path() reads a connector's way without them.
 //
 // Nothing happens on its own: opening a file routes nothing, only the shapes handed to update.
 
@@ -233,6 +245,8 @@ pub fn ends(doc: &Document, shape: ShapeRef) -> Option<([f64; 2], [f64; 2])> {
 fn target_of(doc: &Document, c: &Connect, to: ShapeRef) -> Target {
     match c.to_part {
         Some(3) => return Target::Shape(to),
+        // (JD21 glue) a guide (visGuideX, visGuideY, visGuideIntersect): pointglue.rs
+        Some(1 | 2 | 4) => return Target::None,
         Some(p) if (100..100 + 65536).contains(&p) => return Target::Point { shape: to, row: (p - 100) as u32 },
         _ => {}
     }
@@ -281,16 +295,21 @@ pub fn style(doc: &Document, shape: ShapeRef) -> Style {
         return Style::Curved;
     }
     match get("ShapeRouteStyle", "RouteStyle") {
+        // (JD21v) network (9) routes with right angles in Visio (route_styles.rs)
         Some(v) if v == 2.0 || v == 16.0 => Style::Straight,
         _ => Style::RightAngle,
     }
 }
 
-/// the drawn way of a shape on the page: the first shown Geometry section, curves flattened
+/// the drawn way of a shape on the page: the first shown Geometry section, curves flattened;
+/// (JD21 jumps) a connector's way without its line jumps (jumps::way)
 pub fn path(doc: &Document, shape: ShapeRef) -> Vec<[f64; 2]> {
     let mut out = Vec::new();
     if doc.shape(shape).is_none() {
         return out;
+    }
+    if let Some(w) = crate::jumps::way(doc, shape) {
+        return w;
     }
     let sheet = SheetRef::Shape(shape);
     let (w, h) = (num_sym(doc, sheet, names::WIDTH).unwrap_or(0.0), num_sym(doc, sheet, names::HEIGHT).unwrap_or(0.0));
@@ -306,7 +325,7 @@ pub fn path(doc: &Document, shape: ShapeRef) -> Vec<[f64; 2]> {
 }
 
 // the box of a shape on the page
-fn page_box(doc: &Document, s: ShapeRef) -> Option<[f64; 4]> {
+pub(crate) fn page_box(doc: &Document, s: ShapeRef) -> Option<[f64; 4]> {
     let sheet = SheetRef::Shape(s);
     let (w, h) = (num_sym(doc, sheet, names::WIDTH)?, num_sym(doc, sheet, names::HEIGHT).unwrap_or(0.0));
     let m = doc.page_xform(s);
@@ -318,14 +337,14 @@ fn page_box(doc: &Document, s: ShapeRef) -> Option<[f64; 4]> {
     b.iter().all(|v| v.is_finite()).then_some(b)
 }
 
-fn centre(doc: &Document, s: ShapeRef) -> [f64; 2] {
+pub(crate) fn centre(doc: &Document, s: ShapeRef) -> [f64; 2] {
     let sheet = SheetRef::Shape(s);
     let (w, h) = (num_sym(doc, sheet, names::WIDTH).unwrap_or(0.0), num_sym(doc, sheet, names::HEIGHT).unwrap_or(0.0));
     doc.page_xform(s).apply([w * 0.5, h * 0.5])
 }
 
 // the outline of a shape and its subshapes on the page, as segments
-fn outline(doc: &Document, s: ShapeRef) -> Vec<[[f64; 2]; 2]> {
+pub(crate) fn outline(doc: &Document, s: ShapeRef) -> Vec<[[f64; 2]; 2]> {
     let mut segs = Vec::new();
     let mut stack = alloc::vec![s];
     while let Some(r) = stack.pop() {
@@ -369,7 +388,7 @@ fn line_hit(c: [f64; 2], d: [f64; 2], p: [f64; 2], q: [f64; 2]) -> Option<f64> {
 // where a dynamic end docks: the farthest point of the outline in direction d on the line
 // through the middle (also behind the middle: a shape open on that side), else where the line
 // leaves the box
-fn dock(segs: &[[[f64; 2]; 2]], c: [f64; 2], d: [f64; 2], own: Option<[f64; 4]>) -> [f64; 2] {
+pub(crate) fn dock(segs: &[[[f64; 2]; 2]], c: [f64; 2], d: [f64; 2], own: Option<[f64; 4]>) -> [f64; 2] {
     let Some(d) = unit(d) else { return c };
     let far = segs.iter().filter_map(|s| line_hit(c, d, s[0], s[1])).fold(None::<f64>, |m, t| Some(m.map_or(t, |m| m.max(t))));
     let t = match (far, own) {
@@ -453,9 +472,13 @@ fn set_end(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, end: End, at
     }
     let p = parent_xform(doc, shape).inverse().unwrap_or(Xform::IDENTITY).apply(at);
     let (cx, cy) = end_cells(end);
-    // the old Connect entries of this end go
-    let old: Vec<usize> =
-        connects(doc, owner).iter().enumerate().filter(|(_, c)| c.from_sheet == id && c.from_cell == Some(cx)).map(|(i, _)| i).collect();
+    // the old Connect entries of this end go (JD21: an end on a guide has one from each cell)
+    let old: Vec<usize> = connects(doc, owner)
+        .iter()
+        .enumerate()
+        .filter(|(_, c)| c.from_sheet == id && (c.from_cell == Some(cx) || c.from_cell == Some(cy)))
+        .map(|(i, _)| i)
+        .collect();
     for i in old.into_iter().rev() {
         tx.remove_connect(owner, i)?;
     }
@@ -509,6 +532,17 @@ fn set_end(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, end: End, at
         }
     }
     eng.recalc_cells(tx, &[(sheet, ax), (sheet, ay), (sheet, trig)])?;
+    // (JD21) a dynamic connector glued to a 2-D shape whose ObjType lets Visio decide (0) makes it
+    // placeable (1), as Visio does (Visio check visio-run4 [objtype]: a drawn rectangle 0 -> 1 when
+    // a connector's end is glued to it); Visio's Re-Layout Page moves only such shapes
+    if let Target::Point { shape: t, .. } | Target::Shape(t) = to {
+        let doc = tx.doc();
+        let ts = SheetRef::Shape(t);
+        if is_connector(doc, shape) && !is_one_d(doc, t) && num(doc, ts, "ObjType").unwrap_or(0.0) == 0.0 {
+            let a = CellAddr::single(tx.intern("ObjType"));
+            tx.set_constant(ts, &a, Value::Num(1.0), None)?;
+        }
+    }
     Ok(())
 }
 
@@ -535,6 +569,8 @@ pub fn dependents(doc: &Document, owner: Owner, moved: &[ShapeRef]) -> Vec<Shape
 /// ends -- the glued cells keep their values as constants, triggers point to the shape itself,
 /// the Connect entries go (Transaction::delete_shapes removes the deleted shapes' own)
 pub fn detach(tx: &mut Transaction, eng: &mut Engine, owner: Owner, deleted: &[ShapeRef]) -> Result<(), EditError> {
+    // (JD21 jumps) the line jumps over their connectors go
+    crate::jumps::forget(tx, eng, deleted)?;
     let ids = subtree_ids(tx.doc(), owner, deleted);
     let list: Vec<(usize, Connect)> = connects(tx.doc(), owner)
         .iter()
@@ -762,48 +798,127 @@ pub fn set_style(tx: &mut Transaction, eng: &mut Engine, connectors: &[ShapeRef]
     reset(tx, eng, connectors)
 }
 
-// the obstacles of a page or master: the boxes of its top-level shapes that are not 1-D,
-// guides, permeable both ways (ShapePermeableX and Y), set to "do not lay out and route
-// around" (ObjType 4, CN-17) or containers (JD10: their members sit inside them, Visio's
-// containers are not routed around either)
+// the obstacles of a page or master, as Visio 16 routes around them (JD21v, the counter-check
+// visio-obst-1): the boxes of the top-level shapes whose ObjType has the placeable flag (1, 9;
+// a 1-D shape that is no connector too), not 0 (Visio decides: a shape becomes 1 when a
+// connector is glued to it, set_end), 2, 8 or 4 ("do not lay out and route around", CN-17; it
+// wins); a group with the group flag (8) and without the placeable one stands for its placeable
+// members (and so on down).  Never guides, connectors, shapes permeable both ways
+// (ShapePermeableX and Y) or containers (JD10: their members sit inside them; Visio's own
+// containers are 0, a placeable member inside one is routed around)
 fn obstacles(doc: &Document, owner: Owner) -> Vec<(ShapeRef, [f64; 4])> {
     let mut out = Vec::new();
     for s in doc.top_shapes(owner) {
-        let Some(shape) = doc.shape(s) else { continue };
-        if shape.is_deleted() || shape.header().kind == ShapeKind::Guide || is_one_d(doc, s) {
-            continue;
-        }
-        let sheet = SheetRef::Shape(s);
-        let perm = |c: &str| num(doc, sheet, c).is_some_and(|v| v != 0.0);
-        if perm("ShapePermeableX") && perm("ShapePermeableY") {
-            continue;
-        }
-        if num(doc, sheet, "ObjType").is_some_and(|v| (v as i64) & 4 != 0) || crate::structure::is_container(doc, s) {
-            continue;
-        }
+        obstacle_into(doc, s, &mut out);
+    }
+    out
+}
+
+fn obstacle_into(doc: &Document, s: ShapeRef, out: &mut Vec<(ShapeRef, [f64; 4])>) {
+    let Some(shape) = doc.shape(s) else { return };
+    if shape.is_deleted() || shape.header().kind == ShapeKind::Guide || is_connector(doc, s) || !may_block(doc, s) {
+        return;
+    }
+    let obj = num(doc, SheetRef::Shape(s), "ObjType").map_or(0, |v| v as i64);
+    if obj & 1 != 0 {
         if let Some(b) = page_box(doc, s) {
             out.push((s, b));
+        }
+    } else if obj & 8 != 0 {
+        for m in shape.children() {
+            obstacle_into(doc, m, out);
+        }
+    }
+}
+
+/// (JD21v) the dynamic connectors whose way runs through one of these shapes, or closer to it than
+/// the clearance (half the page's AvenueSize), where the shape keeps connectors out (an obstacle:
+/// placeable, ObjType 1; a group with 8 by its placeable members): after the shapes moved Visio
+/// routes them again (the counter-check visio-obst-1 [sprd] "beside": a way 0.05 in under a shape
+/// moved next to it went round it anew); the shapes themselves are not in the list
+pub fn crowded(doc: &Document, owner: Owner, shapes: &[ShapeRef]) -> Vec<ShapeRef> {
+    let mut boxes = Vec::new();
+    for &s in shapes {
+        obstacle_into(doc, s, &mut boxes);
+    }
+    if boxes.is_empty() {
+        return Vec::new();
+    }
+    let c = opts_for(doc, owner).clearance;
+    let grown: Vec<[f64; 4]> = boxes.iter().map(|(_, b)| [b[0] - c, b[1] - c, b[2] + c, b[3] + c]).collect();
+    doc.top_shapes(owner).filter(|&k| !shapes.contains(&k) && is_connector(doc, k) && path(doc, k).windows(2).any(|w| grown.iter().any(|b| route::hits_box(w[0], w[1], b)))).collect()
+}
+
+// whether a shape may keep connectors out at all: not ObjType 4, not a container, not permeable
+// both ways
+fn may_block(doc: &Document, s: ShapeRef) -> bool {
+    let sheet = SheetRef::Shape(s);
+    let perm = |c: &str| num(doc, sheet, c).is_some_and(|v| v != 0.0);
+    let obj = num(doc, sheet, "ObjType").map_or(0, |v| v as i64);
+    obj & 4 == 0 && !crate::structure::is_container(doc, s) && !(perm("ShapePermeableX") && perm("ShapePermeableY"))
+}
+
+// (JD21v) the straight pieces of the other dynamic connectors glued to the shapes this one is
+// glued to: Visio's right-angle router lays each leg in the middle of the part of its band they
+// leave free (route_styles::free; the counter-check visio-obst-1 [sprd]: connectors between other
+// shapes did not count)
+fn related_lines(doc: &Document, c: ShapeRef, targets: &[Target; 2]) -> Vec<[[f64; 2]; 2]> {
+    let mut out = Vec::new();
+    let Some(own) = doc.shape(c).map(|s| s.id()) else { return out };
+    let ids: Vec<u32> = targets
+        .iter()
+        .filter_map(|t| match *t {
+            Target::Shape(s) | Target::Point { shape: s, .. } => doc.shape(s).map(|x| x.id()),
+            Target::None => None,
+        })
+        .collect();
+    if ids.is_empty() {
+        return out;
+    }
+    let mut seen = BTreeSet::new();
+    for k in connects(doc, c.owner) {
+        if k.from_sheet == own || !ids.contains(&k.to_sheet) || !seen.insert(k.from_sheet) {
+            continue;
+        }
+        let Some(o) = doc.shape_by_id(c.owner, k.from_sheet) else { continue };
+        if !is_connector(doc, o) {
+            continue;
+        }
+        let way = path(doc, o);
+        for s in way.windows(2) {
+            let t = 1e-9 * (1.0 + s[0][0].abs().max(s[0][1].abs()));
+            let (dx, dy) = ((s[0][0] - s[1][0]).abs(), (s[0][1] - s[1][1]).abs());
+            if (dx <= t) != (dy <= t) {
+                out.push([s[0], s[1]]);
+            }
         }
     }
     out
 }
 
-// the clearance (LineToNodeX/Y of the page, else 1/8 inch) and the cost of a bend (1/2 inch),
-// both on paper, in drawing units
-fn opts_for(doc: &Document, owner: Owner) -> Opts {
+// the clearance and the cost of a bend (1/2 inch), both on paper, in drawing units.  (JD21v) The
+// clearance is half the page's AvenueSizeX/Y (Visio's default 7.5 mm where the page has none):
+// Visio keeps that much from obstacles and lays the stubs of its styles so (route_styles.rs;
+// AvenueSize 0.5 in gave 0.25 in, 0.1 in 0.05 in; LineToNode 0.4 in changed nothing, so it is
+// not read here)
+pub(crate) fn opts_for(doc: &Document, owner: Owner) -> Opts {
     let Owner::Page(p) = owner else { return Opts::default() };
     let sh = SheetRef::Page(p);
     let scale = match (num(doc, sh, "PageScale"), num(doc, sh, "DrawingScale")) {
         (Some(ps), Some(ds)) if ps > 0.0 && ds > 0.0 && (ds / ps).is_finite() => ds / ps,
         _ => 1.0,
     };
-    let node = [num(doc, sh, "LineToNodeX"), num(doc, sh, "LineToNodeY")].into_iter().flatten().filter(|v| *v > 0.0 && v.is_finite()).fold(None::<f64>, |m, v| Some(m.map_or(v, |m| m.max(v))));
+    let avenue = [num(doc, sh, "AvenueSizeX"), num(doc, sh, "AvenueSizeY")].into_iter().flatten().filter(|v| *v > 0.0 && v.is_finite()).fold(None::<f64>, |m, v| Some(m.map_or(v, |m| m.max(v))));
     let d = Opts::default();
-    Opts { clearance: node.unwrap_or(d.clearance) * scale, bend: d.bend * scale }
+    Opts { clearance: avenue.unwrap_or(7.5 / 25.4) * 0.5 * scale, bend: d.bend * scale }
 }
 
 fn run(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef], force: bool) -> Result<(), EditError> {
     let mut cache: Vec<(Owner, Vec<(ShapeRef, [f64; 4])>)> = Vec::new();
+    // (JD21, SS-19) which way connectors may cross each obstacle of an entry of the cache
+    let mut passes: Vec<Vec<u8>> = Vec::new();
+    // (JD21 jumps) the connectors laid, in order, with their ways before (jumps.rs)
+    let mut laid = crate::jumps::Laid::default();
     for &c in shapes {
         if !is_one_d(tx.doc(), c) {
             continue;
@@ -816,17 +931,35 @@ fn run(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef], force: bool)
             let i = match cache.iter().position(|(o, _)| *o == c.owner) {
                 Some(i) => i,
                 None => {
-                    cache.push((c.owner, obstacles(tx.doc(), c.owner)));
+                    let list = obstacles(tx.doc(), c.owner);
+                    passes.push(list.iter().map(|(s, _)| crate::route_styles::pass(tx.doc(), *s)).collect());
+                    cache.push((c.owner, list));
                     cache.len() - 1
                 }
             };
-            let boxes: Vec<[f64; 4]> = cache[i].1.iter().filter(|(s, _)| *s != c).map(|(_, b)| *b).collect();
-            route_one(tx, eng, c, force, &boxes)?;
+            let mut boxes: Vec<[f64; 4]> = cache[i].1.iter().filter(|(s, _)| *s != c).map(|(_, b)| *b).collect();
+            let mut pass: Vec<u8> = cache[i].1.iter().zip(&passes[i]).filter(|((s, _), _)| *s != c).map(|(_, p)| *p).collect();
+            // (JD21v) the shapes its own ends are glued to keep it out also where they are not
+            // placeable (a file without ObjType; Visio makes them 1 when it glues)
+            for t in glued(tx.doc(), c) {
+                if let Target::Shape(s) | Target::Point { shape: s, .. } = t {
+                    let doc = tx.doc();
+                    if cache[i].1.iter().all(|(o, _)| *o != s) && !is_one_d(doc, s) && may_block(doc, s) {
+                        if let Some(b) = page_box(doc, s) {
+                            boxes.push(b);
+                            pass.push(crate::route_styles::pass(doc, s));
+                        }
+                    }
+                }
+            }
+            laid.note(tx.doc(), c);
+            route_one(tx, eng, c, force, &boxes, &pass)?;
         } else {
             walk_line(tx, eng, c)?;
         }
     }
-    Ok(())
+    // (JD21 jumps) their line jumps and those of the connectors they cross or crossed
+    crate::jumps::lay(tx, eng, &laid)
 }
 
 // a 1-D shape with walking glue that is no connector: a dynamic end docks on the outline
@@ -931,77 +1064,50 @@ fn candidates(doc: &Document, t: Target, at: [f64; 2], toward: [f64; 2], other: 
     }
 }
 
-// (JD15, SS-18) WalkPreference with bit 1 (Begin) or 2 (End) set: the end prefers the top and
-// bottom of its shape -- among ways as short and with as few bends as the cheapest one, a way
-// from those sides wins (Visio's sides, the default, need nothing: SIDES puts them first)
-fn prefer_walk(ca: &[Port], cb: &[Port], boxes: &[[f64; 4]], opts: &Opts, walk: i64, found: (usize, usize, Vec<[f64; 2]>)) -> (usize, usize, Vec<[f64; 2]>) {
-    if walk & 3 == 0 || found.2.len() < 2 {
-        return found;
-    }
-    let vertical = |p: &Port| p.dir.is_some_and(|d| d[0] == 0.0);
-    let pick = |ports: &[Port], on: bool| -> Vec<usize> { (0..ports.len()).filter(|&k| !on || vertical(&ports[k])).collect() };
-    let (ia, ib) = (pick(ca, walk & 1 != 0), pick(cb, walk & 2 != 0));
-    if ia.is_empty() || ib.is_empty() || (ia.len() == ca.len() && ib.len() == cb.len()) {
-        return found;
-    }
-    let (sa, sb): (Vec<Port>, Vec<Port>) = (ia.iter().map(|&k| ca[k]).collect(), ib.iter().map(|&k| cb[k]).collect());
-    let (i, j, way) = route::best(&sa, &sb, boxes, opts);
-    let len = |w: &[[f64; 2]]| w.windows(2).map(|s| (s[1][0] - s[0][0]).abs() + (s[1][1] - s[0][1]).abs()).sum::<f64>();
-    let (l0, l1) = (len(&found.2), len(&way));
-    if way.len() >= 2 && l1 <= l0 + 1e-9 * (1.0 + l0) && route::bends(&way) <= route::bends(&found.2) {
-        (ia[i], ib[j], way)
-    } else {
-        found
-    }
-}
-
-// a kept way (ConFixedCode): its corners stay, the first and last piece move with the ends
-fn keep(cur: &[[f64; 2]], b: [f64; 2], e: [f64; 2]) -> Option<Vec<[f64; 2]>> {
-    let n = cur.len();
-    if n < 3 {
-        return None;
-    }
-    let horizontal = |p: [f64; 2], q: [f64; 2]| (p[1] - q[1]).abs() <= (p[0] - q[0]).abs();
-    let mut q = cur.to_vec();
-    if n == 3 {
-        let corner = if horizontal(cur[0], cur[1]) { [e[0], b[1]] } else { [b[0], e[1]] };
-        q = alloc::vec![b, corner, e];
-    } else {
-        let (h0, h1) = (horizontal(cur[0], cur[1]), horizontal(cur[n - 1], cur[n - 2]));
-        q[0] = b;
-        if h0 { q[1][1] = b[1] } else { q[1][0] = b[0] }
-        q[n - 1] = e;
-        if h1 { q[n - 2][1] = e[1] } else { q[n - 2][0] = e[0] }
-    }
-    Some(route::simplify(q))
-}
-
-fn route_one(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef, force: bool, boxes: &[[f64; 4]]) -> Result<(), EditError> {
+fn route_one(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef, force: bool, boxes: &[[f64; 4]], pass: &[u8]) -> Result<(), EditError> {
     let doc = tx.doc();
     let sheet = SheetRef::Shape(c);
     let targets = glued(doc, c);
     let Some((bp, ep)) = ends(doc, c) else { return Ok(()) };
     let style = style(doc, c);
     let opts = opts_for(doc, c.owner);
-    let fixed = !force && matches!(num(doc, sheet, "ConFixedCode").map(|v| v as i64), Some(1 | 2));
+    // (JD21, CN-04) ConFixedCode 1 and 2 keep the way (route_edit::kept; 3 .. 6 are what Visio
+    // writes for the connectors it routes itself: free)
+    let code = num(doc, sheet, "ConFixedCode").map_or(0, |v| v as i64);
+    let fixed = !force && matches!(code, 1 | 2);
     let refs = [reference(doc, targets[0], bp), reference(doc, targets[1], ep)];
-    // (JD15, SS-18) WalkPreference: bit 1 Begin, bit 2 End prefer top and bottom
-    // (visWalkPrefBegNS, visWalkPrefEndNS), else the sides
-    let walk = num(doc, sheet, "WalkPreference").filter(|v| v.is_finite()).unwrap_or(0.0) as i64;
     let ca = candidates(doc, targets[0], bp, refs[1], facing(doc, targets[1], ep), style);
     let cb = candidates(doc, targets[1], ep, refs[0], facing(doc, targets[0], bp), style);
-    let pts = if style == Style::Straight {
-        route::straight(&ca[0], &cb[0])
+    // (JD21v, CN-05) the way of the connector's style as Visio lays it (route_styles::route; the
+    // shapes of ends glued to whole shapes).  (JD15, SS-18) WalkPreference changes none of these
+    // ways in Visio (the counter-check): it is kept, not read
+    let shapes = [crate::route_styles::shape(doc, targets[0]), crate::route_styles::shape(doc, targets[1])];
+    let lines = related_lines(doc, c, &targets);
+    let lay = || crate::route_styles::route(crate::route_styles::of(doc, c), [shapes[0].as_ref(), shapes[1].as_ref()], &ca, &cb, boxes, pass, &lines, &opts);
+    let (pts, router) = if style == Style::Straight {
+        // (JD21, CN-04) a straight way with vertices of its own keeps them
+        match fixed.then(|| crate::route_edit::kept_polyline(doc, c, &targets)).flatten() {
+            Some(p) => (p, None),
+            None => {
+                let r = lay();
+                (r.way, Some(r.router))
+            }
+        }
     } else {
-        // one search over the ports of both ends: the cheapest pair of sides among the obstacles
-        let found = route::best(&ca, &cb, boxes, &opts);
-        let (i, j, way) = prefer_walk(&ca, &cb, boxes, &opts, walk, found);
-        match fixed.then(|| keep(&path(doc, c), ca[i].at, cb[j].at)).flatten() {
-            Some(p) => p,
-            None => way,
+        match fixed.then(|| crate::route_edit::kept(doc, c, code, &ca, &cb, boxes, pass, &opts)).flatten() {
+            Some(p) => (p, None),
+            None => {
+                let r = lay();
+                (r.way, Some(r.router))
+            }
         }
     };
-    write_route(tx, eng, c, &targets, &pts, style)
+    write_route(tx, eng, c, &targets, &pts, style)?;
+    // (JD21v) ConFixedCode 6 / 0 afterwards, as Visio writes it
+    match router {
+        Some(r) => crate::route_styles::mark(tx, c, r),
+        None => Ok(()),
+    }
 }
 
 // the Width or Height formula of a connector for a side of length d (None: leave it)
@@ -1020,19 +1126,19 @@ fn side_formula(current: &str, d: f64, standard: &'static str) -> Option<String>
     (want != current).then_some(want)
 }
 
-// a value of a Geometry cell: a constant or a formula
-enum Cv {
+// a value of a Geometry cell: a constant or a formula (NURBS(..), POLYLINE(..))
+pub(crate) enum Cv {
     N(f64),
     F(String),
 }
 
-struct GeoRow {
-    kind: Sym,
-    kind_name: &'static str,
-    cells: Vec<(Sym, Cv)>,
+pub(crate) struct GeoRow {
+    pub(crate) kind: Sym,
+    pub(crate) kind_name: &'static str,
+    pub(crate) cells: Vec<(Sym, Cv)>,
 }
 
-fn write_route(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef, targets: &[Target; 2], pts: &[[f64; 2]], style: Style) -> Result<(), EditError> {
+pub(crate) fn write_route(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef, targets: &[Target; 2], pts: &[[f64; 2]], style: Style) -> Result<(), EditError> {
     let (Some(&first), Some(&last)) = (pts.first(), pts.last()) else { return Ok(()) };
     let sheet = SheetRef::Shape(c);
     let pinv = parent_xform(tx.doc(), c).inverse().unwrap_or(Xform::IDENTITY);
@@ -1181,8 +1287,9 @@ fn place_row(tx: &mut Transaction, sheet: SheetRef, sk: SecKey, key: u32, kind: 
     }
 }
 
-// write the rows into the connector's first Geometry section (made when it has none)
-fn write_geometry(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef, rows: &[GeoRow]) -> Result<(), EditError> {
+// write the rows into the connector's first Geometry section (made when it has none); (JD21
+// jumps) jumps.rs writes its line jumps through it
+pub(crate) fn write_geometry(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef, rows: &[GeoRow]) -> Result<(), EditError> {
     let sheet = SheetRef::Shape(c);
     let sk = match tx.doc().geometry(sheet).first() {
         Some(k) => *k,
@@ -1234,9 +1341,10 @@ fn write_geometry(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef, rows: &[G
             match v {
                 Cv::N(x) => tx.force_constant(sheet, &a, Value::Num(*x), None)?,
                 Cv::F(f) => {
-                    // the value as text with its unit (U="NURBS"), then the formula for it
+                    // the value as text with its unit (U="NURBS", "POLYLINE"), then the formula
+                    let unit = if f.starts_with("POLYLINE") { crate::units::Unit::Polyline } else { crate::units::Unit::Nurbs };
                     let v = Value::Text(tx.intern(f));
-                    tx.force_constant(sheet, &a, v, Some(crate::units::Unit::Nurbs))?;
+                    tx.force_constant(sheet, &a, v, Some(unit))?;
                     tx.force_formula(sheet, &a, f)?;
                     formulas.push((sheet, a));
                 }

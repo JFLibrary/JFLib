@@ -72,9 +72,9 @@ fn from_table_guesses_types_names_and_ids() {
     let rs = Recordset::from_table("Geräte", &h, rows, &[]);
     let kinds: Vec<u16> = rs.columns.iter().map(|c| c.data_type).collect();
     assert_eq!(kinds, vec![kind::TEXT, kind::TEXT, kind::NUMBER, kind::BOOL]);
-    assert_eq!(rs.columns[1].name, "IP_Adresse");
+    assert_eq!(rs.columns[1].name, "_VisDM_IPAdresse");
     assert_eq!(rs.columns[1].label, "IP-Adresse");
-    assert_eq!(rs.columns[0].name, "Gerät");
+    assert_eq!(rs.columns[0].name, "_VisDM_Gerät");
     assert!(rs.row_order);
     assert_eq!(rs.rows.iter().map(|r| r.id).collect::<Vec<_>>(), vec![1, 2, 3]);
     assert_eq!(rs.next_row, 4);
@@ -82,7 +82,7 @@ fn from_table_guesses_types_names_and_ids() {
     let rs = Recordset::from_table("x", &[s("A"), s("A"), s(""), s("1x")], vec![vec![t("1")]], &[]);
     let ids: Vec<&str> = rs.columns.iter().map(|c| c.id.as_str()).collect();
     assert_eq!(ids, vec!["A", "A1", "F", "1x"]);
-    assert_eq!(rs.columns[3].name, "_1x");
+    assert_eq!(rs.columns[3].name, "_VisDM_1x");
     assert_eq!(rs.rows[0].values.len(), 4);
 }
 
@@ -123,10 +123,10 @@ fn link_writes_shape_data_and_undo_takes_it_back() {
     let change = tx.commit().unwrap();
     assert_eq!(written.len(), 4);
     assert_eq!(f.doc.data_link(shape, rs), Some(1));
-    assert_eq!(value(&f.doc, shape, "IP_Adresse"), "10.0.0.1");
-    assert_eq!(value(&f.doc, shape, "Ports"), "24");
-    assert_eq!(value(&f.doc, shape, "Aktiv"), "TRUE");
-    let row = f.doc.shape_data(SheetRef::Shape(shape)).into_iter().find(|r| r.name() == Some("Ports")).unwrap();
+    assert_eq!(value(&f.doc, shape, "_VisDM_IPAdresse"), "10.0.0.1");
+    assert_eq!(value(&f.doc, shape, "_VisDM_Ports"), "24");
+    assert_eq!(value(&f.doc, shape, "_VisDM_Aktiv"), "TRUE");
+    let row = f.doc.shape_data(SheetRef::Shape(shape)).into_iter().find(|r| r.name() == Some("_VisDM_Ports")).unwrap();
     assert_eq!(row.num("Type"), Some(2.0));
     assert_eq!(row.text("Label"), Some("Ports"));
     assert_eq!(row.num(DATA_LINKED), Some(1.0));
@@ -141,7 +141,7 @@ fn link_writes_shape_data_and_undo_takes_it_back() {
     let mut change = change;
     assert!(change.undo(&mut f.doc));
     assert_eq!(f.doc.data_link(shape, rs), None);
-    assert_eq!(value(&f.doc, shape, "IP_Adresse"), "<none>");
+    assert_eq!(value(&f.doc, shape, "_VisDM_IPAdresse"), "<none>");
     assert!(change.redo(&mut f.doc));
     assert_eq!(f.doc.data_link(shape, rs), Some(1));
 }
@@ -156,8 +156,8 @@ fn unlink_keeps_values() {
     unlink(&mut tx, shape, Some(rs)).unwrap();
     tx.commit();
     assert_eq!(f.doc.data_link(shape, rs), None);
-    assert_eq!(value(&f.doc, shape, "Gerät"), "Server2");
-    assert!(!data_linked(&f.doc, SheetRef::Shape(shape), "Gerät"));
+    assert_eq!(value(&f.doc, shape, "_VisDM_Gerät"), "Server2");
+    assert!(!data_linked(&f.doc, SheetRef::Shape(shape), "_VisDM_Gerät"));
 }
 
 #[test]
@@ -172,9 +172,9 @@ fn auto_link_matches_text_and_data() {
     assert_eq!(f.doc.data_link(shapes[2], rs), None);
     // a second run without replace keeps the links; with a data field it matches too
     let mut tx = f.doc.transaction("auto2");
-    let (made, _) = auto_link(&mut tx, &shapes, rs, &[(1, ShapeField::Data(s("IP_Adresse")))], false).unwrap();
+    let (made, _) = auto_link(&mut tx, &shapes, rs, &[(1, ShapeField::Data(s("_VisDM_IPAdresse")))], false).unwrap();
     assert!(made.is_empty());
-    let (made, _) = auto_link(&mut tx, &shapes, rs, &[(1, ShapeField::Data(s("IP_Adresse")))], true).unwrap();
+    let (made, _) = auto_link(&mut tx, &shapes, rs, &[(1, ShapeField::Data(s("_VisDM_IPAdresse")))], true).unwrap();
     tx.commit();
     assert_eq!(made.len(), 2);
 }
@@ -189,10 +189,10 @@ fn refresh_by_key_updates_reports_and_keeps_ids() {
     link(&mut tx, b, rs, 2).unwrap();
     // the user overwrites a linked value on shape a
     let sk = SecKey::one(names::PROPERTY);
-    let rk = RowKey::Named(tx.intern("Ports"));
+    let rk = RowKey::Named(tx.intern("_VisDM_Ports"));
     let v = names::VALUE;
     tx.set_constant(SheetRef::Shape(a), &CellAddr::row(sk, rk, v), Value::Num(99.0), None).unwrap();
-    user_edited(&mut tx, SheetRef::Shape(a), "Ports").unwrap();
+    user_edited(&mut tx, SheetRef::Shape(a), "_VisDM_Ports").unwrap();
     tx.commit();
     // new data: Server2 gone, Server1 with new IP and ports, a new row first, a new column
     let h = vec![s("Gerät"), s("IP-Adresse"), s("Ports"), s("Aktiv"), s("Raum")];
@@ -213,20 +213,20 @@ fn refresh_by_key_updates_reports_and_keeps_ids() {
     assert_eq!(set.time_refreshed.as_deref(), Some("2026-11-23T14:05:00"));
     assert_eq!(set.columns.len(), 5);
     // a: new IP, new column, the user's ports stay and are reported
-    assert_eq!(value(&f.doc, a, "IP_Adresse"), "10.0.1.1");
-    assert_eq!(value(&f.doc, a, "Raum"), "R2");
-    assert_eq!(value(&f.doc, a, "Ports"), "99");
-    assert!(r.conflicts.iter().any(|c| matches!(c, Conflict::UserValue { shape, column, user, .. } if *shape == a && column == "Ports" && user == "99")));
+    assert_eq!(value(&f.doc, a, "_VisDM_IPAdresse"), "10.0.1.1");
+    assert_eq!(value(&f.doc, a, "_VisDM_Raum"), "R2");
+    assert_eq!(value(&f.doc, a, "_VisDM_Ports"), "99");
+    assert!(r.conflicts.iter().any(|c| matches!(c, Conflict::UserValue { shape, column, user, .. } if *shape == a && column == "_VisDM_Ports" && user == "99")));
     // b: its row is gone; it stays linked and is a RefreshConflict
     assert!(r.conflicts.iter().any(|c| matches!(c, Conflict::RowGone { row: 2, shape } if *shape == b)));
     assert_eq!(set.conflicts.len(), 1);
     assert_eq!(f.doc.data_link(b, rs), Some(2));
     // resolving: take the data value on a, unlink b
     let mut tx = f.doc.transaction("resolve");
-    resolve_take_data(&mut tx, a, rs, "Ports").unwrap();
+    resolve_take_data(&mut tx, a, rs, "_VisDM_Ports").unwrap();
     resolve_unlink(&mut tx, b, rs).unwrap();
     tx.commit();
-    assert_eq!(value(&f.doc, a, "Ports"), "32");
+    assert_eq!(value(&f.doc, a, "_VisDM_Ports"), "32");
     assert_eq!(f.doc.data_link(b, rs), None);
     assert!(f.doc.recordset(rs).unwrap().conflicts.is_empty());
     let _ = change;
@@ -242,20 +242,20 @@ fn refresh_overwrite_all_and_duplicates() {
     let mut tx = f.doc.transaction("link");
     set_recordset(&mut tx, set).unwrap();
     link(&mut tx, a, rs, 1).unwrap();
-    let rk = RowKey::Named(tx.intern("Ports"));
+    let rk = RowKey::Named(tx.intern("_VisDM_Ports"));
     tx.set_constant(SheetRef::Shape(a), &CellAddr::row(SecKey::one(names::PROPERTY), rk, names::VALUE), Value::Num(99.0), None).unwrap();
-    user_edited(&mut tx, SheetRef::Shape(a), "Ports").unwrap();
+    user_edited(&mut tx, SheetRef::Shape(a), "_VisDM_Ports").unwrap();
     tx.commit();
     let (h, mut rows) = table();
     rows.push(vec![t("Server1"), t("10.9.9.9"), DataValue::Num(1.0), DataValue::Bool(false)]);
     let mut tx = f.doc.transaction("refresh");
     let r = refresh(&mut tx, rs, &h, rows, "now").unwrap();
     tx.commit();
-    assert_eq!(value(&f.doc, a, "Ports"), "24");
+    assert_eq!(value(&f.doc, a, "_VisDM_Ports"), "24");
     assert!(r.conflicts.iter().any(|c| matches!(c, Conflict::DuplicateKey { key, rows: 2 } if key == "Server1")));
     // the duplicate is a row of its own with a new ID; the shape keeps the first
     assert_eq!(f.doc.recordset(rs).unwrap().rows.len(), 4);
-    assert_eq!(value(&f.doc, a, "IP_Adresse"), "10.0.0.1");
+    assert_eq!(value(&f.doc, a, "_VisDM_IPAdresse"), "10.0.0.1");
 }
 
 #[test]

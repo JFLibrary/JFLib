@@ -32,6 +32,7 @@ TxtPinX = Width*0.5
 TxtPinY = Height*0.5
 TxtLocPinX = TxtWidth*0.5
 TxtLocPinY = TxtHeight*0.5
+ShapeSplit = 1
 
 [User]
 # die Breite der Fase

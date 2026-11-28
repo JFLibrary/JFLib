@@ -21,6 +21,7 @@ Width = 30 mm
 Width.us = 1.25 in
 Height = 28.5 mm
 Height.us = 1.19 in
+ShapeSplit = 1
 
 [Geometry]
 MoveTo  X = Width; Y = Height*0.5

@@ -1,0 +1,113 @@
+# Datengrafik-Element Datenleiste (JD19, DA-07): der Anteil des Werts von Prop.msvCalloutField
+# zwischen Prop.msvCalloutPropMin und Prop.msvCalloutPropMax (User.F, 0 bis 1) bestimmt die
+# Geometrie.  Farben aus dem Design (Normal); gefüllte Teile in der Linienfarbe (FillForegnd = LineColor),
+# kräftig vor dem Shape.  Verborgener Master: die App setzt ihn als Untershape an.
+# Fortschrittsleiste: Rahmen, gefüllter Balken, der Wert rechts daneben (Wert anzeigen).
+master: DG Progress bar
+name.de: Fortschrittsleiste
+name.en: Progress bar
+name.es: Barra de progreso
+name.it: Barra di avanzamento
+name.fr: Barre de progression
+prompt.de: Datengrafik: Balken, der den Wert zwischen Minimum und Maximum zeigt.
+prompt.en: Data graphic: bar that shows the value between the minimum and the maximum.
+prompt.es: Gráfico de datos: barra que muestra el valor entre el mínimo y el máximo.
+prompt.it: Grafico dati: barra che mostra il valore tra il minimo e il massimo.
+prompt.fr: Graphique de données : barre qui montre la valeur entre le minimum et le maximum.
+hidden: true
+text.de: {fld 0}
+text.en: {fld 0}
+text.es: {fld 0}
+text.it: {fld 0}
+text.fr: {fld 0}
+
+[Shape]
+Width = 30 mm
+Width.us = 1.2 in
+Height = 5 mm
+Height.us = 0.2 in
+FillForegnd = LineColor
+FillPattern = 1
+TxtWidth = MAX(User.T,1 mm)
+TxtHeight = Height
+TxtPinX = Width-User.T*0.5
+TxtPinY = Height*0.5
+TxtLocPinX = TxtWidth*0.5
+TxtLocPinY = TxtHeight*0.5
+HideText = NOT(Prop.msvCalloutPropShowValue)
+LeftMargin = 0 mm
+RightMargin = 0 mm
+TopMargin = 0 mm
+BottomMargin = 0 mm
+
+[User]
+msvCalloutType:  Value = "Data Bar"
+# Visios Kennzeichen eines Datengrafik-Callouts (JD19, Visio-Gegenprobe: ohne sie und ohne die
+# Shape-ID 5 des Masters zählt Visio die Elemente einer Datengrafik nicht)
+visDGCalloutItem:  Value = 5
+visDGDefaultPos:  Value = 0
+visDGStackHeight:  Value = 0
+# der Anteil des Werts zwischen Minimum und Maximum, 0 bis 1
+F:  Value = IFERROR(BOUND((Prop.msvCalloutField-Prop.msvCalloutPropMin)/(Prop.msvCalloutPropMax-Prop.msvCalloutPropMin),0,FALSE,0,1),0)
+# der Platz für den Wert rechts
+T:  Value = IF(Prop.msvCalloutPropShowValue,9 mm,0 mm)
+    Value.us = IF(Prop.msvCalloutPropShowValue,0.36 in,0 in)
+
+[Property]
+msvCalloutField:  Type = 2; Value = 50; Prompt = "Number"; SortKey = "Wert"
+        Label.de = Datenfeld
+        Label.en = Data field
+        Label.es = Campo de datos
+        Label.it = Campo dati
+        Label.fr = Champ de données
+msvCalloutPropMin:  Type = 2; Value = 0; Prompt = "Number"
+        Label.de = Minimalwert
+        Label.en = Minimum value
+        Label.es = Valor mínimo
+        Label.it = Valore minimo
+        Label.fr = Valeur minimale
+msvCalloutPropMax:  Type = 2; Value = 100; Prompt = "Number"
+        Label.de = Maximalwert
+        Label.en = Maximum value
+        Label.es = Valor máximo
+        Label.it = Valore massimo
+        Label.fr = Valeur maximale
+msvCalloutPropShowValue:  Type = 3; Value = TRUE; Prompt = "Bool"
+        Label.de = Wert anzeigen
+        Label.en = Show value
+        Label.es = Mostrar valor
+        Label.it = Mostra valore
+        Label.fr = Afficher la valeur
+msvCalloutPropValueFormat:  Type = 0; Value = ""; Prompt = "Format"
+        Label.de = Wertformat
+        Label.en = Value format
+        Label.es = Formato del valor
+        Label.it = Formato valore
+        Label.fr = Format de la valeur
+
+[Character]
+Row  Size = 7 pt
+
+[Field]
+# ohne eigenes Format esc(0), Visios FIELDPICTURE(0): Visios FORMAT(x,"") ist leer (Visio-Gegenprobe JD19)
+Row  Value = IF(Prop.msvCalloutPropShowValue,FORMATEX(Prop.msvCalloutField,IF(STRSAME(Prop.msvCalloutPropValueFormat,""),"esc(0)",Prop.msvCalloutPropValueFormat)),""); Format = "esc(0)"; Type = 0
+
+# der Rahmen
+[Geometry]
+NoFill = TRUE
+MoveTo  X = 0; Y = 0
+LineTo  X = Width-User.T; Y = 0
+LineTo  X = Width-User.T; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# der Balken
+[Geometry]
+NoLine = TRUE
+NoShow = User.F<=0
+MoveTo  X = 0; Y = 0
+LineTo  X = (Width-User.T)*User.F; Y = 0
+LineTo  X = (Width-User.T)*User.F; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+

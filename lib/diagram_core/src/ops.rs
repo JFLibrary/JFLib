@@ -14,7 +14,12 @@
 //   set_pin(tx, eng, shape, at)         the pin to another place, the shape stays
 //   controls / set_control              the yellow control points (SP-04)
 //   vertices / set_vertex / insert_vertex / delete_vertex     Geometry rows (SP-05)
-//   group(tx, eng, owner, shapes) / ungroup(tx, eng, group)   (SP-06)
+//   move_vertices / delete_vertices, arc_handles / set_arc_point / set_eccentricity   (JD21,
+//                                       SP-05) several vertices together, the handles of arcs
+//                                       (ops/arcs.rs)
+//   group(tx, eng, owner, shapes) / ungroup(tx, eng, group)   (SP-06; JD21: glue between a
+//                                       guide and shapes breaks unless both are grouped, SP-17;
+//                                       an instance is made plain first: instance::detach)
 //   reorder(tx, shapes, Z::Front | Back | Forward | Backward) (SP-07)
 //   new_shape(tx, eng, owner, Basic::Rectangle | Ellipse | TextBox, a, b)   rectangle and
 //                                       ellipse with the document's default line, fill and text
@@ -78,6 +83,7 @@ use crate::sheet::{CellAddr, Row, RowKey, SecKey, Section};
 use crate::strings::Sym;
 use crate::units::Unit;
 
+mod arcs;
 mod clip;
 mod draw;
 mod picture;
@@ -87,7 +93,8 @@ pub(crate) mod text;
 pub use clip::{copy, paste, Clip};
 pub use draw::{new_arc, new_freeform, quarter_arc, simplify, Arc, Spline};
 pub use picture::{new_picture, probe_picture, PictureFormat, PictureInfo};
-pub use points::{controls, delete_vertex, insert_vertex, set_control, set_vertex, vertices, Control, Vertex};
+pub use arcs::{arc_handles, set_arc_point, set_eccentricity, ArcHandle};
+pub use points::{controls, delete_vertex, delete_vertices, insert_vertex, move_vertices, set_control, set_vertex, vertices, Control, Vertex};
 
 #[cfg(test)]
 mod tests;
@@ -799,7 +806,7 @@ pub fn set_pin(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, at: [f64
 // ---------------------------------------------------------------- groups
 
 // a cell to its value as a constant (structural: also over GUARD), keeping its unit
-fn freeze(tx: &mut Transaction, sheet: SheetRef, addr: &CellAddr) -> Result<(), EditError> {
+pub(crate) fn freeze(tx: &mut Transaction, sheet: SheetRef, addr: &CellAddr) -> Result<(), EditError> {
     let r = tx.doc().resolve(sheet, addr);
     if !r.exists() {
         return Ok(());
@@ -828,7 +835,7 @@ pub(crate) fn glue_cells(doc: &Document, from_cell: Sym) -> Vec<CellAddr> {
 
 // the cells of a sheet whose own formula names shape `id` by Sheet.N (an inherited formula's
 // Sheet.N names a shape of its master)
-fn cells_naming(doc: &Document, sheet: SheetRef, id: u32) -> Vec<CellAddr> {
+pub(crate) fn cells_naming(doc: &Document, sheet: SheetRef, id: u32) -> Vec<CellAddr> {
     let want = format!("Sheet.{id}");
     crate::formula::sheet_formula_cells(doc, sheet)
         .into_iter()
@@ -845,6 +852,59 @@ fn cells_naming(doc: &Document, sheet: SheetRef, id: u32) -> Vec<CellAddr> {
         .collect()
 }
 
+/// (JD21) the cells of member `m` of group `gid` (its box gw x gh) in the group's coordinates,
+/// the box starting at `origin` of the member's current coordinates: PinX "Sheet.<gid>!Width*k",
+/// PinY "Sheet.<gid>!Height*k", for upright members (turned by a multiple of 90°) whose size is
+/// a constant or proportional and whose ResizeMode (0: `group_rm`) is not 1 also Width/Height;
+/// free ends of 1D members alike, glued ends as results -> (cells to write, results)
+pub(crate) fn member_sets(doc: &Document, m: ShapeRef, origin: [f64; 2], gw: f64, gh: f64, gid: u32, group_rm: f64) -> (Vec<(CellAddr, Put)>, Vec<(CellAddr, f64)>) {
+    let sheet = SheetRef::Shape(m);
+    let b = origin;
+    let prop = |v: f64, size: f64, cell: &str| if size.abs() > EPS { Put::Formula(format!("Sheet.{gid}!{cell}*{}", text::num(v / size))) } else { Put::Num(v) };
+    let mut sets: Vec<(CellAddr, Put)> = Vec::new();
+    let mut results: Vec<(CellAddr, f64)> = Vec::new();
+    if one_d(doc, m) {
+        let (gb, ge) = glued_ends(doc, m);
+        let (bp, ep) = ends(doc, m);
+        for (glued, cx, cy, p) in [(gb, names::BEGIN_X, names::BEGIN_Y, bp), (ge, names::END_X, names::END_Y, ep)] {
+            let q = [p[0] - b[0], p[1] - b[1]];
+            if glued {
+                results.push((single(cx), q[0]));
+                results.push((single(cy), q[1]));
+            } else {
+                sets.push((single(cx), prop(q[0], gw, "Width")));
+                sets.push((single(cy), prop(q[1], gh, "Height")));
+            }
+        }
+    } else {
+        let q = [val(doc, sheet, names::PIN_X) - b[0], val(doc, sheet, names::PIN_Y) - b[1]];
+        sets.push((single(names::PIN_X), prop(q[0], gw, "Width")));
+        sets.push((single(names::PIN_Y), prop(q[1], gh, "Height")));
+        let rm = val(doc, sheet, names::RESIZE_MODE);
+        let rm = if rm == 0.0 { group_rm } else { rm };
+        if rm != 1.0 {
+            let a = norm_angle(val(doc, sheet, names::ANGLE));
+            let quarter = core::f64::consts::FRAC_PI_2;
+            let k = math::round(a / quarter);
+            if (a - k * quarter).abs() < 1e-9 {
+                let swap = (k as i64).rem_euclid(2) == 1;
+                let (w0, h0) = (val(doc, sheet, names::WIDTH), val(doc, sheet, names::HEIGHT));
+                let plain = |c: Sym| match doc.resolve(sheet, &single(c)).formula() {
+                    Formula::Expr(f) => text::proportional(doc.str(f)).is_some(),
+                    _ => true,
+                };
+                if plain(names::WIDTH) {
+                    sets.push((single(names::WIDTH), if swap { prop(w0, gh, "Height") } else { prop(w0, gw, "Width") }));
+                }
+                if plain(names::HEIGHT) {
+                    sets.push((single(names::HEIGHT), if swap { prop(h0, gw, "Width") } else { prop(h0, gh, "Height") }));
+                }
+            }
+        }
+    }
+    (sets, results)
+}
+
 /// group shapes of one parent (SP-06): a new group shape (Type Group, the style "Normal",
 /// ResizeMode 0) around the shapes, at the place of the topmost of them in the z-order; the
 /// box is the upright hull of the shapes in the parent's coordinates (turned shapes with their
@@ -858,6 +918,8 @@ pub fn group(tx: &mut Transaction, eng: &mut Engine, owner: Owner, shapes: &[Sha
     if list.is_empty() {
         return Err(EditError::Invalid);
     }
+    // (JD21, SP-17) glue between a guide and shapes breaks unless both go into the group
+    crate::groups::guide_glue(tx, eng, owner, &list, &[])?;
     let (parent, b, siblings) = {
         let doc = tx.doc();
         let parent = doc.shape(list[0]).ok_or(EditError::NoShape)?.parent();
@@ -912,56 +974,10 @@ pub fn group(tx: &mut Transaction, eng: &mut Engine, owner: Owner, shapes: &[Sha
     }
     tx.move_shape(g, parent, Some(pos))?;
     // the members' cells in the group's coordinates
-    let group_rm = 0.0;
     let mut w = Writer::new();
     for &m in &members {
         let sheet = SheetRef::Shape(m);
-        let (sets, results) = {
-            let doc = tx.doc();
-            let prop = |v: f64, size: f64, cell: &str| if size.abs() > EPS { Put::Formula(format!("Sheet.{gid}!{cell}*{}", text::num(v / size))) } else { Put::Num(v) };
-            let mut sets: Vec<(CellAddr, Put)> = Vec::new();
-            let mut results: Vec<(CellAddr, f64)> = Vec::new();
-            if one_d(doc, m) {
-                let (gb, ge) = glued_ends(doc, m);
-                let (bp, ep) = ends(doc, m);
-                for (glued, cx, cy, p) in [(gb, names::BEGIN_X, names::BEGIN_Y, bp), (ge, names::END_X, names::END_Y, ep)] {
-                    let q = [p[0] - b[0], p[1] - b[1]];
-                    if glued {
-                        results.push((single(cx), q[0]));
-                        results.push((single(cy), q[1]));
-                    } else {
-                        sets.push((single(cx), prop(q[0], gw, "Width")));
-                        sets.push((single(cy), prop(q[1], gh, "Height")));
-                    }
-                }
-            } else {
-                let q = [val(doc, sheet, names::PIN_X) - b[0], val(doc, sheet, names::PIN_Y) - b[1]];
-                sets.push((single(names::PIN_X), prop(q[0], gw, "Width")));
-                sets.push((single(names::PIN_Y), prop(q[1], gh, "Height")));
-                let rm = val(doc, sheet, names::RESIZE_MODE);
-                let rm = if rm == 0.0 { group_rm } else { rm };
-                if rm != 1.0 {
-                    let a = norm_angle(val(doc, sheet, names::ANGLE));
-                    let quarter = core::f64::consts::FRAC_PI_2;
-                    let k = math::round(a / quarter);
-                    if (a - k * quarter).abs() < 1e-9 {
-                        let swap = (k as i64).rem_euclid(2) == 1;
-                        let (w0, h0) = (val(doc, sheet, names::WIDTH), val(doc, sheet, names::HEIGHT));
-                        let plain = |c: Sym| match doc.resolve(sheet, &single(c)).formula() {
-                            Formula::Expr(f) => text::proportional(doc.str(f)).is_some(),
-                            _ => true,
-                        };
-                        if plain(names::WIDTH) {
-                            sets.push((single(names::WIDTH), if swap { prop(w0, gh, "Height") } else { prop(w0, gw, "Width") }));
-                        }
-                        if plain(names::HEIGHT) {
-                            sets.push((single(names::HEIGHT), if swap { prop(h0, gw, "Width") } else { prop(h0, gh, "Height") }));
-                        }
-                    }
-                }
-            }
-            (sets, results)
-        };
+        let (sets, results) = member_sets(tx.doc(), m, [b[0], b[1]], gw, gh, gid, 0.0);
         for (a, v) in results {
             tx.set_result(sheet, &a, Value::Num(v), None)?;
         }

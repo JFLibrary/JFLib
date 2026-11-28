@@ -1,0 +1,53 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD21 route (CN-05, SS-40): Seite einrichten › Layout und Routing shows the
+# routing style and its direction as two rows (Visio's 23 RouteStyle codes) and the appearance,
+# separating and overlapping of lines.  Right angles: an L from the upper shape's bottom to the
+# lower one's left side.  Organigramm von oben nach unten: out at the bottom, in from above,
+# (JD21v, as Visio 16) bending one stub above the lower shape; the lower shape moved: the same
+# style.  Von links nach rechts: out on the right, in on the left, bending one stub before it.
+# The direction is greyed for styles without one.  Verbinder-Verhalten (a connector's menu) has
+# the rows Weg: Gerade on the connector itself wins over the page (one straight line, corner to
+# corner as in Visio), undone.
+cmd 4404
+drag 500,330 640,420
+drag 760,530 900,620
+cmd 4401
+drag 560,370 820,570
+cmd 4400
+key esc
+expect listitem:"Sheet.6" rect 576 424 176 154
+# Seite einrichten › Layout und Routing: Organigramm, top to bottom
+cmd 4886
+expect dialog:"Seite einrichten" exists
+expect text:"Richtung des Routings" exists
+expect text:"Linien trennen und überlappen" exists
+expect #25932 disabled
+click #25916
+expect "Einfach waagerecht-senkrecht" exists
+expect "Mittig zu Mittig" exists
+click "Organigramm"
+expect #25932 enabled
+click button:"OK"
+expect listitem:"Sheet.6" rect 576 424 254 101
+# the lower shape moves right: still the organization chart's way
+drag 830,600 900,600
+expect listitem:"Sheet.6" rect 576 424 329 101
+# left to right
+cmd 4886
+click #25932
+click "Von links nach rechts"
+click button:"OK"
+expect listitem:"Sheet.6" rect 651 374 176 204
+shot build/JFDiagrammer-route-styles.png
+# Verbinder-Verhalten: Gerade on the connector
+click 700,375
+expect listitem:"Sheet.6" selected
+cmd 7200
+expect dialog:"Verbinder-Verhalten" exists
+expect text:"Weg" exists
+click #2032205840
+click "Gerade"
+click button:"OK"
+expect listitem:"Sheet.6" rect 651 424 176 101
+key ctrl+z
+expect listitem:"Sheet.6" rect 651 374 176 204

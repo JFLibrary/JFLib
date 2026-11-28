@@ -109,9 +109,9 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [doc_io](#doc_io) -- conservative DOCX interchange and bounded file I/O
   <br>[lib.rs](#doc_io-crate-root) · [bibliography.rs](#doc_iobibliographyrs) · [bibtex.rs](#doc_iobibtexrs) · [clipboard.rs](#doc_ioclipboardrs) · [html_import.rs](#doc_iohtml_importrs) · [fragment.rs](#doc_iofragmentrs) · [exchange.rs](#doc_ioexchangers) · [library.rs](#doc_iolibraryrs) · [preservation.rs](#doc_iopreservationrs) · [preserved_text.rs](#doc_iopreserved_textrs) · [ris.rs](#doc_iorisrs) · [preserved_stories.rs](#doc_iopreserved_storiesrs)
 - [diagram_core](#diagram_core) -- the diagram model: ShapeSheet cells, formulas, geometry, routing and layout
-  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/data.rs](#diagram_coresrcdatars) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/dock.rs](#diagram_coresrcdockrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/field.rs](#diagram_coresrcfieldrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/draw.rs](#diagram_coresrcopsdrawrs) · [src/ops/picture.rs](#diagram_coresrcopspicturers) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/pagesetup.rs](#diagram_coresrcpagesetuprs) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/route.rs](#diagram_coresrcrouters) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
+  <br>[src/autoconn.rs](#diagram_coresrcautoconnrs) · [src/cell.rs](#diagram_coresrccellrs) · [src/data.rs](#diagram_coresrcdatars) · [src/datagraphic.rs](#diagram_coresrcdatagraphicrs) · [src/datagraphic/legend.rs](#diagram_coresrcdatagraphiclegendrs) · [src/design/mod.rs](#diagram_coresrcdesignmodrs) · [src/design/apply.rs](#diagram_coresrcdesignapplyrs) · [src/design/catalog.rs](#diagram_coresrcdesigncatalogrs) · [src/dock.rs](#diagram_coresrcdockrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/field.rs](#diagram_coresrcfieldrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/groups.rs](#diagram_coresrcgroupsrs) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/instance.rs](#diagram_coresrcinstancers) · [src/instance/detach.rs](#diagram_coresrcinstancedetachrs) · [src/jumps.rs](#diagram_coresrcjumpsrs) · [src/layout.rs](#diagram_coresrclayoutrs) · [src/layout/adjust.rs](#diagram_coresrclayoutadjustrs) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/arcs.rs](#diagram_coresrcopsarcsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/draw.rs](#diagram_coresrcopsdrawrs) · [src/ops/picture.rs](#diagram_coresrcopspicturers) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/pagesetup.rs](#diagram_coresrcpagesetuprs) · [src/pointglue.rs](#diagram_coresrcpointgluers) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/replace.rs](#diagram_coresrcreplacers) · [src/report.rs](#diagram_coresrcreportrs) · [src/report/run.rs](#diagram_coresrcreportrunrs) · [src/report/shape.rs](#diagram_coresrcreportshapers) · [src/route.rs](#diagram_coresrcrouters) · [src/route_edit.rs](#diagram_coresrcroute_editrs) · [src/route_styles.rs](#diagram_coresrcroute_stylesrs) · [src/shapeops.rs](#diagram_coresrcshapeopsrs) · [src/shapeops/frame.rs](#diagram_coresrcshapeopsframers) · [src/shape.rs](#diagram_coresrcshapers) · [src/structure.rs](#diagram_coresrcstructurers) · [src/structure/cff.rs](#diagram_coresrcstructurecffrs) · [src/structure/edge.rs](#diagram_coresrcstructureedgers) · [src/structure/rel.rs](#diagram_coresrcstructurerelrs) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/tools.rs](#diagram_coresrctoolsrs) · [src/tools/array.rs](#diagram_coresrctoolsarrayrs) · [src/tools/dimension.rs](#diagram_coresrctoolsdimensionrs) · [src/tools/number.rs](#diagram_coresrctoolsnumberrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
 - [diagram_io](#diagram_io) -- Visio file formats (the VSDX family) and diagram exports
-  <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/data.rs](#diagram_iosrcdatars) · [src/props.rs](#diagram_iosrcpropsrs) · [src/stencil.rs](#diagram_iosrcstencilrs) · [src/template.rs](#diagram_iosrctemplaters) · [src/textdraw.rs](#diagram_iosrctextdrawrs) · [src/vdx/mod.rs](#diagram_iosrcvdxmodrs) · [src/vss/mod.rs](#diagram_iosrcvssmodrs) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/windows.rs](#diagram_iosrcwindowsrs) · [src/xml.rs](#diagram_iosrcxmlrs)
+  <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/data.rs](#diagram_iosrcdatars) · [src/props.rs](#diagram_iosrcpropsrs) · [src/report.rs](#diagram_iosrcreportrs) · [src/stencil.rs](#diagram_iosrcstencilrs) · [src/template.rs](#diagram_iosrctemplaters) · [src/textdraw.rs](#diagram_iosrctextdrawrs) · [src/vdx/mod.rs](#diagram_iosrcvdxmodrs) · [src/vss/mod.rs](#diagram_iosrcvssmodrs) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/windows.rs](#diagram_iosrcwindowsrs) · [src/xml.rs](#diagram_iosrcxmlrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
   <br>[lib.rs](#rt-crate-root) · [boot.rs](#rtbootrs) · [cpu.rs](#rtcpurs) · [crash.rs](#rtcrashrs) · [fx.rs](#rtfxrs) · [kernel.rs](#rtkernelrs) · [sync.rs](#rtsyncrs) · [x87.rs](#rtx87rs) · [portable/fx.rs](#rtportablefxrs) · [portable/math.rs](#rtportablemathrs) · [hosted.rs](#rthostedrs)
 - [pdf](#pdf) -- PDF writer (vector pages, font subsets, links, outlines) and reader (encryption, text, outlines, forms, attachments, drawing pages)
@@ -127,11 +127,11 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [game_render3d](#game_render3d) -- The bridge from the game core to render3d: entities with a mesh as scene instances
   <br>[lib.rs](#game_render3d-crate-root) · [src/models.rs](#game_render3dsrcmodelsrs)
 - [geom](#geom) -- Deterministic modelling kernel: meshes from primitives, profiles and operations, with checks
-  <br>[lib.rs](#geom-crate-root) · [src/build.rs](#geomsrcbuildrs) · [src/check.rs](#geomsrccheckrs) · [src/csg.rs](#geomsrccsgrs) · [src/exact.rs](#geomsrcexactrs) · [src/math.rs](#geomsrcmathrs) · [src/mesh.rs](#geomsrcmeshrs) · [src/normals.rs](#geomsrcnormalsrs) · [src/poly.rs](#geomsrcpolyrs)
+  <br>[lib.rs](#geom-crate-root) · [src/build.rs](#geomsrcbuildrs) · [src/check.rs](#geomsrccheckrs) · [src/csg.rs](#geomsrccsgrs) · [src/exact.rs](#geomsrcexactrs) · [src/math.rs](#geomsrcmathrs) · [src/mesh.rs](#geomsrcmeshrs) · [src/normals.rs](#geomsrcnormalsrs) · [src/poly.rs](#geomsrcpolyrs) · [src/region.rs](#geomsrcregionrs)
 - [netchan](#netchan) -- Message channels for games: UDP with sequence numbers and acks, WebSocket, the browser's network
   <br>[lib.rs](#netchan-crate-root) · [src/client.rs](#netchansrcclientrs) · [src/conn.rs](#netchansrcconnrs) · [src/endpoint.rs](#netchansrcendpointrs) · [src/packet.rs](#netchansrcpacketrs) · [src/reliable.rs](#netchansrcreliablers) · [src/seal.rs](#netchansrcsealrs) · [src/server.rs](#netchansrcserverrs) · [src/ws.rs](#netchansrcwsrs)
 - [sheet_io](#sheet_io) -- XLSX and CSV import: workbooks and delimited text as typed tables
-  <br>[lib.rs](#sheet_io-crate-root) · [src/csv.rs](#sheet_iosrccsvrs) · [src/xlsx.rs](#sheet_iosrcxlsxrs)
+  <br>[lib.rs](#sheet_io-crate-root) · [src/csv.rs](#sheet_iosrccsvrs) · [src/xlsx.rs](#sheet_iosrcxlsxrs) · [src/xlsx_write.rs](#sheet_iosrcxlsx_writers)
 - [img_jp2](#img_jp2) -- JPEG 2000 decoder
   <br>[lib.rs](#img_jp2-crate-root)
 
@@ -7835,7 +7835,9 @@ shapes to SeShape frames (diagram_core for JFDiagrammer).
                                   click and drag them, screen readers name them (a screen
                                   reader's click on an arrow or a mark reports it as a click)
   tools SE_POINTER, SE_CONNECT, SE_LINE, SE_RECT, SE_ELLIPSE, SE_TEXT, SE_PLACE, SE_FREEFORM,
-        SE_ARC
+        SE_ARC, SE_CPOINT (JD21, the connection point tool)
+  SeState::quick: Vec<SeQuick>    (JD21) the quick shapes the bar at a hot connection arrow
+                                  offers (see below)
 
 Model (SeModel, borrowed per call; world units are the canvas's, y down):
   SeShape { key, parent, bx, ends, pin, bbox, flags, points }
@@ -7846,7 +7848,14 @@ Model (SeModel, borrowed per call; world units are the canvas's, y down):
   SePoint { at, kind, tag, dir, flags }   SP_CONTROL (yellow), SP_CONN (connection points:
                       shown while connecting, with SeState::show_points those of every
                       visible shape, RA-06; SPF_OUTWARD: shown, no target), SP_VERTEX (shown
-                      for a single selection when the app lists them: vertex editing)
+                      for a single selection when the app lists them: vertex editing);
+                      (JD21) SP_SEGMENT (a midpoint of a connector's piece, a small diamond:
+                      dragged like a vertex, chosen by no click; dir = half the piece; shown
+                      while the piece is at least SEG_MIN DIP long on the screen; the pointer
+                      shows the move across it unless SPF_FREE), SP_TARGET (another glue target the app offers: a vertex, a handle,
+                      a control point; shown only as the target under a dragged end), SP_ARC
+                      (an arc's control point, a circle), SP_ECC (an eccentricity handle, a
+                      circle; pairs on a dashed line)
   SeGuide { key, vertical, at }   guides (blue, dashed, across the canvas); moves snap to them
                       (SeState::snap and snap_guides; an app hides guides by leaving them out)
   SeMark { at, dir, tag, owner }  the app's insertion marks (Visio's blue triangle between two
@@ -7875,9 +7884,10 @@ SeEv::Arc; both start and end glued to connection points like the line tool (CN-
 Input (pointer tool): a press on a handle of the selection starts its drag; on a shape it
 selects it (Shift adds, Ctrl toggles) and a drag moves the selection (grid, dynamic grid,
 guides; Alt: free); a second, slow click on a selected group selects the child under the
-pointer; a double click edits the text (SeEv::Text); on the background a drag draws a marquee
-or, with SeState::lasso, a free outline (shapes fully inside, with SeState::partial also those
-it touches, ZF-06; Shift adds, Ctrl toggles).  Corner handles keep the aspect ratio, edge
+pointer, on a selected child with SEF_UP its group (Visio's "members first"); a double click
+edits the text (SeEv::Text); on the background a drag draws a marquee or, with
+SeState::lasso, a free outline (shapes fully inside, with SeState::partial also those it
+touches, ZF-06; Shift adds, Ctrl toggles).  Corner handles keep the aspect ratio, edge
 handles change one side (a locked aspect: both), Ctrl resizes about the middle; locked handles
 are drawn grey and do nothing.  The rotation handle turns about the pin (one shape) or the
 middle of the selection: in 15-degree steps near the shape, in single degrees farther away.
@@ -7886,6 +7896,22 @@ glue); over a shape a dynamic connector's end glues to the whole shape (dynamic 
 shape's frame is highlighted); with Ctrl held a dynamic end swaps the two (CN-03): over a
 connection point it glues to that point's shape as a whole, over a shape to the shape's
 nearest connection point.  Connection points with SPF_OUTWARD are no target for ends (SS-29).
+(JD21, CN-02) Without a connection point in reach an SP_TARGET point of the app is the next
+target (ends, control points, the connector and line tools; not the freeform and the arc
+tool), then (ends and the connector and line tools, SeState::glue_guides) a guide within
+reach: SeGlue::Guide, the end on its line, the guide drawn green.
+
+(JD21, SP-05) Vertex editing: a click chooses a vertex (filled), Shift + click adds one to the
+chosen ones or takes it away (SeState::chosen); a drag on one of several chosen moves them
+together (SeEv::Points, live), Del takes them out (SeEv::PointsDelete; one: PointDelete).  An
+arc's control point (SP_ARC) is chosen alike (the app may list its eccentricity handles then);
+the freeform tool takes back what the pointer goes back over (2 px back along the last piece,
+within 3 px of it).  (JD21, CN-01) The connection point tool (SE_CPOINT): the selection's
+connection points show and are its only handles; a click chooses one (magenta), a drag moves
+it (SeEv::Point), Del takes it out (SeEv::PointDelete), Ctrl + click on, inside or outside the
+single selected shape adds one there (SeEv::PointInsert); a right click on one reports
+SeEv::Context with it chosen (the app's menu of its kind).  Another tool forgets the chosen
+point.
 Ctrl + Shift + click zooms in at the pointer (on a selected shape too), + drag zooms to the
 rectangle (from a selected shape: the copy above), + right click zooms out (ZF-22), + right
 drag pans the view (KB-04).  Keys while the canvas has the focus: Esc
@@ -7922,6 +7948,18 @@ SeEv::ArrowHover { key, dir } once (dir 255: off the arrows of `key`), for a pre
 Insertion marks (SeModel::marks): with the pointer tool and no gesture each mark shows while
 the pointer is on its owner (the shape under the pointer, or inside the owner's box) or
 within MARK_NEAR (16) DIP of it; a click reports SeEv::Mark { tag }, a drag does nothing.
+
+(JD21) Quick shapes bar (SeState::quick, Visio's mini toolbar of an AutoConnect arrow, CN-07):
+while an arrow is under the pointer and the app lists quick shapes, a bar with the first
+QUICK_MAX (4) of them shows beside the arrow where the new shape does not go (above the box
+for the arrows left and right, right of it for those up and down): a row of QUICK_TILE (28)
+DIP tiles with their previews (the app's Draw, like the Shapes panel's tiles), on the flyout
+colour with a thin frame, square.  The arrow stays hot while the pointer is on the bar or
+between it and the arrow; the tile under the pointer is drawn hot and each change of it is
+SeEv::QuickHover { key, dir, tile } once (tile 255: on no tile any more; the app's live
+preview), a click on a tile SeEv::Quick { key, dir, tile }; the bar goes with the arrows.
+Screen readers and scripts get a K_BUTTON per tile named "Schnell-Shape: <name>" (value: the
+tile's index).
 ```
 
 ```rust
@@ -7945,6 +7983,10 @@ SE_FREEFORM: u32 = 7
 /// draw a quarter ellipse from the press to the release, reported as SeEv::Arc (its ends glue
 /// like a line's)
 SE_ARC: u32 = 8
+/// (JD21) the connection point tool: the connection points of the single selection are
+/// handles (a drag moves one, SeEv::Point; a click chooses it, Del takes it out,
+/// SeEv::PointDelete), Ctrl + click on the selected shape adds one (SeEv::PointInsert)
+SE_CPOINT: u32 = 9
 /// shape flags (SeShape::flags)
 SEF_1D: u32 = 1  // the two ends instead of the eight handles
 SEF_GROUP: u32 = 2  // a group: a second click selects the child under the pointer
@@ -7965,15 +8007,35 @@ SEF_END_DYN: u32 = 0x8000
 SEF_LOCK_PIN: u32 = 0x1_0000  // no rotation pin handle
 SEF_NOARROWS: u32 = 0x2_0000  // no connection arrows around it (see the file header)
 SEF_NOSNAP: u32 = 0x4_0000  // moves do not snap to it (the dynamic grid leaves it out)
+/// (JD21) a member of a "members first" group: a second, slow click on it selects its group
+/// (SeShape::parent)
+SEF_UP: u32 = 0x8_0000
 /// kinds of SePoint
 SP_CONTROL: u8 = 0
 SP_CONN: u8 = 1
 SP_VERTEX: u8 = 2
+/// (JD21) another place an end or a control point glues to (a vertex, a handle or a control
+/// point of a shape: the app makes a connection point there, CN-02): not drawn, never a handle;
+/// the target under a dragged end shows like a connection point
+SP_TARGET: u8 = 3
+/// (JD21) the control point of an arc in vertex editing (a small circle; a drag reports
+/// SeEv::Point, a click chooses it like a vertex)
+SP_ARC: u8 = 4
+/// (JD21) an eccentricity handle of an elliptical arc (a small circle on a dashed line through
+/// the arc's control point; a drag reports SeEv::Point)
+SP_ECC: u8 = 5
+/// (JD21) a midpoint of a piece of a connector's way (Visio's midpoint handle): `dir` is half
+/// the piece (world, from the handle to the piece's end); dragging it reports SeEv::Point like a
+/// vertex; hidden (and not hit) while the piece is shorter than SEG_MIN DIP on the screen
+SP_SEGMENT: u8 = 6
 /// point flags (SePoint::flags)
 SPF_GLUE: u32 = 1  // a control point that glues to connection points (SP-04)
 /// a connection point that points outward only (Visio's Type 1): shown, but no end glues to it
 /// (SS-29)
 SPF_OUTWARD: u32 = 2
+/// (JD21) a midpoint that moves anywhere (a straight way: a new vertex); without it the
+/// pointer shows that the piece moves across
+SPF_FREE: u32 = 4
 ```
 
 - **`struct SeBox`**
@@ -8039,11 +8101,18 @@ SPF_OUTWARD: u32 = 2
   - `ver: u32` -- changes whenever shapes are added, removed or reordered
   - `hit: &'a dyn Fn([f32; 2], f32, u64) -> u64` -- the topmost shape at a world point (see the file header)
 
+- **`struct SeQuick`**
+  (JD21) a tile of the quick shapes bar at a hot connection arrow (SeState::quick)
+  - `name: String` -- its name (the button's name for screen readers and scripts)
+  - `draw: Option<DrawRef>` -- its preview, drawn into the tile (None: a generic shapes icon)
+  - `ver: u32` -- the preview's version (cmd_custom: change it when the drawing changes)
+
 - **`enum SeGlue`**
   what an end or a control point is glued to
   - `None`
   - `Point { key: u64, tag: u32 }` -- a connection point (its tag) of a shape: static glue
   - `Shape(u64)` -- a whole shape: dynamic glue
+  - `Guide(u64)` -- (JD21) a guide (its key): the end lies on its line (SeState::glue_guides)
 
 - **`enum SeEv`**
   what the user did (ui.shape_edit's result, in order)
@@ -8055,9 +8124,15 @@ SPF_OUTWARD: u32 = 2
   - `Rotate { keys: Vec<u64>, centre: [f32; 2], angle: f32, done: bool }` -- turn `keys` about `centre` by `angle` radians (counter-clockwise as seen)
   - `Pin { key: u64, at: [f32; 2], done: bool }` -- the rotation pin of a shape goes to `at`
   - `End { key: u64, end: u8, at: [f32; 2], glue: SeGlue, done: bool }` -- end 0 (begin) or 1 of a 1D shape goes to `at`, glued to `glue`
-  - `Point { key: u64, idx: u32, tag: u32, at: [f32; 2], glue: SeGlue, done: bool }` -- a control point or a vertex (index `idx` of SeModel::points, the app's tag) goes to `at`
-  - `PointInsert { key: u64, at: [f32; 2] }` -- Ctrl + click on the outline of a shape with vertices listed: add a vertex at `at`
-  - `PointDelete { key: u64, tag: u32 }` -- Del with a vertex chosen: remove it
+  - `Point { key: u64, idx: u32, tag: u32, at: [f32; 2], glue: SeGlue, done: bool }` -- a control point or a vertex (index `idx` of SeModel::points, the app's tag) goes to `at`;
+    (JD21) also an arc's control point, an eccentricity handle, a connection point
+    (SE_CPOINT)
+  - `PointInsert { key: u64, at: [f32; 2] }` -- Ctrl + click on the outline of a shape with vertices listed: add a vertex at `at`;
+    (JD21) with SE_CPOINT on the selected shape: add a connection point there
+  - `PointDelete { key: u64, tag: u32 }` -- Del with a vertex chosen: remove it; (JD21) with SE_CPOINT the chosen connection point
+  - `Points { key: u64, tags: Vec<u32>, total: [f32; 2], done: bool }` -- (JD21) the vertices chosen with Shift (their tags, SeState::chosen) move together by
+    `total` (world units, from the start of the drag; live like Point)
+  - `PointsDelete { key: u64, tags: Vec<u32> }` -- (JD21) Del with several vertices chosen: remove them
   - `Cancel` -- Esc during a live gesture: take the preview back
   - `Connect { tool: u32, a: [f32; 2], ga: SeGlue, b: [f32; 2], gb: SeGlue }` -- the connector or line tool drew from a to b
   - `Draw { tool: u32, a: [f32; 2], b: [f32; 2] }` -- a drawing tool drew the box from a to b (a == b: a click)
@@ -8073,6 +8148,10 @@ SPF_OUTWARD: u32 = 2
   - `ArrowHover { key: u64, dir: u8 }` -- the pointer went onto the connection arrow `dir` of shape `key`, or off the arrows of
     `key` (dir 255); once per change
   - `Mark { tag: u32 }` -- a click on the insertion mark with this tag (SeModel::marks)
+  - `Quick { key: u64, dir: u8, tile: u8 }` -- (JD21) a click on tile `tile` of the quick shapes bar at the connection arrow `dir` of
+    shape `key`; the selection stays as it was
+  - `QuickHover { key: u64, dir: u8, tile: u8 }` -- (JD21) the pointer went onto tile `tile` of the quick shapes bar of arrow `dir` of shape
+    `key`, or off the tiles (tile 255, dir 255); once per change (a live preview)
 
 - **`struct SeState`**
   the editor's state, kept by the app: the selection, the focused shape, the options, the
@@ -8090,9 +8169,15 @@ SPF_OUTWARD: u32 = 2
   - `snap: bool` -- moves snap to guides and to the dynamic grid at all (off: a page that inhibits snapping,
     SS-39; the grid is DiagramState::snap)
   - `snap_guides: bool` -- moves snap to guides (Ausrichten und Kleben › Führungslinien)
-  - `vertex: Option<(u64, u32)>` -- the vertex chosen with a click (Del removes it): its shape and tag
+  - `vertex: Option<(u64, u32)>` -- the vertex chosen with a click (Del removes it): its shape and tag; (JD21) also an arc's
+    control point, and with SE_CPOINT the chosen connection point
+  - `chosen: BTreeSet<u32>` -- (JD21) the tags of every vertex chosen of that shape (Shift + click adds and takes away;
+    the one in `vertex` among them): a drag moves them together, Del takes them out
+  - `glue_guides: bool` -- (JD21) ends glue to guides (Ausrichten und Kleben › Kleben an Führungslinien)
   - `arrows: bool` -- connection arrows around the shape under the pointer (Ansicht › Verbindungspfeile; see
     the file header)
+  - `quick: Vec<SeQuick>` -- (JD21) the quick shapes the bar at a hot connection arrow offers (the first QUICK_MAX;
+    empty: no bar); the app sets them (Visio: the active stencil's quick shapes)
 
 **`impl SeState`**
 
@@ -8108,6 +8193,9 @@ SPF_OUTWARD: u32 = 2
 - **`fn arrow_hover(&self) -> Option<(u64, u8)>`**
   the connection arrow under the pointer: the shape's key and the direction (0 right,
   1 down, 2 left, 3 up, as seen)
+- **`fn quick_hover(&self) -> Option<(u64, u8, u8)>`**
+  (JD21) the tile of the quick shapes bar under the pointer: the shape's key, the arrow's
+  direction, the tile's index
 - **`fn select(&mut self, keys: &[u64])`**
   select exactly these shapes (the app's commands: paste, group, a new shape)
 
@@ -58506,16 +58594,200 @@ a file loses nothing, and the behaviour Visio files carry works without translat
   data::*                       (JD18) external data: connections, recordsets with their
                                 cached rows, rows bound to shapes (Prop rows, DataLinked),
                                 refresh with conflicts, automatic linking (DA-04, DA-05)
+  shapeops::*                   (JD21) shape operations: Vereinigen, Kombinieren,
+                                Fragmentieren, Schneiden, Subtrahieren (SP-08) on geom's plane
+                                Booleans, arcs rebuilt as arcs; fit_frame (the box follows the
+                                geometry after vertex edits, SP-05), update_alignment_box (SP-16)
+  groups::*                     (JD21) group behaviour: SelectMode and the other Group
+                                Properties, Zu Gruppe hinzufügen / Aus Gruppe entfernen,
+                                dropping into a group, the ungroup warning (SS-17, SP-06, RS-27)
+  replace::*                    (JD21) Shape ändern: shapes replaced by a master's instance,
+                                text, data, format, glue kept (SP-11, Change Shape Behavior)
   field::*                      (JD8) text fields: a Field row's value in its format picture,
                                 new fields, the text with its fields, the document's
                                 properties (Document::fields: the app's locale and clock)
-
-What is to come here, by stage of the plan: page layout (CN-13, P2)
+  layout::*                     (JD21) the page laid out anew in Visio's styles (flowchart,
+                                hierarchy, compact tree, radial, circular; CN-13), connected
+                                shapes aligned and spaced (CN-14), shapes off the page
+                                breaks (PR-03), the diagram turned or flipped (RS-25)
+  autoconn::*                   (JD21) a shape dropped on a connector splits it and the shapes
+                                after it make room (CN-08), a deleted shape's connectors go
+                                and the flow through it heals (CN-09), drops push shapes
+                                away (PlowCode)
+  tools::*                      (JD21) Visio's add-ons as tools (AS-11, RA-09): numbering
+                                shapes, arrays of copies, dimension lines glued or tied to
+                                the shapes they measure
+  route_styles::*               (JD21) the routing styles of page and connector with their
+                                directions (flowchart, tree, organization chart, simple ...;
+                                CN-05, SS-40), the ways they lay as Visio 16 does (JD21v),
+                                shapes connectors may cross (SS-19)
+  route_edit::*                 (JD21) a connector's way by hand: midpoints and vertices
+                                moved, added, removed, the way kept when its shapes move (CN-04)
+  jumps::*                      (JD21) line jumps where connectors cross, written into the
+                                connectors' Geometry when they are laid, as Visio does (CN-06)
+  pointglue::*                  (JD21) control points that glue to connection points and
+                                follow them (SP-04), glue to vertices, handles, control points
+                                and guides (CN-02), the connection point tool (CN-01)
+  datagraphic::*                (JD19) data graphics: callouts, data bars, icon sets and
+                                colour by value from a shape's data as Visio keeps them (a
+                                hidden master per graphic, callout instances as subshapes),
+                                the legend of lists and containers (DA-07, DA-08, ST-08)
+  report::*                     (JD19) shape reports: Visio's report definitions as a model
+                                (their XML and the document sheet's visPropRptN rows are
+                                diagram_io::report), run into a table with groups and
+                                summaries, the table shape on the page and its refresh
+                                (DA-09, DA-13, EX-12)
 
 Rules that hold from the start: no std (only alloc), no unsafe code, nothing recalculated on
 opening a file (connectors, layout and containers move only when something moves), and a
 formula with an unknown function keeps its cached value instead of failing.
 ```
+
+### `diagram_core/src/autoconn.rs`
+
+Source: [`lib/diagram_core/src/autoconn.rs`](../lib/diagram_core/src/autoconn.rs)
+
+```text
+autoconn -- (JD21) connectors that look after the shapes they join: a 2-D shape dropped on a
+connector is put into the flow (connector splitting, CN-08) and the shapes after it make
+room, a deleted shape takes its connectors along and the flow through it heals (CN-09),
+placeable shapes move away from a dropped one (PlowCode, PR-09)
+
+  page_splits(doc, page)            PageShapeSplit of the page (missing: on, Visio's default)
+  splits(doc, shape)                ShapeSplit: a top-level 2-D shape that splits connectors
+  splittable(doc, connector)        a dynamic connector with ShapeSplittable
+  can_insert(doc, owner, shape)     splits and has no connector glued to it yet
+  split_target(doc, owner, box, skip) -> Option<connector>   the connector a shape with this
+                                    box (page) splits when it is dropped there
+  split(tx, eng, connector, shape) -> new connector   Page.SplitConnector: the connector ends
+                                    at the shape, a copy of it (without its text) runs from
+                                    the shape to where it ended
+  insert(tx, eng, owner, shape, connector, gap) -> Inserted   split, the shape lined up with
+                                    the one before it, the shapes after it moved on as far as
+                                    the room needs
+  downstream(doc, owner, shape, stop) -> shapes   what follows a shape through connectors
+  plow(tx, eng, owner, shapes, gap) -> moved   placeable shapes under the dropped ones move
+                                    away (PlowCode / ShapePlowCode)
+  heal(tx, eng, owner, deleted) -> Healed   before shapes are deleted: their connectors to
+                                    delete as well, the flow through a shape joined again
+  spacing(doc, page) -> [x, y]      the page's spacing between shapes (AvenueSizeX/Y)
+
+Every point is on the page in drawing units (inches, y up).  Nothing runs on its own: the
+app calls these when the user drops, pastes, moves or deletes (PLAN.md, "Fallen").
+
+Visio's rules -- belegt (Microsoft Learn: the ShapeSplit, ShapeSplittable, PageShapeSplit,
+PlowCode and ShapePlowCode cells; Page.SplitConnector, ApplicationSettings.
+ConnectorSplittingEnabled and DeleteConnectorsEnabled, Shape.DeleteEx / VisDeleteFlags; the
+Visio blog "Inserting and Deleting Shapes in Visio 2010"):
+* Splitting needs all of: the app's option (Enable connector splitting), the page
+  (PageShapeSplit 1, the default), the shape (ShapeSplit 1; a 2-D shape or a placeable 1-D
+  one -- only 2-D here) and the connector (ShapeSplittable 1, a routable 1-D connector).
+* SplitConnector "duplicates the connector (except for text), positions the shape
+  automatically, and glues the shape to the two resulting connectors"; it returns the copy.
+* A drop on a connector moves the shapes downstream of the insertion "just enough to make
+  room"; a downstream shape beside the flow does not move; the new shape is aligned with the
+  upstream shape and spaced from it.
+* PlowCode 0 / 1: placeable shapes do not / do move away when a placeable shape is dropped
+  near them (Page Setup › "Move other shapes away on drop"); ShapePlowCode 0 as the page
+  says, 1 never, 2 always.
+* Deleting a shape deletes the connectors glued to it (the app's option Delete connectors
+  when deleting shapes) except connectors with text; the option "also determines whether two
+  connectors reconnect when a shape to which they are both connected is deleted"; with more
+  than one connector in and out the reconnection is ambiguous and nothing heals; the other
+  shapes do not move to close the gap.
+
+Angenommen (the user's check in Visio may correct it):
+* The connector a dropped shape splits is a splittable connector on the page whose way
+  crosses the shape's box while both its ends lie outside the box and the box overlaps none of
+  the shapes it is glued to; among several the one whose way passes nearest the box's middle.
+  A shape that already has a connector glued to it splits nothing (it is in a flow already).
+* The original connector keeps its Begin and its text and ends at the shape; the copy starts
+  at the shape and takes over the old End's glue (a connection point stays that point, a
+  whole shape stays dynamic, a free end stays where it was).  Both glue to the dropped shape
+  as a whole (dynamic glue).
+* The flow's axis is the main direction from the shape before to the shape after (else from
+  Begin to End).  The dropped shape's middle goes on the middle line of the shape before when
+  their bands across the axis overlap, and at least the page's spacing (AvenueSizeX/Y) after
+  it; when the shape after is then nearer than the spacing, it and the shapes downstream of it
+  (through connectors Begin -> End) that do not lie before the dropped shape move on along
+  the axis by what is missing.  Fixed shapes (ShapeFixedCode &H7, LockMoveX/Y), containers
+  and shapes with ShapePlowCode 1 stay, and so does what lies only behind them.  This always
+  comes with a split; PlowCode adds plowing for every drop.
+* Plowing: a placeable top-level 2-D shape (no container, no member of one, no callout, not
+  ObjType 4, not fixed) whose box overlaps a dropped shape's box moves the shortest way out of
+  it to the page's spacing, and in turn pushes what it then overlaps (each shape moves once).
+* Healing counts dynamic connectors only (plain lines lose their glue as before); a connector
+  whose both ends are on the deleted shape is deleted; with exactly one connector in (End on
+  the shape) and one out (Begin on it) the one coming in survives (the one going out when
+  only that one has text; both with text: no healing) and takes the other one's far end; a
+  heal that would join a shape to itself does not happen.  Healing runs through chains of
+  deleted shapes.
+```
+
+- **`fn page_splits(doc: &Document, page: PageRef) -> bool`**
+  whether shapes split connectors on the page: PageShapeSplit (missing: yes, Visio's default)
+
+- **`fn splits(doc: &Document, s: ShapeRef) -> bool`**
+  whether a shape splits connectors it is dropped on: a top-level 2-D shape (no guide, no
+  container, no callout) with ShapeSplit 1
+
+- **`fn splittable(doc: &Document, c: ShapeRef) -> bool`**
+  whether a connector can be split: a top-level dynamic connector with ShapeSplittable 1
+
+- **`fn can_insert(doc: &Document, owner: Owner, s: ShapeRef) -> bool`**
+  whether a shape may be put into a connector: it splits, and no connector is glued to it yet
+
+- **`fn split_target(doc: &Document, owner: Owner, b: [f64; 4], skip: &[ShapeRef]) -> Option<ShapeRef>`**
+  the connector a shape with box `b` (page) splits when dropped there: a splittable connector
+  whose way crosses the box, both ends outside it, the box over none of the shapes it is glued
+  to, nearest the box's middle; connectors glued to a shape of `skip` (the dropped shape and
+  what moves with it) do not count
+
+- **`fn split(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef, s: ShapeRef) -> Result<ShapeRef, EditError>`**
+  split connector `c` with shape `s` (Visio's Page.SplitConnector): a copy of the connector
+  without its text is made, `c` ends at `s`, the copy runs from `s` to where `c` ended (with
+  that end's glue); both glue to `s` as a whole and route -> the copy.  Invalid: `c` is no
+  splittable connector, `s` is 1-D or elsewhere
+
+- **`struct Inserted`**
+  what insert did
+  - `connector: ShapeRef` -- the new connector (from the shape to the old End)
+  - `moved: Vec<ShapeRef>` -- the shapes moved: the inserted one when it was lined up, those after it
+
+- **`fn downstream(doc: &Document, owner: Owner, from: ShapeRef, stop: &[ShapeRef]) -> Vec<ShapeRef>`**
+  the shapes downstream of `from` through connectors (Begin on one, End on the next),
+  top-level, in the order found (breadth first); `stop` are never entered
+
+- **`fn insert(tx: &mut Transaction, eng: &mut Engine, owner: Owner, s: ShapeRef, c: ShapeRef, gap: [f64; 2]) -> Result<Inserted, EditError>`**
+  put shape `s` into connector `c` (a drop): split, `s` lined up with the shape before it and
+  spaced from it, the shapes after it moved on along the flow where the room is short (`gap`:
+  the page's spacing in x and y) -> the new connector and what moved; connectors follow
+
+- **`fn spacing(doc: &Document, page: PageRef) -> [f64; 2]`**
+  the page's spacing between shapes in drawing units: AvenueSizeX/Y (Seite einrichten ›
+  Layout und Routing; Visio's metric default 7.5 mm), through the drawing scale
+
+- **`fn plows(doc: &Document, page: PageRef) -> bool`**
+  whether a drop on the page may push shapes at all: PlowCode 1, or a shape on it with
+  ShapePlowCode 2
+
+- **`fn plow(tx: &mut Transaction, eng: &mut Engine, owner: Owner, shapes: &[ShapeRef], gap: [f64; 2]) -> Result<Vec<ShapeRef>, EditError>`**
+  the dropped `shapes` push the placeable shapes they cover out of the way (PlowCode of the
+  page, ShapePlowCode of each shape): the shortest way out to the page's spacing `gap`, and
+  what those then cover in turn; each shape moves once -> the moved shapes (connectors follow)
+
+- **`struct Healed`**
+  what heal decided
+  - `gone: Vec<ShapeRef>` -- connectors to delete with the shapes
+  - `joined: Vec<ShapeRef>` -- connectors that now join the shapes before and after a deleted one: route them once the
+    shapes are gone
+
+- **`fn heal(tx: &mut Transaction, eng: &mut Engine, owner: Owner, deleted: &[ShapeRef]) -> Result<Healed, EditError>`**
+  before `deleted` are deleted (Visio's "Delete connectors when deleting shapes"): the dynamic
+  connectors glued to a deleted 2-D shape go with it unless they have text; where exactly one
+  comes in (End) and one goes out (Begin), one of them survives and joins the shapes before and
+  after (the flow heals).  Glues the survivors anew; the caller deletes `gone` with the shapes,
+  detaches what stays and routes `joined` after the deletion
 
 ### `diagram_core/src/cell.rs`
 
@@ -58659,7 +58931,8 @@ with PrimaryKey elements the key columns identify a row across refreshes, withou
 (RowOrder = 1) its position does; RefreshOverwriteAll = 0 updates only the Value cells whose
 row has DataLinked = 1.  Row IDs start at 1 in the order of the source (Visio's DataAsXML).
 Visio's codes stay as they are in the model: Type and DataType 0 text, 1 fixed list,
-2 number, 3 Boolean, 4 variable list, 5 date, 6 duration, 7 currency.
+2 number, 3 Boolean, 4 variable list, 5 date, 6 duration, 7 currency.  New columns get Visio's
+row names ("_VisDM_" and the source name's letters and digits, ROW_PREFIX).
 ```
 
 - **`struct DataSets`**
@@ -58690,7 +58963,8 @@ Visio's codes stay as they are in the model: Type and DataType 0 text, 1 fixed l
   - `name: String` -- Name: the name of the shape data rows (Prop.&lt;Name>) the column maps to, unique
   - `label: String` -- Label: what the user sees (the shape data label; renaming a column changes it)
   - `orig_label: Option<String>` -- OrigLabel
-  - `lang: Option<u32>` -- LangID
+  - `lang: Option<String>` -- LangID as written: Visio writes a culture name ("de-DE"), not the number [MS-VSDX]'s
+    schema names
   - `calendar: Option<u16>` -- Calendar
   - `data_type: u16` -- DataType (kind::\*)
   - `unit_type: Option<String>` -- UnitType
@@ -58790,6 +59064,11 @@ Visio's codes stay as they are in the model: Type and DataType 0 text, 1 fixed l
   a row's key as text (the key columns' values joined by TAB; the row ID without key)
 - **`fn update_key_values(&mut self)`**
   recompute the RowKeyValue lists from the rows (after a change of rows or key columns)
+
+```rust
+/// the prefix of the shape data rows Visio makes for a linked column ("Prop._VisDM_Ports")
+ROW_PREFIX: &str = "_VisDM_"
+```
 
 - **`fn guess_kind<'a>(values: impl Iterator<Item = &'a DataValue>) -> u16`**
   the data type of a column from its values: number, date, Boolean or currency when every
@@ -58947,6 +59226,425 @@ DURATION: u16 = 6
 /// currency
 CURRENCY: u16 = 7
 ```
+
+### `diagram_core/src/datagraphic.rs`
+
+Source: [`lib/diagram_core/src/datagraphic.rs`](../lib/diagram_core/src/datagraphic.rs)
+
+```text
+datagraphic -- (JD19) data graphics: callouts, data bars, icon sets and colours that show a
+shape's data (DA-07, DA-08, ST-08), stored as Visio stores them
+
+  DataGraphic, Item, Kind, Pos, Opt, Rule, Op, Shade   the model of a data graphic: its name,
+                                  its items (a text callout, a data bar, an icon set, a colour by
+                                  value; the field expression "{Label}" or a formula of such
+                                  fields, the callout master, the position or the graphic's
+                                  default, the options, icon rules, colours), the default
+                                  position, Shape-Text ausblenden, Rahmen
+  is_graphic(doc, m) / graphics(doc)   a master is a data graphic: User.visUSEType = 1 in its
+                                  page sheet
+  read(doc, m) -> DataGraphic      the model of a data graphic master (Visio's or ours)
+  create(tx, &g, src) -> MasterRef  a new data graphic master; the callout masters come from
+                                  the document or from `src` (the app's stencil)
+  update(tx, eng, m, &g, src)      the master written anew, every shape that uses it again
+  rename / duplicate / delete      the gallery's menu (delete: from every shape first)
+  applied(doc, shape) / shapes_with(doc, m) / callouts(doc, shape)
+  apply(tx, eng, shapes, m, layer) the graphic on shapes (an earlier one goes first)
+  remove(tx, eng, shapes)          the graphic off again, the old colours back
+  fields(doc, shapes)              the shape data fields the shapes have (label, row name)
+  resolve_field(doc, shape, expr)  "{Label}" -> the formula on the shape's Prop row
+  icon_formula(&rules) / shade_formula(..)   the compiled formulas of icon rules and colours
+  legend::*                        (ST-08, RD-07) the legend: a list of containers of lists
+
+How Visio keeps a data graphic (Visio 2007 developer article "Building Custom Data Graphics",
+the Visio Insights blog, ShapeSheets of files Visio saved; JD19 research):
+* The graphic is a hidden master: its page sheet has User.visUSEType = 1, visDGVisible,
+  visDGShowBorder, visDGHideText, visDGNextItemID, msvDGCalloutGap and the layer
+  "Data Graphic"; its shape is a group with User.visDGDefaultPos = PNT(h,v) (the default
+  position); every item is a subshape with User.msvCalloutType ("Text Callout", "Data Bar",
+  "Icon Set", "Heading"), visDGDefaultPos (TRUE: the item takes the default position),
+  visDGStackHeight, visDGCalloutItem, visDGField0 (the field expression), visDGItemID,
+  visDGUseMaster = USE("<callout master>"), visDGCalloutField = User.visDGField0, and its
+  options in Prop.msvCalloutProp* rows (Min, Max, Label, ValueFormat, ShowValue ...).
+* Applied to a shape, the shape becomes a group and gets one instance of each item's callout
+  master as a subshape: Prop.msvCalloutField's value is a formula on the shape's own Prop row
+  (Sheet.5!Prop.Tasks, SortKey = the field's label), User.visDGDefaultPos follows the shape's
+  control point Controls.msvDGPosition (seven snap points across, BOUND), the pin is a formula
+  of the position and ThePage!User.msvDGCalloutGap, the callout lies on the layer "Data
+  Graphic".  The shape itself gets User.visDGDisplayFormat = USE({UniqueID of the master}),
+  visDGDefaultPos, msvLayoutIncludeSubshapes and Controls.msvDGPosition.
+* Positions: PNT(h, v), h 0..6 = far left, left edge, left, centre, right, right edge, far
+  right; v 0..6 = below, bottom edge, bottom, middle, top, top edge, above.  The instance
+  rounds the control's place to -1..5 (= h - 1, "x * 4 / Width").
+* Rendering comes from the callout masters' own cells: a data bar's fill width is a geometry
+  formula of Prop.msvCalloutField and its Min/Max, an icon set shows the geometry section
+  whose NoShow is false for User.msvCalloutIconNumber (-1: none), a text callout shows a text
+  field with the value in Prop.msvCalloutPropValueFormat.
+
+Checked in Visio 16 (JD19's Visio check, 2026-11-27: files of JFDiagrammer opened by Visio
+through its automation, Visio's own graphics and callouts read, variants of them tried):
+* Visio takes a subshape of the graphic as an item when it has User.visDGCalloutItem = 5,
+  msvCalloutType ("Text Callout" -> text, "Data Bar" -> data bar ...), visDGItemID,
+  visDGField0, visDGCalloutField and visDGUseMaster = USE("<an existing callout master>").
+* A callout master counts when its shape has visDGCalloutItem = 5, visDGDefaultPos = 0,
+  visDGStackHeight = 0 and the ID 5 (Visio's masters start at 5; Master::new does so now).
+* Visio gives every master a UniqueID ending in -8E40-00608CF305B2 when it opens a file; a
+  graphic written here has such an ID (visio_uid), so the shapes' USE({UniqueID}) keeps naming
+  it.  USE takes the UniqueID bare, a master's name quoted.
+* An instance on a shape names its item with visDGCalloutItem = DEPENDSON(the item's shape ID
+  in the master), a Boolean 0; Visio's own pin formulas differ from ours but read the same
+  cells.
+* Value cells keep their type in the file (formula::Engine): a string U='STR', a colour
+  U='COLOR', a point "PNT(h,v)" U='PNT' -- unmarked, Visio read them as numbers.
+* Text and data bar items are Visio's items then (its dialogs list them, it applies the
+  graphic itself); icon set and colour-by-value items are not: how Visio keeps their rules is
+  its own and Visio's automation cannot make one to look at.  Visio draws and keeps them as
+  written.  Visio's own legend (Page.DropLegend) builds nothing for these graphics.
+
+Assumptions where nothing public says how Visio does it ([NF] in the research; read back by
+JFDiagrammer, kept by Visio as ordinary cells):
+* Icon rules: the instance gets Visio's one compiled formula User.msvCalloutIconNumber
+  (IFERROR(IF(cond0,0,IF(cond1,1,...-1)),-1)); the rules themselves stay in the master item's
+  User.JFD_IconRules ("op|a|b" per icon).  A Visio item without them keeps its own
+  msvCalloutIconNumber formula as read (Item::icon_formula) and passes it on.
+* Colour by value: the item is a subshape of the master group with msvCalloutType "Color By
+  Value" (no callout master); its method and colours stay in User.JFD_CBVMethod (0 each
+  value, 1 ranges) and User.JFD_CBVColors ("value|to|#fill|#text" per colour).  On a shape:
+  User.visDGCBVFill = IF(match, RGB(..), ..., the old fill formula), FillForegnd =
+  User.visDGCBVFill; a text colour goes through User.JFD_DGCBVText into Char.Color.
+  User.visDGOldColors keeps what the shape had (our own text: "cell=I" inherited, "cell=F:..."
+  an own formula, "cell=V:..." an own constant, for FillForegnd, Char.Color, HideText and the
+  kind "Kind=Shape") and puts it back when the graphic goes.
+* The shape, now a group, shows its own geometry behind the callouts (DisplayMode = 1, kept
+  and put back like the colours).
+* An item's own position: User.JFD_DGPos = PNT(h,v) with visDGDefaultPos FALSE; a Visio item
+  without it gets the position its pin in the group is nearest to.
+* An item of a master written here is an instance of its callout master (Visio writes a copy
+  of the callout master's shape); instances on shapes are instances as in Visio.
+* visDGUseMaster and visDGDisplayFormat: USE() is not computed by the engine, so the value
+  written with it (254, as seen in Visio's files) stays.
+* visDGStackHeight = the distance to the item's place (items at one position stack
+  downwards, above the shape upwards).
+* The helper cells User.JFD_DGH and User.JFD_DGV (the position 0..6 the instance's pin
+  formulas read) are ours: Visio's own pin formulas are not known; ours give the same places.
+* Shape-Text ausblenden: HideText = TRUE on the shape (the old value kept as above); the
+  border (visDGShowBorder) is kept and written but not drawn.
+
+Every edit runs inside the caller's transaction (one undo step) and computes what it wrote
+(Engine::recalc of the sheets it touched).
+```
+
+```rust
+/// the universal name of the layer data graphics lie on
+LAYER_U: &str = "Data Graphic"
+/// the gap between a shape and the callouts outside it (inches, on paper; Visio's 1/16 in)
+GAP: f64 = 0.0625
+/// User.visDGCalloutItem: Visio's mark of a data graphic callout (its callout masters, the items
+/// of its graphics and their instances carry 5; an item without it is no item for Visio)
+CALLOUT_ITEM: f64 = 5.0
+```
+
+- **`enum Kind`**
+  the kind of an item (Visio's GraphicItem.Type codes)
+  - `IconSet` -- 2: one icon of a set chosen by rules
+  - `Text` -- 3: the value as text
+  - `DataBar` -- 4: a bar, stars, a thermometer ... between a minimum and a maximum
+  - `ColorByValue` -- 5: the shape's fill by its value
+  - `Heading` -- 6: a heading (Visio's; read and kept, not offered)
+
+**`impl Kind`**
+
+- **`fn code(self) -> u32`**
+  Visio's GraphicItem.Type
+- **`fn callout_type(self) -> &'static str`**
+  User.msvCalloutType as Visio writes it
+- **`fn parse(t: &str) -> Option<Kind>`**
+  the kind of a msvCalloutType text (case and spaces ignored)
+
+- **`struct Pos`**
+  a position at a shape: h 0..6 far left .. far right, v 0..6 below .. above
+  - `h: u8`
+  - `v: u8`
+
+**`impl Pos`**
+
+- **`const DEFAULT: Pos = Pos { h: H_FAR_RIGHT, v: V_MIDDLE }`**
+  far right, middle (Visio's default for new graphics)
+- **`fn pnt(self) -> String`**
+  PNT(h,v)
+- **`fn parse(t: &str) -> Option<Pos>`**
+  the position of a "PNT(h,v)" text (numbers clamped to 0..6)
+
+```rust
+/// horizontal positions
+H_FAR_LEFT: u8 = 0
+H_LEFT_EDGE: u8 = 1
+H_LEFT: u8 = 2
+H_CENTER: u8 = 3
+H_RIGHT: u8 = 4
+H_RIGHT_EDGE: u8 = 5
+H_FAR_RIGHT: u8 = 6
+/// vertical positions
+V_BELOW: u8 = 0
+V_BOTTOM_EDGE: u8 = 1
+V_BOTTOM: u8 = 2
+V_MIDDLE: u8 = 3
+V_TOP: u8 = 4
+V_TOP_EDGE: u8 = 5
+V_ABOVE: u8 = 6
+```
+
+- **`enum Opt`**
+  an option of an item: the value of a Prop.msvCalloutProp\* row
+  - `Num(f64)`
+  - `Text(String)`
+  - `Bool(bool)`
+
+**`impl Opt`**
+
+- **`fn num(&self) -> Option<f64>`**
+  as a number (a Boolean 1 or 0, a text parsed)
+- **`fn text(&self) -> String`**
+  as text
+
+- **`enum Op`**
+  a rule's test of a value
+  - `NotUsed` -- [nicht verwendet]: the icon is not used
+  - `Equal`
+  - `NotEqual`
+  - `Greater`
+  - `GreaterEq`
+  - `Less`
+  - `LessEq`
+  - `Between` -- between a and b (both included)
+  - `Contains`
+  - `NotContains`
+
+**`impl Op`**
+
+- **`const ALL: [Op; 10] = [Op::NotUsed, Op::Equal, Op::NotEqual, Op::Greater, Op::G ...`**
+  every test in the dialog's order
+- **`fn code(self) -> &'static str`**
+  the code in User.JFD_IconRules
+- **`fn parse(t: &str) -> Op`**
+
+- **`struct Rule`**
+  an icon's rule: shown when the value passes the test
+  - `op: Op`
+  - `a: String`
+  - `b: String` -- the upper bound of Between
+
+**`impl Rule`**
+
+- **`fn new(op: Op, a: &str, b: &str) -> Rule`**
+
+- **`struct Shade`**
+  a colour of a colour-by-value item: a value (or a range from `value` to `to`) and its fill
+  and text colour (0xRRGGBB)
+  - `value: String`
+  - `to: String` -- the end of a range ("" for each value)
+  - `fill: u32`
+  - `text: Option<u32>`
+
+- **`struct Item`**
+  an item of a data graphic
+  - `id: u32` -- visDGItemID
+  - `kind: Kind`
+  - `field: String` -- visDGField0: "{Label}" or a formula of such fields ("{Revenue}-{Expenses}")
+  - `callout: String` -- the NameU of the callout master ("" for a colour by value)
+  - `pos: Option<Pos>` -- None: the graphic's default position
+  - `options: Vec<(String, Opt)>` -- Prop.msvCalloutProp\* values: (row name, value)
+  - `rules: Vec<Rule>` -- icon sets: the rule of each icon (index = icon number)
+  - `ranges: bool` -- colour by value: ranges (else each value)
+  - `shades: Vec<Shade>`
+  - `icon_formula: Option<String>` -- an icon number formula read from a file whose rules are not known (kept)
+
+**`impl Item`**
+
+- **`fn new(kind: Kind, field: &str, callout: &str) -> Item`**
+  a new item of `kind` for field `field` ("{Label}") shown by callout master `callout`
+- **`fn opt(&self, name: &str) -> Option<&Opt>`**
+  an option's value
+- **`fn set_opt(&mut self, name: &str, v: Opt)`**
+  set an option
+- **`fn label(&self) -> Option<&str>`**
+  the label of a field expression that is one field ("{Kosten}" -> "Kosten")
+
+- **`struct DataGraphic`**
+  a data graphic
+  - `name: String` -- the master's name
+  - `items: Vec<Item>`
+  - `default_pos: Pos`
+  - `hide_text: bool` -- Shape-Text ausblenden (visDGHideText)
+  - `show_border: bool` -- Rahmen um Elemente an der Standardposition (visDGShowBorder)
+  - `next_item: u32` -- visDGNextItemID
+
+**`impl DataGraphic`**
+
+- **`fn new(name: &str) -> DataGraphic`**
+- **`fn push(&mut self, mut item: Item) -> usize`**
+  add an item (its ID handed out) -> its index
+- **`fn item_of(&self, field: &str) -> Option<usize>`**
+  the item of a field expression
+
+- **`fn parse_num(t: &str) -> Option<f64>`**
+  a number typed by a user or kept as text ("1,5" and "1.5" alike)
+
+- **`fn hex(c: u32) -> String`**
+  "#rrggbb" of 0xRRGGBB
+
+- **`fn parse_hex(t: &str) -> Option<u32>`**
+  0xRRGGBB of "#rrggbb"
+
+- **`fn user_text(doc: &Document, sheet: SheetRef, name: &str) -> Option<String>`**
+  a User cell's value as text (a number as written)
+
+- **`fn unique_name(doc: &Document, base: &str) -> String`**
+  a name no master of the document has (`base`, then "base (2)" ...)
+
+- **`fn is_graphic(doc: &Document, m: MasterRef) -> bool`**
+  whether master m is a data graphic (User.visUSEType = 1 in its page sheet)
+
+- **`fn graphics(doc: &Document) -> Vec<MasterRef>`**
+  the document's data graphics in master order
+
+- **`fn master_name(doc: &Document, m: MasterRef) -> String`**
+  the name of a master (Name, else NameU)
+
+- **`fn read(doc: &Document, m: MasterRef) -> Option<DataGraphic>`**
+  the model of data graphic master m (None: not a data graphic)
+
+- **`fn pin_formulas(gid: u32) -> (String, String)`**
+  the pin formulas of a callout inside group `gid` (its ID): PinX, PinY (stacked by
+  User.visDGStackHeight: down, up above the shape)
+
+- **`struct Field`**
+  a shape data field: its label (as shown) and row name
+  - `label: String`
+  - `row: String`
+
+- **`fn fields(doc: &Document, shapes: &[ShapeRef]) -> Vec<Field>`**
+  the shape data fields of the shapes, by row name, in the order they are met (the
+  callouts' own msvCallout\* rows left out)
+
+- **`fn field_expr(label: &str) -> String`**
+  "{Label}" of a field
+
+- **`fn resolve_field(doc: &Document, shape: ShapeRef, expr: &str, sheet: Option<u32>) -> Option<(String, String)>`**
+  a field expression on a shape -> (the formula, the label): every "{Label}" becomes the
+  shape's Prop row (`Sheet.N!Prop.Row` with `sheet` Some(N), else `Prop.Row`); None when the
+  shape lacks one of them
+
+- **`fn icon_formula(rules: &[Rule]) -> String`**
+  User.msvCalloutIconNumber of icon rules: the number of the first icon whose rule the value
+  passes, -1 for none (errors: -1)
+
+- **`fn shade_formula(shades: &[Shade], ranges: bool, value: &str, text: bool, otherwise: &str) -> String`**
+  the colour of a value: IF(match, RGB(..), ...) with `otherwise` when none matches
+
+- **`fn find_master(doc: &Document, name_u: &str) -> Option<MasterRef>`**
+  a master by NameU (else Name), ASCII case ignored
+
+- **`fn create(tx: &mut Transaction, eng: &mut Engine, g: &DataGraphic, src: Option<&Document>) -> Result<MasterRef, EditError>`**
+  a new data graphic master (hidden) for `g`; the callout masters its items name come from
+  the document or from `src` -> the master.  The caller recalculates nothing: the master's
+  cells are computed here.
+
+- **`fn update(tx: &mut Transaction, eng: &mut Engine, m: MasterRef, g: &DataGraphic, src: Option<&Document>, layer_name: &str) -> Result<Vec<ShapeRef>, EditError>`**
+  write data graphic master m anew from `g` (its name, items, positions, options) and put
+  it again on every shape that uses it -> those shapes
+
+- **`fn rename(tx: &mut Transaction, m: MasterRef, name: &str) -> Result<(), EditError>`**
+  rename a data graphic (Name and NameU; shapes keep it by its UniqueID)
+
+- **`fn duplicate(tx: &mut Transaction, eng: &mut Engine, m: MasterRef, name: &str) -> Result<MasterRef, EditError>`**
+  a copy of data graphic m under a new name ("name (2)" when taken) -> the copy
+
+- **`fn delete(tx: &mut Transaction, eng: &mut Engine, m: MasterRef) -> Result<(), EditError>`**
+  delete data graphic m: off every shape first, then the master (its callout masters stay)
+
+- **`fn applied(doc: &Document, shape: ShapeRef) -> Option<MasterRef>`**
+  the data graphic a shape shows (User.visDGDisplayFormat = USE("{UniqueID}" or name))
+
+- **`fn shapes_with(doc: &Document, m: MasterRef) -> Vec<ShapeRef>`**
+  every shape of the document's pages that shows data graphic m
+
+- **`fn callouts(doc: &Document, shape: ShapeRef) -> Vec<ShapeRef>`**
+  the data graphic callouts of a shape (subshapes with msvCalloutType and visDGCalloutItem)
+
+- **`fn page_layer(tx: &mut Transaction, page: PageRef, name: &str) -> Result<u32, EditError>`**
+  the page's layer for data graphics (NameUniv "Data Graphic"), added with `name` when the
+  page has none -> its index
+
+- **`fn apply(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef], m: MasterRef, layer_name: &str) -> Result<Vec<ShapeRef>, EditError>`**
+  put data graphic m on `shapes` (an earlier graphic goes first; shapes on pages only) ->
+  the shapes that show it now (a shape none of whose fields the graphic names is left out)
+
+- **`fn remove(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef]) -> Result<(), EditError>`**
+  take the data graphic off `shapes`: its callouts go, the shape's colours, text and kind
+  come back, the graphic's rows go
+
+- **`fn describe(item: &Item, kinds: &[&str; 4]) -> String`**
+  the text of a graphic's items for lists: "Kosten (Text)" ... (the caller's words)
+
+### `diagram_core/src/datagraphic/legend.rs`
+
+Source: [`lib/diagram_core/src/datagraphic/legend.rs`](../lib/diagram_core/src/datagraphic/legend.rs)
+
+```text
+legend -- (JD19, ST-08, RD-07) the legend of the data graphics on a page
+
+  Texts                       the words the legend writes (the caller's language): its title,
+                              the tests of icon rules, the line of a text item
+  groups(doc, page, &texts)   what the legend shows: one group per item of the graphics the
+                              page's shapes show (its field and kind once), each with its
+                              entries: an icon and its rule, a colour and its value or range,
+                              a bar and its range, a text item
+  insert(tx, eng, page, horizontal, &texts) -> ShapeRef   the legend as Visio 2010 and later
+                              build it: an outer list ("Legende", horizontal or vertical), one
+                              container per group with the field as its heading, inside an
+                              invisible list of the entries; at the top right of the page
+
+The legend is built with diagram_core::structure (Relationships on both sides, the lists
+laid out, the containers fitted) from plain shapes, so it is edited like any list: entries can
+be retyped and dragged.  Like Visio's it is not kept up to date: after the graphics change
+the user inserts it again.  Its outer list carries User.JFD_DGLegend = TRUE (own cell; how
+Visio marks its legend is not known).  The swatches are instances of the items' callout
+masters (an icon with its number fixed, a bar half full) and small rectangles in the colours.
+```
+
+- **`struct Texts`**
+  the words of a legend in the caller's language
+  - `title: String` -- the outer list's heading ("Legende")
+  - `text: String` -- the entry of a text item ("Wert als Text")
+  - `ops: [String; 10]` -- the tests in the order of Op::ALL ("", "=", "≠", ">" ... "zwischen", "enthält" ...)
+  - `icon: String` -- an icon whose rule is not known ("Symbol {}")
+
+- **`enum Swatch`**
+  the picture of an entry
+  - `Callout { master: MasterRef, icon: Option<i32>, value: Option<f64> }` -- an instance of a callout master: an icon number, a value for the field
+  - `Color(u32)` -- a rectangle in this colour (0xRRGGBB)
+  - `None` -- text only
+
+- **`struct Entry`**
+  an entry: its picture and text
+  - `swatch: Swatch`
+  - `text: String`
+
+- **`struct Group`**
+  a group: the field's label and the entries
+  - `label: String`
+  - `entries: Vec<Entry>`
+
+- **`fn groups(doc: &Document, page: PageRef, t: &Texts) -> Vec<Group>`**
+  the groups of the legend of the graphics shown on `page`
+
+- **`fn insert(tx: &mut Transaction, eng: &mut Engine, page: PageRef, horizontal: bool, t: &Texts, layer_name: &str) -> Result<ShapeRef, EditError>`**
+  the legend of the data graphics on `page` (see the file header) at the top right of the
+  page -> its outer list (Invalid: the page shows no data graphic)
+
+- **`fn is_legend(doc: &Document, s: ShapeRef) -> bool`**
+  whether a shape is (the outer list of) a data graphic legend
 
 ### `diagram_core/src/design/mod.rs`
 
@@ -59323,8 +60021,9 @@ Einrasten": equipment into racks, later doors into walls, valves into pipes)
                                    shapes and what they carry; connectors follow in the app)
   reach(doc, owner, paper)         a distance on paper in the page's drawing units
 
-Visio's point-to-point glue of 2-D shapes: a connection point of Type 1 ("outward") on the
-shape that moves meets one of Type 0 or 2 ("inward", "both") on another shape.  The nearest
+Visio's point-to-point glue of 2-D shapes: a connection point of Type 1 ("outward") or 2
+("both", JD21) on the shape that moves meets one of Type 0 or 2 ("inward", "both") on another
+shape.  The nearest
 pair within `reach` (page units) wins.  A container that would take the shape (its
 categories, structure::accepts) and holds the middle of the shape's box is reached from
 anywhere inside it: a server dropped anywhere over a rack goes onto the nearest unit of its
@@ -59777,6 +60476,9 @@ a Del="1" mark; restore_row and restore_section remove it again.
 - **`fn set_result(&mut self, sheet: SheetRef, addr: &CellAddr, value: Value, error: Option<CellError>) -> Result<(), EditError>`**
   (the engine) store the result of the cell's formula for this sheet; a cell that
   inherits its formula gets an F="Inh" cell of its own
+- **`fn set_result_unit(&mut self, sheet: SheetRef, addr: &CellAddr, value: Value, error: Option<CellError>, unit: Option<Unit>) -> Result<(), EditError>`**
+  (JD19) set_result with the unit that marks the value's type in the file (the formula
+  engine: a Value cell's string is U='STR', a colour U='COLOR', a point U='PNT')
 - **`fn add_section(&mut self, sheet: SheetRef, name: &str) -> Result<SecKey, EditError>`**
   add a section of the sheet's own -> its key (Geometry: the next free index); Exists
   when the sheet has it already
@@ -60512,6 +61214,13 @@ engine binds the names to a document's string table once per formula text.
   - `Le` -- &lt;=
   - `Ge` -- >=
 
+**`impl Func`**
+
+- **`fn by_name(name: &str) -> Option<Func>`**
+  the function of a name (any case); None for names the engine does not know
+- **`fn name(self) -> Option<&'static str>`**
+  the universal name (None for Unknown: Parsed::name has it)
+
 - **`enum SheetName`**
   the sheet part of a reference (in front of "!")
   - `Local` -- none: the sheet the formula belongs to
@@ -60762,6 +61471,9 @@ geometry -- the Geometry sections of a shape as paths, and the transforms of sha
                                    Bézier pieces where they are polynomial, else sampled)
   doc.geometry_paths(sheet, w, h)  the Geometry sections of a sheet with their flags (NoFill,
                                    NoLine, NoShow, NoSnap) and paths in local coordinates
+  doc.geometry_tagged(sheet, w, h) (JD21) the same, and per piece the row (IX) it comes from
+  Conic / row_conic                (JD21) the ellipse an ArcTo, EllipticalArcTo, Ellipse or
+                                   RelEllipticalArcTo row draws: c + u cos t + v sin t
   doc.local_xform(sheet)           local -> parent: Pin, LocPin, Angle, FlipX, FlipY
   doc.page_xform(shape)            local -> page: the chain of groups up to the page
   round_corners(path, r)           the Rounding cell: corners between straight lines rounded
@@ -60872,6 +61584,9 @@ INFINITE: f64 = 1000.0
   the Geometry sections `sheet` really has (inherited ones included, deleted ones left out)
   with their rows as paths in local coordinates; `w` and `h` are the shape's Width and
   Height (the relative rows and the relative points of NURBS and POLYLINE need them)
+- **`fn geometry_tagged(&self, sheet: SheetRef, w: f64, h: f64) -> Vec<(GeoSection, Vec<Vec<u32>>)>`**
+  (JD21) geometry_paths and, per sub-path, the IX of the row each piece comes from (a row
+  that draws several pieces -- an arc, a NURBS curve, a polyline -- gives each of them its IX)
 - **`fn local_xform(&self, sheet: SheetRef) -> Xform`**
   the transform of a shape's local coordinates to its parent's (the page, or the local
   coordinates of its group): T(Pin) R(Angle) Flip T(-LocPin)
@@ -60882,6 +61597,43 @@ INFINITE: f64 = 1000.0
 - **`fn arc_cubics(c: [f64; 2], r: f64, start: f64, sweep: f64, out: &mut Vec<Seg>)`**
   a circular arc (centre, radius, start angle, sweep in radians, positive counter-clockwise)
   as cubic pieces of at most 90 degrees
+
+- **`struct Conic`**
+  An ellipse and an arc of it: the points c + u cos t + v sin t for t from `t0` to `t0 + sweep`
+  (radians, positive counter-clockwise from u towards v; u and v are conjugate half axes, the
+  half axes themselves for an upright ellipse).  An affine map keeps the form: map() maps c, u
+  and v and the parameters stay, so an arc of a turned, flipped or stretched shape is a Conic
+  on the page too.
+  - `c: [f64; 2]`
+  - `u: [f64; 2]`
+  - `v: [f64; 2]`
+  - `t0: f64`
+  - `sweep: f64`
+
+**`impl Conic`**
+
+- **`fn at(&self, t: f64) -> [f64; 2]`**
+  the point at parameter t
+- **`fn is_full(&self) -> bool`**
+  the whole ellipse (a sweep of a full turn)
+- **`fn map(&self, m: &Xform) -> Conic`**
+  the same under an affine map
+- **`fn param(&self, p: [f64; 2]) -> Option<f64>`**
+  the parameter of the point of the ellipse that `p` projects to from the centre (in the
+  space where the ellipse is the unit circle); None for a degenerate ellipse
+- **`fn axes(&self) -> (f64, f64, f64)`**
+  the principal axes: the angle of the major axis (radians), the major and the minor half
+  length (the singular value decomposition of the matrix [u v])
+- **`fn bounds(&self) -> [f64; 4]`**
+  the box of the arc (x0, y0, x1, y1): its ends and the extremes it passes
+
+**`impl Document`**
+
+- **`fn row_conic(&self, sheet: SheetRef, sec: SecKey, key: crate::sheet::RowKey, from: [f64; 2], w: f64, h: f64) -> Option<Conic>`**
+  (JD21) the ellipse arc a Geometry row draws, in local coordinates, the way section_path
+  draws it: ArcTo, EllipticalArcTo and RelEllipticalArcTo from `from` (the current point) to
+  their X, Y, Ellipse as a whole; `w`, `h` the shape's Width and Height.  None for other rows
+  and for arcs that are drawn as a line (a bow of 0, three points on a line)
 
 - **`fn parse_args(text: &str, name: &str) -> Option<Vec<f64>>`**
   the numbers of a NURBS(...) or POLYLINE(...) value (None: not that function, or a part that
@@ -60921,7 +61673,8 @@ glue -- connection points, glue and the dynamic connector (CN-01..05, CN-12, CN-
 
   connection_points(doc, shape) -> Vec<ConnPoint>   the Connection rows on the page: point,
                                    direction (into the shape, as DirX/DirY mean it), Type
-  glued(doc, shape) -> [Target; 2]  what Begin and End are glued to (the Connect entries)
+  glued(doc, shape) -> [Target; 2]  what Begin and End are glued to (the Connect entries; glue
+                                   to a guide reads as None: pointglue.rs)
   ends(doc, shape)                 Begin and End on the page
   is_one_d / is_connector          a 1-D shape / one that routes (ObjType routable)
   style(doc, shape) -> Style       right angle, straight or curved (its cells, else the page's)
@@ -60962,17 +61715,28 @@ MoveTo and one NURBSTo over the corners).  Controls.TextPosition goes to the mid
 way.  Rows of a master keep their indices where their type fits; else they get a Del mark
 and new rows follow.
 
-Dynamic glue docks in the middle of a side of the target, on its outline (the farthest point
-of its geometry on the line through its middle), on the side that gives the cheapest way
-among the obstacles (length + bends; one search over the sides of both ends, route::best);
-where the other end lies within a side's reach, the point straight opposite it is offered
-too (Visio's files show such straight connections).  (JD15, SS-18) WalkPreference bit 1 / 2
-(visWalkPrefBegNS / EndNS): that end prefers top and bottom -- a way from there wins when it is
-as short and has as few bends as the cheapest one.  The straight style docks where the line
-between the two ends leaves the outline.  Obstacles are the boxes of the page's top-level
-shapes that are not 1-D (route.rs keeps the page's LineToNodeX/Y as clearance, else 1/8 in).
-ConFixedCode 1 and 2 (reroute manually / never) keep the corners and only move the first and
-last pieces; reset() routes them anew.
+Dynamic glue docks on the outline of the target (the farthest point of its geometry on a line
+through it).  (JD21v) Where on it, and the way, the connector's routing style decides as Visio
+16 does (route_styles::route, checked against Visio's own ways): right angles straight across
+in the middle of the overlap of two shapes beside each other, else an L leaving the begin's top
+or bottom; around obstacles in the free part of the sides; else the cheapest way over the sides
+(length + bends; route::best_through, which is also all ends glued to points or free get); where
+the other end lies within a side's reach, the point straight opposite it is offered too.
+(JD15, SS-18) WalkPreference changes none of these ways in Visio: kept, not read.  Obstacles
+are, as in Visio 16 (JD21v), the placeable shapes (ObjType with bit 1, not 4; a group with 8 by
+its placeable members; obstacles()), and for each connector the shapes its ends are glued to;
+the clearance is half the page's AvenueSize (opts_for).  The legs of Visio's right-angle router
+keep out of the way of the other connectors glued to the same shapes (related_lines: Visio
+spreads connectors leaving one side); after a move the connectors a placeable shape now crowds
+route again (crowded).  After routing ConFixedCode becomes 6 or 0 as
+Visio writes it (route_styles::mark).  ConFixedCode 1 and 2 (reroute manually / never) keep the
+corners and only move the first and last pieces; reset() routes them anew.  (JD21) 1 is laid
+anew when the kept way runs through a shape (route_edit.rs); 3 .. 6 route freely (Visio writes
+them for the connectors it routes itself); ShapePermeableX/Y let ways cross a shape.
+
+(JD21v) After routing, the line jumps of the connectors laid and of the connectors they cross
+go into their Geometry (jumps.rs, as Visio writes them); detach takes the jumps over deleted
+connectors away; path() reads a connector's way without them.
 
 Nothing happens on its own: opening a file routes nothing, only the shapes handed to update.
 ```
@@ -61023,7 +61787,8 @@ Nothing happens on its own: opening a file routes nothing, only the shapes hande
   straight, else right angles; 0 asks the page (LineRouteExt, RouteStyle)
 
 - **`fn path(doc: &Document, shape: ShapeRef) -> Vec<[f64; 2]>`**
-  the drawn way of a shape on the page: the first shown Geometry section, curves flattened
+  the drawn way of a shape on the page: the first shown Geometry section, curves flattened;
+  (JD21 jumps) a connector's way without its line jumps (jumps::way)
 
 - **`fn glue(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, end: End, at: [f64; 2], to: Target) -> Result<(), EditError>`**
   put an end of a 1-D shape at `at` (page coordinates) and glue it to `to`: a connection
@@ -61064,6 +61829,161 @@ Nothing happens on its own: opening a file routes nothing, only the shapes hande
 - **`fn set_style(tx: &mut Transaction, eng: &mut Engine, connectors: &[ShapeRef], style: Style) -> Result<(), EditError>`**
   give these connectors a style (ShapeRouteStyle and ConLineRouteExt: right angle 1/1,
   straight 16/1, curved 1/2) and route them anew
+
+- **`fn crowded(doc: &Document, owner: Owner, shapes: &[ShapeRef]) -> Vec<ShapeRef>`**
+  (JD21v) the dynamic connectors whose way runs through one of these shapes, or closer to it than
+  the clearance (half the page's AvenueSize), where the shape keeps connectors out (an obstacle:
+  placeable, ObjType 1; a group with 8 by its placeable members): after the shapes moved Visio
+  routes them again (the counter-check visio-obst-1 [sprd] "beside": a way 0.05 in under a shape
+  moved next to it went round it anew); the shapes themselves are not in the list
+
+### `diagram_core/src/groups.rs`
+
+Source: [`lib/diagram_core/src/groups.rs`](../lib/diagram_core/src/groups.rs)
+
+```text
+groups -- (JD21) how groups behave (SS-17, SP-06, SP-17, RS-27): the cells of the Group
+Properties section, Zu Gruppe hinzufügen / Aus Gruppe entfernen, shapes dropped into a group,
+the warning before a group is taken apart that formulas or a master bind
+
+  props(doc, g) -> Props               SelectMode, DisplayMode, IsDropTarget, IsSnapTarget,
+                                       IsTextEditTarget, DontMoveChildren (Visio's values when
+                                       a cell is missing)
+  set_props(tx, eng, g, &props)        the six cells written (constants, Behavior dialog)
+  is_drop_source(doc, s) / set_drop_source(tx, eng, s, on)   IsDropSource (Miscellaneous)
+  double_click_opens(doc, g) / set_double_click_opens(tx, eng, g, on)   EventDblClick
+                                       OPENGROUPWIN() (Verhalten › Doppelklicken)
+  text_target(doc, s) -> ShapeRef      where typing into a group goes (IsTextEditTarget)
+  drop_target_at(doc, owner, p, skip)  the group a shape dropped at page point p joins
+  dropped(tx, eng, owner, shapes)      shapes that may (IsDropSource) dropped onto a group
+                                       that takes them (IsDropTarget) join it
+  add_to_group(tx, eng, g, shapes)     Zu Gruppe hinzufügen: the shapes into the group, where
+                                       they are on the page, the group's box around them
+  remove_from_group(tx, eng, shapes)   Aus Gruppe entfernen: members out to the group's parent,
+                                       just above the group, where they are on the page
+  ungroup_warning(doc, g) -> Option<Warning>   what ungrouping loses (a master, formulas)
+  guide_glue(tx, eng, owner, shapes)   (SP-17) glue between a guide and shapes breaks unless
+                                       both go into a group
+  reparent(tx, eng, s, to, pos)        a shape into another parent, its place on the page kept
+
+Visio's rules (belegt: learn.microsoft.com, cells of the Group Properties section, IsDropSource,
+"Controlling the Behavior of Groups" of the Visio 2002 developer reference, the Behavior dialog
+box on support.microsoft.com, Selection.AddToGroup / RemoveFromGroup / ConvertToGroup, the
+Visio User's Guide ch. 4 "Working with shapes in groups"):
+* SelectMode 0: a click selects the group only; 1 (default): the group first, a later click a
+  member; 2: the member under the pointer first, a later click the group ("click the bounding
+  box to select the group itself"); nested groups follow the selected group's mode.
+* DisplayMode 0 hides the group's own geometry and text, 1 draws it behind the members, 2 (the
+  default) in front (render.rs since JD4).
+* IsDropTarget (Accept dropped shapes) takes a dropped shape only when the shape's IsDropSource
+  (Add shape to groups on drop) is set too; both default to FALSE.
+* IsSnapTarget (Snap to member shapes, default TRUE): shapes snap and glue to the members;
+  FALSE: only to the group.  IsTextEditTarget (Edit text of group, default TRUE since Visio
+  2000): typing goes into the group's text; FALSE: into the member on top of the stacking order.
+* DontMoveChildren: members cannot be dragged with the mouse (other ways still move them).
+* AddToGroup: the selection holds the shapes and the group, the group is the primary selection
+  or the only group.  RemoveFromGroup: the subselected members leave the group.
+* Guides: "If you add a guide and the shapes glued to it to a group, be sure to select both ...;
+  otherwise the glue breaks" (UG ch. 4).
+* Bitmaps: the old guide says imported bitmaps do not turn with a group; Visio 2010 and later
+  turn pictures (Bild › Drehen, the rotation handle) -- kept: they turn (not built, on purpose).
+* In Gruppe umwandeln (ConvertToGroup) turns a metafile into shapes; the model keeps metafiles
+  as bytes it does not draw (render Note::Metafile), so there is nothing to convert yet.
+Angenommen (the Gegenprobe checks): the alignment box follows after Zu Gruppe hinzufügen and Aus
+Gruppe entfernen (update_alignment_box; not with LockCalcWH); a group left without members and
+without geometry of its own goes; added shapes go on top of the members in their page order and
+leave containers and lists they were in; members of an instance of a master (subshapes that
+inherit from its master) stay; a dropped shape joins when its middle lies in the frame of the
+topmost top-level shape under it and that shape is a group taking drops.
+```
+
+- **`enum SelectMode`**
+  how a click selects in a group (SelectMode)
+  - `GroupOnly` -- 0: only the group
+  - `GroupFirst` -- 1: the group first, then a member (Visio's default)
+  - `MembersFirst` -- 2: the member under the pointer first, then the group
+
+**`impl SelectMode`**
+
+- **`fn code(self) -> u8`**
+  the cell's value
+- **`fn of(v: i64) -> SelectMode`**
+  the mode of a cell's value (unknown: group first)
+
+- **`struct Props`**
+  the cells of a group's Group Properties section
+  - `select_mode: SelectMode`
+  - `display_mode: u8` -- DisplayMode: 0 the group's own geometry and text hidden, 1 behind the members, 2 in front
+  - `drop_target: bool` -- IsDropTarget: takes shapes dropped onto it (with IsDropSource)
+  - `snap_target: bool` -- IsSnapTarget: shapes snap and glue to the members
+  - `text_edit_target: bool` -- IsTextEditTarget: typing goes into the group's own text
+  - `dont_move_children: bool` -- DontMoveChildren: members cannot be dragged
+
+- **`fn is_group(doc: &Document, s: ShapeRef) -> bool`**
+  whether the shape is a group
+
+- **`fn props(doc: &Document, g: ShapeRef) -> Props`**
+  the Group Properties of a shape (Visio's values for missing cells)
+
+- **`fn set_props(tx: &mut Transaction, eng: &mut Engine, g: ShapeRef, p: &Props) -> Result<(), EditError>`**
+  write a group's Group Properties (only the cells that change; booleans as TRUE/FALSE values)
+
+- **`fn is_drop_source(doc: &Document, s: ShapeRef) -> bool`**
+  IsDropSource: the shape joins a group it is dropped onto (when the group takes drops)
+
+- **`fn set_drop_source(tx: &mut Transaction, eng: &mut Engine, s: ShapeRef, on: bool) -> Result<(), EditError>`**
+  set IsDropSource of a shape
+
+- **`fn double_click_opens(doc: &Document, g: ShapeRef) -> bool`**
+  whether a double click opens the group (its EventDblClick calls OPENGROUPWIN)
+
+- **`fn set_double_click_opens(tx: &mut Transaction, eng: &mut Engine, g: ShapeRef, on: bool) -> Result<(), EditError>`**
+  a double click opens the group (EventDblClick = OPENGROUPWIN()) or does what it did before
+  (off: the cell inherits again, else 0 -- Visio's "Bearbeitet Text des Shapes")
+
+- **`fn text_target(doc: &Document, s: ShapeRef) -> ShapeRef`**
+  where typing into shape `s` goes: a group whose IsTextEditTarget is off hands it to its member
+  on top of the stacking order (and so on down)
+
+- **`fn drop_target_at(doc: &Document, owner: Owner, p: [f64; 2], skip: &[ShapeRef]) -> Option<ShapeRef>`**
+  the group a shape dropped at page point `p` joins: the topmost top-level shape of `owner`
+  (not in `skip`, no guide, no 1-D shape) whose frame holds p, when it is a group that takes
+  drops (IsDropTarget)
+
+- **`fn dropped(tx: &mut Transaction, eng: &mut Engine, owner: Owner, shapes: &[ShapeRef]) -> Result<Vec<ShapeRef>, EditError>`**
+  shapes dropped or moved: each top-level one with IsDropSource whose middle lies on a group
+  that takes drops joins that group (add_to_group) -> the groups that took shapes
+
+- **`fn reparent(tx: &mut Transaction, eng: &mut Engine, s: ShapeRef, to: Option<ShapeRef>, pos: Option<usize>) -> Result<(), EditError>`**
+  put shape `s` into parent `to` (None: the page) at `pos` in its z-order (None: on top),
+  where it is on the page: its pin, angle and flips (1-D: its ends) in the new parent's
+  coordinates; formulas of it and its subshapes that name its old group become their values
+
+- **`fn add_to_group(tx: &mut Transaction, eng: &mut Engine, g: ShapeRef, shapes: &[ShapeRef]) -> Result<Vec<ShapeRef>, EditError>`**
+  Zu Gruppe hinzufügen: `shapes` (not the group, nothing it holds or that holds it, no
+  inheriting subshape of an instance) go into group `g` on top of its members, where they are on
+  the page; they get the formulas of members (PinX "Sheet.&lt;g>!Width\*k" ...), leave the
+  containers and lists they were in, and the group's box fits them all (update_alignment_box).
+  Glue between a guide and shapes breaks unless both are in the group -> the shapes added
+
+- **`fn remove_from_group(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef]) -> Result<Vec<ShapeRef>, EditError>`**
+  Aus Gruppe entfernen: members (not an inheriting subshape of an instance) go to their group's
+  parent just above the group, where they are on the page; the group's box fits the members that
+  stay, a group left without members and without geometry of its own goes -> the shapes moved
+
+- **`enum Warning`**
+  what ungrouping a group loses (the app asks first)
+  - `Master` -- the group is an instance of a master: its link to the master goes (Visio's warning)
+  - `Formulas(usize)` -- this many cells of members name the group in formulas that are not their place or size
+    (Sheet.N!Prop.X, Sheet.N!User.Y ...): they keep their values only
+
+- **`fn ungroup_warning(doc: &Document, g: ShapeRef) -> Option<Warning>`**
+  what ungrouping `g` would lose (None: nothing)
+
+- **`fn guide_glue(tx: &mut Transaction, eng: &mut Engine, owner: Owner, moving: &[ShapeRef], together: &[ShapeRef]) -> Result<(), EditError>`**
+  (SP-17) the glue between a guide and a shape breaks when one of them is among `moving` (what
+  goes into a group or out of it) and the other is not among `together` (what ends up beside
+  it): the glued cells keep their values, the Connect entry goes
 
 ### `diagram_core/src/hit.rs`
 
@@ -61253,6 +62173,9 @@ instance of it dropped on a page, the texts of masters and stencils in five lang
                                      ColorTrans) and every shape of the instance its own
                                      LayerMember with the page's indices (the master's name
                                      the rows of its own Layer section)
+  detach(&mut tx, shape)             (JD21, SP-06) an instance made plain shapes: what it
+                                     inherits from its master shapes becomes its own, the link
+                                     to the master goes (before it is ungrouped; detach.rs)
 
 The JFD_ cells are JFDiagrammer's own (apps/JFDiagrammer/stencils/README.md); diagram_io's
 stencil builder writes them, the Shapes panel reads them.  Visio keeps them as ordinary User
@@ -61362,6 +62285,483 @@ JFD_TR: &str = "JFD_Tr"
   move master `m` to position `pos` among the masters (a stencil's order: MS-04, SL-07);
   a master in use by shapes of the document stays where it is (InUse)
 
+### `diagram_core/src/instance/detach.rs`
+
+Source: [`lib/diagram_core/src/instance/detach.rs`](../lib/diagram_core/src/instance/detach.rs)
+
+```text
+instance::detach -- (JD21, SP-06) an instance of a master made plain shapes: what it inherits
+from its master shapes becomes its own, so that it can be taken apart (Visio's "Durch diese
+Aktion wird die Verknüpfung des Objekts mit dem Master getrennt")
+
+  detach(tx, shape)        the instance and its subshapes: every cell, section and row of their
+                           master shapes they lack, the text and the picture they show, the
+                           styles, then no Master / MasterShape any more
+
+Formulas taken from the master name the master's shapes by Sheet.N: they get the IDs of the
+instance's shapes that inherit from them.  Cells the instance has with F="Inh" (the master's
+formula, a value of its own) get the master's formula and keep their value.  Rows and sections
+the instance deletes (Del="1") stay away, and the markers go.  A master shape that is itself an
+instance of another master passes on only what it holds itself (Visio's masters seldom nest).
+```
+
+- **`fn detach(tx: &mut Transaction, shape: ShapeRef) -> Result<(), EditError>`**
+  make the instance `shape` (a shape with a Master) and its subshapes plain shapes: what they
+  inherit from their master shapes becomes their own (see the head of this file); a shape that
+  is no instance is left alone
+
+### `diagram_core/src/jumps.rs`
+
+Source: [`lib/diagram_core/src/jumps.rs`](../lib/diagram_core/src/jumps.rs)
+
+```text
+jumps -- (JD21, CN-06) line jumps: where two dynamic connectors of a page cross, one of them
+hops over the other (an arc, a gap, a square, a bump of 2 to 7 sides).  As in Visio they are
+rows of the connector's Geometry, written when connectors are laid (routed): the connector laid
+and every connector it crosses or crossed get their jumps anew.  Nothing is worked out while
+drawing and nothing when a file opens -- a file shows what its Geometry holds.
+
+  Laid / laid.note(doc, c)      the connectors a gesture lays, in the order it lays them
+  lay(tx, eng, &laid)           (glue::run, route_edit::set_way) after they are laid: their
+                                jumps and those of every connector they cross, and of those
+                                whose jumps the crossings no longer explain (a connector they
+                                jumped over went away)
+  lay_again(tx, eng, &conns)    these connectors laid again where they are (the app routes
+                                them instead, as Visio does when their own cells change)
+  lay_page(tx, eng, page)       every connector of the page laid again, in z-order (the page's
+                                line jump cells changed: Seite einrichten, Linienübergänge
+                                anzeigen)
+  forget(tx, eng, &deleted)     (glue::detach) before shapes are deleted: the jumps over their
+                                connectors go
+  way(doc, c) -> Option<points> a connector's way on the page without its jumps (None: it has
+                                none): glue::path and route_edit read ways through it, so a
+                                file with jumps gives the same handles, ways and routes
+  read(doc, c) -> Vec<Jump>     the jumps a connector's Geometry holds (tests, diagramiotest)
+  Jump, JumpStyle
+
+Visio's rows (Visio 16 checked, JD21v: visio-run2 [jumps], visio-run3 [jumps2], visio-run4
+[jumprows], visio-jumps-1): a connector that jumps has, on the straight piece crossed, a LineTo
+to the jump's start and one row to its end -- ArcTo with the bow (A) half the jump's width
+(style 0 and 1), MoveTo (2, the gap) or PolylineTo with A = POLYLINE(0, 0, x / Width, y /
+Height, ...) through the bump's corners (3 square, 4 .. 9 two to seven sides); the jumps of a
+piece in the order the piece runs.  The corners in units of half the width, along the piece from the jump's start
+and across it, are Visio's own (not exactly on a half circle): square (0, 1) (2, 1); 2 sides
+(1, 1); 3 (0.5, 0.86) (1.5, 0.86); 4 (0.3, 0.7) (1, 1) (1.7, 0.7); 5 (0.2, 0.58) (0.7, 0.96)
+(1.3, 0.96) (1.8, 0.58); 6 (0.14, 0.5) (0.5, 0.86) (1, 1) (1.5, 0.86) (1.86, 0.5); 7 (0.1,
+0.44) (0.38, 0.78) (0.78, 0.98) (1.22, 0.98) (1.62, 0.78) (1.9, 0.44).  Visio writes the rows'
+numbers as constants in the drawing's unit; here they are constants in inches.
+Visio's rules -- belegt by the check:
+* When a connector is laid (new, moved, an end changed), Visio works out the jumps of it and
+  of every connector it crosses: partners gain or lose their jumps over it (all of a
+  partner's jumps by the rule, not only the one over it).  A connector deleted or moved away
+  takes the jumps over it along.  A page's line jump cell changed: every connector of the page
+  gets its jumps anew where it is (no routing); a connector's ConLineJumpCode changed: Visio
+  routes it again.  A file opened shows its rows (Visio draws the jumps of a file of ours as
+  they are, and lays them anew to the same rows, 126 of 135 connectors; the others below).
+* LineJumpCode (the page): 0 none; 1 at a crossing the more horizontal piece jumps (the
+  smaller |dy / dx|; equal slopes, as two 45 degree lines: neither); 2 the more vertical one;
+  3 the one laid last (it jumps over its partners, they lose their jumps over it); 4 the upper
+  one in the z-order; 5 the lower one.  Missing: 1.  (Codes 4 and 5 in a file Visio has just
+  opened: no connector jumps over another until a shape is brought to the front -- Visio's
+  display order of the shapes read is not known before; here the z-order counts from the
+  start.)
+* LineJumpStyle 0 and 1 arc, 2 gap, 3 square, 4 .. 9 two to seven sides.  Missing: 0.
+* The width: LineJumpFactorX x LineToLineX on pieces that run more along x (LineJumpFactorY x
+  LineToLineY on the others), the jump centred on the crossing, as high as half its width.
+  Missing: the factors 2/3, LineToLineX / Y 2.5 mm (a page without the cells: 0.0656 in).
+* Jumps closer than their width merge into one from the first one's start to the last one's
+  end, as high as half of that (the arc a half circle again).
+* PageLineJumpDirX: pieces that run along x jump 0 / 1 up, 2 down; PageLineJumpDirY: the
+  others 0 / 1 left, 2 right.
+* ConLineJumpCode (the connector): 0 the page's, 1 never, 2 always, 3 the other connector
+  jumps, 4 neither; ConLineJumpStyle 0 the page's, else as LineJumpStyle; ConLineJumpDirX / Y
+  0 the page's, else as the page's cells.  "Always" works on a page with LineJumpCode 0.
+Angenommen (no source; earlier assumptions kept):
+* "Last laid" for connectors not laid now keeps what their rows show; a whole page laid
+  anew (lay_page) is laid in z-order.
+* The conflicts of the connector codes: "neither" on either side: no jump; "always" on a side,
+  or "other" on the other side, makes that side jump; asked on both sides, the page's rule
+  decides (on a tie the upper one); "never" never jumps.
+* Only straight pieces of connectors with MoveTo and LineTo rows (and jump rows) take part
+  (curved connectors neither jump nor are jumped over); a jump that would reach over the end of
+  its piece (a bend, the end) is left out; a connector's end on another line (a T) is no
+  crossing, nor are lines along each other; no connector jumps over itself.  Rounding does
+  not move the jumps (they lie on the way without it).
+* Connectors in groups take part (where they lie on the page); connectors without a line
+  (LinePattern 0) or on hidden layers only do not.
+Lengths: the page's cells are lengths on paper (as LineToNodeX for the router); the ways are
+in drawing units on the page, the widths turned into drawing units by the drawing scale.
+
+Large pages: the pieces lie in a uniform grid (at most 64 x 64 cells), a crossing test looks
+only at the pieces in the cells of a piece's box; nothing compares all pairs.  A connector's
+rows are written only when they change.  Who crossed a laid connector before is not known
+(its cells have moved when it is laid): a jump with no crossing under it, or one wider on one
+side of its crossings than on the other (a merged jump that lost one), is laid anew.
+```
+
+- **`enum JumpStyle`**
+  how a jump looks (LineJumpStyle)
+  - `Arc` -- a half circle (0, 1)
+  - `Gap` -- the line stops and goes on (2)
+  - `Square` -- three sides of a box (3)
+  - `Sides(u8)` -- 2 .. 7 sides (4 .. 9)
+
+**`impl JumpStyle`**
+
+- **`fn from_code(v: u32) -> JumpStyle`**
+  LineJumpStyle / ConLineJumpStyle 1 .. 9 (0 and other values: the arc)
+- **`fn corners(self) -> &'static [[f64; 2]]`**
+  the corners of the bump in units of half the jump's width: along the piece from the
+  jump's start, across it (Visio's numbers)
+
+- **`struct Jump`**
+  a jump in a connector's Geometry
+  - `start: [f64; 2]` -- where it starts and ends on the connector's way (page coordinates)
+  - `end: [f64; 2]`
+  - `normal: [f64; 2]` -- the side it rises to (a unit vector across the way; a gap: 0, 0) and how high (drawing
+    units; a gap: half its width)
+  - `height: f64`
+  - `style: JumpStyle`
+
+**`impl Jump`**
+
+- **`fn width(&self) -> f64`**
+  its width along the way
+
+- **`fn way(doc: &Document, c: ShapeRef) -> Option<Vec<[f64; 2]>>`**
+  a connector's way on the page without its line jumps (None: no connector, or no jump rows:
+  read its Geometry as it is)
+
+- **`fn read(doc: &Document, c: ShapeRef) -> Vec<Jump>`**
+  the line jumps a connector's Geometry holds, in the order of its rows
+
+- **`struct Laid`**
+  the connectors a gesture lays, in its order
+
+**`impl Laid`**
+
+- **`fn note(&mut self, doc: &Document, c: ShapeRef)`**
+  a connector laid (other shapes are passed over)
+- **`fn is_empty(&self) -> bool`**
+  whether no connector was noted
+
+- **`fn lay(tx: &mut Transaction, eng: &mut Engine, laid: &Laid) -> Result<(), EditError>`**
+  after the connectors noted are laid: their jumps, those of every connector they cross and of
+  every connector whose jumps the crossings no longer explain, worked out and written (one call
+  per gesture: the order of the list is the order they were laid in)
+
+- **`fn lay_again(tx: &mut Transaction, eng: &mut Engine, conns: &[ShapeRef]) -> Result<(), EditError>`**
+  these connectors laid again where they are (their line jump cells changed), in this order
+
+- **`fn lay_page(tx: &mut Transaction, eng: &mut Engine, page: PageRef) -> Result<(), EditError>`**
+  every connector of the page laid again, in z-order (the page's line jump cells changed)
+
+- **`fn forget(tx: &mut Transaction, eng: &mut Engine, deleted: &[ShapeRef]) -> Result<(), EditError>`**
+  before shapes are deleted: the connectors that cross their connectors (theirs and those in
+  them) get their jumps anew without them
+
+### `diagram_core/src/layout.rs`
+
+Source: [`lib/diagram_core/src/layout.rs`](../lib/diagram_core/src/layout.rs)
+
+```text
+layout -- (JD21) a page laid out anew (Seitenlayout neu anordnen: CN-13, RW-09), connected
+shapes aligned and spaced (CN-14, RS-25), shapes off the page breaks (PR-03), the diagram
+turned or flipped with its shapes upright (RS-25)
+
+  Place::from_code(PlaceStyle) / place.code()   Visio's placement codes <-> style, direction,
+                                 the side a compact tree steps to, a hierarchy's alignment
+  Opts::from_page(doc, page)     the page's cells: PlaceStyle, PlaceDepth, AvenueSizeX/Y (the
+                                 space between shapes), BlockSizeX/Y (the layout grid)
+  diagram(doc, owner, only) -> Diagram   what a layout moves: the placeable shapes (nodes),
+                                 their boxes, the connections Begin -> End between them, the
+                                 boxes that stay (obstacles)
+  arrange(&diagram, &opts) -> centres    where the nodes' middles go (pure: no document)
+  plan(doc, owner, only, &opts) -> moves the nodes' moves
+  relayout(tx, eng, owner, only, &opts, routing) -> moved   the command: moves, members and
+                                 callouts along, containers settled, connectors routed
+  store(tx, eng, page, &opts, route, resize)   the page's cells as the dialog sets them
+  enlarge_page(tx, eng, page, margin)    Seite vergrößern: the page around its drawing
+  align_space(doc, owner, only, align, space, spacing) -> moves   (adjust.rs) Automatische
+                                 Ausrichtung und Abstände, Automatischer Abstand
+  turn(doc, owner, only, Turn, spacing) -> moves   (adjust.rs) Diagramm drehen
+  off_breaks(doc, owner, only, &xs, &ys, margin) -> moves   (adjust.rs) Von Seitenumbrüchen
+                                 verschieben, Seitenumbrüche vermeiden
+  move_nodes(tx, eng, owner, &moves) / reroute(tx, eng, owner, &moved, routing, all)
+
+Coordinates are the page's (drawing units, inches, y up).  Everything is deterministic: the
+same drawing gives the same layout (orders come from positions and shape ids, never from a
+hash).  Nothing runs on its own: opening a file lays out nothing (PLAN.md, "Fallen").
+
+Visio's rules -- belegt (Microsoft Learn: the ShapeSheet reference of the Page Layout and
+Shape Layout sections, VisCellVals, Page.Layout, Page.LayoutIncremental, VisLayoutDirection;
+support.microsoft.com: "Re-layout a diagram", "Align and position shapes in a diagram",
+"Configure Layout dialog box", "Layout and Routing Spacing dialog box"; the Visio blog
+"Layout improvements in Visio 2010" and the Office developer blog on LayoutChangeDirection;
+the German ribbon of Visio for Microsoft 365):
+* Design > Layout > Re-Layout Page (Entwurf › Layout › Zeichenblattlayout neu anordnen): a
+  gallery (flowchart, hierarchy, compact tree, radial, circular) with a live preview while
+  pointing; More Layout Options = Configure Layout: placement style, direction (flowchart,
+  compact tree and hierarchy only), alignment (hierarchy only), spacing; connector style and
+  appearance (straight / curved), "Apply routing style to connectors" (to all connectors of
+  the page or the selected ones); "Apply settings to" the selection or the current page;
+  "Enlarge page to fit drawing".  A layout of a selection lays out the selected shapes only,
+  with nothing selected the whole page.
+* PlaceStyle (visPLOPlace*/visLOPlace*): 0 default, 1 top to bottom, 2 left to right,
+  3 radial, 4 bottom to top, 5 right to left, 6 circular, 7..14 compact trees (7 down-right,
+  8 right-down, 9 right-up, 10 up-right, 11 up-left, 12 left-up, 13 left-down, 14 down-left),
+  15 parent default (ShapePlaceStyle), 16..27 hierarchies (top to bottom left/centre/right
+  16-18, bottom to top 19-21, left to right top/middle/bottom 22-24, right to left 25-27).
+* PlaceDepth: 0 page default, 1 medium, 2 deep, 3 shallow ("the method by which the drawing
+  is analyzed before creating the layout").  PlaceFlip / ShapePlaceFlip: 0 default, 1 flip x,
+  2 flip y, 4 in 90 degree steps, 8 none.  ResizePage: TRUE enlarges the page to enclose the
+  drawing.  AvenueSizeX/Y: the space between shapes of a layout ("Space between shapes" of
+  Layout and Routing Spacing); BlockSizeX/Y: "the area in which each of your shapes must fit"
+  ("Average shape size"); LineToLineX/Y and LineToNodeX/Y: the clearance between connectors and
+  between connectors and shapes; LineAdjustFrom/To: which overlapping connectors are spaced
+  apart; PlowCode / ShapePlowCode: placeable shapes move away on a drop; PageShapeSplit: a
+  shape dropped on a connector splits it.  A metric document's defaults (local corpus):
+  AvenueSize 7.5 mm, BlockSize 5 mm, LineToLine and LineToNode 2.5 mm.
+* ObjType: 0 Visio decides by context (a shape becomes placeable, 1, when the Connector tool
+  glues a connector to it), 1 placeable, 2 routable (1-D), 4 neither -- it wins over the
+  others --, 8 a group with placeable or routable shapes.  ShapeFixedCode: &H1 not moved by a
+  layout, &H2 not moved and plowing shapes stay off it, &H4 not moved and they may lie on it,
+  &H20 / &H40 connection points ignored / only, &H80 glue to the alignment box.
+* Auto Align & Space (Home > Arrange > Position; Automatische Ausrichtung und Abstände):
+  connected shapes; a shape downstream of another (over a connector) is its child; a child is
+  aligned with its parent and set at the default page spacing (or the one of Spacing
+  Options), shapes further downstream are carried along; the selected shapes, all shapes with
+  nothing selected.  Auto Space only spaces, Auto Align only aligns.  Avoid Page Breaks (a
+  toggle) keeps those commands off the page breaks; Move Off Page Breaks moves the selected
+  shapes (all with nothing selected) off them.
+* Rotate Diagram: the connected shapes (every set of two or more connected shapes; the
+  selected ones) turned 90 degrees right or left or flipped vertically or horizontally as a
+  unit; the shapes themselves keep their orientation (visLayoutDirRotateRight 0, ..Left 1,
+  ..FlipVert 2, ..FlipHorz 3).
+
+Angenommen (no source says it; chosen here, the user's check in Visio may correct it):
+* The flow follows Begin -> End of each connector (FEATURES CN-13); a shape glued to a 1-D
+  shape counts as connected whatever its glue (static or dynamic).  A container is laid out
+  as one block with its members (and every callout moves with its target); a connection to a
+  member is one to the outermost container.
+* Shapes that are not placeable (ObjType 0 without glue), fixed shapes (ShapeFixedCode &H7,
+  LockMoveX/Y) and, for a selection, the placeable shapes outside it stay where they are and
+  are kept clear: the laid-out drawing is shifted across past them.  A shape that encloses
+  all the moved ones (a frame) is no obstacle, (JD21) nor is one with ShapePermeablePlace
+  (shapes may be placed on top of it).  ObjType 4 shapes are ignored altogether.
+* The laid-out drawing keeps the corner of the moved shapes' box where the flow starts (top
+  left for top to bottom, ...); separate parts (components) follow each other across the
+  flow, in the order they had; placeable shapes without connections are parts of their own.
+* PlaceStyle 0 is a flowchart top to bottom, PlaceDepth 0 is medium; the depth is how hard
+  the crossings of connectors are reduced (shallow: two sweeps, medium: eight, deep:
+  twenty-four and exchanges of neighbours).  Middles snap to the layout grid (BlockSizeX/Y)
+  when Opts::grid is set; the distances between middles are then whole grid steps.
+* Compact tree "Down then right" (7): the tree grows downwards, each level steps right by
+  half its parent's width plus half the spacing (an outline); the other seven alike.
+* Hierarchy: the levels as rows, each row packed at the spacing and aligned at its start,
+  centred or at its end; flowchart: each shape centred over (and under) its connections.
+* Radial: the root is the shape with the most connections (among equals one without
+  incoming connections, then the one that reaches most), the others on circles around it in
+  wedges by the leaves of their subtrees, the root's first child at the top, clockwise.  Circular: a ring per part in the order
+  of a walk along the connections, the first at the top, clockwise.
+* Rotate Diagram turns each connected part (two or more shapes; a selection as one part)
+  about the middle of its box; where shapes would come too close after a turn the distances
+  grow along that axis (to the page spacing).  Avoid Page Breaks also applies to Re-Layout
+  Page (the dialog offers it).
+
+How a layered style works (flowchart, hierarchy; layered.rs): cycles broken by a depth-first
+walk (the connector leading back is reversed for the layout only), levels by the longest
+path (a source moved down next to its first successor), long connections through dummy
+points, the order in each level by barycentre sweeps with the crossings counted (the best
+order kept), levels at the spacing apart; then across: flowchart nodes as near the median of
+their neighbours as the order and the spacing allow (isotonic regression, pool adjacent
+violators), hierarchy rows packed and aligned.
+```
+
+```rust
+/// Visio's default space between shapes of a metric drawing (7.5 mm)
+AVENUE: f64 = 7.5 / 25.4
+/// Visio's default layout block of a metric drawing (5 mm)
+BLOCK: f64 = 5.0 / 25.4
+```
+
+- **`enum Style`**
+  a layout style of Seitenlayout neu anordnen
+  - `Flowchart` -- levels in the flow, each shape centred over its connections
+  - `Hierarchy` -- levels in the flow as rows, aligned at their start, centre or end
+  - `CompactTree` -- a tree as an outline: down (right, ...) with the levels stepping aside
+  - `Radial` -- the root in the middle, the others on circles around it
+  - `Circular` -- a ring
+
+- **`enum Dir`**
+  a direction on the page
+  - `Down` -- top to bottom
+  - `Up` -- bottom to top
+  - `Right` -- left to right
+  - `Left` -- right to left
+
+**`impl Dir`**
+
+- **`fn vector(self) -> [f64; 2]`**
+  the unit vector on the page (y up)
+- **`fn vertical(self) -> bool`**
+  up or down
+
+- **`enum Align`**
+  where a hierarchy's rows line up
+  - `Start` -- left (top for a horizontal flow)
+  - `Centre` -- centred (middle)
+  - `End` -- right (bottom)
+
+- **`enum Depth`**
+  how hard a layout works on the crossings (PlaceDepth)
+  - `Shallow` -- 3: few sweeps
+  - `Medium` -- 1 (and the page default 0)
+  - `Deep` -- 2: many sweeps and exchanges
+
+**`impl Depth`**
+
+- **`fn from_code(code: i64) -> Depth`**
+  PlaceDepth -> depth (0 and unknown values: medium)
+- **`fn code(self) -> i64`**
+  depth -> PlaceDepth
+
+- **`struct Place`**
+  a placement: style, direction, the side a compact tree steps to, a hierarchy's alignment
+  - `style: Style`
+  - `dir: Dir` -- the flow (flowchart, hierarchy), the way a compact tree grows; radial, circular: Down
+  - `then: Dir` -- across `dir`: the side a compact tree's levels step to; else where the levels spread
+  - `align: Align` -- a hierarchy's rows (else Centre)
+
+**`impl Place`**
+
+- **`fn new(style: Style, dir: Dir) -> Place`**
+  a style in a direction, the rest as Visio's gallery offers it (hierarchies centred,
+  compact trees stepping right of a vertical and down of a horizontal growth)
+- **`fn from_code(code: i64) -> Option<Place>`**
+  PlaceStyle / ShapePlaceStyle -> placement (None: 0 default, 15 parent default, unknown)
+- **`fn code(&self) -> i64`**
+  placement -> PlaceStyle
+- **`fn side(&self) -> Dir`**
+  the side across the flow (`then`, mended when it runs along the flow)
+
+- **`struct Opts`**
+  what a layout needs besides the drawing
+  - `place: Place`
+  - `spacing: [f64; 2]` -- the space between shapes, x and y (AvenueSizeX/Y), drawing units
+  - `depth: Depth`
+  - `grid: Option<[f64; 2]>` -- the layout grid the middles snap to (BlockSizeX/Y), drawing units; None: no grid
+
+**`impl Opts`**
+
+- **`fn new(place: Place) -> Opts`**
+  a placement with Visio's metric defaults (7.5 mm apart, medium depth, no grid)
+- **`fn from_page(doc: &Document, page: PageRef) -> Opts`**
+  the page's cells (lengths on paper, turned into drawing units): PlaceStyle (0: a
+  flowchart top to bottom), PlaceDepth, AvenueSizeX/Y, BlockSizeX/Y as the grid
+
+- **`fn fixed(doc: &Document, s: ShapeRef) -> bool`**
+  the shape stays where a layout or an adjustment leaves it: ShapeFixedCode &H1, &H2 or &H4,
+  LockMoveX or LockMoveY set
+
+- **`struct Diagram`**
+  what a layout works on
+  - `nodes: Vec<ShapeRef>` -- the shapes laid out (placeable, free; a container stands for its members), page order
+  - `boxes: Vec<[f64; 4]>` -- their boxes on the page
+  - `edges: Vec<(usize, usize)>` -- the connections Begin -> End between nodes (indices into `nodes`), each once, no loops
+  - `obstacles: Vec<[f64; 4]>` -- the boxes of what stays and is kept clear: shapes not placeable, fixed ones and (a
+    selection) the placeable ones outside it
+
+- **`fn diagram(doc: &Document, owner: Owner, only: &[ShapeRef]) -> Diagram`**
+  the shapes a layout of `owner` moves and what it keeps clear; `only` (not empty): a
+  selection, the others stay (a member selected stands for its outermost container)
+
+- **`fn arrange(d: &Diagram, opts: &Opts) -> Vec<[f64; 2]>`**
+  where the middles of the diagram's nodes go (page coordinates; see the file header): the
+  parts laid out in the style, one after the other across the flow (a compact tree's along
+  it), the start corner of the nodes' box kept, the obstacles kept clear
+
+- **`fn plan(doc: &Document, owner: Owner, only: &[ShapeRef], opts: &Opts) -> Vec<(ShapeRef, [f64; 2])>`**
+  the moves of a layout: each node by how far its middle goes
+
+- **`enum Routing`**
+  how connectors follow a layout
+  - `Follow` -- they follow the moved shapes (glue::update: ConFixedCode keeps a fixed way)
+  - `Apply { route: i64, ext: i64, }` -- Routing-Stil auf Verbinder anwenden: ShapeRouteStyle `route` and ConLineRouteExt `ext`
+    (1 straight, 2 curved) on the connectors, routed anew
+
+- **`fn move_nodes(tx: &mut Transaction, eng: &mut Engine, owner: Owner, moves: &[(ShapeRef, [f64; 2])]) -> Result<Vec<ShapeRef>, EditError>`**
+  move the nodes with what they carry (members, callouts), each shape once; then their
+  containers settle (lists laid out, sizes; no membership changes) -> every shape moved
+
+- **`fn reroute(tx: &mut Transaction, eng: &mut Engine, owner: Owner, moved: &[ShapeRef], routing: Routing, all: bool) -> Result<(), EditError>`**
+  the connectors after shapes moved: the ones glued to them and the ones whose way now runs
+  through them follow; Routing::Apply gives its style to those (`all`: to every connector of
+  `owner`) and routes them anew
+
+- **`fn relayout(tx: &mut Transaction, eng: &mut Engine, owner: Owner, only: &[ShapeRef], opts: &Opts, routing: Routing) -> Result<Vec<ShapeRef>, EditError>`**
+  Seitenlayout neu anordnen: the nodes of `owner` (`only`: a selection) laid out by `opts`,
+  what they carry along, the containers settled, the connectors routed (Routing::Apply: the
+  style on every connector of the page, or on the selection's) -> the shapes moved
+
+- **`fn store(tx: &mut Transaction, eng: &mut Engine, page: PageRef, opts: &Opts, route: Option<(i64, i64)>, resize: Option<bool>) -> Result<bool, EditError>`**
+  the page's layout cells as the dialog sets them: PlaceStyle, PlaceDepth (the page default
+  0 stays where it means the same), AvenueSizeX/Y (on paper); RouteStyle and LineRouteExt
+  when `route` is given; ResizePage when `resize` is -> whether anything changed
+
+- **`fn enlarge_page(tx: &mut Transaction, eng: &mut Engine, page: PageRef, margin: f64) -> Result<Option<[f64; 2]>, EditError>`**
+  Seite vergrößern (ResizePage): the page grows around its drawing with `margin` (drawing
+  units) where the drawing juts out, never shrinks; a drawing past the left or bottom edge
+  moves with the page's origin -> the move of the drawing (None: the page holds it already)
+
+### `diagram_core/src/layout/adjust.rs`
+
+Source: [`lib/diagram_core/src/layout/adjust.rs`](../lib/diagram_core/src/layout/adjust.rs)
+
+```text
+layout/adjust -- (JD21) small adjustments of connected shapes: Automatische Ausrichtung und
+Abstände and Automatischer Abstand (CN-14, RS-25), Diagramm drehen (RS-25), Von
+Seitenumbrüchen verschieben and Seitenumbrüche vermeiden (PR-03); the rules in layout.rs
+
+  align_space(doc, owner, only, align, space, spacing) -> moves   each child (downstream over
+                      a connector) lined up with its parent and set at the spacing from it,
+                      its siblings on that side at the spacing from each other, everything
+                      further downstream carried along
+  turn(doc, owner, only, Turn, spacing) -> moves   each connected part (a selection: one)
+                      turned or flipped about the middle of its box, the shapes upright;
+                      distances grow where shapes would come too close
+  off_breaks(doc, owner, only, &xs, &ys, margin) -> moves   shapes across a page break
+                      moved to the side where more of them lies, `margin` from the break
+
+The moves are applied with layout::move_nodes (members and callouts along) and the
+connectors follow with layout::reroute, all in the caller's transaction.
+```
+
+- **`fn align_space(doc: &Document, owner: Owner, only: &[ShapeRef], align: bool, space: bool, spacing: [f64; 2]) -> Vec<(ShapeRef, [f64; 2])>`**
+  Automatische Ausrichtung und Abstände (`align` and `space`), Automatischer Abstand (`space`
+  alone), automatisch ausrichten (`align` alone) on the connected shapes of `owner` (`only`
+  not empty: the selected ones adjust, what lies downstream of them is carried along) ->
+  the moves of the shapes (see the file header)
+
+- **`enum Turn`**
+  Diagramm drehen: VisLayoutDirection's four (0 right, 1 left, 2 vertical, 3 horizontal)
+  - `Right` -- 90 degrees clockwise
+  - `Left` -- 90 degrees anticlockwise
+  - `FlipV` -- top and bottom exchanged
+  - `FlipH` -- left and right exchanged
+
+- **`fn turn(doc: &Document, owner: Owner, only: &[ShapeRef], how: Turn, spacing: [f64; 2]) -> Vec<(ShapeRef, [f64; 2])>`**
+  Diagramm drehen: every connected part of two or more shapes of `owner` (`only` not empty:
+  the selected shapes as one part) turned or flipped about the middle of its box; the shapes
+  keep their own orientation, fixed ones stay; after a turn the distances along an axis grow
+  where two shapes would come closer than `spacing` on both axes -> the moves
+
+- **`fn off_breaks(doc: &Document, owner: Owner, only: &[ShapeRef], xs: &[f64], ys: &[f64], margin: f64) -> Vec<(ShapeRef, [f64; 2])>`**
+  Von Seitenumbrüchen verschieben: the shapes of `owner` (`only` not empty: those; members
+  move with their containers, fixed shapes stay) that lie across a page break (`xs`: the
+  vertical lines, `ys`: the horizontal ones, drawing units) moved to the side where more of
+  them lies, `margin` from the break -> the moves
+
 ### `diagram_core/src/names.rs`
 
 Source: [`lib/diagram_core/src/names.rs`](../lib/diagram_core/src/names.rs)
@@ -61421,7 +62821,12 @@ groups, z-order, new shapes, text, copy and paste (JD7: SP-03..07, TX-01, TX-03,
   set_pin(tx, eng, shape, at)         the pin to another place, the shape stays
   controls / set_control              the yellow control points (SP-04)
   vertices / set_vertex / insert_vertex / delete_vertex     Geometry rows (SP-05)
-  group(tx, eng, owner, shapes) / ungroup(tx, eng, group)   (SP-06)
+  move_vertices / delete_vertices, arc_handles / set_arc_point / set_eccentricity   (JD21,
+                                      SP-05) several vertices together, the handles of arcs
+                                      (ops/arcs.rs)
+  group(tx, eng, owner, shapes) / ungroup(tx, eng, group)   (SP-06; JD21: glue between a
+                                      guide and shapes breaks unless both are grouped, SP-17;
+                                      an instance is made plain first: instance::detach)
   reorder(tx, shapes, Z::Front | Back | Forward | Backward) (SP-07)
   new_shape(tx, eng, owner, Basic::Rectangle | Ellipse | TextBox, a, b)   rectangle and
                                       ellipse with the document's default line, fill and text
@@ -61627,6 +63032,55 @@ vertical flip toggles FlipY and makes it 2φ - a.
   move and size a shape's text block (TX-03; `to` from Frame::drag of text_frame, same
   turn): TxtWidth and TxtHeight, then TxtPinX/Y where the frame puts the text's local pin
   (proportional formulas keep their form); LockTextEdit refuses (Invalid)
+
+### `diagram_core/src/ops/arcs.rs`
+
+Source: [`lib/diagram_core/src/ops/arcs.rs`](../lib/diagram_core/src/ops/arcs.rs)
+
+```text
+ops::arcs -- (JD21, SP-05) the handles of arcs in vertex editing: an arc's control point and
+the eccentricity handles of an elliptical arc
+
+  arc_handles(doc, shape) -> Vec<ArcHandle>    per ArcTo, EllipticalArcTo and
+                                               RelEllipticalArcTo row of the shown sections:
+                                               the control point on the page and (absolute
+                                               EllipticalArcTo) the two eccentricity handles
+  set_arc_point(tx, eng, shape, section, row, at)     the control point dragged to `at`
+  set_eccentricity(tx, eng, shape, section, row, at)  an eccentricity handle dragged to `at`
+
+Visio's vertex editing (pencil tool) shows a control point in the middle of an arc segment;
+dragging it bends the arc.  An ArcTo keeps its bow A (the distance of the arc's middle from
+the middle of its chord, positive right of the chord: geometry.rs), the control point is the
+arc's middle; an EllipticalArcTo goes through its control point A, B, which is where the
+handle shows (relative rows: fractions of Width and Height).  A clicked control point of an
+elliptical arc shows two eccentricity handles on a line through it (Visio: "drag the
+eccentricity handles to change the angle and the eccentricity"): the line runs along the
+major axis (C, its angle) and each handle lies D x L from the control point, L a quarter of the
+chord (assumed: Visio's own spacing is not documented).  Dragging one sets C to the
+direction and D to the distance over L (D between 0.01 and 100).  The written cells keep the
+form of their formulas where they are proportional (ops::keep_form); the box follows the
+geometry afterwards (shapeops::fit_frame), as after every vertex edit.
+```
+
+- **`struct ArcHandle`**
+  the handles of one arc row
+  - `section: u32` -- the Geometry section's index (Geometry1 is 0)
+  - `row: u32` -- the row's IX
+  - `at: [f64; 2]` -- the control point on the page (an ArcTo: the arc's middle; an EllipticalArcTo: A, B)
+  - `ecc: Option<[[f64; 2]; 2]>` -- the two eccentricity handles on the page (an absolute EllipticalArcTo only)
+
+- **`fn arc_handles(doc: &Document, shape: ShapeRef) -> Vec<ArcHandle>`**
+  the arc handles of a shape, section by section (hidden sections left out)
+
+- **`fn set_arc_point(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, section: u32, row: u32, at: [f64; 2]) -> Result<(), EditError>`**
+  drag the control point of arc row `row` to the page point `at`: an ArcTo gets the bow that
+  puts its middle at the point's projection onto the chord's normal, an elliptical arc A and B
+  there.  NoRow: not an arc row; Invalid: LockVtxEdit
+
+- **`fn set_eccentricity(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, section: u32, row: u32, at: [f64; 2]) -> Result<(), EditError>`**
+  drag an eccentricity handle of the elliptical arc row `row` to the page point `at`: the
+  major axis (C) turns towards it, the ratio (D) is its distance from the control point over
+  the handles' unit (see the module comment).  NoRow: not an absolute EllipticalArcTo
 
 ### `diagram_core/src/ops/clip.rs`
 
@@ -61843,6 +63297,8 @@ ops::points -- control points (SP-04) and vertices (SP-05) of a shape
   set_control(tx, eng, shape, row, at)         a control point dragged to a page point
   vertices(doc, shape) -> Vec<Vertex>          the points of the Geometry rows on the page
   set_vertex / insert_vertex / delete_vertex   move one, add one after a row, take one out
+  move_vertices / delete_vertices              (JD21, SP-05) several of one shape together
+                                               (Visio: chosen with Shift)
 
 A control point is a row of the Controls section: X and Y in local coordinates, XDyn/YDyn
 the point its rubber band starts from, XCon/YCon how it behaves ([MS-VSDX] Controls; the
@@ -61861,7 +63317,10 @@ its own and moves with the start.  Relative rows keep fractions of Width and Hei
 absolute rows keep the proportional form of their formulas (Visio's "Width*0.5").  Adding and
 taking out a vertex inserts or removes a row in the middle of the section
 (Transaction::insert_row / remove_row: the rows after it are renumbered, formulas follow, an
-instance's inherited section becomes its own).  LockVtxEdit refuses (Invalid).
+instance's inherited section becomes its own).  LockVtxEdit refuses (Invalid).  (JD21, SP-05)
+After each of them the box follows the geometry (shapeops::fit_frame: Width, Height, Pin and
+the rows into the box of the geometry, the shape stays on the page; not with LockCalcWH), as
+Visio does after a vertex edit.
 ```
 
 - **`struct Control`**
@@ -61905,6 +63364,15 @@ instance's inherited section becomes its own).  LockVtxEdit refuses (Invalid).
 - **`fn delete_vertex(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, section: u32, row: u32) -> Result<(), EditError>`**
   take a vertex out; at the start of a sub-path the next vertex becomes the start (and the
   closing row of a closed one goes there); a sub-path keeps at least two vertices (Invalid)
+
+- **`fn move_vertices(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, list: &[(u32, u32)], d: [f64; 2]) -> Result<(), EditError>`**
+  (JD21, SP-05) move several vertices of a shape (section, row) together by `d` (page): each
+  as set_vertex moves it (the start of a closed sub-path takes its closing row along), the box
+  follows once at the end; vertices that are not there are left out
+
+- **`fn delete_vertices(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, list: &[(u32, u32)]) -> Result<(), EditError>`**
+  (JD21, SP-05) take several vertices of a shape out, the last rows first so the others keep
+  their numbers; a vertex its sub-path cannot spare (two left) stays
 
 ### `diagram_core/src/page.rs`
 
@@ -61998,7 +63466,8 @@ the sheets are shape IDs of the same page or master.
 **`impl Master`**
 
 - **`fn new(header: MasterHeader) -> Master`**
-  an empty master with this header
+  an empty master with this header; its new shapes get IDs from 5 on, as Visio's (a file's
+  masters keep the IDs they have)
 - **`fn master_shape(&self) -> Option<u32>`**
   the slot of the shape instances inherit from (the first top-level shape)
 
@@ -62039,6 +63508,8 @@ tiles of the printed sheet
   fit_to_drawing(tx, eng, page, margins) the page around its drawing, the shapes moved in
   Tiles::new(paper, margins, zoom); grow(tx, eng, page, &tiles)   automatic size after a
                                          gesture: whole tiles added or taken away
+  shift(tx, eng, page, d)                (JD21) the drawing moved with the page's origin,
+                                         dynamically glued connector ends along
 
 The cells (Visio's ShapeSheet reference, Page Properties and Print Properties sections):
 * DrawingSizeType: 0 same as printer (visPrintSetup), 1 fit page to drawing contents
@@ -62116,6 +63587,147 @@ happens on opening a file (PLAN.md, "Fallen"): only the app's gesture asks.
   grew or shrank at its left and bottom edge -> that move (drawing units) when the page
   changed, None when it stays (the automatic size is off, it fits, a step is too small)
 
+- **`fn shift(tx: &mut Transaction, eng: &mut Engine, page: PageRef, d: [f64; 2]) -> Result<(), EditError>`**
+  (JD21) every top-level shape of the page moved by `d` (ops::shift_all: the page's origin
+  moves under the drawing), and the ends of 1-D shapes glued to a whole shape along: their
+  \_WALKGLUE has no value of the engine's, so the stored point moves by `d` too (the formula
+  stays); static glue follows its formula by itself.  Before, a page that grew to the left or
+  down left such connectors behind
+
+### `diagram_core/src/pointglue.rs`
+
+Source: [`lib/diagram_core/src/pointglue.rs`](../lib/diagram_core/src/pointglue.rs)
+
+```text
+pointglue -- (JD21) glue beyond the ends of 1-D shapes: control points that glue (SP-04,
+SS-30), glue to vertices, handles, control points and guides (CN-02), the connection point
+tool (CN-01, RS-17)
+
+  glue_control(tx, eng, shape, row, at, to)    a control point dragged to `at` and glued to a
+                                               connection point (Target::Point) or let go
+                                               (Target::None)
+  glued_controls(doc, shape) -> [(row, Target)]  what its control points are glued to
+  followers(doc, owner, &moved)                 shapes whose control points are glued to these
+                                                shapes: they changed with them (their own glued
+                                                connectors follow in the app)
+  Anchor / anchor_point(tx, eng, target, anchor)  the connection point at a vertex, a handle
+                                                or a control point of `target` (made when it
+                                                has none there yet) -> its IX; glue::glue or
+                                                glue_control glue to it
+  anchor_at(doc, target, anchor)                where that place is on the page
+  glue_guide(tx, eng, shape, end, at, guide)    an end of a 1-D shape on a guide
+  is_glue_guide(doc, g) / guide_of(doc, shape)  a guide ends glue to; the guides its ends are on
+  add_point / move_point / delete_point / set_point_kind / point_kind / point_at   the
+                                                connection point tool: a Connection row added,
+                                                moved, taken out, its Type (0 inward, 1
+                                                outward, 2 both)
+
+The file's record, as Visio writes it (the local files: Ethernet taps glued to computers;
+learn.microsoft.com VisFromParts, VisToParts, Cell.GlueTo; Visio 2002 Developer Reference
+"Creating a Connected Drawing from a Program"):
+* a control point (Controls row k, 0-based position in its section) glued to connection point
+  n of shape N: X and Y = LOC(PNT(Sheet.N!Connections.Xn,Sheet.N!Connections.Yn)) (LOC: a
+  control point's X and Y are local), Connect FromCell=Controls.<row name> FromPart=100+k
+  ToCell=Connections.Xn ToPart=100+n-1.  No trigger cell: the formula follows the target.
+  Control points glue statically only (Visio: "control-handle connectors ... can only glue to
+  a specific point"), to inward points and points of both kinds (Type 0 and 2), not to
+  outward ones.
+* Glue to a vertex, a selection handle or (assumed: Visio's GlueTo lists them for neither
+  ends nor control points) a control point of another shape: Visio adds a connection point
+  there and glues to it ("A connection point is created that is glued to ... new formulas in
+  both the X and Y cells of the connection row").  The row's X and Y here: Geometry<s>.X<r> and
+  .Y<r> of the vertex (relative rows: times Width and Height), Width*fx and Height*fy of the
+  handle, Controls.<row> and Controls.<row>.Y of the control point (assumed); DirX, DirY 0,
+  Type 0.  A row with these formulas that is there already is used again.
+* An end on a guide (JD21, as Visio 16 writes it; Visio check visio-run2 [glue]): both
+  coordinates of the end INTERSECTX/INTERSECTY(Sheet.G!PinX, Sheet.G!PinY, Sheet.G!Angle, the
+  end's point, Sheet.G!Angle+90 deg) -- the foot of the point on the guide's line, so the end
+  follows the guide and keeps its place along it; two Connect entries, FromCell BeginX and
+  BeginY (EndX, EndY), FromPart 7 and 8 (10 and 11), ToSheet=G, ToCell=Angle, ToPart=4
+  (glue::glue replaces both like any).  An older form Visio still reads: the coordinate the
+  guide fixes = Sheet.G!PinY (PinX), one entry ToPart 2 (1).  Only top-level 1-D shapes and
+  guides that run across or up the page.
+
+The connection point tool (Visio's: Ctrl+click on a selected shape adds a point, a drag moves
+it, Del takes it out; the point's menu sets its kind): a new row's X and Y are Width*k and
+Height*k (proportional, as Visio writes them), DirX and DirY 0, Type 0; a moved point keeps
+the form of its formulas (ops: proportional stays proportional).  Taking a point out lets go
+of what is glued to it (its cells keep their values) and renumbers the rows after it; what is
+glued to them is glued again to the same point under its new number.
+
+Which kinds glue (Visio's Type cell: 0 inward, 1 outward, 2 inward & outward): ends and
+control points glue to points of kind 0 and 2; a 2-D shape's points of kind 1 and 2 dock on
+points of kind 0 and 2 of another shape (dock.rs).  The edit layer leaves kind 1 out as a
+target (SPF_OUTWARD).
+```
+
+- **`enum Anchor`**
+  a place on a shape that gets a connection point when something glues there (CN-02)
+  - `Vertex { section: u32, row: u32 }` -- a vertex: the Geometry section's index (Geometry1 is 0) and the row's IX
+  - `Handle { fx: f64, fy: f64 }` -- a selection handle: fractions of Width and Height (0, 0.5, 1)
+  - `Control(RowKey)` -- a control point (its row of the Controls section)
+
+- **`fn glue_control(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, row: RowKey, at: [f64; 2], to: Target) -> Result<(), EditError>`**
+  drag a control point (its row) to the page point `at` and glue it to `to`: a connection
+  point of kind 0 or 2 of another shape on the same page (static glue, LOC(PNT(..)) formulas
+  and a Connect entry), or nothing (the point placed as ops::set_control places it).  Invalid:
+  a whole shape, a shape inside this one or around it, an outward point; NoRow: no such
+  connection point.  A point that was glued is let go first.  A GUARD on X or Y keeps the
+  point where it is unglued
+
+- **`fn glued_controls(doc: &Document, shape: ShapeRef) -> Vec<(RowKey, Target)>`**
+  the control points of a shape that are glued, with their targets (Connect entries from
+  Controls.&lt;row> to a connection point)
+
+- **`fn followers(doc: &Document, owner: Owner, moved: &[ShapeRef]) -> Vec<ShapeRef>`**
+  the shapes (not among `moved` nor inside them) whose control points are glued to these
+  shapes or to shapes inside them, and those glued to those in turn: their control points
+  moved with the targets (the formulas did it), so their own connectors have to follow
+
+- **`fn anchor_at(doc: &Document, target: ShapeRef, anchor: Anchor) -> Option<[f64; 2]>`**
+  where an anchor of a shape is on the page (None: no such vertex or control point)
+
+- **`fn anchor_point(tx: &mut Transaction, eng: &mut Engine, target: ShapeRef, anchor: Anchor) -> Result<u32, EditError>`**
+  the connection point of `target` at an anchor: an indexed Connection row whose X and Y have
+  the anchor's formulas, else a new one (DirX, DirY, Type 0) -> its IX.  Invalid: a section of
+  named rows, a row without a point (Ellipse, InfiniteLine)
+
+- **`fn is_glue_guide(doc: &Document, g: ShapeRef) -> bool`**
+  whether `g` is a guide an end can glue to (top-level, across or up the page)
+
+- **`fn glue_guide(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, end: End, at: [f64; 2], guide: ShapeRef) -> Result<(), EditError>`**
+  put an end of a 1-D shape on a guide: `at` goes onto the guide's line, the coordinate the
+  guide fixes gets its formula (see the file header), a Connect entry records it; a dynamic
+  connector routes again.  Invalid: not a top-level 1-D shape, not such a guide, another page
+
+- **`fn guide_of(doc: &Document, shape: ShapeRef) -> [Option<ShapeRef>; 2]`**
+  the guides the begin and the end of a 1-D shape are glued to (Connect entries from BeginX or
+  EndX to a guide)
+
+- **`fn point_kind(doc: &Document, shape: ShapeRef, row: u32) -> Option<u8>`**
+  the kind (Type) of connection point `row` of a shape: 0 inward, 1 outward, 2 both
+
+- **`fn point_at(doc: &Document, shape: ShapeRef, row: u32) -> Option<[f64; 2]>`**
+  the page point of connection point `row` (None: no such row)
+
+- **`fn add_point(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, at: [f64; 2]) -> Result<u32, EditError>`**
+  add a connection point at the page point `at` (the connection point tool's Ctrl+click):
+  X = Width\*k, Y = Height\*k (a value where the side is 0), DirX, DirY, Type 0 -> its IX.
+  Invalid: a section of named rows, a shape that cannot be turned back (no local point)
+
+- **`fn move_point(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, row: u32, at: [f64; 2]) -> Result<(), EditError>`**
+  move connection point `row` to the page point `at`: X and Y keep the form of their formulas
+  (Width\*k stays proportional, a value stays a value); what is glued to it follows with the
+  recalculation (ends through glue::update in the app)
+
+- **`fn set_point_kind(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, row: u32, kind: u8) -> Result<(), EditError>`**
+  give connection point `row` the kind `kind` (Type: 0 inward, 1 outward, 2 both)
+
+- **`fn delete_point(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, row: u32) -> Result<(), EditError>`**
+  take connection point `row` out: what is glued to it is let go where it is, the rows after it
+  move one up (Transaction::remove_row) and what is glued to them is glued again under the
+  new number
+
 ### `diagram_core/src/render/mod.rs`
 
 Source: [`lib/diagram_core/src/render/mod.rs`](../lib/diagram_core/src/render/mod.rs)
@@ -62130,6 +63742,8 @@ gfx, later the exports of diagram_io)
                                   (JD7, rebuild.rs) the items of some top-level shapes made
                                   anew in their place; false: shapes came, went or changed
                                   their order (build anew)
+  render::affected(&doc, &drawing, &Options, &shapes) -> tops   (JD21) the top-level shapes
+                                  rebuild makes anew for these shapes
   Drawing { width, height, scale, items, fonts, notes }   in paper inches, y up, the origin at
                                   the page's bottom left corner; items in painter's order
   drawing.query(rect, &mut out)   the items whose boxes touch a rectangle (a grid over the
@@ -62153,6 +63767,8 @@ closed sub-paths of the Geometry sections without NoFill (even-odd), a Foreign s
 picture, the lines of the sections without NoLine with their line ends, the text.  Not
 drawn: deleted subshapes (Del, ID 4294967295, no Type), guides, sections with NoShow,
 shapes whose layers are all hidden.  A layer's colour (Color not 255) colours its members.
+(JD21) Line jumps are rows of the connectors' Geometry (crate::jumps writes them when
+connectors are laid): drawn as the rest of the geometry.
 
 Values Visio caches as "Themed" (the Theme style and a few shapes) are resolved against the
 page's theme: the theme part whose schemeEnum the page's ThemeIndex names (colours by
@@ -62338,8 +63954,13 @@ The result is the list build would make of the document now, as long as only tho
 changed.  false (nothing changed in the drawing): a shape came or went, the top-level order
 changed, the page's size or scale changed, a named shape of the page is not in the drawing
 -- the caller builds anew.  Changes the shapes do not show (the page's layers, styles,
-masters, themes) are the caller's to know: they need build.
+masters, themes) are the caller's to know: they need build.  (JD21) Line jumps are rows of
+the connectors' Geometry: a connector whose jumps changed is a changed shape like any other.
 ```
+
+- **`fn affected(doc: &Document, d: &Drawing, opts: &Options, shapes: &[ShapeRef]) -> Vec<ShapeRef>`**
+  (JD21) the top-level shapes rebuild makes anew for `shapes` (in painter's order; shapes the
+  drawing does not show are passed over)
 
 - **`fn rebuild(doc: &Document, d: &mut Drawing, measure: &mut dyn Measure, opts: &Options, shapes: &[ShapeRef]) -> bool`**
   the items of the top-level shapes of `shapes` made anew in `d` -> false: build anew
@@ -62355,8 +63976,8 @@ patterns, and line ends drawn by JFDiagrammer itself
   PALETTE[i]                      the colours of index 0 .. 23 (the document's Colors table
                                   comes first)
   dash(pattern) -> &[f64]         LinePattern 2 .. 23 in multiples of the line's weight
-  fill_pattern(p) -> FillKind     FillPattern 2 .. 24 as hatches, 25 .. 40 as the old
-                                  two-colour gradients
+  fill_pattern(p) -> FillKind     FillPattern 2 .. 24 as Visio draws them (hatches, dot
+                                  patterns as a tint), 25 .. 40 as the old two-colour gradients
   arrow(kind, size, weight)       BeginArrow / EndArrow 1 .. 45 with the size 0 (very small)
                                   .. 6 (colossal): JFDiagrammer's own line ends, pointing to
                                   +x with the tip at the origin, and how far the line stops
@@ -62384,6 +64005,7 @@ PALETTE: [u32; 24] = [ 0x000000, 0xFFFFFF, 0xFF0000, 0x00FF00, 0x0000FF, 0xFFF .
   - `Solid`
   - `Hatch(&'static [(f64, f64)])` -- lines in the foreground colour over the background colour: up to two families (angle in
     degrees, spacing in inches)
+  - `Tint(f64)` -- a dot pattern too fine to draw: the foreground's share (0 .. 1) mixed over the background
   - `Legacy(Legacy)` -- the old gradients from the foreground to the background colour
 
 - **`enum Legacy`**
@@ -62393,6 +64015,10 @@ PALETTE: [u32; 24] = [ 0x000000, 0xFFFFFF, 0xFF0000, 0x00FF00, 0x0000FF, 0xFFF .
   - `Radial(f64, f64)` -- from a point of the box (fractions, 0..1) outwards
 
 - **`fn fill_pattern(p: u32) -> FillKind`**
+  FillPattern 2 .. 24 as Visio draws them (JD26 Visio check: its SVG export holds each as an
+  8 x 8 bitmap tiled every 6 pt, a pixel 1/96 inch): the line patterns as hatches with Visio's
+  directions and spacings (hatch lines are a pixel wide), the dot patterns as their share of the
+  foreground over the background; 25 .. 40 the old gradients (36 .. 39 from the corners)
 
 - **`struct Arrow`**
   a line end in its own space: the tip at the origin, the line coming in from -x
@@ -62538,6 +64164,502 @@ attributes, nothing else; anything it does not understand is skipped.
 - **`fn no_theme_color(index: u32) -> u32`**
   QuickStyle colours without a theme
 
+### `diagram_core/src/replace.rs`
+
+Source: [`lib/diagram_core/src/replace.rs`](../lib/diagram_core/src/replace.rs)
+
+```text
+replace -- (JD21) Shape ändern (SP-11, RS-28, SH-G05): shapes replaced by instances of a master,
+keeping what the user gave them -- place, size, text, shape data, format, glue, membership
+
+  Behavior::of(doc, shape)            the Change Shape Behavior cells a replacement reads
+  can_replace(doc, shape, master)     whether `shape` can become an instance of `master`
+  replace(tx, eng, shapes, master, lang) -> Vec<ShapeRef>   every shape that can, replaced; the
+                                      new shapes in the order given
+  class(doc, sheet)                   User.msvReplaceClass (the gallery offers the same class)
+
+Visio's rules (belegt: learn.microsoft.com "Change Shape Behavior Section", ReplaceLockFormat,
+ReplaceLockText, ReplaceLockShapeData, ReplaceCopyCells; Visio blog "Insights for developers
+about Change Shape" (2012); support.microsoft.com "Replace one shape with another"):
+* It works like deleting the old shape and dropping the new one (new ID, the master's name);
+  "position, connections, formatting, shape text, and shape data" stay.  Only 2-D for 2-D and
+  1-D for 1-D; a container only by a container (the gallery offers containers only); list
+  shapes (a flowchart's lanes) are never replaced; LockReplace, PageLockReplace and
+  DocLockReplace refuse.  User.msvReplaceClass narrows the gallery to masters of the same class.
+* What moves over are the old shape's LOCAL values: shape data, text, format, and the cells of
+  Hyperlink, Layer, Protection, Alignment, Layout, 1-D Endpoints and Shape Transform.  What it
+  inherits from its master does not.  Actions, User cells, Controls, Geometry never move.
+* The cells of the NEW master decide: ReplaceLockShapeData TRUE keeps the master's shape data,
+  ReplaceLockText TRUE the master's text (and its Character, Paragraph, Tabs, Text Fields and
+  Text Block Format), ReplaceLockFormat TRUE the master's format (Fill, Line, Quick Style, Theme,
+  Gradient, Bevel, Effects, gradient stops).  ReplaceCopyCells = DEPENDSON(cell, ...) names
+  cells that are copied whatever the locks say (formula and value; value only where the new
+  shape lacks a cell the formula names).
+Angenommen (the Gegenprobe checks): connectors glued to a connection point keep it when the new
+shape has a point with that index, else they glue to the whole shape (dynamic) or let go (a
+plain line); the new shape takes the old one's place in the z-order and in its group, its
+container and list memberships, callouts and boundary edges (the Relationships of both sides);
+a container keeps its members; the text's Character/Paragraph/Tabs/Field rows come with the
+text; Text Transform does not move; a group's own styles move when they differ from its
+master's (or it has no master); comments (kept as a raw part, HL-04) and data links (JD18)
+stay with the old ID -- not yet carried over.
+```
+
+- **`struct Behavior`**
+  the cells of the Change Shape Behavior section (read from the new shape's master)
+  - `lock_data: bool` -- ReplaceLockShapeData: the master's shape data stays
+  - `lock_text: bool` -- ReplaceLockText: the master's text stays
+  - `lock_format: bool` -- ReplaceLockFormat: the master's format stays
+  - `copy: Vec<alloc::string::String>` -- ReplaceCopyCells: the cells copied anyway (names as the formula writes them)
+
+**`impl Behavior`**
+
+- **`fn of(doc: &Document, sheet: SheetRef) -> Behavior`**
+  the behaviour cells of a shape sheet (with inheritance)
+
+- **`fn class(doc: &Document, sheet: SheetRef) -> Option<alloc::string::String>`**
+  User.msvReplaceClass of a sheet (None: none)
+
+- **`fn can_replace(doc: &Document, shape: ShapeRef, master: MasterRef) -> bool`**
+  whether `shape` can be replaced by an instance of `master` (a master of the same document):
+  1-D for 1-D, 2-D for 2-D, a container only by a container, no list, no guide, no
+  LockReplace / PageLockReplace / DocLockReplace
+
+- **`fn replace(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef], master: MasterRef, lang: usize) -> Result<Vec<ShapeRef>, EditError>`**
+  replace every shape of `shapes` that can_replace allows by an instance of `master` (a master
+  of this document: instance::import_master first), Name in language `lang` (instance::LANGS);
+  see the head of this file -> the new shapes (the others are left alone)
+
+### `diagram_core/src/report.rs`
+
+Source: [`lib/diagram_core/src/report.rs`](../lib/diagram_core/src/report.rs)
+
+```text
+report -- (JD19) shape reports (DA-09, DA-13, AS-05, EX-12): Visio's report definitions as a
+model, run against a drawing into a table, put on a page as a table shape
+
+  ReportDef                     a definition as Visio's VisioReportDefinition describes it:
+                                name, title, description, which shapes (Scope), the criteria
+                                (Filter), the columns (Field: built-in fields, shape data,
+                                user cells; display names and order; summaries), grouping
+                                with subtotals, grand summary and duplicates (Grouping),
+                                up to three sort keys (Sort), precision, units, case; what a
+                                file had and the model does not know stays as data (attrs,
+                                extra) for the writer
+  run(doc, &def, &Ctx) -> Table   the result: title, columns, item rows, group headers,
+                                subtotal rows, the grand total; every cell as text (in the
+                                definition's precision, with units when it says so) and
+                                typed (for CSV and XLSX)
+  place(tx, eng, owner, at, &table, &Place) -> ShapeRef   the table shape: a group of cell
+                                shapes (title, header, grid, group and summary rows) on its
+                                own layer, marked with User.JFD_Report* (report/shape.rs)
+  report_shape(doc, shape) / refresh(tx, eng, shape, &table) / report_layer(..)   find a table
+                                shape (a cell of it too), build it anew in place (DA-13)
+
+The XML (VisioReportDefinition, .vrd files) and the definitions kept in the document sheet
+(User.visPropRptN, U="STR") are diagram_io::report: this crate holds no file format.  The
+codes below (Scope::code, Condition::code, Func::bit, Property::tag, Builtin::key) are the
+numbers and names that XML carries.
+
+Assumptions where no source says (Annahmen; the user's own Visio file will settle them):
+* SelectDrawingDataMethod: 1 every page, 2 the current page (both seen), 3 the selected
+  shapes (not seen); another number reads as Scope::Other and runs over every page.
+* Condition, checked in Visio 16 (a definition per code run through Visio's report add-on,
+  Auslastung against 60): 1 =, 2 <>, 3 >, 4 <, 5 >=, 6 <=, 8 exists; Visio's own definitions
+  (INVENTRY.VRD) write "exists" as 8 with Value 1 and PropertyDataType 3 (a Boolean), so "does
+  not exist" is written as 8 with Value 0 (diagram_io::report; 7 is read as it too, earlier
+  JFDiagrammer files wrote it, Visio gives no report for 7).
+* AdvancedFilter: Visio's own definitions write 0; with 1 Visio leaves the criteria out (every
+  code gave every shape), so they count only without it (run.rs, as Visio).
+* SummaryTypes is a bit mask, checked in Visio 16 (JD19's Visio check: a definition with each
+  bit alone run through Visio's report add-on): 1 count, 2 total, 4 average, 8 minimum,
+  16 maximum, 32 median (Func::bit); Visio's grand total row shows the total alone.
+* Tag 1 a built-in field, 2 shape data, 3 a user cell (seen); Type and PropertyDataType are
+  the shape data types of diagram_core::data::kind (0 text, 2 number, 3 Boolean seen).
+* ItemDisplay 1 shows the shapes' rows with the summaries, 0 only the summaries (one row per
+  group); GroupingField 0 groups nothing; a Boolean attribute is 1 or 0 (true / -1 read too).
+* A shape data field is named by its row name (Prop.<Name>); a shape that has no row of that
+  name but one with that label counts too (Visio's dialog lists the fields by label).
+* NAMEINFO is the shape's name as shown (Name), NAMEIDINFO its NameID ("Sheet.5"); lengths
+  (PINXINFO ...) in the unit of their cell, else the page's.
+* Visio's output "Visio-Shape" is an embedded Excel object (NO-22: not here), an instance of
+  its hidden master "Report shape" that names the definition only in RUNADDONWARGS formulas
+  (EventDrop, the actions "Bericht aktualisieren" and "Bericht erstellen"; seen in JD19's
+  check).  The table shape here is JFDiagrammer's own: User.JFD_Report = 1,
+  JFD_ReportName, JFD_ReportDef (a copy of the definition) or JFD_ReportLink (the
+  definition's name in the drawing or a .vrd path), on the layer the app names ("Bericht").
+
+The columns are in DisplayOrder with the grouping field first, as Visio's report shows them.
+
+Which shapes a report sees (run.rs): the top-level shapes of the pages of its scope (the
+foreground pages for "every page") or the selected shapes; a group without master and without
+shape data of its own stands for its members (a user's group of devices counts its devices),
+every other shape counts as one -- an instance's subshapes never.  Table shapes of reports
+are left out.  Summaries: Count counts the rows of the group, the others take the numbers.
+```
+
+- **`enum Scope`**
+  which shapes a report takes (SelectDrawingDataMethod)
+  - `AllPages` -- the shapes of every (foreground) page: 1
+  - `Page` -- the shapes of the current page: 2
+  - `Selection` -- the selected shapes: 3 (assumed)
+  - `Other(u32)` -- a number not known here (runs like AllPages, written back as read)
+
+**`impl Scope`**
+
+- **`fn code(self) -> u32`**
+  the code of SelectDrawingDataMethod
+- **`fn of(code: u32) -> Scope`**
+  the scope of a code
+
+- **`enum Builtin`**
+  a built-in field (Tag 1): its name in the definition
+  - `Text` -- TEXTINFO: the shape's text as shown (fields included)
+  - `Master` -- MASTERINFO: the name of the shape's master
+  - `Name` -- NAMEINFO: the shape's name
+  - `NameId` -- NAMEIDINFO: the shape's NameID ("Sheet.5")
+  - `PinX` -- PINXINFO
+  - `PinY` -- PINYINFO
+  - `Width` -- WIDTHINFO
+  - `Height` -- HEIGHTINFO
+  - `Other(String)` -- a name not known here (kept; it shows nothing)
+
+```rust
+/// the built-in fields in the order the wizard offers them
+BUILTINS: [Builtin; 8] = [Builtin::Text, Builtin::Master, Builtin::Name, Builtin:: ...
+```
+
+**`impl Builtin`**
+
+- **`fn key(&self) -> &str`**
+  the name in the definition (TEXTINFO ...)
+- **`fn of(key: &str) -> Builtin`**
+  the field of a name
+- **`fn is_length(&self) -> bool`**
+  whether its values are lengths
+
+- **`enum Property`**
+  what a column or a criterion reads from a shape
+  - `Builtin(Builtin)` -- a built-in field (Tag / PropertyType 1)
+  - `Data(String)` -- a shape data field by its row name (Prop.&lt;name>; Tag 2)
+  - `User(String)` -- a user cell by its row name (User.&lt;name>; Tag 3)
+
+**`impl Property`**
+
+- **`fn tag(&self) -> u32`**
+  Tag / PropertyType
+- **`fn key(&self) -> &str`**
+  the name the definition writes (TEXTINFO, the row name)
+- **`fn of(tag: u32, key: &str) -> Property`**
+  the property of a tag and a name (an unknown tag reads as shape data)
+
+- **`enum Func`**
+  a summary function of a column (SummaryTypes, a bit each; Visio's bits, checked in Visio 16)
+  - `Total` -- the sum: bit 2
+  - `Average` -- the mean: bit 4
+  - `Median` -- the middle value: bit 32
+  - `Count` -- the number of rows: bit 1
+  - `Min` -- the smallest number: bit 8
+  - `Max` -- the largest number: bit 16
+
+```rust
+/// the functions in the order of the dialog (and of the summary rows)
+FUNCS: [Func; 6] = [Func::Total, Func::Average, Func::Median, Func::Count, F ...
+```
+
+**`impl Func`**
+
+- **`fn bit(self) -> u32`**
+  its bit in SummaryTypes
+- **`fn of_mask(mask: u32) -> Vec<Func>`**
+  the functions of a SummaryTypes mask, in order
+
+- **`struct Field`**
+  a column of the report (VisioRptDefField)
+  - `id: u32` -- ID (groups and sort keys name it)
+  - `property: Property` -- what it shows (Tag with Name)
+  - `display_name: String` -- DisplayName: the column's heading ("" -- the property's name)
+  - `display: bool` -- Display: shown as a column
+  - `order: u32` -- DisplayOrder: the column's place (smaller first)
+  - `data_type: u16` -- Type: the data type (data::kind: 0 text, 2 number ...)
+  - `summary: u32` -- SummaryTypes (Func::bit)
+  - `attrs: Vec<(String, String)>` -- attributes not known here, kept
+
+**`impl Field`**
+
+- **`fn new(id: u32, property: Property, display_name: &str) -> Field`**
+  a shown column of a property with a heading
+- **`fn heading(&self) -> &str`**
+  the heading: DisplayName, else the property's name
+
+- **`enum Condition`**
+  a condition of a criterion (Condition; codes assumed, see the file head)
+  - `Eq` -- =
+  - `Ne` -- &lt;>
+  - `Gt` -- >
+  - `Ge` -- >=
+  - `Lt` -- &lt;
+  - `Le` -- &lt;=
+  - `Exists` -- the shape has the property
+  - `NotExists` -- the shape does not have it
+  - `Other(u32)` -- a code not known here (the criterion holds for no shape)
+
+```rust
+/// the conditions with their codes (one table: the assumption lives here)
+CONDITIONS: [(Condition, u32); 8] = [ (Condition::Eq, 1), (Condition::Ne, 2), (Condition::Gt, ...
+```
+
+**`impl Condition`**
+
+- **`fn code(self) -> u32`**
+  the code of Condition
+- **`fn of(code: u32) -> Condition`**
+  the condition of a code
+- **`fn has_value(self) -> bool`**
+  whether it compares with a value (Exists and NotExists do not)
+
+- **`struct Filter`**
+  a criterion: which shapes the report takes (VisioRptDefFilter)
+  - `id: u32` -- ID
+  - `property: Property` -- the property compared (PropertyType with Property)
+  - `condition: Condition` -- Condition
+  - `value: String` -- Value: what it compares with
+  - `unit: String` -- Unit: the value's unit code ("MM"; "" none)
+  - `data_type: u16` -- PropertyDataType (data::kind)
+  - `and: bool` -- AndOr: 1 and (Visio's criteria are all "and"), 0 or with the ones before
+  - `attrs: Vec<(String, String)>` -- attributes not known here, kept
+
+**`impl Filter`**
+
+- **`fn new(id: u32, property: Property, condition: Condition, value: &str) -> Filter`**
+  a criterion "property condition value"
+
+- **`struct Grouping`**
+  grouping and the summaries of the whole (VisioRptDefGroup)
+  - `id: u32` -- ID
+  - `field: u32` -- GroupingField: the ID of the field the rows are grouped by (0: none)
+  - `show_items: bool` -- ItemDisplay: the shapes' rows are shown (else only the summaries)
+  - `grand_summary: bool` -- GrandSummary: summaries over every row at the end
+  - `exclude_duplicates: bool` -- ExcludeDuplicates: a row the same as one before is left out
+  - `attrs: Vec<(String, String)>` -- attributes not known here, kept
+
+- **`struct Sort`**
+  a sort key (VisioRptDefSort)
+  - `id: u32` -- ID
+  - `field: u32` -- SortField: the field's ID
+  - `ascending: bool` -- Ascending
+  - `case_sensitive: bool` -- CaseSensitive
+  - `attrs: Vec<(String, String)>` -- attributes not known here, kept
+
+**`impl Sort`**
+
+- **`fn new(id: u32, field: u32, ascending: bool) -> Sort`**
+  a sort key on a field
+
+- **`struct ReportDef`**
+  a report definition (VisioReportDefinition; a .vrd file holds the same)
+  - `name: String` -- Name: what the list of reports shows
+  - `title: String` -- Title: the heading of the result ("" -- the name)
+  - `description: String` -- Description
+  - `scope: Scope` -- SelectDrawingDataMethod
+  - `precision: u32` -- Precision: decimals of numbers
+  - `show_units: bool` -- ShowUnits: lengths, angles and durations with their unit
+  - `case_sensitive: bool` -- CaseSensitive: criteria compare texts with case
+  - `user_cells: bool` -- UserCells: the wizard offers user cells (Visio's "Show all properties")
+  - `hidden_properties: bool` -- HiddenProperties: the wizard offers hidden shape data
+  - `advanced_filter: bool` -- AdvancedFilter: criteria were given (Visio's dialog Erweitert)
+  - `filter_expression: String` -- FilterExpression as read (written back unchanged)
+  - `exists: bool` -- ReportExists
+  - `version: String` -- Version ("3")
+  - `fields: Vec<Field>` -- the columns in file order
+  - `filters: Vec<Filter>` -- the criteria
+  - `grouping: Option<Grouping>` -- grouping and summaries (None: the file has no group element)
+  - `sorts: Vec<Sort>` -- the sort keys, the first one first
+  - `attrs: Vec<(String, String)>` -- root attributes not known here, kept
+  - `extra: Vec<String>` -- child elements not known here, as XML text, written back after the known ones
+
+**`impl ReportDef`**
+
+- **`fn new(name: &str) -> ReportDef`**
+  an empty definition named `name` (every page, two decimals, units shown)
+- **`fn field(&self, id: u32) -> Option<&Field>`**
+  a field by ID
+- **`fn columns(&self) -> Vec<&Field>`**
+  the shown fields in their display order (DisplayOrder, then file order)
+- **`fn heading(&self) -> &str`**
+  the title shown: Title, else Name
+- **`fn next_field_id(&self) -> u32`**
+  the next free field ID
+
+### `diagram_core/src/report/run.rs`
+
+Source: [`lib/diagram_core/src/report/run.rs`](../lib/diagram_core/src/report/run.rs)
+
+```text
+run -- a report definition run against a drawing: the shapes it takes, their values, the
+table with groups, summaries and the grand total
+
+  run(doc, &def, &Ctx) -> Table
+  Ctx { page, selection, labels }    the page shown, the selected shapes, the words of the
+                                     summary rows (the app's language; English by default)
+  Table { title, columns, rows, shapes }   rows of RowKind Item, Group (a group's heading),
+                                     Summary(f) (a group's subtotal), Grand(f) (over all);
+                                     None instead of a function: a row with several
+
+The layouts:
+* no grouping: the shapes' rows (sorted, duplicates left out when the definition says so),
+  then one row per summary function any column has (Grand), the function's name in the first
+  empty cell
+* grouping with the rows shown: per group a heading row (the group's value in its column),
+  its rows, one subtotal row per function; with GrandSummary the summaries over all at the end
+* grouping, summaries only (ItemDisplay 0): one row per group -- the group's value, then a
+  column per (field, function): "Anzahl" for the grouping field itself, else
+  "<field> (<function>)" -- and with GrandSummary a last row over all (Visio's inventory:
+  Master-Name and the count of each)
+
+Summaries take the numbers of a column, also numbers kept as text ("450" in a text field).
+Values: a number in the definition's precision with the drawing's decimal sign
+(Document::fields), with the unit's abbreviation when ShowUnits is on and the unit has one
+(lengths in the unit of their cell, per cent, angles, durations); dates in the general date
+format; Booleans as Labels::yes / no; texts as they are.  Each cell also carries its value
+typed (Val): the number in the shown unit, rounded to the precision, for CSV and XLSX.
+Sorting compares numbers as numbers and texts by their characters (case as the sort key
+says); an empty or missing value comes first.  Criteria: =, <>, <, <=, >, >= compare numbers
+when both sides are numbers (the criterion's value in its Unit, else in the shape's unit),
+else texts (case as the definition says); exists / does not exist ask whether the shape has
+the field.  Every criterion must hold, one with AndOr 0 is an "or" with the ones before.
+```
+
+- **`struct Labels`**
+  the words of the summary rows and of truth values (the app's language)
+  - `total: String` -- Func::Total
+  - `average: String` -- Func::Average
+  - `count: String` -- Func::Count
+  - `min: String` -- Func::Min
+  - `max: String` -- Func::Max
+  - `median: String` -- Func::Median
+  - `grand: String` -- the rows over all groups
+  - `yes: String` -- a true value
+  - `no: String` -- a false value
+
+**`impl Labels`**
+
+- **`fn func(&self, f: Func) -> &str`**
+  the word of a function
+
+- **`struct Ctx<'a>`**
+  where a report runs
+  - `page: Option<PageRef>` -- the page shown (Scope::Page)
+  - `selection: &'a [ShapeRef]` -- the selected shapes (Scope::Selection)
+  - `labels: Labels` -- the words of the summary rows
+
+- **`enum Val`**
+  a cell's value, typed
+  - `Empty` -- nothing
+  - `Num(f64)` -- a number in the unit shown
+  - `Text(String)` -- a text
+  - `Bool(bool)` -- a truth value
+  - `Date(f64)` -- a date (days since 30 December 1899)
+
+- **`struct Cell`**
+  a cell of the table: its text and its value
+  - `text: String` -- as shown
+  - `value: Val` -- typed
+
+- **`enum RowKind`**
+  what a row of the table is
+  - `Item` -- a shape's row (summaries only: a group's row)
+  - `Group` -- a group's heading
+  - `Summary(Option<Func>)` -- a group's subtotal (None: several functions in one row)
+  - `Grand(Option<Func>)` -- the summary over all (None: several functions in one row)
+
+- **`struct Row`**
+  a row of the table
+  - `kind: RowKind` -- what it is
+  - `cells: Vec<Cell>` -- a cell per column
+
+- **`struct Column`**
+  a column of the table
+  - `name: String` -- its heading
+  - `numeric: bool` -- its values are numbers (right-aligned)
+
+- **`struct Table`**
+  a report's result
+  - `title: String` -- the title (the definition's Title, else its Name)
+  - `columns: Vec<Column>` -- the columns
+  - `rows: Vec<Row>` -- the rows
+  - `shapes: usize` -- how many shapes the report took
+
+- **`fn run(doc: &Document, def: &ReportDef, ctx: &Ctx) -> Table`**
+  run a definition against a drawing
+
+### `diagram_core/src/report/shape.rs`
+
+Source: [`lib/diagram_core/src/report/shape.rs`](../lib/diagram_core/src/report/shape.rs)
+
+```text
+shape -- (NO-22, DA-13) a report's table on the page: a group of cell shapes instead of
+Visio's embedded Excel object, found again and built anew in place
+
+  report_layer(tx, page, name, name_univ) -> index   the layer of report tables (found by
+                                      its universal name, else added)
+  place(tx, eng, owner, top_left, &table, &Place) -> the group
+  report_shape(doc, shape) -> Option<ReportShape>      the table a shape is (or is part of)
+  refresh(tx, eng, shape, &table) -> the new group     the same place, marks and layers
+
+The table: a title row (no line, no fill, 11 pt bold), the heading row (8 pt bold on a light
+grey), the rows (8 pt; group headings, subtotals and the grand total bold, the totals on a
+lighter grey), each cell a rectangle with its text (numeric columns right-aligned), grouped
+with ops::group (the members scale with the group as in any group).  Sizes are on paper
+(rows 0.2 in, columns by their longest text, 0.5 to 3.5 in) and grow with the page's scale.
+The group carries the marks: User.JFD_Report = 1, JFD_ReportName (the definition's name),
+JFD_ReportDef (a copy of the definition's XML, Visio's "Kopie der Berichtsdefinition") or
+JFD_ReportLink (where the definition is: "" the drawing's definition of that name, else the
+path of a .vrd file, Visio's "Verknüpfung mit der Berichtsdefinition"); SelectMode 0 (a click
+takes the table, not a cell).  At most MAX_ROWS rows are drawn, then a row "…".
+```
+
+```rust
+/// User cell of a report table: 1
+MARK: &str = "JFD_Report"
+/// User cell: the definition's name (STR)
+MARK_NAME: &str = "JFD_ReportName"
+/// User cell: a copy of the definition's XML (STR)
+MARK_DEF: &str = "JFD_ReportDef"
+/// User cell: where the definition is ("" the drawing, else a .vrd path; STR)
+MARK_LINK: &str = "JFD_ReportLink"
+/// the most rows a table shape draws
+MAX_ROWS: usize = 2000
+```
+
+- **`struct Place`**
+  what a placed table carries besides its cells
+  - `name: String` -- the definition's name
+  - `def_copy: Option<String>` -- a copy of the definition (its XML), or None when it is linked
+  - `link: Option<String>` -- the link when it is not copied: "" the drawing's definition of that name, else a .vrd path
+  - `layers: Vec<u32>` -- the layers of the page the table and its cells go on
+
+- **`struct ReportShape`**
+  a table shape found on a page
+  - `shape: ShapeRef` -- the group
+  - `name: String` -- JFD_ReportName
+  - `def: Option<String>` -- JFD_ReportDef (None: none or empty)
+  - `link: Option<String>` -- JFD_ReportLink (None: none)
+
+- **`fn report_shape(doc: &Document, shape: ShapeRef) -> Option<ReportShape>`**
+  the report table `shape` is, or belongs to (a cell of it)
+
+- **`fn report_layer(tx: &mut Transaction, page: PageRef, name: &str, name_univ: &str) -> Result<u32, EditError>`**
+  the layer report tables go on: the page's layer with this universal name, else a new one
+
+- **`fn place(tx: &mut Transaction, eng: &mut Engine, owner: Owner, at: [f64; 2], table: &Table, p: &Place) -> Result<ShapeRef, EditError>`**
+  put a report's table on a page or master: its top left corner at `at` (page coordinates)
+  -> the group
+
+- **`fn refresh(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, table: &Table) -> Result<ShapeRef, EditError>`**
+  build a report table anew where it is (its top left corner, its marks and layers stay), as
+  part of the caller's transaction -> the new group
+
 ### `diagram_core/src/route.rs`
 
 Source: [`lib/diagram_core/src/route.rs`](../lib/diagram_core/src/route.rs)
@@ -62555,6 +64677,11 @@ route -- the ways of connectors on the page: right angles around obstacles, stra
   best(&a_ports, &b_ports, &obstacles, &opts) -> (i, j, points)   the cheapest way between
                                      any two of the ports (a dynamic end offers one or two
                                      per side)
+  best_through(&a, &b, &obstacles, &pass, &opts)   (JD21, SS-19) the same; pass[k] says
+                                     which way the way may cross obstacle k (PASS_X across it
+                                     horizontally: ShapePermeableX; PASS_Y vertically)
+  hits_pass(p, q, &b, pass)          hits_box, but a horizontal (vertical) segment through a
+                                     box it may cross does not count
   straight(a, b) -> points           the line between the two ends
   cost(&points, &opts) / bends(&points) / length(&points)
   spline_knots(n) -> (degree, knots) a clamped uniform B-spline over n control points: the
@@ -62576,7 +64703,9 @@ How orthogonal finds its way (deterministic, no state between calls):
 3. A sparse grid: the x and y lines of the grown boxes, of the exit points and the lines
    halfway between the two ends' exits (so a Z bends in the middle, as Visio's do).  Grid
    points inside a grown box and grid edges through one are blocked; the lines of a grown box
-   itself stay open, so a way keeps exactly the clearance.
+   itself stay open, so a way keeps exactly the clearance.  (JD21) A box the way may cross
+   horizontally (vertically) blocks only its vertical (horizontal) edges and no grid point, so
+   a way runs straight through it but cannot turn inside it.
 4. A* over (grid point, direction of travel) with the cost length + bend * bends; the
    estimate is the Manhattan distance plus the fewest bends any way to a goal needs (from
    the direction of travel and the one the goal wants), so the way found is the cheapest.
@@ -62608,6 +64737,17 @@ How orthogonal finds its way (deterministic, no state between calls):
 - **`fn hits_box(p: [f64; 2], q: [f64; 2], b: &[f64; 4]) -> bool`**
   whether the segment p-q runs through the inside of box b (touching its edge is not)
 
+```rust
+/// (JD21, SS-19) a way may cross the obstacle horizontally (ShapePermeableX)
+PASS_X: u8 = 1
+/// (JD21, SS-19) a way may cross the obstacle vertically (ShapePermeableY)
+PASS_Y: u8 = 2
+```
+
+- **`fn hits_pass(p: [f64; 2], q: [f64; 2], b: &[f64; 4], pass: u8) -> bool`**
+  (JD21) whether the segment p-q runs through the inside of box b where it may not: a
+  horizontal segment through a box with PASS_X, a vertical one through a box with PASS_Y do not
+
 - **`fn length(points: &[[f64; 2]]) -> f64`**
   the length of a polyline
 
@@ -62632,6 +64772,411 @@ How orthogonal finds its way (deterministic, no state between calls):
   the cheapest right-angle route from any of the ports `a` to any of the ports `b` (one
   search: a dynamic end offers a port per side) -> the indices of the two ports and the
   route; both lists must not be empty
+
+- **`fn best_through(a: &[Port], b: &[Port], obstacles: &[[f64; 4]], pass: &[u8], opts: &Opts) -> (usize, usize, Vec<[f64; 2]>)`**
+  (JD21, SS-19) best() among obstacles the way may cross: `pass[k]` (PASS_X, PASS_Y; missing:
+  0) for obstacles[k]
+
+### `diagram_core/src/route_edit.rs`
+
+Source: [`lib/diagram_core/src/route_edit.rs`](../lib/diagram_core/src/route_edit.rs)
+
+```text
+route_edit -- (JD21, CN-04) the way of a dynamic connector by hand: the handles of a selected
+connector (a midpoint on every piece, a vertex at every bend), a piece moved across (right
+angles stay right angles; next to an end a jog keeps the end where it is), a bend moved, added
+and removed; the way kept afterwards when its shapes move
+
+  way(doc, c) -> Option<Way>        the corners of the drawn way on the page and whether it is
+                                    right-angled (None: no dynamic connector, curved, LockVtxEdit)
+  handles(doc, c) -> Vec<Handle>    the midpoints and vertices to show (page coordinates)
+  move_piece(&pts, i, to, right, stub, snap) / move_bend(&pts, j, ..) / add_bend(&pts, at)
+  / remove_bend(&pts, j, right, stub) -> new points        pure, the ends stay
+  edit(tx, eng, c, Edit, snap) -> changed   one of them on the connector: the way written,
+                                    ConFixedCode 1 (2 stays)
+  set_way(tx, eng, c, &pts)         a way written as given (ends must be the connector's)
+  reset(tx, eng, &connectors)       Verbinder zurücksetzen: ConFixedCode 1 -> 0, routed anew
+  kept(..) / kept_polyline(..)      (crate, glue::route_one) a kept way after its shapes moved
+
+Visio's rules -- belegt (Visio 2000 user's guide, chapter 6, "Working with routable connectors";
+support.microsoft.com "Edit connector lines, arrows, or points"; Microsoft Learn ConFixedCode):
+routable connectors show midpoints and vertices besides their endpoints; their paths are edited
+"by moving, adding, or deleting endpoints, midpoints, and vertices"; "to reroute a connector,
+select it, and then drag a midpoint to a new location"; vertices are added with Ctrl + click and
+deleted with Del after a click on them (the pencil tool, as for other shapes); ConFixedCode 1 is
+"reroute as needed (manual reroute)", 2 "never reroute", 3 "reroute on crossover", 4 .. 6
+"internal".  The local corpus: the connectors on the pages have 0 (from the style), 3, 4, 5 or 6
+(Visio writes them when it routes), never 1 or 2: they reroute freely here as before.
+
+Angenommen (the user's check in Visio may correct it):
+* A right-angle way: a midpoint moves its piece across only; where the piece meets the end, a
+  short stub (the routing clearance, at most a third of the piece) stays at the end and a jog
+  carries the moved piece (two new bends); a piece next to an end's stub cannot be dragged past
+  it.  A piece that comes within `snap` of the line of a parallel piece two further on, or of an
+  end, snaps to it, and the bends between them go (that is how bends are removed by dragging).
+  A vertex moves the two pieces at it.  Ctrl + click adds a vertex on the piece (a right-angle
+  way: the piece is split; drag the vertex or a half to make a step).  Del removes a vertex: on a
+  right-angle way with its neighbour, the jog between them flattened by moving the piece after
+  (or before) them onto the line of the piece before (after) -- not where that piece ends at an
+  end of the connector.
+* A straight way (straight, network, centre to centre): dragging a midpoint makes a new vertex
+  there; vertices move freely and are removed with Del.  Curved connectors have no handles.
+* A way edited by hand gets ConFixedCode 1 (Visio's "manual reroute"; 2 stays).  Kept ways (1,
+  2) keep their corners when their shapes move: the first and last pieces follow the ends, a
+  dynamic end stays on the side the way leaves by.  1 is laid anew when the kept way now runs
+  through a shape or an end piece would run back into its shape; 2 never.  Verbinder
+  zurücksetzen gives ConFixedCode 1 back as 0 and routes anew.
+```
+
+- **`struct Way`**
+  the drawn way of a connector by hand
+  - `pts: Vec<[f64; 2]>` -- its corners on the page, Begin first
+  - `right: bool` -- right angles (a right-angle style and every piece upright or level); else a polyline
+
+- **`struct Handle`**
+  a handle of a connector's way
+  - `at: [f64; 2]` -- where it is (page)
+  - `bend: bool` -- a vertex (true) or a piece's midpoint (false)
+  - `index: usize` -- the vertex's index into Way::pts, or the piece's (the piece from pts[index])
+  - `half: [f64; 2]` -- a midpoint: half the piece, from the handle to its end (page); a vertex: 0, 0
+  - `free: bool` -- a midpoint that moves anywhere (a straight way: a new vertex), not only across
+
+- **`enum Edit`**
+  one change by hand
+  - `Piece(usize, [f64; 2])` -- the piece from pts[i] moves (across, or a new vertex on a straight way) to `to`
+  - `Bend(usize, [f64; 2])` -- vertex pts[j] moves to `to`
+  - `Add([f64; 2])` -- a vertex on the piece nearest to the point
+  - `Remove(usize)` -- vertex pts[j] goes
+
+- **`fn orthogonal(pts: &[[f64; 2]]) -> bool`**
+  whether every piece is level or upright (pieces without length count as either)
+
+- **`fn way(doc: &Document, c: ShapeRef) -> Option<Way>`**
+  the way of a connector that can be edited by hand: a dynamic connector, not curved, not
+  locked against vertex edits (LockVtxEdit)
+
+- **`fn handles(doc: &Document, c: ShapeRef) -> Vec<Handle>`**
+  the handles a selected connector shows: a vertex at every bend, a midpoint on every piece
+
+- **`fn move_piece(pts: &[[f64; 2]], i: usize, to: [f64; 2], right: bool, stub: f64, snap: f64) -> Vec<[f64; 2]>`**
+  the way with piece i (from pts[i]) dragged to `to`: a right-angle way moves the piece across
+  (snapped within `snap`, jogs at the ends with stubs of `stub`), a straight one gets a vertex
+  at `to`
+
+- **`fn move_bend(pts: &[[f64; 2]], j: usize, to: [f64; 2], right: bool, stub: f64, snap: f64) -> Vec<[f64; 2]>`**
+  the way with vertex pts[j] dragged to `to`: on a right-angle way the two pieces at it move
+  across (at a vertex that only splits a piece: the piece after it), else the vertex moves
+
+- **`fn add_bend(pts: &[[f64; 2]], at: [f64; 2]) -> Option<Vec<[f64; 2]>>`**
+  the way with a new vertex on the piece nearest to `at` (where `at` falls onto it; a right-angle
+  way: the piece is split there) -> None: on a vertex or an end already
+
+- **`fn remove_bend(pts: &[[f64; 2]], j: usize, right: bool, stub: f64) -> Option<Vec<[f64; 2]>>`**
+  the way without vertex pts[j] (see the file header) -> None: it cannot go
+
+- **`fn set_way(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef, pts: &[[f64; 2]]) -> Result<(), EditError>`**
+  write a way into a connector as given (Begin first; the ends must be where the connector's
+  are) and mark it as the user's (ConFixedCode 1, unless it is 1 or 2 already)
+
+- **`fn edit(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef, e: Edit, snap: f64) -> Result<bool, EditError>`**
+  apply one change by hand to a connector's way (`snap`: how near a piece snaps to a line, in
+  drawing units) -> whether the way changed
+
+- **`fn reset(tx: &mut Transaction, eng: &mut Engine, connectors: &[ShapeRef]) -> Result<(), EditError>`**
+  Verbinder zurücksetzen: a way kept because it was edited by hand (ConFixedCode 1) is free
+  again (0); the connectors are routed anew with few bends
+
+### `diagram_core/src/route_styles.rs`
+
+Source: [`lib/diagram_core/src/route_styles.rs`](../lib/diagram_core/src/route_styles.rs)
+
+```text
+route_styles -- (JD21, CN-05, SS-40, SS-19) the routing styles of a page and of a connector with
+their directions, the ways they lay, and the shapes connectors may cross
+
+  Kind, RouteStyle { kind, dir }      a style and its direction (organization chart, flowchart,
+                                      tree and simple have one; the others None)
+  RouteStyle::from_code(c) / code()   Visio's RouteStyle / ShapeRouteStyle codes 0 .. 22
+  RouteStyle::new(kind, dir)          (a direction where the style has none is dropped, one
+                                      where it needs one defaults to top to bottom)
+  of(doc, connector) -> RouteStyle    its ShapeRouteStyle, else its page's RouteStyle (0 and
+                                      unknown codes: right angle)
+  pass(doc, shape) -> u8              route::PASS_X | PASS_Y from ShapePermeableX / Y
+  permeable_place(doc, shape)         ShapePermeablePlace: a layout may place shapes on it
+                                      (layout::diagram leaves it out of the obstacles)
+  dynamics_off(doc, owner) -> bool    the page's DynamicsOff
+  (crate) shape(doc, target) -> Option<Shape>   a dynamic end's shape: box, middle, outline
+  (crate) route(style, [shapes], &a_ports, &b_ports, ..) -> Routed   the way of a connector in its
+                                      style and whether Visio's right-angle router lays it
+  (crate) mark(tx, connector, router) ConFixedCode afterwards as Visio writes it (6 / 0)
+
+Visio's rules -- belegt (Microsoft Learn: the cells RouteStyle, ShapeRouteStyle, ConFixedCode,
+ShapePermeableX/Y/Place, DynamicsOff, CtrlAsInput, LineAdjustFrom/To, LineRouteExt; the archived
+Visio 2002 developer pages "Creating Routable and Other 1-D Connectors" and "Designing Shapes for
+Automatic Layout"; the Visio 2000 user's guide, chapter 6):
+* RouteStyle / ShapeRouteStyle: 0 default (right angle), 1 right angle, 2 straight,
+  3/4/10/11 organization chart top to bottom / left to right / bottom to top / right to left,
+  5/6/12/13 flowchart, 7/8/14/15 tree (the same four directions), 9 network, 16 centre to
+  centre, 17/18/19/20 simple (top to bottom, left to right, bottom to top, right to left),
+  21 simple horizontal-vertical, 22 simple vertical-horizontal.  ShapeRouteStyle 0 takes the
+  page's.
+* ShapePermeableX / Y: TRUE lets connectors route horizontally / vertically through the
+  (placeable) shape.  ShapePermeablePlace: shapes may be placed on top of it by a layout
+  (layout.rs).  ObjType 4: routing behaves as if the shape did not exist (glue.rs).
+* DynamicsOff: TRUE turns off "placeable shapes move and connectors reroute around other shapes
+  and connectors".  CtrlAsInput: which shape is the parent of a control handle's glue -- not
+  routing, kept for Visio.  LineAdjustFrom / LineAdjustTo: which connectors routed on top of each
+  other are spaced apart / lined up -- kept for Visio and shown in Seite einrichten (JD21v: Visio
+  16 spread connectors at one shape apart whatever the two cells said, 0 .. 2; see below).
+  LineRouteExt / ConLineRouteExt: 0 default, 1 straight, 2 curved (the appearance, glue.rs).
+* ConFixedCode: 0 reroute freely, 1 reroute as needed (manual reroute), 2 never reroute,
+  3 reroute on crossover, 4 .. 6 internal (route_edit.rs keeps a way by hand).
+
+(JD21v) The ways as a real Visio 16 lays them -- belegt by the counter-check of 2026-11-27
+(Documents\JFLib-jd21-visio-check: visio-run3 grid.txt, every style against a child in ten places
+around its parent, the tests in route_styles_visio_tests.rs; visio-route-1 / -2, Visio's own
+drawings with obstacles, permeable shapes, WalkPreference, ConFixedCode; visio-run2 [route] and
+visio-route-3, our drawing after a move: 63 of 100 ways the same; visio-obst-1 / -2, what Visio
+routes around and how it spreads connectors, then 76 of 100, the rest below under "Not here").
+A is the connector's begin shape, B its end shape (both glued dynamically); "the stub" is half
+the page's AvenueSize (route clearance, glue::opts_for: 3.75 mm by default;
+AvenueSize 0.5 in gave 0.25 in, LineToNode 0.4 in nothing); "overlap" means the two boxes share
+a stretch along an axis:
+* The direction of a style decides nothing but its axis: bottom to top lays the same ways as top
+  to bottom, right to left as left to right (the sides come from where B lies).
+* Right angle (0, 1) and network (9; not straight): B beside A (overlap across the axis): one
+  straight line in the middle of the overlap.  Else an L that leaves A vertically (top or bottom,
+  at its middle) and comes into B's side from the side (at its middle) -- for squares, tall and
+  wide shapes, far and near, whatever WalkPreference says (it has no effect on these ways), and
+  the other way round when the connector runs from the lower shape (the begin leaves
+  vertically).  Obstacles (placeable shapes): each leg of the straight line or the L runs in the
+  middle of the part of its band (the stretch of the shape's side it may leave from) that no
+  obstacle between the shapes covers -- the nearest such part, then the one towards the other
+  shape, then the higher one; no part free: the L leaving A sideways (horizontal, then vertical);
+  neither: a detour around the obstacles at the stub's distance (route.rs; Visio's detours were
+  matched in form, not always in the side they pass).  Visio writes ConFixedCode 6.  (visio-obst-1
+  [sprd]) The straight pieces of the other connectors glued to A or B that run along a leg split
+  its band as well (no clearance to them): a second connector leaving A's bottom runs in the
+  middle of the part the first leaves free (A 3.2 .. 4.8 wide, the first at 4.0: 4.4 towards C,
+  3.6 towards B), each connector routed again keeps out of the others' way; connectors between
+  other shapes do not count.  Placeable is ObjType with bit 1 (not 4): glue.rs.
+* Straight (2): B beside A: the right-angle's straight line (ConFixedCode 6); else a line from
+  A's corner nearest to B to B's corner nearest to A (0).  Obstacles do not matter.
+* Centre to centre (16): the line between the middles, from outline to outline (6).
+* Organization chart (3/4/10/11) and flowchart (5/6/12/13): B beyond A along the axis: out of A's
+  side facing B at its middle, into B's side facing A at its middle; one straight line when the
+  middles line up, else a Z whose middle piece runs one stub before B (organization chart) or one
+  stub after A (flowchart); where an obstacle lies on that piece, at the other of the two places
+  (Visio did so), where both are blocked or the straight line is, around the obstacles keeping to
+  the two sides.  B beside A (overlap along the axis): the right-angle router (ConFixedCode 6),
+  else 0.
+* Tree (7/8/14/15): one straight line from the middle of A's side facing B to the middle of B's
+  side facing A, along the axis -- across it when B lies beside A; obstacles do not matter (0).
+* Simple (17 .. 20): like the tree's sides, one line when the middles line up, else a Z bending
+  halfway between the two sides; obstacles do not matter (0).
+* Simple horizontal-vertical (21) / vertical-horizontal (22): an L out of A's side (21) or its top
+  or bottom (22), into B's top or bottom (21) or its side (22), through the middles; B beside A
+  (no L): one line when the middles line up, else a Z -- above or below A bending one stub before
+  B, to its left or right one stub after A (both styles alike); obstacles do not matter (0).
+* After routing Visio writes ConFixedCode 6 where its right-angle router laid the way and 0 where
+  a style laid its own (also over 4, 5, 6 and 0 set before); 1, 2 and 3 stay (mark).
+Angenommen: ends glued to connection points or free keep the rules from before (the sides of
+the direction, the right-angle search); a stub longer than the gap gives the middle; Visio's only
+data had the parent at the begin (organization chart before B, flowchart after A are taken as
+before the end and after the begin).  Not here: in our own drawings Visio laid the stubs of
+organization chart and flowchart larger (0.264 in for our connectors, 0.189 in for its own
+there; 0.148 in in its drawings, half the AvenueSize): Visio reads our page's AvenueSize as
+7.5 mm, and 0.264 stayed with AvenueSize 0.375 in, LineToNode 0.4 in and without arrows
+(visio-obst-2 [stub]) -- unexplained, the drawing's theme is left; the counter-check of our
+drawing after the moves: 76 of 100 ways the same, the other 24 these stubs.  Two connectors
+between the same two shapes: when one end moves Visio left the first where it was (the second
+avoided it), here both are routed again.
+```
+
+- **`enum Kind`**
+  a routing style without its direction
+  - `RightAngle` -- right angles around obstacles (also the page default)
+  - `Straight` -- one straight line, corner to corner (beside each other: across in the middle)
+  - `OrgChart` -- right angles, the bend one stub before the end's shape
+  - `Flowchart` -- right angles, the bend one stub after the begin's shape
+  - `Tree` -- one straight line between the middles of the facing sides
+  - `Network` -- right angles, as RightAngle (Visio lays the same ways)
+  - `Simple` -- right angles bending halfway, around nothing
+  - `SimpleHV` -- leave horizontally, arrive vertically, around nothing
+  - `SimpleVH` -- leave vertically, arrive horizontally, around nothing
+  - `CentreToCentre` -- one straight line between the middles
+
+**`impl Kind`**
+
+- **`fn directed(self) -> bool`**
+  whether the style has a direction
+- **`fn straight(self) -> bool`**
+  whether the style draws one straight line (straight, centre to centre)
+
+- **`struct RouteStyle`**
+  a routing style and its direction (Visio's RouteStyle / ShapeRouteStyle)
+  - `kind: Kind` -- the style
+  - `dir: Option<Dir>` -- the flow (directed kinds only; the ways use only its axis)
+
+**`impl RouteStyle`**
+
+- **`const RIGHT_ANGLE: RouteStyle = RouteStyle { kind: Kind::RightAngle, dir: None }`**
+  right angles (RouteStyle 1)
+- **`fn new(kind: Kind, dir: Option<Dir>) -> RouteStyle`**
+  a style in a direction (dropped where the style has none; top to bottom where it needs one)
+- **`fn from_code(code: i64) -> Option<RouteStyle>`**
+  a RouteStyle / ShapeRouteStyle code (None: 0, the default, and unknown codes)
+- **`fn code(self) -> i64`**
+  its RouteStyle / ShapeRouteStyle code
+
+- **`fn of(doc: &Document, connector: ShapeRef) -> RouteStyle`**
+  the style a connector routes in: its own ShapeRouteStyle, else its page's RouteStyle
+
+- **`fn pass(doc: &Document, shape: ShapeRef) -> u8`**
+  how connectors may cross a shape: PASS_X (ShapePermeableX), PASS_Y (ShapePermeableY)
+
+- **`fn permeable_place(doc: &Document, shape: ShapeRef) -> bool`**
+  whether a layout may place shapes on top of the shape (ShapePermeablePlace)
+
+- **`fn dynamics_off(doc: &Document, owner: Owner) -> bool`**
+  whether the page turns dynamics off (DynamicsOff): connectors do not reroute around shapes
+  moved onto them
+
+### `diagram_core/src/shapeops.rs`
+
+Source: [`lib/diagram_core/src/shapeops.rs`](../lib/diagram_core/src/shapeops.rs)
+
+```text
+shapeops -- (JD21) Visio's shape operations (SP-08: Vereinigen, Kombinieren, Fragmentieren,
+Schneiden, Subtrahieren), a frame that follows its geometry (SP-05) and Ausrichtungsfeld
+aktualisieren (SP-16)
+
+  Operation::{Union, Combine, Fragment, Intersect, Subtract}
+  available(doc, shapes, op) -> bool       whether the operation can run on the selection
+  operate(tx, eng, shapes, op) -> Vec<ShapeRef>   the operation; shapes[0] is the primary
+                                           shape (the first one selected): the result(s), empty
+                                           when nothing is left (the inputs are gone then too)
+  fit_frame(tx, eng, shape) -> bool        Width, Height, Pin and the rows to the geometry's box,
+                                           the shape stays where it is on the page (frame.rs)
+  update_alignment_box(tx, eng, shape) -> bool    (SP-16) a group's box around its members, a
+                                           shape's around its geometry (frame.rs)
+  geometry_bounds(doc, shape) -> Option<[f64; 4]>  the box of a shape's geometry in its own
+                                           coordinates: arcs by their extremes (frame.rs)
+
+How an operation works:
+* Each input shape becomes an operand in page coordinates: its Geometry sections (hidden ones,
+  NoShow, and InfiniteLine rows left out) through the shape's transform (turns, flips, groups
+  around it).  Lines stay exact; arcs (ArcTo, EllipticalArcTo, RelEllipticalArcTo, Ellipse) are
+  flattened into short chords that remember their arc (geometry::Conic); other curves (NURBS,
+  splines, Bézier rows) into chords that remember their row.  Closed sub-paths are the area,
+  filled even-odd as Visio fills a shape's sections (overlapping sections make holes); open
+  sub-paths are lines.  A group is the union of its members (and of its own geometry).
+* The Boolean operations run in geom::region (exact decisions on a grid of 2^30 steps across
+  the inputs; jflib-geom, docs/GEOM.md "Ebene Regionen"); every edge of the result names the
+  input edge it lies on, so the result is rebuilt row by row: a run of edges on one arc is
+  EllipticalArcTo again (pieces of at most half a turn, the ends projected onto the arc), a
+  whole ellipse an Ellipse row, a run on one line one LineTo, other curves LineTo polylines.
+  Kombinieren needs no Boolean operation: the sections are taken over as they are, each one a
+  section of the result.
+* The result is a new shape without master: Angle 0, its box around the geometry (arcs by their
+  extremes), PinX/PinY in its middle, LocPin "Width*0.5"/"Height*0.5", every geometry cell as
+  "Width*k" / "Height*k" (the control points of arcs too, and D of an upright arc as
+  "Width/Height*k") so that the result stretches with its box; one Geometry section per contour
+  (Visio fills them even-odd: holes stay holes).  It goes into the primary shape's parent on top
+  of its siblings.  The inputs are deleted (glue to them let go, container memberships
+  forgotten); with an empty result nothing new comes.
+
+Visio's rules (the sources: Visio 5 User Guide ch. 24 pp. 210-215, the VBA reference of
+Selection.Union / Combine / Fragment / Intersect / Subtract / UpdateAlignmentBox, "Merged
+Shapes" and "Alignment Boxes" of the Visio 2002 developer reference, Visio 2003 Inside Out ch. 22;
+details in the JD21 notes):
+* belegt: format (line, fill) and text come from the primary shape (the first one selected);
+  Fragmentieren gives every piece the primary's format and no text; the result is the topmost
+  shape of its parent; the inputs are deleted; the result has a ShapeSheet of its own (formulas
+  of the inputs are gone); Vereinigen leaves open paths out; Schneiden keeps what all inputs
+  cover, of disjoint shapes nothing (and the inputs are gone); Subtrahieren takes the area of
+  the others away from the primary shape, the others are deleted even where they do not
+  overlap; Kombinieren keeps each input's sections, overlaps become holes; Fragmentieren makes a
+  shape of every region, and lines (1-D shapes, open paths) cut regions.
+* angenommen: the result is a plain shape without master (the primary's format is copied with
+  its inherited cells, styles stay referenced); shape data, user cells, hyperlinks and the
+  protection cells of the inputs are not taken over; LayerMember and the text block cells are;
+  a closed path of a NoFill section is area too; a shape without area does not take part in
+  Vereinigen, Schneiden and Subtrahieren and is left alone; a group takes part as the union of
+  its members; after an operation the result(s) are selected (the app does that); Vereinigen and
+  Fragmentieren also run on one shape (its own sections merged or cut), Kombinieren, Schneiden
+  and Subtrahieren need two; locks (LockDelete ...) do not protect the inputs; the shapes are
+  given in selection order, the primary first, and Subtrahieren takes the others away together.
+```
+
+- **`enum Operation`**
+  the shape operations (Entwicklertools › Shape-Design › Vorgänge)
+  - `Union` -- Vereinigen (Union): the outline of all of them
+  - `Combine` -- Kombinieren (Combine): all sections in one shape, overlaps become holes
+  - `Fragment` -- Fragmentieren (Fragment): a shape for every region the outlines and lines make
+  - `Intersect` -- Schneiden (Intersect): what all of them cover
+  - `Subtract` -- Subtrahieren (Subtract): the primary shape without the others
+
+- **`fn available(doc: &Document, shapes: &[ShapeRef], op: Operation) -> bool`**
+  whether `op` can run on these shapes (shapes[0] the primary one): Vereinigen and
+  Fragmentieren need one shape with geometry (Vereinigen: with an area), Kombinieren two with
+  geometry, Schneiden two with an area, Subtrahieren a primary shape with an area and another one
+  with an area
+
+- **`fn operate(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef], op: Operation) -> Result<Vec<ShapeRef>, EditError>`**
+  Run a shape operation on shapes of one page or master, `shapes[0]` the primary shape (the
+  first one selected): its format and text go to the result (Fragmentieren: the format only),
+  the result goes into its parent on top.  The shapes that take part are deleted (Vereinigen,
+  Schneiden, Subtrahieren: those with an area; Kombinieren, Fragmentieren: all).  -> the new
+  shapes: one, a piece each for Fragmentieren, none when nothing is left.  Invalid when the
+  operation cannot run on these shapes (available)
+
+### `diagram_core/src/shapeops/frame.rs`
+
+Source: [`lib/diagram_core/src/shapeops/frame.rs`](../lib/diagram_core/src/shapeops/frame.rs)
+
+```text
+shapeops::frame -- (JD21) a frame that follows its geometry (SP-05, "Rahmen folgt der Geometrie")
+and Ausrichtungsfeld aktualisieren (SP-16)
+
+  geometry_bounds(doc, shape)          the box of a shape's geometry in its local coordinates
+  fit_frame(tx, eng, shape)            Width, Height, Pin to that box (after vertices changed)
+  update_alignment_box(tx, eng, shape) a group's box around its members; a shape's: fit_frame
+
+Visio recomputes a shape's box when a vertex is edited or a row type changes, unless LockCalcWH
+is set (belegt: [MS-VSDX]/ShapeSheet reference of LockCalcWH, "Alignment Boxes" of the Visio
+2002 developer reference); Ausrichtungsfeld aktualisieren does it on request, for a group around
+its members, also only without LockCalcWH (belegt: VBA Selection.UpdateAlignmentBox).  How it
+writes the cells is not documented; here (angenommen): the shape stays where it is on the page,
+Angle and the flips stay, Width and Height become the box's size (a proportional formula keeps
+its form), LocPin follows its own formula (mostly Width*0.5), the pin goes where the old frame
+had the new local pin, and every geometry cell moves into the new box: absolute rows keep
+"Width*k" with a new k (constants stay constants), relative rows get new fractions (the
+ellipse of RelEllipticalArcTo a new C and D), NURBS(...) and POLYLINE(...) values their
+points, a D of "Width/Height*k" a new k; a cell that names another geometry cell (a closing
+row's Geometry1.X1) follows by itself.  Connection points, control points and the text block
+keep their formulas (they are relative to the box) -- also an assumption.  A group's members get
+their pins (and 1-D members their free ends) in the new box, "Sheet.<group>!Width*k" with a new
+k, sizes that are proportional to the group keep their value.  Bézier pieces count with their
+extremes (not their control points), arcs with theirs.
+```
+
+- **`fn geometry_bounds(doc: &Document, shape: ShapeRef) -> Option<[f64; 4]>`**
+  the box of a shape's geometry in its local coordinates (x0, y0, x1, y1): lines by their ends,
+  arcs and Bézier pieces with their extremes; hidden sections (NoShow) and InfiniteLine rows
+  left out.  None: no geometry
+
+- **`fn fit_frame(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef) -> Result<bool, EditError>`**
+  The frame follows the geometry (SP-05): Width, Height, Pin and LocPin to the box of the
+  shape's geometry (geometry_bounds), the geometry rows into the new box, the shape staying where
+  it is on the page (see the module comment).  Only for a 2-D shape that is no group, and not
+  with LockCalcWH or a guarded Width or Height -> whether it changed
+
+- **`fn update_alignment_box(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef) -> Result<bool, EditError>`**
+  Ausrichtungsfeld aktualisieren (SP-16): a group's box around its members (2-D ones by their
+  frames, 1-D ones by their ends) and its own geometry, the members staying where they are on the
+  page; a shape that is no group gets the box of its geometry (fit_frame).  Not with LockCalcWH
+  -> whether it changed
 
 ### `diagram_core/src/shape.rs`
 
@@ -62830,6 +65375,8 @@ structure -- containers, lists and callouts (JD10: ST-01, ST-02, ST-04 .. ST-06)
   disband(tx, eng, c)                     the container goes, its members stay
   repair(tx, owner)                       relationships named on one side only are dropped
   aim_callouts(tx, eng, callouts)         a callout's tail back onto its target
+  edge::*                                 (JD21, ST-03) boundary members: on a container's
+                                          edge (Relationships 7 .. 10), they go with the edge
 
 The file keeps the structure in the Relationships cell of both shapes (structure::rel) and
 the settings in User cells named as Visio names them (msvStructureType, msvSDContainer*,
@@ -62859,6 +65406,8 @@ Rules (Visio's, as far as they are documented, else chosen and named here):
 * Moving a container moves its members (nested ones too) and the callouts of everything
   moved; deleting and copying take them along (carried).
 * Nothing is computed when a file opens: settle runs only after a gesture.
+* (JD21, ST-03) A shape dropped across an edge of a container sits on that edge (structure::edge):
+  a member that follows the edge, which the container's automatic size leaves out.
 ```
 
 - **`enum Kind`**
@@ -63199,6 +65748,69 @@ M_PHASE_LIST: &str = "Phase List"
   create with a lane or a phase already on the page (one dropped outside any flowchart) as the
   first lane or phase; the others are new
 
+### `diagram_core/src/structure/edge.rs`
+
+Source: [`lib/diagram_core/src/structure/edge.rs`](../lib/diagram_core/src/structure/edge.rs)
+
+```text
+structure::edge -- (JD21, ST-03) boundary members: shapes that sit on a container's edge (tabs on
+a panel), stay on it and go with it
+
+  REL_LEFT, REL_RIGHT, REL_TOP, REL_BOTTOM    the Relationships types 7 .. 10 (the member names
+                                      the container whose left / right / top / bottom edge it
+                                      sits on; learn.microsoft.com "Relationships Cell")
+  edge_of(doc, s, c) -> Option<Edge>  the edge of container c that member s sits on
+  boundary_members(doc, c)            the members of c on its edges
+  straddles(doc, c, s) -> Option<Edge>   the edge of c shape s lies across where it is now
+  targets(doc, owner, s, moving)      the containers whose edge s lies across (and that take it)
+  align(tx, eng, c) -> moved          every boundary member back onto its edge
+
+Visio (belegt: Visio team blog "Details on Container Behaviors", 2009): "To put a shape on the
+boundary of a container, simply drag it there"; boundary shapes stay members (types 1 and 4 as
+any member) "but they behave differently during resize actions": "it will move with that
+boundary"; the highlight shows along the one edge.  Angenommen (the Gegenprobe checks): a 2-D
+shape is on an edge when the edge's line runs through its box (not wholly inside nor outside)
+and its middle lies within the edge's length, the nearest edge wins at a corner; it then sits
+with its middle on the edge's line (dropped there it is put onto it), slides along the edge and
+stays within its ends; a plain member moved partly out stays a plain member (the container
+grows, JD10) -- only a shape that comes from outside or sits on an edge already takes one;
+boundary members do not count for the container's automatic size; only
+upright containers have boundary members; the container side names them as members (type 1)
+only, the member side has type 4 and its edge type.
+```
+
+```rust
+/// the member names the container whose left edge it sits on
+REL_LEFT: u32 = 7
+/// ... right edge
+REL_RIGHT: u32 = 8
+/// ... top edge
+REL_TOP: u32 = 9
+/// ... bottom edge
+REL_BOTTOM: u32 = 10
+```
+
+- **`fn rel_of(e: Edge) -> Option<u32>`**
+  the type of an edge
+
+- **`fn edge_of(doc: &Document, s: ShapeRef, c: ShapeRef) -> Option<Edge>`**
+  the edge of container `c` that member `s` sits on (its Relationships, types 7 .. 10)
+
+- **`fn boundary_members(doc: &Document, c: ShapeRef) -> Vec<(ShapeRef, Edge)>`**
+  the members of `c` that sit on one of its edges
+
+- **`fn straddles(doc: &Document, c: ShapeRef, s: ShapeRef) -> Option<Edge>`**
+  the edge of container `c` whose line runs through the box of `s` with the middle of `s` within
+  the edge's length (the nearest one at a corner); None: no edge, or `c` is turned
+
+- **`fn targets(doc: &Document, owner: Owner, s: ShapeRef, moving: &[ShapeRef]) -> Vec<(ShapeRef, Edge)>`**
+  the containers on `owner` (not among `moving`) whose edge shape `s` lies across, that take
+  it and are not locked, with the edge
+
+- **`fn align(tx: &mut Transaction, eng: &mut Engine, c: ShapeRef) -> Result<Vec<ShapeRef>, EditError>`**
+  every boundary member of `c` back onto its edge: its middle on the edge's line, within the
+  edge's length -> the members moved (with what they carry)
+
 ### `diagram_core/src/structure/rel.rs`
 
 Source: [`lib/diagram_core/src/structure/rel.rs`](../lib/diagram_core/src/structure/rel.rs)
@@ -63219,7 +65831,8 @@ Section)"; a plain cell under <Shape>, V="0"):
   1 members of this container        4 containers of this shape
   2 items of this list (in order)    5 the list of this item
   3 callouts on this shape           6 the target of this callout
-  7 .. 10 the container on whose left / right / top / bottom edge the shape sits
+  7 .. 10 the container on whose left / right / top / bottom edge the shape sits (JD21:
+          written and read by structure::edge; the container names it as a member, type 1)
   11 the list this list overlaps (a cross-functional flowchart's lanes and phases)
 
 One DEPENDSON per type, the type first, the shapes after it; Visio leaves an empty term
@@ -63507,6 +66120,262 @@ flooded with texts that all fall on one slot).
 - **`fn is_empty(&self) -> bool`**
   whether the table holds nothing but the empty text and the known names
 
+### `diagram_core/src/tools.rs`
+
+Source: [`lib/diagram_core/src/tools.rs`](../lib/diagram_core/src/tools.rs)
+
+```text
+tools -- (JD21) shape tools in place of Visio's add-ons (AS-11, RA-09): numbering shapes, arrays
+of copies, dimension lines
+
+  number::*      Shapes nummerieren: the order (as selected, in rows, in columns, along the
+                 connectors), the number written into the text before or after it or instead
+                 of it and kept in User.JFD_Number / JFD_NumberPlace, so a second run replaces
+                 it instead of adding one more; a page that goes on numbering shapes as they
+                 are dropped (User.JFD_NumberNext ... of the page sheet)
+  array::*       Array: copies of shapes in rows and columns, spaced between the shapes or from
+                 middle to middle, to the right or left and down or up; copies as a paste makes
+                 them (instances stay instances of their masters)
+  dimension::*   Maßlinien: the two ends of a dimension shape on two points, a shape's extent
+                 or between two shapes (horizontal, vertical, aligned): glued to a connection
+                 point where one is there (static glue, a Connect entry), else tied to a point of
+                 the shape's box by the same PAR(PNT(...)) formula; both follow the shape
+
+Every position is on the page in drawing units, y up.  Everything runs inside the caller's
+transaction (one undo step).  Visio's own add-ons are programs, not cells: nothing of them is
+in a file, so these tools write only ordinary cells (text, User rows, glue formulas) that Visio
+keeps and draws as they are.
+```
+
+- **`fn plain(doc: &Document, s: ShapeRef) -> bool`**
+  whether the tools take a shape as one of their own: a 2-D shape that is no guide, container,
+  list or callout (connectors, lines and dimensions are left out)
+
+### `diagram_core/src/tools/array.rs`
+
+Source: [`lib/diagram_core/src/tools/array.rs`](../lib/diagram_core/src/tools/array.rs)
+
+```text
+tools::array -- Array (AS-11, RA-09): copies of shapes in rows and columns
+
+  Grid                    rows, columns, the spacing, how it is measured, the directions
+  offsets(size, &grid)    the offset of every cell but the first (row by row): where the copy
+                          of that cell goes, from the shapes themselves
+  make(tx, eng, owner, shapes, &grid) -> Vec<ShapeRef>   the copies (new top-level shapes in
+                          the order of the cells)
+
+The shapes copied stand in the first cell (top left with the default directions); the cell is
+the box around all of them.  Spacing between the shapes: from the box's edge to the next box's
+edge; from middle to middle: the step itself (smaller than the box: the copies overlap, as the
+user asked).  Copies are made the way a paste makes them (ops::paste): masters stay masters,
+connectors between copied shapes come along, glue to shapes left behind is let go.
+```
+
+```rust
+/// the most cells an array makes (rows x columns)
+MAX_CELLS: u32 = 10_000
+```
+
+- **`struct Grid`**
+  an array of copies
+  - `rows: u32` -- rows (1 or more)
+  - `cols: u32` -- columns (1 or more)
+  - `gap: [f64; 2]` -- x: between columns, y: between rows (drawing units, 0 or more)
+  - `centres: bool` -- the gap is the step from middle to middle (else from edge to edge)
+  - `left: bool` -- the columns go to the left (else to the right)
+  - `up: bool` -- the rows go up (else down)
+
+- **`fn offsets(size: [f64; 2], g: &Grid) -> Vec<(u32, u32, [f64; 2])>`**
+  (row, column, offset) of every cell but the first, row by row, for shapes whose box is
+  `size` wide and high
+
+- **`fn make(tx: &mut Transaction, eng: &mut Engine, owner: Owner, shapes: &[ShapeRef], g: &Grid) -> Result<Vec<ShapeRef>, EditError>`**
+  the copies of `shapes` (top-level shapes of `owner`) for every cell but the first -> the new
+  top-level shapes, cell by cell.  Invalid: no rows or columns, more than MAX_CELLS
+
+### `diagram_core/src/tools/dimension.rs`
+
+Source: [`lib/diagram_core/src/tools/dimension.rs`](../lib/diagram_core/src/tools/dimension.rs)
+
+```text
+tools::dimension -- Maßlinien (AS-11): the ends of a dimension shape on points and shapes
+
+  Kind                     Horizontal, Vertical, Aligned (what the dimension shape measures:
+                           its master shows the horizontal or vertical distance of its ends or
+                           its own length)
+  Anchor                   where an end goes: a free point, a connection point of a shape
+                           (static glue), a point of a shape's box (Width and Height fractions)
+  anchor_at(doc, s, frac)  the connection point at that point of the box, else the box point
+  point(doc, &anchor)      where it is on the page now
+  of_shape(doc, s, kind)   the shape's own extent: its left and right side (bottom and top)
+  between(doc, a, b, kind) between two shapes: the sides that face each other (horizontal:
+                           the left shape's right side and the right shape's left side;
+                           vertical: the lower one's top and the upper one's bottom; aligned:
+                           the nearest pair)
+  attach(tx, eng, dim, end, &anchor)    one end there, glued or tied
+  place(tx, eng, dim, kind, &begin, &end, clear)   both ends; the dimension line (the control
+                           row "Line" of the master, if it has one) `clear` beyond the shapes:
+                           above them (horizontal), left of them (vertical)
+
+How an end follows (so it does in Visio too, the cells are Visio's own):
+* a connection point: static glue as glue::glue writes it -- BeginX = PAR(PNT(Sheet.N!
+  Connections.Xk,Sheet.N!Connections.Yk)), BegTrigger = _XFTRIGGER(Sheet.N!EventXFMod) and a
+  Connect entry;
+* any other point of a shape: the same formula on the box, BeginX = PAR(PNT(Sheet.N!Width*fx,
+  Sheet.N!Height*fy)) with the trigger, without a Connect entry (Visio has no Connect for it; the
+  formula alone moves the end, as PAR reads the shape's transform);
+* a free point: a constant.
+The candidates of a shape are its connection points (Type 0 and 2; outward ones are no glue
+target), a shape without any offers the middles of its four sides.
+```
+
+- **`enum Kind`**
+  what a dimension measures
+  - `Horizontal` -- the horizontal distance of its ends
+  - `Vertical` -- the vertical distance of its ends
+  - `Aligned` -- its length
+
+- **`enum Anchor`**
+  where an end of a dimension goes
+  - `Free([f64; 2])` -- a point of the page
+  - `Point { shape: ShapeRef, row: u32, }` -- connection point `row` (IX) of a shape: static glue
+  - `Box { shape: ShapeRef, at: [f64; 2], }` -- a point of a shape's box: fractions of Width and Height in its local coordinates
+
+**`impl Anchor`**
+
+- **`fn shape(&self) -> Option<ShapeRef>`**
+  the shape it is on (None: a free point)
+
+- **`fn point(doc: &Document, a: &Anchor) -> [f64; 2]`**
+  where an anchor is on the page now
+
+- **`fn anchor_at(doc: &Document, s: ShapeRef, frac: [f64; 2]) -> Anchor`**
+  the connection point at the box point `frac` (fractions of Width and Height), else the box
+  point itself
+
+- **`fn of_shape(doc: &Document, s: ShapeRef, kind: Kind) -> (Anchor, Anchor)`**
+  a shape's own extent: left and right side (Horizontal, Aligned: along its width), bottom and
+  top (Vertical); the first end left of (below) the second
+
+- **`fn between(doc: &Document, a: ShapeRef, b: ShapeRef, kind: Kind) -> (Anchor, Anchor)`**
+  between two shapes (see the file header); the first end left of (below) the second
+
+- **`fn attach(tx: &mut Transaction, eng: &mut Engine, dim: ShapeRef, end: End, anchor: &Anchor) -> Result<(), EditError>`**
+  put an end of dimension shape `dim` (1-D) on `anchor`: glued to a connection point, tied to a
+  box point by formula, or free
+
+- **`fn place(tx: &mut Transaction, eng: &mut Engine, dim: ShapeRef, kind: Kind, begin: &Anchor, end: &Anchor, clear: f64) -> Result<(), EditError>`**
+  both ends of `dim` on their anchors; the dimension line `clear` (drawing units) above the
+  shapes (Horizontal) or left of them (Vertical), when the master has the control row "Line"
+
+- **`fn end_formulas(doc: &Document, dim: ShapeRef) -> (Option<alloc::string::String>, Option<alloc::string::String>)`**
+  the formulas of BeginX and EndX of a 1-D shape (None: a constant), for checks
+
+### `diagram_core/src/tools/number.rs`
+
+Source: [`lib/diagram_core/src/tools/number.rs`](../lib/diagram_core/src/tools/number.rs)
+
+```text
+tools::number -- Shapes nummerieren (AS-11, RA-09): numbers in the shapes' texts
+
+  Order               Selection (as given), Rows (left to right, then top to bottom), Columns
+                      (top to bottom, then left to right), Connections (along the connectors)
+  Place               Before the text, After it, Instead of it
+  Numbering           start, step, prefix, place
+  order(doc, shapes, by) -> Vec<ShapeRef>     the shapes in the order they get their numbers
+  label(prefix, n)    the text a number shows: "S-" and 3 -> "S-3"
+  number(tx, eng, shapes, &numbering) -> next   the numbers written (one shape after the
+                      other, step by step) -> the number the next shape would get
+  set_number(tx, eng, s, text, place)     one shape's number (an earlier one replaced)
+  remove(tx, eng, s)  the number taken out of the text again
+  on_drop(doc, page) / keep_on_drop(tx, page, Some(&numbering) | None) / dropped(tx, eng, s)
+                      a page that numbers shapes as they are dropped: the settings and the next
+                      number in User cells of the page sheet; dropped() gives a dropped shape the
+                      next number and counts on
+
+Rules (Visio's add-on is a program; these are chosen and named here):
+* The number is plain text: before the text it is followed by a space ("3 Prüfen"), after it it
+  follows one ("Prüfen 3"), instead of it it is the whole text.  The characters' formatting
+  stays: the number goes into the first (last) run of characters.
+* User.JFD_Number keeps the number text written and User.JFD_NumberPlace where (0 before, 1
+  after, 2 instead): numbering again takes the old number out first, so a shape never carries
+  two.  A text the user changed so that the old number is gone is taken as it is.
+* Rows: the shapes are sorted by their middles from top to bottom; a shape whose middle lies
+  within the height of the first shape of the current row joins that row, else it starts the
+  next; each row runs from left to right.  Columns alike with the axes swapped.
+* Connections: the shapes in the order of the flow -- a shape gets its number once every shape
+  with a connector to it (Begin -> End) has one; among the shapes that are ready the one first in
+  rows comes first; in a loop the first shape in rows that is left goes on.  Shapes without
+  connectors are ready from the start.
+* A shape whose text is locked (LockTextEdit) is left out and takes no number.
+```
+
+```rust
+/// User cell: the number text a shape got (prefix and number)
+NUMBER_CELL: &str = "JFD_Number"
+/// User cell: where it went (Place::code)
+PLACE_CELL: &str = "JFD_NumberPlace"
+/// User cells of the page sheet while the page numbers shapes as they are dropped: the next
+/// number, the step, the prefix, the place
+NEXT_CELL: &str = "JFD_NumberNext"
+STEP_CELL: &str = "JFD_NumberStep"
+PREFIX_CELL: &str = "JFD_NumberPrefix"
+DROP_PLACE_CELL: &str = "JFD_NumberDropPlace"
+```
+
+- **`enum Order`**
+  the order the shapes get their numbers in
+  - `Selection` -- as given (the order the user selected them in)
+  - `Rows` -- left to right, then top to bottom
+  - `Columns` -- top to bottom, then left to right
+  - `Connections` -- along the connectors (Begin -> End)
+
+- **`enum Place`**
+  where the number goes in the text
+  - `Before` -- in front of the text, a space between
+  - `After` -- after the text, a space between
+  - `Instead` -- the number is the whole text
+
+**`impl Place`**
+
+- **`fn code(self) -> u8`**
+  the code of User.JFD_NumberPlace
+- **`fn from_code(c: f64) -> Place`**
+  the place of a code (anything else: Before)
+
+- **`struct Numbering`**
+  how shapes are numbered
+  - `start: i64` -- the first number
+  - `step: i64` -- added for every next shape (may be negative)
+  - `prefix: String` -- the text before the number ("S-", "Schritt ")
+  - `place: Place`
+
+- **`fn label(prefix: &str, n: i64) -> String`**
+  the text a number shows
+
+- **`fn order(doc: &Document, shapes: &[ShapeRef], by: Order) -> Vec<ShapeRef>`**
+  the shapes in the order they get their numbers
+
+- **`fn set_number(tx: &mut Transaction, eng: &mut Engine, s: ShapeRef, num: &str, place: Place) -> Result<(), EditError>`**
+  give shape `s` the number text `num` at `place`, an earlier number taken out first
+
+- **`fn remove(tx: &mut Transaction, eng: &mut Engine, s: ShapeRef) -> Result<(), EditError>`**
+  take a shape's number out of its text again (the User cells stay, empty)
+
+- **`fn number(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef], n: &Numbering) -> Result<i64, EditError>`**
+  number `shapes` in the order given -> the number the next shape would get; shapes whose
+  text is locked are left out
+
+- **`fn on_drop(doc: &Document, page: PageRef) -> Option<Numbering>`**
+  the page numbers shapes as they are dropped: its numbering (start = the next number)
+
+- **`fn keep_on_drop(tx: &mut Transaction, page: PageRef, n: Option<&Numbering>) -> Result<(), EditError>`**
+  the page numbers dropped shapes from `n.start` on (None: no more); the page sheet's User cells
+
+- **`fn dropped(tx: &mut Transaction, eng: &mut Engine, s: ShapeRef) -> Result<bool, EditError>`**
+  a shape dropped on a page that numbers dropped shapes gets the next number, the page counts
+  on -> whether it got one
+
 ### `diagram_core/src/units.rs`
 
 Source: [`lib/diagram_core/src/units.rs`](../lib/diagram_core/src/units.rs)
@@ -63735,6 +66604,10 @@ format follows the public specification [MS-VSDX]; no code of other implementati
   data::ado(&recordset) -> String
                       (JD18) a recordset's rows as an ADO persisted recordset (the recordset
                       parts of a .vsdx; Visio's DataAsXML format)
+  report::parse(xml) / report::to_xml(&def) / report::stored(&doc), add, replace, rename,
+                      remove   (JD19, DA-09) shape report definitions (diagram_core::report's
+                      model) as Visio's VisioReportDefinition XML (.vrd files the same) and
+                      as the document sheet's User rows visPropRptN, as transactions
   textdraw::parse(text, &opts, &limits) / textdraw::apply(tx, eng, page, &plan, &masters, &b)
                       (JD18, IM-08) a connected drawing from a text file: Shape and Link
                       records (Visio's text import) into a plan with problems per line, then
@@ -63773,18 +66646,30 @@ unused, but desktop Visio refuses a file without it (error 271, found with the u
 on 2026-11-17); an empty Windows element with the client size is enough (windows_xml).
 
 The styles (universal names as Visio knows them, so that formulas and Visio's connector
-detection find them):
+detection find them), with the IDs of Visio's own: Visio 16 names the styles 1, 2 and 3 of a
+file it opens Text Only, None and Normal whatever their names, and gives a style that then
+has a taken name another ("Style.4"); its new drawing has 0 No Style, 1 Text Only, 2 None,
+3 Normal, 4 Guide, 6 Theme, and its connector tool adds 7 Connector based on Normal unless
+there is a Connector already (JD26 Visio check, 2026-11-27: with Connector at 2 and Guide at
+3, Visio's connector tool drew in our guide's look).  Files written before keep their IDs.
   0 No Style   the root: every line, fill, text block, character and paragraph cell with a
                plain value -- the NetLab look without a design (Signalblau 1 pt line, light
                blue fill, anthracite Inter 10 pt, centred text); themed cells fall back to it
-  5 Theme      based on No Style (JD11): every cell a design sets is THEMEVAL() (V "Themed"),
+  6 Theme      based on No Style (JD11): every cell a design sets is THEMEVAL() (V "Themed"),
                the QuickStyle cells 100 (the variant's colour 1 and style 1), the theme index
                cells 65534 (the page's design)
-  1 Normal     based on Theme: what shapes use
-  2 Connector  based on Normal: the connector scheme's style 1 (line with its arrow, text),
-               no fill, the background colour behind the text
-  3 Guide      based on No Style: thin light blue dashed line, no fill
-  4 Text Only  based on Normal: no line, no fill, the dark text of font style 1, with
+  3 Normal     based on Theme: what shapes use
+  2 None       based on Normal: no line, no fill (as Visio's)
+  7 Connector  based on Normal: the connector scheme's style 1 (line with its arrow, text),
+               no fill, the background colour behind the text; the line in the variant's
+               colour 7 (QuickStyleLineColor 106): NetLab's connector line is dk2 (slate),
+               which Visio 16 does not take from a theme's style lists -- there it draws the
+               shape's quick style colour instead (as for phClr; also a fixed srgbClr, and
+               transforms on dk1 it drops), and colour 7 is that slate in NetLab's variants
+               1 .. 3 (JD26 Visio check, 2026-11-27).  JFDiagrammer reads dk2 as dk2; the
+               designs whose connector line is dk1 look the same with any colour
+  4 Guide      based on No Style: thin light blue dashed line, no fill
+  1 Text Only  based on Normal: no line, no fill, the dark text of font style 1, with
                Visio's contrast rule for text (QuickStyleVariation 2)
 DocumentSettings name Normal as the default text, line and fill style and Guide as the
 default guide style.  The page is A4 (metric, millimetres) or Letter (US, inches), landscape,
@@ -63833,9 +66718,15 @@ The parts ([MS-VSDX] 2.3.3.2, 2.3.3.10; desktop Visio):
                                  persisted recordset: <xml> s:Schema > s:ElementType >
                                  s:AttributeType (name, rs:name, s:datatype dt:type) and
                                  rs:data > z:row with one attribute per column
-Row IDs: a Visio_RowID column when the data has one (DataAsXML adds it), else the
-RowKeyValue of the row's key, else the position (from 1).  The data is written without
-Visio_RowID: the key or the position gives the IDs back.
+Row IDs: the column "_Visio_RowID_" (Visio 16 writes it first in the data of a recordset it
+made itself; DataAsXML calls it "Visio_RowID"), else the RowKeyValue of the row's key (when
+the key values name every row once), else the RowIDs of the key values in their order (Visio
+saves rows it has not loaded with stale key values, the RowIDs in row order), else the
+position (from 1).  Written with "_Visio_RowID_" first, as Visio writes its own.
+What Visio 16 does otherwise (the Visio check of 2026-11-27): LangID='de-DE' (a culture name,
+not the number the schema names), no XML declaration in the data part, a column's name as
+the attribute when it is a plain name (else cN with rs:name), hex character references;
+it keeps a data part it has not loaded as it was.
 
 Everything is untrusted: the parts are bounded by the ZIP limits (part size), the XML by the
 reader's depth and attribute limits; nothing recurses.
@@ -63914,6 +66805,99 @@ CT_CUSTOM: &str = "application/vnd.openxmlformats-officedocument.custom-pro ...
   make the property parts say `p` (see the module comment); parts whose entries did not change
   keep their bytes
 
+### `diagram_io/src/report.rs`
+
+Source: [`lib/diagram_io/src/report.rs`](../lib/diagram_io/src/report.rs)
+
+```text
+report -- (JD19, DA-09) shape report definitions as Visio keeps them: the XML of
+VisioReportDefinition (a .vrd file holds the same) and the document sheet's User rows
+visPropRpt1, visPropRpt2 ... (Value: that XML as a string, U="STR")
+
+  parse(text) -> Result<ReportDef, ReportError>   a definition read (diagram_core::report's
+                                      model; a BOM is skipped, a UTF-16 .vrd is decoded
+                                      by the caller, e.g. with text_of)
+  to_xml(&def) -> String              the same as Visio writes it: the declaration, the root
+                                      with its attributes, Name, Title, the fields,
+                                      criteria, the group, the sort keys, then the elements
+                                      not known here as they were read
+  stored(doc) -> Vec<Stored>          every visPropRptN row in the order of its number, read
+  find(doc, name) -> Option<Stored>   the one with this name (case ignored)
+  add(tx, &def) -> row name           a new row: the number after the largest one
+  replace(tx, row, &def)              the row's definition anew
+  rename(tx, row, name)               only the name (and the title, when it was the name)
+  remove(tx, row)                     the row goes; the definitions after it move up a row
+                                      (visPropRpt3 into visPropRpt2 ...), so the numbers
+                                      stay without gaps (Annahme: Visio reads them in order)
+
+Where Visio keeps them ([MS-VSDX] says nothing; two files Visio 16 saved, bvisual.net): the
+root VisioReportDefinition in the namespace NS with ReportExists, SelectDrawingDataMethod,
+Description, Precision, ShowUnits, CaseSensitive, UserCells, HiddenProperties,
+AdvancedFilter, FilterExpression, Version and the children Name, Title, VisioRptDefField (ID,
+Display, DisplayOrder, Type, SummaryTypes, Tag; Name, DisplayName), VisioRptDefFilter (ID,
+Property, Condition, AndOr, PropertyType, PropertyDataType, Value, Unit), VisioRptDefGroup (ID,
+GroupingField, ItemDisplay, GrandSummary, ExcludeDuplicates), VisioRptDefSort (ID, SortField,
+Ascending, CaseSensitive).  The codes and what is assumed about them: diagram_core::report.
+
+Reading: the crate's own pull reader (xml.rs: bounded, no DTD, no entity but the five, an
+error and never a panic), at most 16 levels and 64 attributes per element, MAX_BYTES of text,
+512 fields, criteria, sort keys and unknown elements each.  Elements are taken by their local
+name in the default namespace (NS or none); an unknown child of the root is kept as the text
+it was (one with a namespace prefix is left out: its declaration may be the root's), an
+unknown child of a field is not.  Attributes in no namespace that are not known are kept.
+Writing: double quotes as Visio writes them; esc() is the one place that escapes, and leaves
+out what XML 1.0 cannot carry.  A row whose text is no definition stays as it is (its
+Stored::def is the error); replace and remove take it like any other.
+```
+
+```rust
+/// the namespace of VisioReportDefinition
+NS: &str = "urn:schemas-microsoft-com:office:visio:reportdefinition"
+/// the longest definition read (bytes)
+MAX_BYTES: usize = 1 << 20
+/// the row names' prefix in the document sheet's User section
+ROW_PREFIX: &str = "visPropRpt"
+```
+
+- **`enum ReportError`**
+  why a text is no report definition
+  - `Syntax` -- not well-formed XML
+  - `Limit` -- too long, too deep, too many attributes or elements
+  - `Unsupported` -- a DOCTYPE or an encoding the reader does not take
+  - `NotReport` -- well-formed, but no VisioReportDefinition
+
+- **`fn parse(text: &str) -> R<ReportDef>`**
+  read a definition
+
+- **`fn to_xml(d: &ReportDef) -> String`**
+  the definition as XML (the text of a visPropRptN cell and of a .vrd file)
+
+- **`struct Stored`**
+  a definition kept in the document
+  - `row: String` -- the row's name (visPropRpt3)
+  - `index: u32` -- its number (3)
+  - `xml: String` -- the text of its Value cell
+  - `def: Result<ReportDef, ReportError>` -- the definition read from it
+
+- **`fn stored(doc: &Document) -> Vec<Stored>`**
+  the definitions of the document sheet, by their numbers
+
+- **`fn find(doc: &Document, name: &str) -> Option<Stored>`**
+  the definition named `name` (case ignored)
+
+- **`fn add(tx: &mut Transaction, def: &ReportDef) -> Result<String, EditError>`**
+  keep a new definition in the document -> its row's name
+
+- **`fn replace(tx: &mut Transaction, row: &str, def: &ReportDef) -> Result<(), EditError>`**
+  give a kept definition's row another definition
+
+- **`fn rename(tx: &mut Transaction, row: &str, name: &str) -> Result<(), EditError>`**
+  rename a kept definition (its title too when it was its name); a row that is no
+  definition is refused (Invalid)
+
+- **`fn remove(tx: &mut Transaction, row: &str) -> Result<(), EditError>`**
+  remove a kept definition; the ones after it move up a row
+
 ### `diagram_io/src/stencil.rs`
 
 Source: [`lib/diagram_io/src/stencil.rs`](../lib/diagram_io/src/stencil.rs)
@@ -63978,7 +66962,8 @@ and the same bytes.
 The JFD_ cells (diagram_core::instance reads them): the document sheet's User.JFD_Name (the
 title in de|en|es|it|fr) and User.JFD_Category; per master page User.JFD_Name, JFD_Prompt,
 JFD_Keywords, JFD_Text, JFD_Quick (1 for the first `quick` masters) and JFD_Tr1, JFD_Tr2 ...
-("Section.Row.Cell|de|en|es|it|fr" with VSDX section names: Control.Row_1.Tip).
+("Section.Row.Cell|de|en|es|it|fr" with VSDX section and cell names: Control.Row_1.Prompt; a
+source's Tip of a control point is the VSDX cell Prompt, JD21).
 
 (JD15) Text fields: a [Field] section (Value, Format, Type ...; `Unit = mm` gives Value the unit
 the field shows) and "{fld N}" marks in a master's text (diagram_core::field::marked); a mark
@@ -66866,10 +69851,11 @@ view -- a page of a diagram as a render2d scene plus what the scene cannot hold
                                    texts measured with the fonts drawn), the scene made of
                                    it, pictures decoded
   view.update(&doc, &mut fonts, &shapes) -> Option<[f64; 4]>   (JD7) the named shapes (their
-                                   top-level shapes) made anew in the list and the scene; the
-                                   box of what changed, old and new place (paper inches;
-                                   a zero box: nothing drawn either way); None: shapes came,
-                                   went or changed their order -- the page was built anew
+                                   top-level shapes, render::affected) made anew in the list
+                                   and the scene; the box of what changed, old and new place
+                                   (paper inches; a zero box: nothing drawn either way); None:
+                                   shapes came, went or changed their order -- the page was
+                                   built anew
   view.draw(dc, sf, r, &cam)       the page on the CPU into the rectangle r of a surface
                                    (render2d's CPU path; gradients and pictures in between)
   view.render(w, h) -> Surface     the page fitted into w x h pixels on its colour (XRGB)
@@ -72037,6 +75023,10 @@ built from primitives, profiles and operations, checked, the same bits on every 
                  corners rounded once at the end), bevel (chamfer or round edges and corners)
   exact          expansions (Shewchuk), orient2d, the side of a plane at a meeting of three planes,
                  the correctly rounded quotient
+  region         plane regions with holes (JD21): union, intersection, difference, xor and the
+                 decomposition of an overlay (Visio's Fragment) of contour sets, non-zero or even-odd,
+                 open polylines as cutters; every output edge marks the input edge it lies on;
+                 decided by snap rounding on an integer grid (exact, the same bits everywhere)
   Report         closed, manifold, outward, degenerate triangles, normals, bounds, area, volume, Euler
                  characteristic, components; json()
   math           Vec3, Aabb, Affine in f64; sqrt correctly rounded, sin / cos / atan2 from rt's portable
@@ -72759,6 +75749,145 @@ MERGE_RATIO: f64 = 1e-9
 - **`fn rounded_rect(w: f64, h: f64, r: f64, n: usize) -> Vec<[f64; 2]>`**
   a rectangle `w` x `h` centred on the origin with corners rounded by radius `r` (at most half the shorter
   side), `n` segments per corner, counter-clockwise
+
+### `geom/src/region.rs`
+
+Source: [`lib/geom/src/region.rs`](../lib/geom/src/region.rs)
+
+```text
+region -- Boolean operations on plane regions (docs/GEOM.md, "Ebene Regionen"): sets given as contours
+(outer contours and holes, nested to any depth, several operands, filled by a rule: non-zero or
+even-odd), union, intersection, difference, exclusive or, and the decomposition of their overlay into
+its faces with the operands that cover each one (Visio's "Fragment", the polygons of a map made from
+overlapping areas).  Open polylines go in as cutters: they split the faces of a decomposition.
+
+  boolean(operands, op, rule) -> Vec<Contour>      the result's boundary: outer contours
+                                                    counter-clockwise, holes clockwise
+  decompose(operands, rule) -> Vec<Piece>           every covered face with its operands
+  union / intersection / difference / xor           shorthands; area(contours)
+  Operand { contours, open }, Contour { points, marks }, Mark { operand, contour, edge, reversed }
+
+Every output edge carries a Mark: the input edge it lies on (operand, contour, the edge from point i to
+point i + 1, and whether it runs against it).  A caller that flattened curves into polylines
+(diagram_core: the arcs of a shape) finds its curves again by these marks.  Consecutive output edges
+with the same mark are one edge (the vertex between them is gone).
+
+How it decides (snap rounding to an integer grid, exact integer arithmetic):
+* The input is put on a grid: the box around all points is 2^30 steps across its longer side (the
+  coordinate minus the box's corner times a power of two, rounded to the nearest step), so every point
+  becomes a pair of integers below 2^30.  Points closer than a step (10^-9 of the extent) are one.
+* Snap rounding (Hobby; Guibas and Marimont): every endpoint and every point where two segments cross
+  makes a "hot pixel", the unit square around the grid point it rounds to; every segment is bent
+  through the centre of each hot pixel it passes through, in order.  The result has no crossings: its
+  segments meet at their ends or lie on each other.  Done again on its own output until nothing changes
+  (iterated snap rounding, Halperin and Packer), which also splits a segment where a vertex lies on it.
+  All tests are signs of determinants and comparisons of fractions in i128: exact, the same answer on
+  every target, and no case is special (touching in a point or along an edge, identical operands, a
+  hole on its outer contour, an operand overlapping itself).  Only crossing points move, by at most
+  half a step; input points come back with their own f64 bits.
+* The overlay: equal segments become one edge that keeps, per operand, how much the winding number
+  grows from its right to its left (+1 for an edge of a counter-clockwise contour).  Edges that change
+  nothing (an operand's edge drawn there and back) are left out.  Around each vertex the edges are
+  sorted by angle (exactly: half-plane, then cross product) and the faces traced as cycles; a cycle with
+  positive area is a face, the one with area <= 0 of each connected part is its outside.  Which face
+  holds a part is found by a ray down from just left of its lowest-leftmost vertex: the first edge it
+  meets, compared as exact fractions.  Winding numbers spread from the face around a part across its
+  edges.
+* A face is inside an operand when its winding number is not 0 (non-zero) or odd (even-odd).  The result
+  of an operation is its boundary: the edges with a different answer left and right, traced so that each
+  contour turns as sharply as it can where two pieces touch (two squares corner to corner stay two
+  contours).
+
+Deterministic like the rest of geom: integers and + - * on f64, sorting with unique keys, no unordered
+containers, no threads.  Limits against runaway input: MAX_EDGES input edges, MAX_HOT crossings.
+```
+
+```rust
+/// The input's box is 2^GRID_BITS steps across its longer side (a step is 10^-9 of the extent).
+GRID_BITS: i32 = 30
+/// the most input edges (all operands together)
+MAX_EDGES: usize = 1 << 20
+/// the most points where edges cross
+MAX_HOT: usize = 1 << 22
+```
+
+- **`enum FillRule`**
+  how contours fill: where the winding number is not 0, or where it is odd
+  - `NonZero`
+  - `EvenOdd`
+
+- **`enum BoolOp`**
+  the Boolean operations
+  - `Union` -- in any operand
+  - `Intersection` -- in every operand
+  - `Difference` -- in the first and in none of the others
+  - `Xor` -- in an odd number of operands
+
+- **`struct Operand`**
+  An operand: closed contours (the last point joins the first; outer contours and holes in any order and
+  direction, the fill rule decides) or, `open`, polylines that only cut (decompose).
+  - `contours: Vec<Vec<[f64; 2]>>`
+  - `open: bool`
+
+**`impl Operand`**
+
+- **`fn closed(contours: Vec<Vec<[f64; 2]>>) -> Operand`**
+  an area from closed contours
+- **`fn open(polylines: Vec<Vec<[f64; 2]>>) -> Operand`**
+  cutters from open polylines
+
+- **`struct Mark`**
+  Where an output edge comes from: the input edge from point `edge` to point `edge + 1` (the closing edge
+  of a closed contour has the index of its last point) of contour `contour` of operand `operand`;
+  `reversed`: the output runs against it.  Where input edges lie on each other, the smallest of them.
+  - `operand: u32`
+  - `contour: u32`
+  - `edge: u32`
+  - `reversed: bool`
+
+- **`struct Contour`**
+  An output contour: closed, `marks[i]` the mark of the edge from `points[i]` to the next point.
+  - `points: Vec<[f64; 2]>`
+  - `marks: Vec<Mark>`
+
+**`impl Contour`**
+
+- **`fn area(&self) -> f64`**
+  the signed area (shoelace about the first point, so that far coordinates do not cancel): positive
+  for an outer contour, negative for a hole
+- **`fn is_hole(&self) -> bool`**
+  whether it runs clockwise (a hole)
+
+- **`struct Piece`**
+  A face of a decomposition: the operands that cover it (indices, rising) and its boundary (an outer
+  contour, counter-clockwise, and its holes, clockwise).
+  - `cover: Vec<u32>`
+  - `contours: Vec<Contour>`
+
+- **`fn area(contours: &[Contour]) -> f64`**
+  the sum of the signed areas of contours (the area of a result)
+
+- **`fn union(operands: &[Operand], rule: FillRule) -> Result<Vec<Contour>, Error>`**
+  union of the closed operands
+
+- **`fn intersection(operands: &[Operand], rule: FillRule) -> Result<Vec<Contour>, Error>`**
+  intersection of the closed operands
+
+- **`fn difference(operands: &[Operand], rule: FillRule) -> Result<Vec<Contour>, Error>`**
+  the first closed operand without the others
+
+- **`fn xor(operands: &[Operand], rule: FillRule) -> Result<Vec<Contour>, Error>`**
+  what an odd number of closed operands cover
+
+- **`fn boolean(operands: &[Operand], op: BoolOp, rule: FillRule) -> Result<Vec<Contour>, Error>`**
+  The boundary of a Boolean operation on the closed operands (open ones do not take part): outer contours
+  counter-clockwise, holes clockwise, none crossing another (they may touch in a point).  Empty when
+  nothing is left.
+
+- **`fn decompose(operands: &[Operand], rule: FillRule) -> Result<Vec<Piece>, Error>`**
+  The faces of the overlay that at least one closed operand covers, each with the operands covering it
+  (by `rule`) and its boundary.  Neighbouring faces with the same cover are one piece unless a cutter (an
+  open operand) runs between them.  Pieces in a fixed order (the order their edges were found).
 
 ## netchan
 
@@ -73714,8 +76843,9 @@ anything else (Error::Net with NetErrorKind::Denied).
 *XLSX and CSV import: workbooks and delimited text as typed tables* -- crate root [`lib/sheet_io/src/lib.rs`](../lib/sheet_io/src/lib.rs)
 
 ```text
-sheet_io -- XLSX and CSV import: workbooks and delimited text as typed tables (JFDiagrammer JD18,
-FEATURES.md IM-05 / IM-10, decision F6: "CSV und .xlsx in P2 mit XLSX-Leser in JFLib")
+sheet_io -- XLSX and CSV import and export: workbooks and delimited text as typed tables
+(JFDiagrammer JD18, FEATURES.md IM-05 / IM-10, decision F6: "CSV und .xlsx in P2 mit XLSX-Leser
+in JFLib"; the writers JD19, EX-12 shape reports and EX-16 data export as CSV / .xlsx)
 
   xlsx::Workbook::open(bytes, Limits) -> Workbook     the workbook part, its relationships,
        the shared strings and the styles (which number formats are dates); not the sheets yet
@@ -73727,7 +76857,18 @@ FEATURES.md IM-05 / IM-10, decision F6: "CSV und .xlsx in P2 mit XLSX-Leser in J
   csv::read(bytes, &Options) -> Csv                    RFC 4180 and what Excel writes: the
        encoding (BOM, UTF-8, else Windows-1252) and the delimiter (; , TAB |) detected
   csv::to_table(&csv, header, infer) -> Table          with numbers, booleans and dates typed
+  xlsx::write(&BookOut, &WriteOptions) -> Vec<u8>      typed rows as a workbook Excel opens
+       without repair (xlsx_write.rs): shared strings, dates with Excel's number formats, a
+       bold and frozen header, column widths, a filter; Excel's limits as errors
+  csv::write(rows, &WriteOptions) / csv::write_table -> Vec<u8>   delimiter, line end,
+       encoding (UTF-8 with or without BOM, UTF-16, Windows-1252), decimal comma, a guard
+       against formula injection
   Value, CellError, CellRef / parse_ref / col_name, Area / parse_area, civil / serial
+
+What is written reads back with the readers here as it was written (the tests check it), with
+the exceptions each writer names: Excel's newer errors and dates it cannot show become texts,
+NaN and infinities #NUM!; CSV has no types at all.  Writing is deterministic (no time stamps,
+the same rows give the same bytes) and bounded (xlsx::WriteOptions, csv::WriteOptions::max_bytes).
 
 Why a crate of its own: one crate per foreign format family, like dxf, gltf and pdf.  Not
 doc_io: that is jfWord's document model, and every user of a spreadsheet reader would pull in
@@ -73887,6 +77028,9 @@ csv -- delimited text: RFC 4180 and what Excel writes
   decode(bytes) -> (String, Encoding)  a BOM decides; else valid UTF-8; else Windows-1252
   detect_delimiter(text) -> u8         ; , TAB or |
   to_table(&csv, header, infer) -> Table   numbers, booleans and dates typed on request
+  write(rows, &WriteOptions) / write_table(&table, &WriteOptions) -> Vec<u8>   the other way
+       (JD19, FEATURES.md EX-12 / EX-16): delimiter, line end, encoding, decimal separator,
+       an optional guard against formula injection; what is written reads back with read
 
 The grammar: a field in quotes may hold the delimiter, line breaks and "" for a quote; records
 end with CR LF, LF or CR; the last record may end without a line break, and a line break at
@@ -73995,6 +77139,63 @@ bytes of one field; nothing recurses.
   ```text
   `d.m.yyyy` (`23.11.2026`, `1.2.2026 14:05`) as `Value::Date`
   ```
+
+- **`enum LineEnd`**
+  How the lines of a CSV file written end.
+  - `CrLf` -- CR LF, as Excel writes and RFC 4180 says
+  - `Lf` -- LF, as Unix tools write
+
+- **`struct WriteOptions`**
+  How a CSV file is written (`write`, `write_table`).
+  - `delimiter: u8` -- `,` `;` TAB or `|`: the delimiters `detect_delimiter` finds again
+  - `line_end: LineEnd` -- the line end
+  - `encoding: Encoding` -- the encoding: UTF-8 with BOM by default (Excel reads UTF-8 without BOM in the ANSI code
+    page); UTF-16 is written with its BOM; Windows-1252 refuses a character it lacks
+    (`WriteError::Unmappable`) rather than writing `?` for it
+  - `decimal: u8` -- the decimal separator of numbers: `.`, or `,` as German Excel writes them (then the
+    delimiter cannot be `,`; `to_table` reads them back with `;`)
+  - `guard_formulas: bool` -- a text starting with `=` `+` `-` `@` TAB or CR gets a leading `'`, so a spreadsheet
+    opening the file does not run it as a formula (CSV injection).  Off by default: it
+    changes the data (every program but Excel shows the `'`, and Excel shows it too in a
+    cell read from CSV), so the application decides, by who opens the file.  Only texts:
+    a Number -5 stays -5.
+  - `max_bytes: usize` -- the most bytes of the file written (`WriteError::Limit("max_bytes")`)
+
+**`impl WriteOptions`**
+
+- **`const DEFAULT: WriteOptions = WriteOptions { delimiter: b',', line_end: LineEnd::CrLf, ...`**
+  `,`, CR LF, UTF-8 with BOM, `.` as the decimal separator, no formula guard, up to
+  `CsvLimits::DEFAULT.bytes` (what `read` takes by default).
+- **`const GERMAN: WriteOptions = WriteOptions { delimiter: b';', decimal: b',', ..WriteOpt ...`**
+  As German Excel opens a CSV file with a double click: `;` and a decimal comma; else
+  `DEFAULT`.
+
+- **`enum WriteError`**
+  Why a CSV file was not written.
+  - `Options` -- a delimiter other than `,` `;` TAB `|`, a decimal separator other than `.` and `,`, or
+    `,` as both
+  - `Unmappable { record: usize, field: usize, ch: char, }` -- a character the encoding (Windows-1252) does not have
+  - `Limit(&'static str)` -- over a limit: the name of the field of `WriteOptions`
+
+**`impl WriteError`**
+
+- **`fn text(&self) -> String`**
+  The error as a sentence in English.
+
+- **`fn write(rows: &[Vec<Value>], opts: &WriteOptions) -> Result<Vec<u8>, WriteError>`**
+  Write rows as a CSV file: one record a row (rows may differ in length), each ending with the
+  line end, the last one too.  Fields: a Number as the shortest text that reads back with the
+  decimal separator of the options, no thousands separators (-0 as 0); NaN and the infinities
+  as `#NUM!` (as in `xlsx::write`); a Date as ISO 8601 text (`Value::text`: `2026-11-24`,
+  `2026-11-24 14:05:30`, a time alone `14:05:30`, which `to_table` keeps as text); a Bool as
+  TRUE / FALSE; an Error as Excel writes it (`#N/A`); Empty as an empty field; a Text as it
+  is.  A field is quoted when it holds the delimiter, a quote, CR or LF, starts or ends with a
+  space or TAB, or is a first field `sep=...`; a quote in it is doubled.  CSV has no types:
+  `read` and `to_table` give a Text that looks like a number back as a Number.
+
+- **`fn write_table(table: &Table, opts: &WriteOptions) -> Result<Vec<u8>, WriteError>`**
+  Write a table as a CSV file: a header record of its column names (texts; none for a table
+  without columns), then its rows (see `write`).
 
 ### `sheet_io/src/xlsx.rs`
 
@@ -74170,6 +77371,136 @@ never read; a shared-string index out of range is Invalid.
 - **`fn sheet_table(&self, index: usize, header: bool) -> Result<Table, Error>`**
   The used range of a sheet as a Table (from the first to the last row and column that hold
   a value); an empty sheet gives an empty Table.
+
+### `sheet_io/src/xlsx_write.rs`
+
+Source: [`lib/sheet_io/src/xlsx_write.rs`](../lib/sheet_io/src/xlsx_write.rs)
+
+```text
+xlsx_write -- typed rows as an XLSX workbook (JFDiagrammer JD19, FEATURES.md EX-12 "Shape-Bericht
+exportieren ... als Excel-Tabelle (.xlsx)", EX-16 "Daten exportieren (Inventar)"); re-exported
+as sheet_io::xlsx::{write, BookOut, SheetOut, WriteOptions, WriteError}
+
+  xlsx::write(&BookOut, &WriteOptions) -> Vec<u8>     the workbook as an OPC package
+  BookOut { sheets }                                  the sheets in tab order, the first active
+  SheetOut { name, rows, header_rows, widths, autofilter }
+  SheetOut::new(name, rows) / SheetOut::from_table(name, &Table)  (the column names as a header
+                                                      row: bold, kept in view)
+
+Values, as xlsx::Workbook reads them back:
+  Number   the shortest text that reads back (-0 as 0).  NaN and the infinities, which Excel
+           cannot store, become the error #NUM! (what Excel shows for a number out of its
+           range) instead of refusing the whole workbook for one cell
+  Text     a shared string (equal texts stored once); "" is no cell.  The characters XML
+           cannot hold (controls but TAB and LF; U+FFFE, U+FFFF) and CR are Excel's escape
+           _xHHHH_, and a "_" that would read as the start of one (_x and four hex digits) is
+           _x005F_, so Excel and the reader give back the text as it was; white space at either
+           end is kept (xml:space="preserve")
+  Bool     t="b"
+  Error    t="e" for the seven errors of ECMA-376 (#NULL! #DIV/0! #VALUE! #REF! #NAME? #NUM!
+           #N/A).  Excel stores the newer ones (#SPILL!, #CALC!, #GETTING_DATA, ...) as #VALUE!
+           with rich-value metadata, so they are written as a text of the same letters
+  Date     a serial of Excel's 1900 date system: OLE dates from 1900-01-01 to 1900-02-28 one
+           day down (Excel counts a 1900-02-29 that never was; the reader moves them up again),
+           a time of day alone (0 to below 1) as it is.  The number format is the one Excel
+           picks when a date is typed in: the viewer's short date (built-in 14) without a time
+           part, short date and h:mm (22) with one (seconds stay in the value, unshown), h:mm:ss
+           (21) for a time alone.  A date Excel cannot show (before 1900-01-01, after
+           9999-12-31) is written as its text (Value::text); NaN and infinities as #NUM!
+  Empty    no cell
+No formula is ever written: a text starting with "=" stays a text, so a workbook written here
+carries no formula injection (csv::WriteOptions::guard_formulas is CSV's matter).
+
+Excel's limits are errors (WriteError), never a file Excel has to repair: values only up to
+row 1 048 576 and column XFD (Empty past them is fine), texts up to 32 767 characters (UTF-16
+units, as Excel counts them), sheet names of 1 to 31 characters without [ ] : * ? / \ and
+control characters, not starting or ending with ', not "History" (Excel's change history),
+unique case-insensitively; at least one sheet; column widths 0 to 255.  WriteOptions bounds the
+cells and the bytes of XML, checked cell by cell, so a caller bounds the memory writing takes,
+and sets the DEFLATE level (6; 1 is several times faster on large sheets).
+
+The package: [Content_Types].xml, _rels/.rels, xl/workbook.xml (bookViews, sheets, a hidden
+_xlnm._FilterDatabase name per filter, as Excel writes them), its relationships,
+xl/worksheets/sheetN.xml (dimension, sheetViews with a frozen pane below the header rows,
+sheetFormatPr, cols, sheetData, autoFilter, pageMargins), xl/styles.xml (fonts regular and
+bold, the fills none and gray125 Excel expects first, one border, the style xf, eight cell xfs:
+general, date, date and time, time, each regular and bold; the Normal cell style),
+xl/sharedStrings.xml when there are texts, docProps/core.xml (empty: no author, no time) and
+docProps/app.xml.  Children come in the order of the schema (ECMA-376 Part 1): Excel repairs
+a part whose elements come in another.  Deterministic: no time stamps, archive's fixed ZIP
+date: the same book and options give the same bytes.
+
+Column widths: a given one as it is; else from the longest line among the column's values (an
+East Asian wide character counts twice, a header cell a tenth more for bold) plus a margin,
+from Excel's default 8.43 up to 80.
+```
+
+```rust
+/// Excel's most characters in one cell (UTF-16 units, as Excel counts them)
+MAX_TEXT: usize = 32_767
+/// Excel's most characters of a sheet name (UTF-16 units)
+MAX_SHEET_NAME: usize = 31
+```
+
+- **`struct BookOut`**
+  A workbook to write: its sheets in tab order, the first one the active tab.
+  - `sheets: Vec<SheetOut>` -- the sheets, at least one
+
+- **`struct SheetOut`**
+  One worksheet to write.
+  - `name: String` -- the tab's name: 1 to 31 characters, none of `[ ] : * ? / \` and no control character, not
+    starting or ending with `'`, not "History", unlike the other sheets' names in any case
+  - `rows: Vec<Vec<Value>>` -- the rows from row 1 on, each from column A on; rows may differ in length, Empty (and an
+    empty Text) is no cell
+  - `header_rows: u32` -- how many of the first rows are a header: bold and kept in view (a frozen pane below them)
+  - `widths: Vec<Option<f64>>` -- column widths from column A on, in characters of the default font's digits as Excel
+    counts them (0 to 255; 0 hides the column); None, or no entry, estimates the width from
+    the column's values
+  - `autofilter: bool` -- filter buttons on the last header row over the columns that hold values (needs
+    `header_rows` of 1 or more)
+
+**`impl SheetOut`**
+
+- **`fn new(name: &str, rows: Vec<Vec<Value>>) -> SheetOut`**
+  A sheet of rows without header, filter or given widths.
+- **`fn from_table(name: &str, table: &Table) -> SheetOut`**
+  A table as a sheet: a header row of its column names (bold, kept in view), then its rows;
+  no filter (set `autofilter`), the widths estimated.
+
+- **`struct WriteOptions`**
+  How a workbook is written and what writing may take.  The default: DEFLATE level 6, ten
+  million cells, 1 GiB of XML.
+  - `level: u8` -- DEFLATE level 1 (fastest) to 9 (smallest), 0: stored; 6 by default, as diagram_io's
+    vsdx::write.  For a large sheet 1 is several times faster and the file about a sixth larger
+  - `cells: usize` -- cells with a value in all sheets together
+  - `bytes: usize` -- bytes of the XML of all parts together, before compression: with the rows given, what
+    bounds the memory writing takes (the compressed package comes on top)
+
+**`impl WriteOptions`**
+
+- **`const DEFAULT: WriteOptions = WriteOptions { level: 6, cells: 10_000_000, bytes: 1 << 30 }`**
+  The default (see `WriteOptions`).
+
+- **`enum WriteError`**
+  Why a workbook was not written.
+  - `NoSheets` -- a workbook without sheets (Excel needs one)
+  - `SheetName { sheet: usize, what: &'static str, }` -- a sheet's name Excel does not take (see `SheetOut::name`)
+  - `Sheet { sheet: usize, what: &'static str, }` -- a sheet's settings: header rows past Excel's last row, a filter without a header row, a
+    width outside 0 to 255, widths past column XFD
+  - `Cell { sheet: usize, at: CellRef, what: &'static str, }` -- a value Excel cannot hold where it stands: past row 1 048 576 or column XFD, a text over
+    32 767 characters
+  - `Limit(&'static str)` -- over a limit: the name of the field of `WriteOptions`
+  - `Package(opc::Error)` -- the package (archive::opc) refused what was built: never for a workbook that passed the
+    checks above
+
+**`impl WriteError`**
+
+- **`fn text(&self) -> String`**
+  The error as a sentence in English.
+
+- **`fn write(book: &BookOut, opts: &WriteOptions) -> Result<Vec<u8>, WriteError>`**
+  Write a workbook as XLSX (see the module's head for how values, dates and widths are written
+  and what Excel's limits are).  Deterministic: the same book gives the same bytes.
 
 ## img_jp2
 

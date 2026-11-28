@@ -162,6 +162,24 @@ fn stencil_parts() {
     assert_eq!(formula(SheetRef::Shape(kids[0]), "Height"), alloc::format!("GUARD(Sheet.{gid}!Height)"));
     let num = |d: &diagram_core::Document, s: SheetRef, n: &str| d.sym(n).and_then(|c| d.resolve(s, &CellAddr::single(c)).num()).unwrap_or(f64::NAN);
     assert!((num(doc, SheetRef::Shape(kids[0]), "Width") * 25.4 - 20.0).abs() < 1e-9);
+    // (JD26 Visio check) part of a text block written: the rest as the shape's box (Visio reads
+    // a missing cell of it as 0); none written: none added
+    assert_eq!(formula(SheetRef::Shape(group), "TxtPinX"), "Width*0.5");
+    assert_eq!(formula(SheetRef::Shape(group), "TxtLocPinY"), "TxtHeight*0.5");
+    assert_eq!(formula(SheetRef::Shape(kids[0]), "TxtPinX"), "");
+    {
+        let b = build(&master("", "", &part.replace("QuickStyleFillColor = 101", "TxtPinY = Height*0.26"))).expect("a part with TxtPinY builds");
+        let d = &b.doc;
+        let m = d.masters().next().expect("the master");
+        let slot = d.master(m).and_then(|x| x.master_shape()).expect("the master shape");
+        let g = ShapeRef { owner: Owner::Master(m), slot };
+        let k = d.shape(g).and_then(|s| s.children().next()).expect("the part");
+        let f = |s: SheetRef, n: &str| d.sym(n).and_then(|c| d.resolve(s, &CellAddr::single(c)).formula().expr()).map(|f| alloc::string::String::from(d.str(f))).unwrap_or_default();
+        assert_eq!(f(SheetRef::Shape(k), "TxtPinY"), "Height*0.26");
+        assert_eq!(f(SheetRef::Shape(k), "TxtWidth"), "Width*1");
+        assert_eq!(f(SheetRef::Shape(k), "TxtLocPinX"), "TxtWidth*0.5");
+        assert_eq!(f(SheetRef::Shape(g), "TxtPinX"), "");
+    }
     // dropped in English: the part shows its English text
     let mut d = vsdx::new_document(DocKind::Drawing, Measure::Metric);
     let pg = d.pages().next().expect("a page");

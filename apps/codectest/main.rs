@@ -30,6 +30,9 @@
 //   --sheet [--only NAME]          lib/sheet_io's XLSX and CSV readers against crafted
 //                                  workbooks and texts (sheet_checks.rs; tests/sheet.uis); exit
 //                                  code 1 on a failure
+//   --sheet-dump FILE              (JD18) a real .xlsx / .csv (one Excel saved, say): sheets,
+//                                  names, each sheet's table with the type of every value; exit
+//                                  code 1 when it does not read
 //
 // Batch file: "CTB1", then records {u32 op, u32 arg, u32 len, u8 data[len]}.
 // Result file: "CTR1", then per record {i32 result, u32 len, u8 data[len]}.  An op handler
@@ -199,6 +202,9 @@ fn codectest() -> i32 {
     }
     if ct.args.flag("--hostile") {
         return hostile::run(ct.args.value("--only"));
+    }
+    if let Some(path) = ct.args.value("--sheet-dump").map(alloc::string::String::from) {
+        return sheet_checks::dump(&path);
     }
     if ct.args.flag("--sheet") {
         return sheet_checks::run(ct.args.value("--only"));

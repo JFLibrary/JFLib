@@ -143,9 +143,10 @@ pub struct Master {
 }
 
 impl Master {
-    /// an empty master with this header
+    /// an empty master with this header; its new shapes get IDs from 5 on, as Visio's (a file's
+    /// masters keep the IDs they have)
     pub fn new(header: MasterHeader) -> Master {
-        Master { header, shapes: ShapeTree::new(), ..Master::default() }
+        Master { header, shapes: ShapeTree::starting_at(crate::shape::FIRST_MASTER_ID), ..Master::default() }
     }
 
     /// the slot of the shape instances inherit from (the first top-level shape)

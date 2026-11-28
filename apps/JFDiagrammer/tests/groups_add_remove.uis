@@ -1,0 +1,51 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD21: Start › Anordnen › Gruppieren › Zu Gruppe hinzufügen / Aus Gruppe entfernen
+# (RS-27) -- the group as the primary selection takes the other selected shape, which stays where
+# it is; the group's box follows; a sub-selected member leaves and stays where it is; undo
+cmd 4404
+drag 500,330 640,420
+drag 700,330 800,420
+drag 900,500 1000,560
+cmd 4400
+expect listitem:"Sheet.6" rect 902 500 101 50
+click 560,380
+click 750,380 shift
+cmd 4453
+expect listitem:"Sheet.7" selected
+expect listitem:"Sheet.7" rect 500 324 302 100
+# the group first, then the shape: Zu Gruppe hinzufügen
+click 950,530 shift
+click button:"Gruppieren"
+expect menuitem:"Zu Gruppe hinzufügen" enabled
+expect menuitem:"Aus Gruppe entfernen" disabled
+click menuitem:"Zu Gruppe hinzufügen"
+expect listitem:"Sheet.6" missing
+expect listitem:"Sheet.7" selected
+expect listitem:"Sheet.7" rect 500 324 503 226
+key ctrl+z
+expect listitem:"Sheet.6" exists
+expect listitem:"Sheet.7" rect 500 324 302 100
+key ctrl+y
+expect listitem:"Sheet.6" missing
+# the second click picks the member, Aus Gruppe entfernen takes it out where it is
+wait 600
+click 950,530
+expect listitem:"Sheet.6" selected
+click button:"Gruppieren"
+expect menuitem:"Aus Gruppe entfernen" enabled
+click menuitem:"Aus Gruppe entfernen"
+expect listitem:"Sheet.6" selected
+expect listitem:"Sheet.6" rect 902 500 101 50
+expect listitem:"Sheet.7" rect 500 324 302 100
+key ctrl+z
+expect listitem:"Sheet.7" rect 500 324 503 226
+# the context menu has them too (a click beside the shapes first: the member stays selected after
+# the undo, and a right click goes to the members of its group)
+click 1100,650
+rclick 560,380
+expect listitem:"Sheet.7" selected
+click menuitem:"Gruppierung"
+expect menuitem:"Gruppe öffnen" enabled
+expect menuitem:"Zu Gruppe hinzufügen" disabled
+key esc
+key esc

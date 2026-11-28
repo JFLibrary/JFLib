@@ -25,6 +25,7 @@ Width.us = GUARD(MAX(0.75 in, TEXTWIDTH(TheText)))
 Height = 10 mm
 Height.us = 0.375 in
 LockWidth = TRUE
+ShapeSplit = 1
 
 [Geometry]
 MoveTo  X = 0; Y = 0

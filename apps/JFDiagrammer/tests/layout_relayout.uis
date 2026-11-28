@@ -1,0 +1,113 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD21 (CN-13, RW-09): Entwurf › Layout › Seitenlayout neu anordnen -- the menu's
+# styles; pointing at a row shows its layout on the drawing (live preview), leaving it takes it
+# back; a chosen layout is one undo step: flowchart top to bottom and left to right (the flow
+# follows Begin -> End of the connectors, the loop back from Nein runs against it), hierarchy,
+# compact tree, radial, circular (diagram_core::layout)
+cmd 4404
+drag 700,560 790,600
+drag 420,330 510,370
+drag 760,400 850,440
+drag 450,460 540,500
+drag 650,280 740,320
+cmd 4400
+click 745,580
+type "Start"
+click 1100,700
+click 465,350
+type "Schritt"
+click 1100,700
+click 805,420
+type "Prüfen"
+click 1100,700
+click 495,480
+type "Ja"
+click 1100,700
+click 695,300
+type "Nein"
+click 1100,700
+cmd 4401
+drag 745,580 465,350
+drag 465,350 805,420
+drag 805,420 495,480
+drag 805,420 695,300
+drag 695,300 465,350
+cmd 4400
+click 1100,700
+expect listitem:"Start" rect 701 550 101 50
+expect listitem:"Schritt" rect 425 324 75 50
+expect listitem:"Prüfen" rect 752 399 100 50
+expect listitem:"Ja" rect 450 449 100 51
+expect listitem:"Nein" rect 651 273 101 51
+click tab:"Entwurf"
+click button:"Seitenlayout neu anordnen"
+expect menuitem:"Flussdiagramm (von oben nach unten)" enabled
+expect menuitem:"Hierarchie (von links nach rechts)" enabled
+expect menuitem:"Kompakte Struktur (nach unten, dann rechts)" enabled
+expect menuitem:"Kreisförmig" enabled
+expect menuitem:"Weitere Layoutoptionen..." enabled
+# the live preview: radial while the row is pointed at, gone when it is left
+move menuitem:"Radial"
+expect listitem:"Start" rect 425 487 100 50
+expect listitem:"Schritt" rect 563 424 75 51
+expect listitem:"Nein" rect 550 273 101 51
+move 300,700
+expect listitem:"Start" rect 701 550 101 50
+expect listitem:"Schritt" rect 425 324 75 50
+expect listitem:"Nein" rect 651 273 101 51
+# flowchart top to bottom: Start, Schritt, Prüfen one under the other, Ja and Nein side by side
+click menuitem:"Flussdiagramm (von oben nach unten)"
+expect listitem:"Start" rect 488 273 100 51
+expect listitem:"Schritt" rect 500 349 76 50
+expect listitem:"Prüfen" rect 500 424 101 51
+expect listitem:"Ja" rect 550 500 101 50
+expect listitem:"Nein" rect 425 500 100 50
+shot build/JFDiagrammer-layout-flow.png
+key ctrl+z
+expect listitem:"Start" rect 701 550 101 50
+expect listitem:"Prüfen" rect 752 399 100 50
+expect listitem:"Nein" rect 651 273 101 51
+# left to right
+cmd 7235
+expect listitem:"Start" rect 425 311 100 50
+expect listitem:"Schritt" rect 550 311 76 50
+expect listitem:"Prüfen" rect 651 324 101 50
+expect listitem:"Ja" rect 777 349 100 50
+expect listitem:"Nein" rect 777 273 100 51
+key ctrl+z
+# hierarchy top to bottom, the rows centred
+cmd 7237
+expect listitem:"Start" rect 488 273 100 51
+expect listitem:"Schritt" rect 500 349 76 50
+expect listitem:"Prüfen" rect 488 424 100 51
+expect listitem:"Ja" rect 550 500 101 50
+expect listitem:"Nein" rect 425 500 100 50
+key ctrl+z
+# compact tree down then right: one shape per row, each level stepping right
+cmd 7241
+expect listitem:"Start" rect 425 273 100 51
+expect listitem:"Schritt" rect 488 349 75 50
+expect listitem:"Nein" rect 538 424 100 51
+expect listitem:"Prüfen" rect 538 500 100 50
+expect listitem:"Ja" rect 601 575 100 50
+key ctrl+z
+# radial and circular
+cmd 7245
+expect listitem:"Start" rect 425 487 100 50
+expect listitem:"Prüfen" rect 676 487 101 50
+expect listitem:"Ja" rect 814 575 101 50
+key ctrl+z
+cmd 7246
+expect listitem:"Start" rect 626 512 100 51
+expect listitem:"Schritt" rect 689 361 75 51
+expect listitem:"Prüfen" rect 475 512 101 51
+expect listitem:"Ja" rect 425 361 100 51
+expect listitem:"Nein" rect 550 273 101 51
+shot build/JFDiagrammer-layout-circular.png
+# undo brings every shape back
+key ctrl+z
+expect listitem:"Start" rect 701 550 101 50
+expect listitem:"Schritt" rect 425 324 75 50
+expect listitem:"Prüfen" rect 752 399 100 50
+expect listitem:"Ja" rect 450 449 100 51
+expect listitem:"Nein" rect 651 273 101 51

@@ -1,0 +1,60 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD21 glue (SP-04, SS-30): a control point that glues -- an Ethernet's first tap
+# dragged onto a router glues to its middle connection point (LOC(PNT(..)), Connect from
+# Controls.Row_1); the router moves, the tap follows; the Ethernet moves, the tap stays on the
+# router; the tap's Tip is its QuickInfo; dragged off again it is let go; undo
+click button:"Weitere Shapes"
+click "Netzwerk"
+click "Netzwerk und Peripheriegeräte"
+drag button:"Ethernet" 640,520
+drag button:"Router" 500,330
+cmd 4400
+wait 600
+click 640,520
+expect button:"Steuerpunkt 1" rect 470 515 10 10
+drag button:"Steuerpunkt 1" 500,331
+expect button:"Steuerpunkt 1" rect 495 325 10 10
+expect listitem:"Ethernet" rect 451 330 378 195
+# the router moves: the tap follows
+click 1000,650
+wait 600
+drag 500,330 580,290
+wait 600
+click 1000,650
+wait 600
+click 700,520
+expect button:"Steuerpunkt 1" rect 576 291 10 10
+expect listitem:"Ethernet" rect 451 296 378 229
+# its QuickInfo
+move 580,290
+move 582,292
+wait 800
+expect text:"Auf ein Gerät ziehen" exists
+# the Ethernet moves down: the tap stays on the router
+drag 760,520 760,600
+expect listitem:"Ethernet" rect 451 296 378 304
+expect button:"Steuerpunkt 1" rect 576 291 10 10
+key ctrl+z
+expect listitem:"Ethernet" rect 451 296 378 229
+# undo the router's move and the glue
+key ctrl+z
+key ctrl+z
+expect listitem:"Router" rect 475 322 50 16
+click 700,520
+expect button:"Steuerpunkt 1" rect 470 515 10 10
+key ctrl+y
+key ctrl+y
+click 1000,650
+wait 600
+click 700,520
+expect button:"Steuerpunkt 1" rect 576 291 10 10
+# dragged off the router: let go, the router moves without it
+drag button:"Steuerpunkt 1" 520,420
+click 1000,650
+wait 600
+drag 580,290 640,250
+wait 600
+click 1000,650
+wait 600
+click 700,520
+expect button:"Steuerpunkt 1" rect 520 419 10 10

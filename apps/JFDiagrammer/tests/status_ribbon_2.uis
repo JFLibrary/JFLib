@@ -8,9 +8,11 @@ theme light
 # RE-06: Einfügen › Container with nothing selected: an empty container, selected
 click tab:"Einfügen"
 click button:"Container"
-expect menuitem:"Klar" exists
-expect menuitem:"Abgerundet" exists
-click menuitem:"Akzent"
+expect button:"Klar" exists
+expect button:"Abgerundet" exists
+# (JD21) the 14 styles as pictures
+expect button:"Kopf unten" exists
+click button:"Akzent"
 expect listitem:"Container" selected
 expect tab:"Format" exists
 key ctrl+z
@@ -29,17 +31,19 @@ click tab:"Start"
 expect button:"Verbinder" checked
 expect button:"Zeigertool" unchecked
 cmd 4400
-# RW-10: two boxes joined by a connector; Entwurf › Verbinder › Gerade, Gebogen, Rechtwinklig
+# RW-10: two boxes joined by a connector (JD21v: the L leaves the upper box at its bottom, as in
+# Visio 16); Entwurf › Verbinder › Gerade, Gebogen, Rechtwinklig
 cmd 4404
 drag 400,250 500,300
 drag 700,450 800,500
 cmd 4401
 drag 450,275 750,475
 cmd 4400
-expect listitem:"Sheet.8" rect 500 273 255 176
+expect listitem:"Sheet.8" rect 450 299 251 179
 click tab:"Entwurf"
 click #4880
-expect menuitem:"Linienübergänge anzeigen" disabled
+# (JD21) Linienübergänge anzeigen works (jumps.uis): the new page has jumps
+expect menuitem:"Linienübergänge anzeigen" checked
 click menuitem:"Gerade"
 expect listitem:"Sheet.8" rect 488 299 226 150
 click #4880
@@ -50,7 +54,7 @@ expect text:"Rückgängig: Gebogen (Strg+Z)" exists
 move 1000,700
 click #4880
 click menuitem:"Rechtwinklig"
-expect listitem:"Sheet.8" rect 500 273 255 176
+expect listitem:"Sheet.8" rect 450 299 251 179
 # RW-05: Alle Designs › Aktuelles Design speichern: the design comes back under Gespeichert
 click button:"Alle Designs"
 click "Aktuelles Design speichern ..."

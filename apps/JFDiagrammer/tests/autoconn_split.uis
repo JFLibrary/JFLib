@@ -1,0 +1,60 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD21: Automatisch einfügen (CN-08, SL-03, PR-09) -- a shape dropped onto a
+# connector between two shapes splits it: the connector ends at the shape, a copy (Sheet.N) runs
+# on to the old end; the shape lines up with the one before it (dropped 20 px to the right, it
+# goes onto the rectangle's middle line), the shapes after it move on where the room is short
+# (the page's spacing, 7.5 mm); a shape moved onto a connector on the page splits it too; one
+# undo step each; Optionen › Erweitert › Verbinder teilen off: the connector only routes around
+# (Standard-Shapes carry ShapeSplit, the dynamic connector ShapeSplittable)
+click button:"Weitere Shapes"
+click "Allgemein"
+click "Standard-Shapes"
+drag button:"Rechteck" 560,260
+wait 600
+drag button:"Ellipse" 560,560
+click 560,260
+click 560,560 shift
+cmd 5421
+expect listitem:"Sheet.6" rect 557 285 6 250
+# from the panel onto the connector: it ends at the Raute, the copy runs on to the ellipse
+wait 600
+drag button:"Raute" 580,420
+expect listitem:"Raute" rect 522 382 76 76
+expect listitem:"Sheet.6" rect 557 285 6 97
+expect listitem:"Sheet.8" rect 557 458 6 77
+expect listitem:"Ellipse" rect 522 535 76 50
+shot build/JFDiagrammer-autoconn-split.png
+key ctrl+z
+expect listitem:"Raute" missing
+expect listitem:"Sheet.8" missing
+expect listitem:"Sheet.6" rect 557 285 6 250
+# dropped close to the ellipse: the ellipse moves down to the page's spacing
+wait 600
+drag button:"Raute" 560,490
+expect listitem:"Raute" rect 522 452 76 76
+expect listitem:"Ellipse" rect 522 547 76 50
+expect listitem:"Sheet.10" rect 557 528 6 19
+key ctrl+z
+expect listitem:"Ellipse" rect 522 535 76 50
+# a shape moved onto the connector on the page
+wait 600
+drag button:"Quadrat" 800,420
+drag 790,420 560,420
+expect listitem:"Quadrat" rect 522 374 76 75
+expect listitem:"Sheet.6" rect 557 285 6 89
+expect listitem:"Sheet.12" rect 557 449 6 86
+key ctrl+z
+expect listitem:"Sheet.12" missing
+expect listitem:"Sheet.6" rect 557 285 6 250
+key ctrl+z
+# Verbinder teilen off: nothing is split, the connector routes around the shape
+click tab:"Datei"
+click button:"Optionen"
+click button:"Erweitert"
+click switch:"Verbinder teilen"
+expect switch:"Verbinder teilen" unchecked
+key esc
+wait 600
+drag button:"Raute" 580,420
+expect listitem:"Raute" rect 542 382 76 76
+expect listitem:"Sheet.14" missing

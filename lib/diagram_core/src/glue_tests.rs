@@ -143,6 +143,14 @@ impl Fx {
         tx.commit()
     }
 
+    // (JD21v) ObjType 1: a placeable shape, which connectors route around (Visio's obstacles)
+    fn placeable(&mut self, s: ShapeRef) {
+        let mut tx = self.doc.transaction("ObjType");
+        let a = CellAddr::single(tx.intern("ObjType"));
+        tx.set_constant(SheetRef::Shape(s), &a, Value::Num(1.0), None).unwrap();
+        tx.commit();
+    }
+
     fn connector(&mut self, begin: ([f64; 2], Target), end: ([f64; 2], Target)) -> ShapeRef {
         let mut tx = self.doc.transaction("Verbinden");
         let c = new_connector(&mut tx, &mut self.eng, self.owner, begin, end).unwrap();
@@ -347,10 +355,29 @@ fn dynamic_glue_faces_the_other_shape() {
     assert_eq!(f.formula(c, "EndX"), "_WALKGLUE(EndTrigger,BegTrigger,WalkPreference)");
 }
 
-// (JD15, SS-18) WalkPreference decides between ways of the same cost: B diagonal to A, both ends
-// dynamic -- by default the begin leaves A's side (Visio's side to side), with bit 1
-// (visWalkPrefBegNS) its top; bit 2 (visWalkPrefEndNS) docks the end on B's bottom; a dearer way
-// is never taken for it (B straight right of A: side to side whatever the bits say)
+// (JD21) a shape a dynamic connector is glued to becomes placeable (ObjType 1) when its ObjType
+// let Visio decide, as Visio does (Visio check visio-run4 [objtype]); one that says otherwise keeps it
+#[test]
+fn glued_shapes_become_placeable() {
+    let mut f = fx();
+    let a = f.rect(None, 1, [2.0, 2.0], [1.0, 1.0], 0.0);
+    let b = f.rect(None, 2, [6.0, 2.0], [1.0, 1.0], 0.0);
+    let objtype = |f: &Fx, s| f.doc.sym("ObjType").and_then(|c| f.doc.resolve(SheetRef::Shape(s), &CellAddr::single(c)).num());
+    assert_eq!(objtype(&f, a).unwrap_or(0.0), 0.0);
+    {
+        let mut tx = f.doc.transaction("ObjType");
+        let c = CellAddr::single(tx.intern("ObjType"));
+        tx.set_constant(SheetRef::Shape(b), &c, Value::Num(4.0), None).unwrap();
+        tx.commit();
+    }
+    f.connector(([2.0, 2.0], Target::Shape(a)), ([6.0, 2.0], Target::Shape(b)));
+    assert_eq!(objtype(&f, a), Some(1.0));
+    assert_eq!(objtype(&f, b), Some(4.0));
+}
+
+// (JD15, SS-18; JD21v) WalkPreference changes no way of a dynamic connector: B diagonal to A, both
+// ends dynamic -- Visio 16 left A's top and came into B's left side for 0, 1, 2 and 3 alike (the
+// counter-check visio-route-1); B straight right of A: side to side
 #[test]
 fn walk_preference_picks_the_sides() {
     let mut f = fx();
@@ -365,16 +392,11 @@ fn walk_preference_picks_the_sides() {
         tx.commit();
         path(&f.doc, c)
     };
-    let p = path(&f.doc, c);
-    assert_eq!(route::bends(&p), 1, "{p:?}");
-    assert_pt!(p[0], [2.5, 2.0]);
-    let p = walk(&mut f, 1.0);
-    assert_path(&p, &[[2.0, 2.5], [2.0, 6.0], [5.5, 6.0]]);
-    let p = walk(&mut f, 2.0);
-    assert_path(&p, &[[2.5, 2.0], [6.0, 2.0], [6.0, 5.5]]);
-    // back to the default
-    let p = walk(&mut f, 0.0);
-    assert_pt!(p[0], [2.5, 2.0]);
+    let l = [[2.0, 2.5], [2.0, 6.0], [5.5, 6.0]];
+    assert_path(&path(&f.doc, c), &l);
+    for v in [1.0, 2.0, 3.0, 0.0] {
+        assert_path(&walk(&mut f, v), &l);
+    }
     // a dearer way is never taken
     f.move_to(b, [6.0, 2.0]).unwrap();
     let p = walk(&mut f, 3.0);
@@ -389,9 +411,10 @@ fn dynamic_glue_lines_up_when_it_can() {
     let b = f.rect(None, 2, [2.3, 6.0], [1.0, 1.0], 0.0);
     let c = f.connector(([2.0, 2.5], Target::Point { shape: a, row: 3 }), ([2.3, 6.0], Target::Shape(b)));
     assert_path(&path(&f.doc, c), &[[2.0, 2.5], [2.0, 5.5]]);
-    // both dynamic, the boxes overlap in x from 1.8 to 2.5: straight up in the middle of it
+    // both dynamic, the boxes overlap in x from 1.8 to 2.5: straight up in the middle of the part
+    // the first connector (at x = 2, glued to the same shapes) leaves free, as Visio spreads them
     let d = f.connector(([2.0, 2.0], Target::Shape(a)), ([2.3, 6.0], Target::Shape(b)));
-    assert_path(&path(&f.doc, d), &[[2.15, 2.5], [2.15, 5.5]]);
+    assert_path(&path(&f.doc, d), &[[2.25, 2.5], [2.25, 5.5]]);
     // out of reach: the middle of the side again
     f.move_to(b, [5.0, 6.0]).unwrap();
     let p = path(&f.doc, c);
@@ -642,6 +665,7 @@ fn connector_routes_around_shapes_on_the_page() {
     let a = f.rect(None, 1, [1.0, 2.0], [1.0, 1.0], 0.0);
     let b = f.rect(None, 2, [7.0, 2.0], [1.0, 1.0], 0.0);
     let wall = f.rect(None, 3, [4.0, 2.0], [1.0, 3.0], 0.0);
+    f.placeable(wall);
     let c = f.connector(([1.5, 2.0], Target::Point { shape: a, row: 1 }), ([6.5, 2.0], Target::Point { shape: b, row: 0 }));
     let p = path(&f.doc, c);
     let boxes: Vec<[f64; 4]> = [a, b, wall].iter().map(|s| page_box(&f.doc, *s).unwrap()).collect();
@@ -908,8 +932,9 @@ fn a_fixed_route_keeps_its_corners() {
 #[test]
 fn the_page_scale_and_spacing_count() {
     let mut f = fx();
-    // 1:10 and a spacing of 0.25 in on paper: the clearance is 2.5 drawing inches
-    let cells = vec![cnum(&mut f.doc, "PageScale", 1.0), cnum(&mut f.doc, "DrawingScale", 10.0), cnum(&mut f.doc, "LineToNodeX", 0.25)];
+    // 1:10 and a spacing of 0.5 in on paper: the clearance (JD21v: half the AvenueSize, LineToNode
+    // does not count) is 2.5 drawing inches
+    let cells = vec![cnum(&mut f.doc, "PageScale", 1.0), cnum(&mut f.doc, "DrawingScale", 10.0), cnum(&mut f.doc, "AvenueSizeX", 0.5), cnum(&mut f.doc, "LineToNodeX", 1.0)];
     f.doc.page_mut(f.page).unwrap().sheet.cells = cells;
     let o = opts_for(&f.doc, f.owner);
     assert!(close(o.clearance, 2.5) && close(o.bend, 5.0), "{o:?}");

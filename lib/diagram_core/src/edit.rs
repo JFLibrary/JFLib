@@ -823,14 +823,20 @@ impl<'d> Transaction<'d> {
     /// (the engine) store the result of the cell's formula for this sheet; a cell that
     /// inherits its formula gets an F="Inh" cell of its own
     pub fn set_result(&mut self, sheet: SheetRef, addr: &CellAddr, value: Value, error: Option<CellError>) -> Result<(), EditError> {
+        let unit = self.doc.resolve(sheet, addr).unit();
+        self.set_result_unit(sheet, addr, value, error, unit)
+    }
+
+    /// (JD19) set_result with the unit that marks the value's type in the file (the formula
+    /// engine: a Value cell's string is U='STR', a colour U='COLOR', a point U='PNT')
+    pub fn set_result_unit(&mut self, sheet: SheetRef, addr: &CellAddr, value: Value, error: Option<CellError>, unit: Option<Unit>) -> Result<(), EditError> {
         let r = self.doc.resolve(sheet, addr);
         if !r.exists() {
             return Err(if r.origin == crate::cell::Origin::Deleted { EditError::Deleted } else { EditError::Invalid });
         }
-        let unit = r.unit();
         let e = error.map(|e| self.intern(e.as_str()));
         self.write_cell(sheet, addr, |old| match old {
-            Some(c) => Cell { value, error: e, stale: false, ..*c },
+            Some(c) => Cell { value, error: e, stale: false, unit, ..*c },
             None => Cell { name: addr.cell, value, formula: Formula::Inherited, unit, error: e, stale: false },
         })
     }

@@ -50,11 +50,49 @@
 //   data::*                       (JD18) external data: connections, recordsets with their
 //                                 cached rows, rows bound to shapes (Prop rows, DataLinked),
 //                                 refresh with conflicts, automatic linking (DA-04, DA-05)
+//   shapeops::*                   (JD21) shape operations: Vereinigen, Kombinieren,
+//                                 Fragmentieren, Schneiden, Subtrahieren (SP-08) on geom's plane
+//                                 Booleans, arcs rebuilt as arcs; fit_frame (the box follows the
+//                                 geometry after vertex edits, SP-05), update_alignment_box (SP-16)
+//   groups::*                     (JD21) group behaviour: SelectMode and the other Group
+//                                 Properties, Zu Gruppe hinzufügen / Aus Gruppe entfernen,
+//                                 dropping into a group, the ungroup warning (SS-17, SP-06, RS-27)
+//   replace::*                    (JD21) Shape ändern: shapes replaced by a master's instance,
+//                                 text, data, format, glue kept (SP-11, Change Shape Behavior)
 //   field::*                      (JD8) text fields: a Field row's value in its format picture,
 //                                 new fields, the text with its fields, the document's
 //                                 properties (Document::fields: the app's locale and clock)
-//
-// What is to come here, by stage of the plan: page layout (CN-13, P2)
+//   layout::*                     (JD21) the page laid out anew in Visio's styles (flowchart,
+//                                 hierarchy, compact tree, radial, circular; CN-13), connected
+//                                 shapes aligned and spaced (CN-14), shapes off the page
+//                                 breaks (PR-03), the diagram turned or flipped (RS-25)
+//   autoconn::*                   (JD21) a shape dropped on a connector splits it and the shapes
+//                                 after it make room (CN-08), a deleted shape's connectors go
+//                                 and the flow through it heals (CN-09), drops push shapes
+//                                 away (PlowCode)
+//   tools::*                      (JD21) Visio's add-ons as tools (AS-11, RA-09): numbering
+//                                 shapes, arrays of copies, dimension lines glued or tied to
+//                                 the shapes they measure
+//   route_styles::*               (JD21) the routing styles of page and connector with their
+//                                 directions (flowchart, tree, organization chart, simple ...;
+//                                 CN-05, SS-40), the ways they lay as Visio 16 does (JD21v),
+//                                 shapes connectors may cross (SS-19)
+//   route_edit::*                 (JD21) a connector's way by hand: midpoints and vertices
+//                                 moved, added, removed, the way kept when its shapes move (CN-04)
+//   jumps::*                      (JD21) line jumps where connectors cross, written into the
+//                                 connectors' Geometry when they are laid, as Visio does (CN-06)
+//   pointglue::*                  (JD21) control points that glue to connection points and
+//                                 follow them (SP-04), glue to vertices, handles, control points
+//                                 and guides (CN-02), the connection point tool (CN-01)
+//   datagraphic::*                (JD19) data graphics: callouts, data bars, icon sets and
+//                                 colour by value from a shape's data as Visio keeps them (a
+//                                 hidden master per graphic, callout instances as subshapes),
+//                                 the legend of lists and containers (DA-07, DA-08, ST-08)
+//   report::*                     (JD19) shape reports: Visio's report definitions as a model
+//                                 (their XML and the document sheet's visPropRptN rows are
+//                                 diagram_io::report), run into a table with groups and
+//                                 summaries, the table shape on the page and its refresh
+//                                 (DA-09, DA-13, EX-12)
 //
 // Rules that hold from the start: no std (only alloc), no unsafe code, nothing recalculated on
 // opening a file (connectors, layout and containers move only when something moves), and a
@@ -64,8 +102,10 @@
 
 extern crate alloc;
 
+pub mod autoconn;
 mod cell;
 pub mod data;
+pub mod datagraphic;
 pub mod design;
 pub mod dock;
 mod document;
@@ -74,19 +114,29 @@ pub mod field;
 pub mod formula;
 pub mod geometry;
 pub mod glue;
+pub mod groups;
 pub mod hit;
 mod inherit;
 pub mod instance;
+pub mod jumps;
+pub mod layout;
 mod names;
 pub mod ops;
 mod page;
 pub mod pagesetup;
+pub mod pointglue;
 pub mod render;
+pub mod replace;
+pub mod report;
 pub mod route;
+pub mod route_edit;
+pub mod route_styles;
+pub mod shapeops;
 mod shape;
 pub mod structure;
 mod sheet;
 mod strings;
+pub mod tools;
 mod units;
 mod views;
 

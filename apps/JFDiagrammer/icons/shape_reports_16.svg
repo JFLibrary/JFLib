@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Shape-Berichte, 16 px</title>
+  <polygon class="body" fill="#DCDEE1" points="3,2 9,2 9,6 13,6 13,14 3,14"/>
+  <polygon class="shade" fill="#B9BBBE" points="10,2 13,5 10,5"/>
+  <path class="ink" stroke="#1D2228" d="M2.5 1.5H9.5L13.5 5.5V14.5H2.5Z"/>
+  <path class="ink" stroke="#1D2228" d="M9.5 2V5.5H13"/>
+  <path class="ink" stroke="#1D2228" d="M4 12.5H12"/>
+  <rect class="ink" fill="#1D2228" x="4" y="9" width="2" height="3"/>
+  <rect class="tint" fill="#1F5FA8" x="7" y="6" width="2" height="6"/>
+  <rect class="ink" fill="#1D2228" x="10" y="8" width="2" height="4"/>
+</svg>

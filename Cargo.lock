@@ -820,6 +820,8 @@ name = "jflib-diagram-core"
 version = "0.2.1"
 dependencies = [
  "jflib-formats",
+ "jflib-geom",
+ "jflib-rt",
 ]
 
 [[package]]

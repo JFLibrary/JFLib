@@ -1,0 +1,52 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD21 glue (CN-01, RS-17): Start › Tools › Verbindungspunkt (7360) -- Ctrl + click
+# on the selected rectangle adds a connection point (Width*k, Height*k), a drag moves it (on the
+# grid), Ctrl + click outside the shape adds one there too; a line glued to the first point
+# follows the rectangle; the second point's menu makes it outward (Nach außen): a line's end
+# dropped there does not glue; Del takes a chosen point out; every step undoes
+cmd 4404
+drag 500,330 640,420
+cmd 7360
+expect button:"Verbindungspunkt" checked
+click 560,380 ctrl
+expect button:"Verbindungspunkt 1" rect 556 376 10 10
+drag button:"Verbindungspunkt 1" 600,330
+expect button:"Verbindungspunkt 1" rect 596 319 10 10
+wait 600
+click 680,375 ctrl
+expect button:"Verbindungspunkt 2" rect 676 371 10 10
+# a line from the right onto the first point: glued, it follows the rectangle
+cmd 4406
+drag 800,250 600,331
+expect listitem:"Sheet.5" rect 601 248 201 76
+# the second point outward: a line's end dropped on it stays where it was dropped
+cmd 7360
+click 560,380
+wait 600
+rclick button:"Verbindungspunkt 2"
+click menuitem:"Nach außen"
+cmd 4406
+drag 800,450 681,376
+cmd 4400
+wait 600
+click 560,380
+wait 600
+drag 560,380 560,480
+expect listitem:"Sheet.4" rect 500 424 151 101
+expect listitem:"Sheet.5" rect 601 248 201 176
+expect listitem:"Sheet.6" rect 676 374 126 75
+key ctrl+z
+expect listitem:"Sheet.4" rect 500 324 151 100
+# Del with the connection point tool takes the chosen point out
+cmd 7360
+click 560,380
+wait 600
+click button:"Verbindungspunkt 2"
+key delete
+expect button:"Verbindungspunkt 2" missing
+expect button:"Verbindungspunkt 1" exists
+key ctrl+z
+expect button:"Verbindungspunkt 2" exists
+# another tool: no connection point records
+cmd 4400
+expect button:"Verbindungspunkt 1" missing

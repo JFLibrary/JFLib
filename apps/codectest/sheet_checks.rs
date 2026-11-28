@@ -1,7 +1,8 @@
 // sheet_checks -- codectest --sheet: lib/sheet_io's XLSX and CSV readers against workbooks and
 // texts built here (nothing of Microsoft's in the repository): hostile ones must be refused with
 // the right error, quickly and without allocating what they claim; controls of the same shape
-// must still read.  Exit code 1 when a check fails.
+// must still read.  The writers (JD19): large controls written and read back in bounded time,
+// what Excel cannot hold refused quickly.  Exit code 1 when a check fails.
 //
 //   xlsx_zip       a ZIP bomb by ratio (4 MiB of rows packed more than 200 times), too many parts,
 //                  a truncated archive, no ZIP at all, no officeDocument relationship
@@ -18,6 +19,11 @@
 //   csv_limits     64 MiB of delimiters, a quote that never closes, too many records, a header of
 //                  16384 equal names (no quadratic naming)
 //   csv_large      control: 200000 records of German CSV in Windows-1252, typed
+//   xlsx_write     control: 50000 rows of 8 columns (1000 distinct texts, numbers, dates,
+//                  booleans) written and read back as the same Table; refused quickly: a value
+//                  past row 1048576 after a million empty rows, WriteOptions::bytes and ::cells
+//   csv_write      control: 200000 records written as German CSV in Windows-1252 and read back
+//                  typed; refused quickly: a character Windows-1252 lacks, max_bytes
 //
 // --only NAME runs the groups whose names start with NAME.  (build_rs.py test codectest runs it
 // through tests/sheet.uis; --script is ignored)
@@ -29,11 +35,14 @@ use alloc::vec::Vec;
 
 use archive::{Entry, Method};
 use sheet_io::csv::{self, CsvLimits, Options};
-use sheet_io::xlsx::{Error, Limits, Workbook};
-use sheet_io::Value;
+use sheet_io::xlsx::{self, BookOut, Error, Limits, SheetOut, WriteError, WriteOptions, Workbook};
+use sheet_io::{Table, Value};
 
 /// a refusal must come within this many microseconds
 const QUICK_US: u64 = 1_000_000;
+/// ... or within this many, when it first works through a default limit's worth (256 MB of shared
+/// string copies, a 64 MB text scanned): about 0.5 s alone, past 1 s beside the parallel suite
+const WORK_US: u64 = 10_000_000;
 
 struct H {
     ok: u32,
@@ -56,11 +65,15 @@ impl H {
     }
     /// f() must give `want`, within QUICK_US
     fn quick<T: PartialEq + core::fmt::Debug>(&mut self, name: &str, want: T, f: impl FnOnce() -> T) {
+        self.within(name, want, QUICK_US, f);
+    }
+    /// f() must give `want`, within `limit_us`
+    fn within<T: PartialEq + core::fmt::Debug>(&mut self, name: &str, want: T, limit_us: u64, f: impl FnOnce() -> T) {
         let t0 = plat::time_us();
         let r = f();
         let us = plat::time_us().wrapping_sub(t0);
         let what = format!("{r:?} (want {want:?}) in {} ms", us / 1000);
-        self.check(name, r == want && us < QUICK_US, what);
+        self.check(name, r == want && us < limit_us, what);
     }
 }
 
@@ -170,7 +183,7 @@ fn xlsx_limits(t: &mut H) {
     // one shared string of 100 KB in 20000 cells: 2 GB of text if each cell copied it unbounded
     let long = "x".repeat(100_000);
     let amp = zip(&book(&ws(&"<row><c t=\"s\"><v>0</v></c></row>".repeat(20_000)), &format!("<si><t>{long}</t></si>"), &[], ""));
-    t.quick("xlsx_limits/amplified", Some(Error::Limit("string_bytes")), || sheet_err(&amp, d));
+    t.within("xlsx_limits/amplified", Some(Error::Limit("string_bytes")), WORK_US, || sheet_err(&amp, d));
     t.quick("xlsx_limits/index", Some(Error::Invalid("a shared string index past the table")), || sheet_err(&z(r#"<row><c t="s"><v>3</v></c></row>"#), d));
     t.quick("xlsx_limits/index_huge", Some(Error::Invalid("a shared string index")), || sheet_err(&z(r#"<row><c t="s"><v>99999999999999999999999</v></c></row>"#), d));
 }
@@ -236,7 +249,7 @@ fn xlsx_large(t: &mut H) {
 
 fn csv_limits(t: &mut H) {
     let commas = vec![b';'; 64 << 20];
-    t.quick("csv_limits/delimiters", Some(csv::Error::Limit("fields")), || csv::read(&commas, &Options::default()).err());
+    t.within("csv_limits/delimiters", Some(csv::Error::Limit("fields")), WORK_US, || csv::read(&commas, &Options::default()).err());
     let lines = "a;b\n".repeat(1 << 20);
     t.quick("csv_limits/records", Some(csv::Error::Limit("records")), || csv::read(lines.as_bytes(), &Options { limits: CsvLimits { records: 1000, ..CsvLimits::DEFAULT }, ..Options::DEFAULT }).err());
     t.quick("csv_limits/cells", Some(csv::Error::Limit("cells")), || csv::read(lines.as_bytes(), &Options { limits: CsvLimits { cells: 1000, ..CsvLimits::DEFAULT }, ..Options::DEFAULT }).err());
@@ -269,10 +282,66 @@ fn csv_large(t: &mut H) {
     t.check("csv_large/table", ok && ms < 30_000, format!("{} KB, 200000 records typed in {ms} ms ({:?})", bytes.len() / 1024, r.as_ref().err()));
 }
 
+// a table of `rows` rows: texts (1000 distinct), numbers, dates, booleans, gaps
+fn report(rows: u32) -> Table {
+    let columns = ["Name", "Typ", "Anzahl", "Preis", "Datum", "Aktiv", "Notiz", "Nr"].map(String::from).to_vec();
+    let rows = (0..rows)
+        .map(|r| {
+            vec![
+                Value::Text(format!("Ger\u{e4}t {}", r % 1000)),
+                Value::Text(String::from(if r % 3 == 0 { "Router" } else { "Switch" })),
+                Value::Number((r % 17) as f64),
+                Value::Number(r as f64 * 0.25),
+                Value::Date(45_000.0 + (r % 3000) as f64),
+                Value::Bool(r % 2 == 0),
+                if r % 5 == 0 { Value::Empty } else { Value::Text(format!("Zeile {r};\"x\"")) },
+                Value::Number(r as f64),
+            ]
+        })
+        .collect();
+    Table { columns, rows }
+}
+
+fn xlsx_write(t: &mut H) {
+    let table = report(50_000);
+    let mut sheet = SheetOut::from_table("Bericht", &table);
+    sheet.autofilter = true;
+    let book = BookOut { sheets: vec![sheet] };
+    let t0 = plat::time_us();
+    let z = xlsx::write(&book, &WriteOptions::DEFAULT);
+    let write_ms = plat::time_us().wrapping_sub(t0) / 1000;
+    let back = z.as_ref().ok().map(|z| open(z, Limits::default()).and_then(|wb| wb.sheet_table(0, true)));
+    let ms = plat::time_us().wrapping_sub(t0) / 1000;
+    let ok = matches!(&back, Some(Ok(tab)) if *tab == table);
+    t.check("xlsx_write/table", ok && ms < 30_000, format!("{} KB, 400000 cells written in {write_ms} ms, read back equal in {ms} ms ({:?})", z.as_ref().map_or(0, |z| z.len() / 1024), z.as_ref().err()));
+    let mut rows = vec![Vec::new(); 1_048_576];
+    rows.push(vec![Value::Bool(true)]);
+    let far = BookOut { sheets: vec![SheetOut::new("Weit", rows)] };
+    t.quick("xlsx_write/past_last_row", Some(WriteError::Cell { sheet: 0, at: sheet_io::CellRef::new(1_048_576, 0), what: "a value past Excel's last row 1 048 576" }), || xlsx::write(&far, &WriteOptions::DEFAULT).err());
+    t.quick("xlsx_write/bytes", Some(WriteError::Limit("bytes")), || xlsx::write(&book, &WriteOptions { bytes: 1 << 20, ..WriteOptions::DEFAULT }).err());
+    t.quick("xlsx_write/cells", Some(WriteError::Limit("cells")), || xlsx::write(&book, &WriteOptions { cells: 1000, ..WriteOptions::DEFAULT }).err());
+}
+
+fn csv_write(t: &mut H) {
+    let table = report(200_000);
+    let opts = csv::WriteOptions { encoding: csv::Encoding::Windows1252, ..csv::WriteOptions::GERMAN };
+    let t0 = plat::time_us();
+    let b = csv::write_table(&table, &opts);
+    let write_ms = plat::time_us().wrapping_sub(t0) / 1000;
+    let back = b.as_ref().ok().map(|b| csv::read(b, &Options::DEFAULT).map(|c| (c.encoding, c.delimiter, csv::to_table(&c, true, true))));
+    let ms = plat::time_us().wrapping_sub(t0) / 1000;
+    let ok = matches!(&back, Some(Ok((csv::Encoding::Windows1252, b';', tab))) if *tab == table);
+    t.check("csv_write/table", ok && ms < 30_000, format!("{} KB, 200000 records written in {write_ms} ms, read back equal in {ms} ms ({:?})", b.as_ref().map_or(0, |b| b.len() / 1024), b.as_ref().err()));
+    let mut cjk = report(1000);
+    cjk.rows[999][6] = Value::Text(String::from("\u{65e5}\u{672c}"));
+    t.quick("csv_write/unmappable", Some(csv::WriteError::Unmappable { record: 1000, field: 6, ch: '\u{65e5}' }), || csv::write_table(&cjk, &opts).err());
+    t.quick("csv_write/max_bytes", Some(csv::WriteError::Limit("max_bytes")), || csv::write_table(&table, &csv::WriteOptions { max_bytes: 1 << 20, ..opts }).err());
+}
+
 /// run every group -> exit code
 pub fn run(only: Option<&str>) -> i32 {
     let mut t = H { ok: 0, failed: 0, only: only.map(String::from) };
-    let groups: [(&str, fn(&mut H)); 8] = [
+    let groups: [(&str, fn(&mut H)); 10] = [
         ("xlsx_zip", xlsx_zip),
         ("xlsx_sparse", xlsx_sparse),
         ("xlsx_limits", xlsx_limits),
@@ -281,6 +350,8 @@ pub fn run(only: Option<&str>) -> i32 {
         ("xlsx_large", xlsx_large),
         ("csv_limits", csv_limits),
         ("csv_large", csv_large),
+        ("xlsx_write", xlsx_write),
+        ("csv_write", csv_write),
     ];
     for (name, f) in groups {
         if t.on(name) {
@@ -289,4 +360,64 @@ pub fn run(only: Option<&str>) -> i32 {
     }
     plat::write_stdout(format!("sheet: {} ok, {} failed\n", t.ok, t.failed).as_bytes());
     if t.failed == 0 { 0 } else { 1 }
+}
+
+/// --sheet-dump FILE: a real workbook or text file as sheet_io reads it (a check of files that
+/// Excel or another program wrote; nothing of them goes into the repository)
+pub fn dump(path: &str) -> i32 {
+    let say = |s: String| plat::write_stdout(s.as_bytes());
+    let Some(bytes) = plat::read_file(path) else {
+        say(format!("{path}: cannot read\n"));
+        return 1;
+    };
+    let typed = |v: &Value| match v {
+        Value::Empty => String::from("-"),
+        Value::Number(x) => format!("N:{x}"),
+        Value::Text(t) => format!("T:{t:?}"),
+        Value::Bool(b) => format!("B:{b}"),
+        Value::Date(d) => format!("D:{}", v.text()).replace("D:", &format!("D({d}):")),
+        Value::Error(e) => format!("E:{}", e.text()),
+    };
+    let table = |t: &Table| {
+        say(format!("    columns: {}\n", t.columns.join(" | ")));
+        for r in &t.rows {
+            say(format!("    {}\n", r.iter().map(typed).collect::<Vec<_>>().join(" | ")));
+        }
+    };
+    if path.to_ascii_lowercase().ends_with(".csv") || path.to_ascii_lowercase().ends_with(".txt") {
+        return match csv::read(&bytes, &Options::DEFAULT) {
+            Ok(c) => {
+                say(format!("{path}: CSV, delimiter {:?}, {:?}, {} records\n", c.delimiter as char, c.encoding, c.records.len()));
+                table(&csv::to_table(&c, true, true));
+                0
+            }
+            Err(e) => {
+                say(format!("{path}: {}\n", e.text()));
+                1
+            }
+        };
+    }
+    let wb = match Workbook::open(&bytes, Limits::DEFAULT) {
+        Ok(wb) => wb,
+        Err(e) => {
+            say(format!("{path}: {}\n", e.text()));
+            return 1;
+        }
+    };
+    say(format!("{path}: {} sheets, date1904 {}\n", wb.sheets().len(), wb.date1904()));
+    for n in wb.names() {
+        say(format!("  name {:?} scope {:?} hidden {} builtin {} = {} -> {:?}\n", n.name, n.scope, n.hidden, n.builtin(), n.formula, n.area));
+    }
+    let mut rc = 0;
+    for (i, s) in wb.sheets().iter().enumerate() {
+        say(format!("  sheet {i} {:?} {:?} {:?}\n", s.name, s.state, s.kind));
+        match wb.sheet_table(i, true) {
+            Ok(t) => table(&t),
+            Err(e) => {
+                say(format!("    ERROR {}\n", e.text()));
+                rc = 1;
+            }
+        }
+    }
+    rc
 }

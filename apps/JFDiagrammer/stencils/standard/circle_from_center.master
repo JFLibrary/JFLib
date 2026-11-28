@@ -36,6 +36,9 @@ TxtHeight = Width*1.4
 TxtLocPinX = TxtWidth*0.5
 TxtLocPinY = TxtHeight*0.5
 TxtAngle = -Angle
+# Visio zeichnet ein 1D-Shape mit QuickStyleType 0 aus der Verbinder-Liste des Designs (graue
+# Fläche, dunkle Linie); 2: aus der Shape-Liste wie in JFDiagrammer
+QuickStyleType = 2
 
 [Geometry]
 Ellipse  X = 0; Y = Height*0.5; A = Width; B = Height*0.5; C = 0; D = Height*0.5+Width

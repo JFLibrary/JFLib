@@ -8,6 +8,9 @@
 //                                    Bézier pieces where they are polynomial, else sampled)
 //   doc.geometry_paths(sheet, w, h)  the Geometry sections of a sheet with their flags (NoFill,
 //                                    NoLine, NoShow, NoSnap) and paths in local coordinates
+//   doc.geometry_tagged(sheet, w, h) (JD21) the same, and per piece the row (IX) it comes from
+//   Conic / row_conic                (JD21) the ellipse an ArcTo, EllipticalArcTo, Ellipse or
+//                                    RelEllipticalArcTo row draws: c + u cos t + v sin t
 //   doc.local_xform(sheet)           local -> parent: Pin, LocPin, Angle, FlipX, FlipY
 //   doc.page_xform(shape)            local -> page: the chain of groups up to the page
 //   round_corners(path, r)           the Rounding cell: corners between straight lines rounded
@@ -265,6 +268,12 @@ impl Document {
     /// with their rows as paths in local coordinates; `w` and `h` are the shape's Width and
     /// Height (the relative rows and the relative points of NURBS and POLYLINE need them)
     pub fn geometry_paths(&self, sheet: SheetRef, w: f64, h: f64) -> Vec<GeoSection> {
+        self.geometry_tagged(sheet, w, h).into_iter().map(|(g, _)| g).collect()
+    }
+
+    /// (JD21) geometry_paths and, per sub-path, the IX of the row each piece comes from (a row
+    /// that draws several pieces -- an arc, a NURBS curve, a polyline -- gives each of them its IX)
+    pub fn geometry_tagged(&self, sheet: SheetRef, w: f64, h: f64) -> Vec<(GeoSection, Vec<Vec<u32>>)> {
         let mut out = Vec::new();
         for sec in self.geometry(sheet) {
             let flag = |c: Sym| self.resolve(sheet, &CellAddr::section(sec, c)).num().is_some_and(|v| v != 0.0);
@@ -276,17 +285,22 @@ impl Document {
                 no_snap: flag(names::NO_SNAP),
                 path: Path::default(),
             };
-            self.section_path(sheet, sec, w, h, &mut g.path);
-            out.push(g);
+            let mut tags = Vec::new();
+            self.section_path(sheet, sec, w, h, &mut g.path, &mut tags);
+            out.push((g, tags));
         }
         out
     }
 
-    fn section_path(&self, sheet: SheetRef, sec: SecKey, w: f64, h: f64, path: &mut Path) {
+    fn section_path(&self, sheet: SheetRef, sec: SecKey, w: f64, h: f64, path: &mut Path, tags: &mut Vec<Vec<u32>>) {
         let rows = self.rows(sheet, sec);
-        let mut b = Builder::new(path);
+        let mut b = Builder::new(path, tags);
         let mut spline: Option<Spline> = None;
         for row in &rows {
+            let ix = match row.key {
+                crate::sheet::RowKey::Index(i) => i,
+                crate::sheet::RowKey::Named(_) => 0,
+            };
             let kind = row.kind.map(|k| self.str(k)).unwrap_or("");
             let num = |c: Sym| self.resolve(sheet, &CellAddr::row(sec, row.key, c)).num();
             let text = |c: Sym| match self.resolve(sheet, &CellAddr::row(sec, row.key, c)).value() {
@@ -302,6 +316,7 @@ impl Document {
                     s.finish(&mut b);
                 }
             }
+            b.tag = ix;
             match kind {
                 "MoveTo" => b.move_to(p),
                 "LineTo" => b.line_to(p),
@@ -358,6 +373,7 @@ impl Document {
                 "SplineStart" => {
                     let from = b.cur();
                     spline = Some(Spline {
+                        tag: ix,
                         degree: num(names::D).unwrap_or(3.0),
                         points: alloc::vec![from, p],
                         knots: alloc::vec![num(names::B).unwrap_or(0.0), num(names::A).unwrap_or(0.0)],
@@ -447,11 +463,15 @@ struct Builder<'p> {
     sub: Option<Sub>,
     /// the current point (also after an ellipse, which leaves no open sub-path)
     at: Option<[f64; 2]>,
+    /// (JD21) the row the pieces come from now, and per sub-path the row of each piece
+    tag: u32,
+    tags: &'p mut Vec<Vec<u32>>,
+    sub_tags: Vec<u32>,
 }
 
 impl<'p> Builder<'p> {
-    fn new(path: &'p mut Path) -> Builder<'p> {
-        Builder { path, sub: None, at: None }
+    fn new(path: &'p mut Path, tags: &'p mut Vec<Vec<u32>>) -> Builder<'p> {
+        Builder { path, sub: None, at: None, tag: 0, tags, sub_tags: Vec::new() }
     }
 
     fn cur(&self) -> [f64; 2] {
@@ -459,10 +479,12 @@ impl<'p> Builder<'p> {
     }
 
     fn flush(&mut self) {
+        let tags = core::mem::take(&mut self.sub_tags);
         if let Some(mut s) = self.sub.take() {
             if !s.segs.is_empty() {
                 s.closed = near(s.start, s.end());
                 self.path.subs.push(s);
+                self.tags.push(tags);
             }
         }
     }
@@ -486,6 +508,7 @@ impl<'p> Builder<'p> {
         self.ensure(end);
         if let Some(sub) = self.sub.as_mut() {
             sub.segs.push(s);
+            self.sub_tags.push(self.tag);
         }
         self.at = Some(end);
     }
@@ -560,7 +583,8 @@ impl<'p> Builder<'p> {
         let mut segs = Vec::new();
         arc_cubics([0.0, 0.0], 1.0, 0.0, core::f64::consts::TAU, &mut segs);
         let start = m.apply([1.0, 0.0]);
-        let segs = segs.iter().map(|s| s.map(&m)).collect();
+        let segs: Vec<Seg> = segs.iter().map(|s| s.map(&m)).collect();
+        self.tags.push(alloc::vec![self.tag; segs.len()]);
         self.path.subs.push(Sub { start, segs, closed: true });
         self.sub = None;
         self.at = Some(c);
@@ -572,6 +596,7 @@ impl<'p> Builder<'p> {
 }
 
 struct Spline {
+    tag: u32,
     degree: f64,
     points: Vec<[f64; 2]>,
     knots: Vec<f64>,
@@ -580,6 +605,7 @@ struct Spline {
 
 impl Spline {
     fn finish(self, b: &mut Builder) {
+        b.tag = self.tag;
         let end = *self.points.last().unwrap_or(&[0.0, 0.0]);
         let deg = self.degree as usize;
         let mut knots = self.knots;
@@ -628,7 +654,7 @@ fn arc3(a: [f64; 2], m: [f64; 2], c: [f64; 2], out: &mut Vec<Seg>) -> bool {
 }
 
 /// the circle through three points (None: on a line, or not finite)
-fn circle3(a: [f64; 2], b: [f64; 2], c: [f64; 2]) -> Option<([f64; 2], f64)> {
+pub(crate) fn circle3(a: [f64; 2], b: [f64; 2], c: [f64; 2]) -> Option<([f64; 2], f64)> {
     let (bx, by) = (b[0] - a[0], b[1] - a[1]);
     let (cx, cy) = (c[0] - a[0], c[1] - a[1]);
     let d = 2.0 * (bx * cy - by * cx);
@@ -664,6 +690,136 @@ pub fn arc_cubics(c: [f64; 2], r: f64, start: f64, sweep: f64, out: &mut Vec<Seg
         t = t1;
         s0 = s1;
         c0 = c1;
+    }
+}
+
+// ---------------------------------------------------------------- the ellipse of an arc row (JD21)
+
+/// An ellipse and an arc of it: the points c + u cos t + v sin t for t from `t0` to `t0 + sweep`
+/// (radians, positive counter-clockwise from u towards v; u and v are conjugate half axes, the
+/// half axes themselves for an upright ellipse).  An affine map keeps the form: map() maps c, u
+/// and v and the parameters stay, so an arc of a turned, flipped or stretched shape is a Conic
+/// on the page too.
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub struct Conic {
+    pub c: [f64; 2],
+    pub u: [f64; 2],
+    pub v: [f64; 2],
+    pub t0: f64,
+    pub sweep: f64,
+}
+
+impl Conic {
+    /// the point at parameter t
+    pub fn at(&self, t: f64) -> [f64; 2] {
+        let (s, c) = sincos(t);
+        [self.c[0] + self.u[0] * c + self.v[0] * s, self.c[1] + self.u[1] * c + self.v[1] * s]
+    }
+
+    /// the whole ellipse (a sweep of a full turn)
+    pub fn is_full(&self) -> bool {
+        self.sweep.abs() >= core::f64::consts::TAU - 1e-9
+    }
+
+    /// the same under an affine map
+    pub fn map(&self, m: &Xform) -> Conic {
+        Conic { c: m.apply(self.c), u: m.apply_vec(self.u), v: m.apply_vec(self.v), ..*self }
+    }
+
+    /// the parameter of the point of the ellipse that `p` projects to from the centre (in the
+    /// space where the ellipse is the unit circle); None for a degenerate ellipse
+    pub fn param(&self, p: [f64; 2]) -> Option<f64> {
+        let m = Xform { a: self.u[0], b: self.u[1], c: self.v[0], d: self.v[1], e: self.c[0], f: self.c[1] };
+        let q = m.inverse()?.apply(p);
+        (q[0] != 0.0 || q[1] != 0.0).then(|| atan2(q[1], q[0]))
+    }
+
+    /// the principal axes: the angle of the major axis (radians), the major and the minor half
+    /// length (the singular value decomposition of the matrix [u v])
+    pub fn axes(&self) -> (f64, f64, f64) {
+        let (a, b, c, d) = (self.u[0], self.v[0], self.u[1], self.v[1]);
+        let (e, f, g, h) = ((a + d) * 0.5, (a - d) * 0.5, (c + b) * 0.5, (c - b) * 0.5);
+        let q = sqrt(e * e + h * h);
+        let r = sqrt(f * f + g * g);
+        let phi = (atan2(h, e) + atan2(g, f)) * 0.5;
+        (phi, q + r, (q - r).abs())
+    }
+
+    /// the box of the arc (x0, y0, x1, y1): its ends and the extremes it passes
+    pub fn bounds(&self) -> [f64; 4] {
+        let (p, q) = (self.at(self.t0), self.at(self.t0 + self.sweep));
+        let mut b = [p[0].min(q[0]), p[1].min(q[1]), p[0].max(q[0]), p[1].max(q[1])];
+        let tau = core::f64::consts::TAU;
+        for k in 0..2 {
+            let base = atan2(self.v[k], self.u[k]);
+            for t in [base, base + core::f64::consts::PI] {
+                // whether t lies on the arc
+                let d = if self.sweep >= 0.0 { rem(t - self.t0, tau) } else { rem(self.t0 - t, tau) };
+                if d <= self.sweep.abs() || self.is_full() {
+                    let x = self.at(t);
+                    b = [b[0].min(x[0]), b[1].min(x[1]), b[2].max(x[0]), b[3].max(x[1])];
+                }
+            }
+        }
+        b
+    }
+}
+
+// an arc from a through m to c as a Conic of the circle through them (None: on a line)
+fn conic3(a: [f64; 2], m: [f64; 2], c: [f64; 2]) -> Option<Conic> {
+    let (ctr, r) = circle3(a, m, c)?;
+    let tau = core::f64::consts::TAU;
+    let t0 = atan2(a[1] - ctr[1], a[0] - ctr[0]);
+    let tm = atan2(m[1] - ctr[1], m[0] - ctr[0]);
+    let t1 = atan2(c[1] - ctr[1], c[0] - ctr[0]);
+    let ccw = rem(t1 - t0, tau);
+    let mid = rem(tm - t0, tau);
+    let sweep = if mid <= ccw { ccw } else { ccw - tau };
+    (sweep != 0.0).then_some(Conic { c: ctr, u: [r, 0.0], v: [0.0, r], t0, sweep })
+}
+
+impl Document {
+    /// (JD21) the ellipse arc a Geometry row draws, in local coordinates, the way section_path
+    /// draws it: ArcTo, EllipticalArcTo and RelEllipticalArcTo from `from` (the current point) to
+    /// their X, Y, Ellipse as a whole; `w`, `h` the shape's Width and Height.  None for other rows
+    /// and for arcs that are drawn as a line (a bow of 0, three points on a line)
+    pub fn row_conic(&self, sheet: SheetRef, sec: SecKey, key: crate::sheet::RowKey, from: [f64; 2], w: f64, h: f64) -> Option<Conic> {
+        let row = self.rows(sheet, sec).into_iter().find(|r| r.key == key)?;
+        let kind = row.kind.map(|k| self.str(k)).unwrap_or("");
+        let num = |c: Sym| self.resolve(sheet, &CellAddr::row(sec, key, c)).num();
+        let (x, y) = (num(names::X).unwrap_or(0.0), num(names::Y).unwrap_or(0.0));
+        let (a, b, c, d) = (num(names::A), num(names::B), num(names::C), num(names::D));
+        match kind {
+            "ArcTo" => {
+                let (to, bow) = ([x, y], a.unwrap_or(0.0));
+                let dd = [to[0] - from[0], to[1] - from[1]];
+                let l = sqrt(dd[0] * dd[0] + dd[1] * dd[1]);
+                if !(bow.is_finite() && l > 0.0) || bow.abs() < 1e-9 * l.max(1e-9) {
+                    return None;
+                }
+                let m = [(from[0] + to[0]) * 0.5 + dd[1] / l * bow, (from[1] + to[1]) * 0.5 - dd[0] / l * bow];
+                conic3(from, m, to)
+            }
+            "EllipticalArcTo" | "RelEllipticalArcTo" => {
+                let rel = kind == "RelEllipticalArcTo";
+                let (angle, ratio) = (c.unwrap_or(0.0), d.unwrap_or(1.0));
+                if !(ratio.is_finite() && ratio > 1e-12 && angle.is_finite()) || (rel && (w == 0.0 || h == 0.0)) {
+                    return None;
+                }
+                let out = if rel { Xform::scale(w, h) } else { Xform::IDENTITY };
+                let from = if rel { [from[0] / w, from[1] / h] } else { from };
+                let ctl = [a.unwrap_or(0.0), b.unwrap_or(0.0)];
+                let into = Xform::rotate(-angle).then(&Xform::scale(1.0 / ratio, 1.0));
+                let back = Xform::scale(ratio, 1.0).then(&Xform::rotate(angle)).then(&out);
+                Some(conic3(into.apply(from), into.apply(ctl), into.apply([x, y]))?.map(&back))
+            }
+            "Ellipse" => {
+                let u = [a.unwrap_or(0.0) - x, b.unwrap_or(0.0) - y];
+                let v = [c.unwrap_or(0.0) - x, d.unwrap_or(0.0) - y];
+                Some(Conic { c: [x, y], u, v, t0: 0.0, sweep: core::f64::consts::TAU })
+            }
+            _ => None,
+        }
     }
 }
 
@@ -1116,7 +1272,8 @@ mod tests {
     fn bow_turns_counter_clockwise_when_positive() {
         // a rounded corner of a counter-clockwise box: from (0, 0) to (1, 1), bulging outwards
         let mut path = Path::default();
-        let mut b = Builder::new(&mut path);
+        let mut tags = Vec::new();
+        let mut b = Builder::new(&mut path, &mut tags);
         b.move_to([0.0, 0.0]);
         b.arc_to_bow([0.0, 0.0], [1.0, 1.0], 1.0 - core::f64::consts::FRAC_1_SQRT_2);
         b.finish();
@@ -1142,9 +1299,10 @@ mod tests {
         for d in [1e12, f64::INFINITY, f64::NAN, 0.0, 10.0] {
             assert!(Nurbs::from_row(&[1.0, d, 0.0, 0.0], [0.0, 0.0], [1.0, 1.0], None, None, None, None, 1.0, 1.0).is_none(), "{d}");
             let mut path = Path::default();
-            let mut b = Builder::new(&mut path);
+            let mut tags = Vec::new();
+            let mut b = Builder::new(&mut path, &mut tags);
             b.move_to([0.0, 0.0]);
-            Spline { degree: d, points: alloc::vec![[0.0, 0.0], [1.0, 1.0]], knots: alloc::vec![0.0], last: 1.0 }.finish(&mut b);
+            Spline { tag: 0, degree: d, points: alloc::vec![[0.0, 0.0], [1.0, 1.0]], knots: alloc::vec![0.0], last: 1.0 }.finish(&mut b);
             b.finish();
             assert!(!path.subs.is_empty(), "{d}");
         }

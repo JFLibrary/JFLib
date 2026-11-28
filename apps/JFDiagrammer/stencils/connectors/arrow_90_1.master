@@ -34,6 +34,9 @@ Width = GUARD(EndX-BeginX)
 Height = GUARD(EndY-BeginY)
 Angle = GUARD(0DA)
 GlueType = 2
+# Visio zeichnet ein 1D-Shape mit QuickStyleType 0 aus der Verbinder-Liste des Designs (graue
+# Fläche, dunkle Linie); 2: aus der Shape-Liste wie in JFDiagrammer
+QuickStyleType = 2
 
 
 [User]

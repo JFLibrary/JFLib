@@ -29,6 +29,11 @@ viewer draws are there; glue, connector routing and layout follow.
 - **Geometry:** every row type of a Geometry section (lines, circular and elliptical arcs,
   ellipses, NURBS, polylines, splines, infinite lines, the relative rows) as paths of lines and
   cubic curves, and the transforms of shapes and groups (pin, local pin, angle, flips).
+- **Shape operations** (`shapeops`): Visio's union, combine, fragment, intersect and subtract on
+  shapes, groups and lines, with arcs coming back as arcs and formulas that let the result stretch
+  with its box; the box of a shape follows its geometry after vertex edits, and a group's box can be
+  fitted around its members again. The plane Booleans come from
+  [`jflib-geom`](https://crates.io/crates/jflib-geom).
 - **A display list per page** (`render::build`): what a viewer draws, in order, from the values
   the file cached -- fills, lines with patterns and line ends, texts laid out in their blocks,
   pictures, background pages, layers, the page's theme -- with a grid to find items by place.

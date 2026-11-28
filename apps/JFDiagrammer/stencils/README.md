@@ -119,6 +119,9 @@ Row_1:  X = 5 mm; Y = Height
         ...
 ```
 
+`Tip` ist der Name aus Visios ShapeSheet-Fenster; in die Datei kommt die Zelle als `Prompt` (so steht
+sie in Visios Dateien, und dort lesen Visio und JFDiagrammer die QuickInfo des Steuerpunkts, JD21).
+
 ### Formeln
 
 - Formeln sind Visios universelle Schreibweise (wie im `F`-Attribut), z. B. `Width*0.5`,
@@ -224,6 +227,9 @@ Row  Value = ABS(Width); Unit = mm; Format = "0 u"; Type = 2
   der Wert folgt jeder Änderung (`diagram_core::field::marked`, `instance::place`).
 - Im Einsatz: die Bemaßungen der Rack-Schablone (`rack_equipment/dim_*.master`) und die
   Auto-Bemaßung der Beschriftungen (`callouts/auto_dimension.master`, zeigt ihre eigene Länge).
+  (JD21) Ansicht › Add-Ons › Maßlinien legt genau diese drei Master ab (horizontal, vertikal,
+  ausgerichtet) und setzt ihre Enden an Shapes (`diagram_core::tools::dimension`); ihre NameU und
+  der Steuerpunkt `Controls.Line` sind dafür fest.
 
 ## 1D-Shapes (Verbinder, Linienpfeile)
 
@@ -263,6 +269,13 @@ App (`diagram_core::glue::is_one_d`) liest es genauso.
   Hintergrund aus dem Design), gefüllte flächige Pfeile `Normal`. Ein Verbinder nur aus Umrissen
   (ohne Füllung) nimmt ebenfalls `Connector`, mit `BeginArrow = 0` und `EndArrow = 0`: mit
   `Normal` verschwände er in Designs ohne Shape-Linien (Kontrast).
+- **Pfeilspitze aus dem Design: `QuickStyleType = 3`.** Visio gibt einem Shape ohne `ObjType 2`
+  die Pfeilspitzen des Designs (`THEMEVAL()` in `BeginArrow`/`EndArrow`, auch
+  `THEMEVAL("ConnectorEnd",13)`) nur mit `QuickStyleType 3`; mit 0 sind sie dort 0 (1D-Shapes
+  zeichnet es dann aus der Verbinder-Liste ohne Spitzen, 2D-Shapes aus der Shape-Liste).
+  JFDiagrammer erkennt die Verbinder-Liste auch am Namen `Connector`. Jeder Master, dessen
+  Spitze aus dem Design kommt, setzt deshalb `QuickStyleType = 3` (Visio-Gegenprobe, alle
+  1D-Master von Blöcke und Verbinder einzeln abgelegt).
 - Text eines Linienverbinders: ein fester Textblock (z. B. `TxtWidth = 30 mm`) mitten auf dem
   Verlauf; der Hintergrund aus `Connector` erscheint nur hinter vorhandenem Text.
 
@@ -301,6 +314,13 @@ Schablone alle Master.
   Stichworte je Sprache; NameU ist der naheliegende englische Begriff.
 - **Kategorien für Regeln:** Flussdiagramm-Shapes tragen `User.msvShapeCategories`
   (`"Flowchart"`, die Entscheidung `"Flowchart;Decision"`, Start/Ende `"Flowchart;Terminator"`).
+- **Hindernisse (`ObjType`, JD21v):** Dynamische Verbinder weichen nur platzierbaren Shapes aus
+  (`ObjType` mit Bit 1, wie Visio 16). Ein Master bekommt `ObjType = 1`, wo Visios Gegenstück
+  platzierbar ist (Gegenprobe visio-obst-2): die Flussdiagramm-Shapes, die gestellmontierten Server,
+  Wolke, Ring-Netzwerk und Ethernet. Die übrigen 2D-Master bleiben ohne `ObjType` (0, Visio
+  entscheidet: platzierbar erst, wenn ein Verbinder an ihnen klebt). Visios Gegenstücke sind dort
+  0, 4 oder Gruppen mit 8 ohne platzierbare Teile (Standard-Shapes, Blöcke, Netzwerk- und
+  Server-Symbole, Marketing, Venn, Pyramide, Matrix, Datengrafiken 4), also keine Hindernisse.
 
 Ergänzt mit dem JD26-Probeblatt (vom Nutzer abgenommen, 2026-11-23):
 
@@ -316,6 +336,24 @@ Ergänzt mit dem JD26-Probeblatt (vom Nutzer abgenommen, 2026-11-23):
   wenn das Shape eigene Spitzen zeichnet. Linien und Flächen in einem Shape: `line_style:
   Connector`, `fill_style`/`text_style: Normal`, `QuickStyleType = 3`, `QuickStyleFillMatrix` und
   `QuickStyleFontMatrix` 100; oder eine Gruppe mit einem Linien- und einem Flächen-Teil.
+- **Schnellformatzellen ausdrücklich** (Visio-Gegenprobe JD26): Visio nimmt `QuickStyleType` und
+  alle `QuickStyle…Matrix`-Zellen aus der *Füll*-Formatvorlage, JFDiagrammer die Linienmatrix aus
+  der Linien- und die Schriftmatrix aus der Text-Formatvorlage. Wer die Formatvorlagen mischt
+  oder `style: Connector` mit `QuickStyleType = 3` nimmt, setzt `QuickStyleLineMatrix` selbst:
+  reine Linien `2` (Linie 2 der Verbinder-Liste, 1 pt in der Variantenfarbe), Linien mit
+  Flächen wie Normal `100`, und dazu `QuickStyleLineColor = 100` (Variantenfarbe 1): Die
+  Formatvorlage `Connector` zeichnet in Variantenfarbe 7 (`QuickStyleLineColor 106`), damit
+  Visio die NetLab-Verbinder schiefergrau zeigt. Linie 1 der Verbinder-Liste von NetLab ist
+  `dk2`; aus den Listen eines Themes nimmt Visio aber nur dk1, lt1, die Akzente und den
+  Platzhalter, alles andere (dk2, eine feste Farbe, Transformationen auf dk1) zeichnet es in der
+  Schnellformatfarbe des Shapes. Variantenfarbe 7 ist in NetLab-Variante 1–3 dieses Schiefergrau
+  (Variante 4: Grau). Linie 2 und Schrift 2 der Shape-Liste (`dk2`) zeigt Visio deshalb in der
+  Schnellformatfarbe; kein Master nimmt sie.
+  Die Pfeilspitze des Designs (`EndArrow` aus Connector) steht am Ende des *letzten* Pfads:
+  eine Linie mit Kasten zeichnet den Kasten zuerst (Kategorie-Gräten).
+- **Textblock ganz oder gar nicht:** Visio liest eine fehlende Zelle eines Textblocks, von dem
+  das Shape eine Zelle hat, als 0 (Breite 0, am linken Rand); das Bauwerkzeug ergänzt deshalb
+  die übrigen der sechs Zellen (`TxtPinX` … `TxtLocPinY`) mit dem Shape-Kasten.
 - **Anzahl aus Shape-Daten** (Ebenen, Stufen, Phasen, Segmente): `Prop.<Name>` (Typ 2) mit Label
   und Prompt in fünf Sprachen, `User.N` begrenzt; Teile oder Abschnitte über N mit `NoShow` und
   `HideText`, deckungsgleich mit dem letzten sichtbaren und darunter. Wo Ziehen Elemente
@@ -389,6 +427,13 @@ Regeln für die Master:
   verschwindet der Kopf samt Text (`HideText`), die Box bleibt sauber gezeichnet. Beim Master
   `Container` sind beide Formeln aus `msvSDHeadingStyle` (1 Kopfband oben, 2 nur Titel oben,
   3 Kopfband links, 4 ohne Kopf).
+- (JD21, ST-02) Der Master `Container` hat 14 Containerstile (`msvSDContainerStyleCount = 14`;
+  1–6 unverändert seit JD10, 7–14: Leiste, Doppelrahmen, Schiefer, Reiter, Kopflinie, Klammer,
+  Signal, Kopf unten) und je Stil 2–4 Kopfzeilenstile (`msvSDHeadingStyleCount` per Formel aus dem
+  Stil; Stil 14 legt den Kopf unten bzw. rechts). Ein Kopfzeilenstil über der Anzahl zeigt keinen
+  Kopf. Die App zeigt die Stile als Galerien mit Bildern dieses Masters (`container_styles.rs`)
+  und bietet nur so viele Stile an, wie der Master des Containers hat (ältere Zeichnungen: 6).
+  Probeblatt: `diagramiotest --write-stencil-previews DIR` › `container-styles.png`.
 - Geometrie nur aus `Width`, `Height` und Zellformeln: die App vergrößert die Shapes per Code.
   Teile, die ein Stil nicht zeigt, schaltet `NoShow` im Geometrieabschnitt ab; ein Shape hat
   eine Linie und eine Füllung, verschiedene Looks entstehen über `NoFill`/`NoLine` je Abschnitt.
@@ -421,6 +466,34 @@ Acht Schablonen: `decorative` (SH-003), `charting` (SH-004), `venn` (SH-007) in 
 - Prüfen: `diagramiotest --check --only stencils/business`, Ansicht
   `diagramiotest --write-stencil-previews DIR` (`probeblatt-jd26.png`, `<ordner>-alle.png` und
   `<ordner>-alle-kontrast.png`).
+
+## Datengrafiken (JD19)
+
+Die verborgene Schablone `datagraphics` (Kategorie `extras`, in „Weitere Shapes“ nicht angeboten)
+liefert die Elemente, die eine Datengrafik an ein Shape setzt (DA-07): drei Text-Elemente (`DG Text`,
+`DG Text box`, `DG Text underlined`), vier Datenleisten (`DG Progress bar`, `DG Star rating`,
+`DG Thermometer`, `DG Speedometer`) und vier Symbolsätze (`DG Traffic lights`, `DG Arrows`,
+`DG Flags`, `DG Rating`). Alle Master sind `hidden: true`; die App setzt Instanzen als Untershapes an
+die Shapes (`diagram_core::datagraphic`). Die Zellnamen sind Visios, damit Visio die Elemente erkennt
+und bearbeiten kann; Zeichnungen, Formeln und Farben sind eigene Arbeit. Der NameU beginnt mit `DG `,
+damit er nicht mit Visios Mastern gleichen Namens in einer Datei zusammenfällt.
+
+| Zelle | Inhalt |
+|---|---|
+| `User.msvCalloutType` | `"Text Callout"`, `"Data Bar"` oder `"Icon Set"` |
+| `Prop.msvCalloutField` | der Wert, den das Element zeigt (die App schreibt eine Formel auf die Shape-Daten des Shapes; `SortKey` = Bezeichnung des Felds) |
+| `Prop.msvCalloutProp*` | die Optionen; `Prompt` = Art des Eingabefelds wie bei Visio (`Number`, `Bool`, `Format`, `String`, `List`): `Min`, `Max`, `ShowValue`, `ValueFormat`, `Label`, `LabelPosition`, `Border`, `Fill` |
+| `User.msvCalloutIconCount`, `User.msvCalloutIconNumber` | Symbolsätze: Anzahl der Symbole, das gezeigte (-1 keins); die App schreibt dort die aus den Regeln übersetzte Formel |
+
+- Datenleisten rechnen den Anteil `User.F` = (Wert - Minimum) / (Maximum - Minimum), begrenzt auf 0 bis 1;
+  Breite, Säule, Sterne und Zeiger folgen ihm. Gefüllte Teile in der Linienfarbe (`FillForegnd =
+  LineColor`).
+- Symbolsätze schalten ihre Geometrieabschnitte mit `NoShow`/`NoFill` nach `User.msvCalloutIconNumber`.
+  Die Farben der Ampel, Pfeile und Flaggen sind die Bedeutung der Symbole und deshalb fest
+  (begründete Ausnahme der Stilregeln).
+- Text-Elemente zeigen ein Textfeld: Bezeichnung und Wert (`FORMAT` im Wertformat) nach
+  `LabelPosition`; Rahmen und Füllung nach `Border` und `Fill`.
+- Prüfen: `diagramiotest --check --only datagraphics`, Gegenprobe `diagramiotest --write-dg DIR`.
 
 ## Was in der `.vssx` steht
 

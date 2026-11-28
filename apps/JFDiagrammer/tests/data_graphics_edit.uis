@@ -1,0 +1,136 @@
+#!args apps/JFDiagrammer/tests/jd19-dg.vsdx --no-system-fonts
+# JFDiagrammer, JD19: Erweiterte Datengrafiken (RD-10, DA-07), Legende einfügen (RD-07, ST-08) and
+# the shape's menu -- jd19-dg.vsdx (diagramiotest --write-dg): five boxes linked to "Geräte".
+# A new data graphic for Server A and Router: two items made in the dialogs (a thermometer for
+# Auslastung up to 200, an icon set for Status with one rule), their order, the default
+# position, Shape-Text ausblenden; edited: an item's settings read back, an item deleted,
+# Übernehmen; renamed, duplicated, the shapes with it selected; the legend vertical and
+# horizontal (one undo step each); Keine Datengrafik for one shape; a graphic deleted from its
+# tile's menu; Datengrafik bearbeiten in the shape's menu of a shape without one
+wait 100
+click tab:"Daten"
+click listitem:"Server A"
+click listitem:"Router" shift
+cmd 6414
+expect "Die Zeichnung hat noch keine Datengrafik." exists
+click "Neue Datengrafik erstellen ..."
+expect dialog:"Neue Datengrafik" exists
+# the first item: Auslastung as a thermometer from 0 to 200
+click button:"Neues Element ..."
+expect dialog:"Neues Element" exists
+expect dialog:"Neue Datengrafik" missing
+click #2100297744
+click "Auslastung"
+click #2100297746
+click "Datenleiste"
+expect #2100297747 text "Fortschrittsleiste"
+click #2100297747
+click "Thermometer"
+click #2100297777
+key ctrl+a
+type "200"
+click button:"OK"
+expect dialog:"Neue Datengrafik" exists
+expect listitem:"Auslastung (Datenleiste)" exists
+# the second: Status as flags, icon 1 for "OK"
+click button:"Neues Element ..."
+click #2100297744
+click "Status"
+click #2100297746
+click "Symbolsatz"
+click #2100297747
+click "Flaggen"
+click #2100297792
+click "ist gleich"
+click #2100297793
+type "OK"
+click button:"OK"
+expect listitem:"Status (Symbolsatz)" exists
+# Status first, above the shapes by default, the shapes' text hidden
+click listitem:"Status (Symbolsatz)"
+click button:"Nach oben"
+click #2099249201
+click "Oberhalb"
+click checkbox:"Shape-Text ausblenden"
+click button:"OK"
+expect dialog:"Neue Datengrafik" missing
+# the pane: the selection shows both fields
+cmd 6412
+expect text:"Datengrafik: Datengrafik" exists
+expect checkbox:"Auslastung" checked
+expect checkbox:"Status" checked
+expect checkbox:"Kosten" unchecked
+# Datengrafik bearbeiten: as written; the bar's settings; the bar deleted, Übernehmen, OK
+cmd 6531
+expect dialog:"Datengrafik bearbeiten" exists
+expect #2099249201 text "Oberhalb"
+expect checkbox:"Shape-Text ausblenden" checked
+click listitem:"Auslastung (Datenleiste)"
+click button:"Element bearbeiten ..."
+expect dialog:"Element bearbeiten" exists
+expect #2100297744 text "Auslastung"
+expect #2100297747 text "Thermometer"
+expect #2100297777 text "200"
+click button:"Abbrechen"
+expect dialog:"Datengrafik bearbeiten" exists
+click listitem:"Auslastung (Datenleiste)"
+click button:"Löschen"
+expect listitem:"Auslastung (Datenleiste)" missing
+click button:"Übernehmen"
+expect dialog:"Datengrafik bearbeiten" exists
+expect checkbox:"Auslastung" unchecked
+click button:"OK"
+expect dialog:"Datengrafik bearbeiten" missing
+# Umbenennen
+cmd 6532
+expect dialog:"Datengrafik umbenennen" exists
+click #2101346306
+key ctrl+a
+type "Ampeln"
+click button:"OK"
+expect text:"Datengrafik: Ampeln" exists
+# Duplizieren: the copy is not on any shape
+cmd 6533
+cmd 6414
+expect button:"Ampeln" exists
+expect button:"Ampeln (2)" exists
+key esc
+# Shapes mit dieser Grafik auswählen: nothing selected, the document's first graphic
+click listitem:"Switch"
+cmd 6535
+expect listitem:"Server A" selected
+expect listitem:"Router" selected
+expect listitem:"Switch" unselected
+# the legend, vertical then horizontal; undo takes it back
+cmd 6529
+expect listitem:"Legende" selected
+key ctrl+z
+expect listitem:"Legende" missing
+cmd 6409
+click "Horizontal"
+expect listitem:"Legende" exists
+key ctrl+z
+expect listitem:"Legende" missing
+# Keine Datengrafik for Router alone
+click listitem:"Router"
+cmd 6536
+expect checkbox:"Status" unchecked
+click listitem:"Server A"
+expect checkbox:"Status" checked
+# the tile's menu: Löschen takes the graphic off Server A and out of the drawing
+cmd 6414
+rclick button:"Ampeln"
+click #2097414148
+cmd 6414
+expect button:"Ampeln" missing
+expect button:"Ampeln (2)" exists
+key esc
+expect checkbox:"Status" unchecked
+# the shape's menu: a shape without a graphic gets a new one
+rclick listitem:"Switch"
+click "Daten"
+click "Datengrafik bearbeiten ..."
+expect dialog:"Neue Datengrafik" exists
+click button:"Abbrechen"
+expect dialog:"Neue Datengrafik" missing
+shot build/JFDiagrammer-data-graphics-edit.png

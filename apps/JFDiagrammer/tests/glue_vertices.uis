@@ -1,0 +1,75 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD21 glue (SP-05): vertex editing with the pencil tool -- two vertices of a
+# rectangle chosen (click, Shift + click) move together and the box follows; Del takes both out;
+# an arc's control point (Bogengriff) bends it, chosen it shows its eccentricity handles, one of
+# them turns and stretches the ellipse; the freeform tool takes back what the pointer goes back
+# over; undo
+cmd 4404
+drag 500,330 640,420
+cmd 4409
+click 560,380
+wait 600
+click button:"Scheitelpunkt 2"
+wait 600
+click button:"Scheitelpunkt 3" shift
+wait 600
+drag button:"Scheitelpunkt 3" 691,330
+expect listitem:"Sheet.4" rect 500 324 201 100
+expect button:"Scheitelpunkt 2" rect 696 419 10 10
+expect button:"Scheitelpunkt 3" rect 696 319 10 10
+key ctrl+z
+expect listitem:"Sheet.4" rect 500 324 151 100
+# Shift + click takes one away again: only the other one moves
+click button:"Scheitelpunkt 2"
+wait 600
+click button:"Scheitelpunkt 3" shift
+wait 600
+click button:"Scheitelpunkt 3" shift
+wait 600
+drag button:"Scheitelpunkt 2" 691,420
+expect button:"Scheitelpunkt 2" rect 696 419 10 10
+expect button:"Scheitelpunkt 3" rect 646 319 10 10
+key ctrl+z
+# two chosen, Del: both go (a line is left)
+click button:"Scheitelpunkt 1"
+wait 600
+click button:"Scheitelpunkt 2" shift
+key delete
+expect button:"Scheitelpunkt 3" missing
+expect button:"Scheitelpunkt 2" exists
+key ctrl+z
+expect button:"Scheitelpunkt 4" exists
+# an arc: its control point bends it, the eccentricity handles turn the ellipse
+cmd 4408
+drag 500,500 600,580
+cmd 4409
+click 1000,700
+wait 600
+click 571,522
+wait 600
+expect button:"Bogengriff 1" rect 566 517 10 10
+expect button:"Exzentrizitätsgriff 1" missing
+drag button:"Bogengriff 1" 590,505
+expect listitem:"Sheet.5" rect 500 484 122 91
+expect button:"Bogengriff 1" rect 596 495 10 10
+expect button:"Exzentrizitätsgriff 1" rect 638 495 10 10
+drag button:"Exzentrizitätsgriff 1" 640,470
+expect button:"Exzentrizitätsgriff 1" rect 646 470 10 10
+expect button:"Exzentrizitätsgriff 2" rect 545 520 10 10
+expect listitem:"Sheet.5" rect 500 488 118 87
+key ctrl+z
+expect listitem:"Sheet.5" rect 500 484 122 91
+key ctrl+z
+expect listitem:"Sheet.5" rect 500 500 101 75
+# the freeform tool: out to 950 and back to 890, the stroke ends at 890
+cmd 4407
+down 800,600
+move 830,600
+move 860,600
+move 890,600
+move 920,600
+move 950,600
+move 920,601
+move 890,601
+up 890,601
+expect listitem:"Sheet.6" rect 801 601 90 1
