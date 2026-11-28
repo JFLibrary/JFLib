@@ -9,6 +9,7 @@ use super::{parse_date, Document, Error};
 use crate::Date;
 use alloc::collections::BTreeSet;
 use alloc::format;
+use alloc::rc::Rc;
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -414,10 +415,13 @@ impl Document {
         let mut out = Vec::new();
         let mut seen = BTreeSet::new();
         let mut annot_page: Option<alloc::collections::BTreeMap<Ref, usize>> = None;
-        // (field, parent's full name, inherited FT, Ff, V)
-        let mut stack: Vec<(Object, String, Option<Vec<u8>>, Option<u32>, Option<Object>, u32)> =
-            roots.into_iter().rev().map(|o| (o, String::new(), None, None, None, 0)).collect();
+        // (field, parent's full name, inherited FT, Ff, V); what is inherited is shared by the
+        // kids (a /T of a megabyte with a million kids copied it for each before anything was
+        // checked), and the names and values all fields give stay within max_stream bytes
+        type Up = (Object, Rc<str>, Option<Rc<[u8]>>, Option<u32>, Option<Rc<Object>>, u32);
+        let mut stack: Vec<Up> = roots.into_iter().rev().map(|o| (o, Rc::from(""), None, None, None, 0)).collect();
         let mut n = 0;
+        let mut text_left = self.max_stream;
         while let Some((o, parent, ft, ff, v, depth)) = stack.pop() {
             n += 1;
             if n > BUDGET || depth > 64 {
@@ -432,14 +436,17 @@ impl Document {
             if d.is_empty() {
                 continue;
             }
-            let name = match self.text_of(&d, "T") {
-                Some(t) if parent.is_empty() => t,
-                Some(t) => format!("{parent}.{t}"),
+            let name: Rc<str> = match self.text_of(&d, "T") {
+                Some(t) if parent.is_empty() => Rc::from(t),
+                Some(t) => Rc::from(format!("{parent}.{t}")),
                 None => parent.clone(),
             };
-            let ft = d.name("FT").map(<[u8]>::to_vec).or(ft);
+            if name.len() > text_left {
+                break;
+            }
+            let ft = d.name("FT").map(Rc::from).or(ft);
             let ff = self.key(&d, "Ff").as_int().map(|f| f as u32).or(ff);
-            let v = d.get("V").map(|x| self.resolve(x)).or(v);
+            let v = d.get("V").map(|x| Rc::new(self.resolve(x))).or(v);
             // kids that are fields (they have /T); kids without are this field's widgets
             let kids = match self.key(&d, "Kids") {
                 Object::Array(a) => a,
@@ -448,6 +455,9 @@ impl Document {
             let field_kids: Vec<Object> = kids.iter().filter(|k| self.dict(k).contains("T")).cloned().collect();
             if !field_kids.is_empty() {
                 for k in field_kids.into_iter().rev() {
+                    if k.as_ref().is_some_and(|r| seen.contains(&r)) {
+                        continue;
+                    }
                     stack.push((k, name.clone(), ft.clone(), ff, v.clone(), depth + 1));
                 }
                 continue;
@@ -465,7 +475,7 @@ impl Document {
             };
             let mut value = Vec::new();
             let mut signature = None;
-            match &v {
+            match v.as_deref() {
                 Some(Object::String(b)) => value.push(text_string(b)),
                 Some(Object::Name(nm)) => value.push(nm.to_text()),
                 Some(Object::Array(a)) => {
@@ -503,7 +513,12 @@ impl Document {
                 });
                 widgets.push((page, rect_of(&self.key(&wd, "Rect"))));
             }
-            out.push(Field { name, kind, value, flags, read_only: flags & 1 != 0, required: flags & 2 != 0, options, widgets, signature });
+            let size = name.len() + value.iter().chain(&options).map(String::len).sum::<usize>();
+            if size > text_left {
+                break;
+            }
+            text_left -= size;
+            out.push(Field { name: String::from(&*name), kind, value, flags, read_only: flags & 1 != 0, required: flags & 2 != 0, options, widgets, signature });
         }
         out
     }

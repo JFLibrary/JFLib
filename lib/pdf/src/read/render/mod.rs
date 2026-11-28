@@ -29,7 +29,7 @@ mod shade;
 mod type1;
 
 use super::content::Ops;
-use super::object::{Dict, Object, Ref};
+use super::object::{Dict, Object, Ref, Stream};
 use super::{Document, Error, Page};
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::rc::Rc;
@@ -216,7 +216,38 @@ pub(crate) struct Cache {
     glyphs: RefCell<BTreeMap<(usize, u32, [u64; 4], u8), (Rc<fonts::GFont>, Option<Rc<canvas::Cover>>)>>,
     glyph_bytes: core::cell::Cell<usize>,
     subst: RefCell<BTreeMap<(String, bool, bool, bool, Option<String>), Option<Rc<fonts::Prog>>>>,
+    /// the font programs by where they are: an embedded one by its stream (and kind), a
+    /// substitute by its size, face and a fingerprint of its bytes (many names find one file);
+    /// the bytes of all programs held stay within PROG_CACHE
+    progs: RefCell<BTreeMap<(usize, usize, u64), Option<Rc<fonts::Prog>>>>,
+    prog_bytes: core::cell::Cell<usize>,
     system: OnceCell<Rc<dyn FontSource>>,
+}
+
+impl Cache {
+    /// keep a program of `len` bytes; past PROG_CACHE everything that holds programs is let go
+    /// first (4096 font dictionaries on one FontFile2 of 50 MB held 4096 copies of it)
+    fn keep_prog(&self, key: (usize, usize, u64), p: Option<Rc<fonts::Prog>>, len: usize) {
+        if self.prog_bytes.get() + len > PROG_CACHE {
+            self.progs.borrow_mut().clear();
+            self.subst.borrow_mut().clear();
+            self.fonts.borrow_mut().clear();
+            self.glyphs.borrow_mut().clear();
+            self.glyph_bytes.set(0);
+            self.prog_bytes.set(0);
+        }
+        self.prog_bytes.set(self.prog_bytes.get() + len);
+        self.progs.borrow_mut().insert(key, p);
+    }
+}
+
+/// a fingerprint of a font file: its length and FNV-1a of its first and last 4 KB
+fn fingerprint(d: &[u8]) -> u64 {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325 ^ d.len() as u64;
+    for &c in d.iter().take(4096).chain(d.iter().skip(d.len().saturating_sub(4096))) {
+        h = (h ^ c as u64).wrapping_mul(0x0100_0000_01b3);
+    }
+    h
 }
 
 pub(super) type M = [f64; 6];
@@ -274,6 +305,22 @@ const GLYPH_CACHE: usize = 16 << 20;
 /// the pixels painted for a page: this many per pixel of the page, at least MIN_WORK
 const WORK_PER_PX: u64 = 1024;
 const MIN_WORK: u64 = 1 << 27;
+/// a content stream costs an operator for this many of its bytes each time it is run (a form of
+/// a megabyte of white space drawn a million times has no operators), as does decoding a form,
+/// a CharProc or a font program
+const BYTES_PER_OP: usize = 64;
+/// the masks a page makes (clips that are no rectangle, soft masks), in bytes: this many per
+/// pixel of the page, at least MIN_MASKS (each q may hold one)
+const MASK_PER_PX: u64 = 64;
+const MIN_MASKS: u64 = 1 << 28;
+/// the decoded CharProcs of Type 3 glyphs kept for a page, in bytes
+const T3_CACHE: usize = 32 << 20;
+/// the decoded images kept for a page, in bytes
+const IMAGE_CACHE: usize = 256 << 20;
+/// the font programs kept for a document, in bytes
+const PROG_CACHE: usize = 256 << 20;
+/// the patterns kept for a page (by reference and the matrix of their space)
+const PATTERN_CACHE: usize = 256;
 
 /// a colour of the graphics state: its space, components, RGB, or a pattern
 #[derive(Clone)]
@@ -388,11 +435,20 @@ struct Run<'d> {
     forms: Vec<Ref>,
     form_cache: BTreeMap<Ref, Option<Rc<Form>>>,
     images: BTreeMap<Ref, Option<Rc<image::Img>>>,
+    image_bytes: usize,
     cs_cache: BTreeMap<Ref, Option<Rc<Cs>>>,
     shadings: BTreeMap<Ref, Option<Rc<shade::Shading>>>,
+    /// patterns by reference and the matrix of their space (each scn parsed and drew it anew)
+    patterns: BTreeMap<(Ref, [u64; 6]), Option<Rc<shade::Pattern>>>,
+    /// Type 3 CharProcs decoded, by where their data is
+    t3_procs: BTreeMap<(usize, usize), Option<Rc<Vec<u8>>>>,
+    t3_bytes: usize,
     ops: u64,
     work: u64,
     budget: u64,
+    /// the bytes of the masks made so far, and the most for the page
+    mask_bytes: u64,
+    mask_cap: u64,
     /// the OCGs off in the default configuration, the marked content open (true: hidden)
     oc_off: BTreeSet<Ref>,
     mc: Vec<bool>,
@@ -564,11 +620,17 @@ impl<'d> Run<'d> {
             forms: Vec::new(),
             form_cache: BTreeMap::new(),
             images: BTreeMap::new(),
+            image_bytes: 0,
             cs_cache: BTreeMap::new(),
             shadings: BTreeMap::new(),
+            patterns: BTreeMap::new(),
+            t3_procs: BTreeMap::new(),
+            t3_bytes: 0,
             ops: 0,
             work: 0,
             budget: pixels.saturating_mul(WORK_PER_PX).max(MIN_WORK),
+            mask_bytes: 0,
+            mask_cap: pixels.saturating_mul(MASK_PER_PX).max(MIN_MASKS),
             oc_off: BTreeSet::new(),
             mc: Vec::new(),
             hidden: 0,
@@ -592,6 +654,49 @@ impl<'d> Run<'d> {
 
     fn stopped(&self) -> bool {
         self.error.is_some()
+    }
+
+    /// count operators (bytes read and decoded, glyphs shown); false when the page has used them up
+    fn charge(&mut self, ops: u64) -> bool {
+        self.ops = self.ops.saturating_add(ops);
+        if self.ops > MAX_OPS {
+            self.error.get_or_insert(Error::Limit("the operators of a page"));
+            return false;
+        }
+        true
+    }
+
+    /// a mask of `px` bytes is kept: what the masks of a page come to together (each q may hold
+    /// one: 256 of them on each of 12 levels were tens of GB)
+    fn mask_kept(&mut self, px: u64) -> bool {
+        self.mask_bytes = self.mask_bytes.saturating_add(px);
+        if self.mask_bytes > self.mask_cap {
+            self.error.get_or_insert(Error::Limit("memory"));
+            return false;
+        }
+        true
+    }
+
+    /// the clip and the area of the rasterizer's lines (a mask of their pixels when that is no
+    /// rectangle); the pixels count as work
+    fn clip_ras(&mut self, rule: u32) {
+        let px = self.gs.clip.path_area(&self.ras);
+        if !self.spend(px) {
+            return;
+        }
+        match self.gs.clip.and_path(&mut self.ras, rule) {
+            Some(c) => {
+                if let Some(m) = &c.mask {
+                    if !self.mask_kept(m.a.len() as u64) {
+                        return;
+                    }
+                }
+                self.gs.clip = c;
+            }
+            None => {
+                self.error.get_or_insert(Error::Limit("memory"));
+            }
+        }
     }
 
     fn layer_rect(&self) -> Rect {
@@ -803,9 +908,7 @@ impl<'d> Run<'d> {
             return;
         }
         self.lines(&segs, &ctm);
-        if let Some(c) = self.gs.clip.and_path(&mut self.ras, RULE_NONZERO) {
-            self.gs.clip = c;
-        }
+        self.clip_ras(RULE_NONZERO);
     }
 
     /// the source of a paint for the pixels of a fill
@@ -874,12 +977,7 @@ impl<'d> Run<'d> {
                 return;
             }
             self.lines(&segs, &ctm);
-            match self.gs.clip.and_path(&mut self.ras, rule) {
-                Some(c) => self.gs.clip = c,
-                None => {
-                    self.error.get_or_insert(Error::Limit("memory"));
-                }
-            }
+            self.clip_ras(rule);
         }
         self.path.clear();
     }
@@ -917,7 +1015,21 @@ impl<'d> Run<'d> {
                 let pat = res.patterns.get_bytes(&n.0).cloned();
                 let base = self.base;
                 let doc = self.doc;
-                let pat = pat.and_then(|o| shade::Pattern::parse(doc, &o, &base, self));
+                // a pattern by its reference and the matrix of its space, parsed and its tile
+                // drawn once (each scn did it again: many /P0 scn ... f put a page over its work)
+                let key = pat.as_ref().and_then(Object::as_ref).map(|r| (r, base.map(f64::to_bits)));
+                let pat = match key.and_then(|k| self.patterns.get(&k).cloned()) {
+                    Some(p) => p,
+                    None => {
+                        let p = pat.and_then(|o| shade::Pattern::parse(doc, &o, &base, self));
+                        if let Some(k) = key {
+                            if self.patterns.len() < PATTERN_CACHE {
+                                self.patterns.insert(k, p.clone());
+                            }
+                        }
+                        p
+                    }
+                };
                 let p = if stroke { &mut self.gs.stroke } else { &mut self.gs.fill };
                 p.pat = pat;
                 if let Some(u) = under {
@@ -1044,6 +1156,12 @@ impl<'d> Run<'d> {
         if canvas::is_empty(rect) {
             return Some(Rc::new(Mask { rect, a: Vec::new(), outside }));
         }
+        // the group's layer is filled, drawn and read: its pixels count as work, the mask as
+        // memory (a page-size soft mask a million times, each held by a q)
+        let px = (rect[2] - rect[0]) as u64 * (rect[3] - rect[1]) as u64;
+        if !self.spend(px.saturating_mul(4)) || !self.mask_kept(px) {
+            return None;
+        }
         let mut layer = Layer::new(rect)?;
         layer.fill(back);
         let saved_gs = self.gs.clone();
@@ -1093,16 +1211,44 @@ impl<'d> Run<'d> {
             return None;
         }
         let source = self.opt.fonts.clone().unwrap_or_else(|| cache.system.get_or_init(|| Rc::new(SystemFonts::new())).clone());
+        // the bytes read and decoded for programs count as operators
+        let read = core::cell::Cell::new(0usize);
+        let mut embedded = |s: &Stream, kind: u8| -> Option<Rc<fonts::Prog>> {
+            let key = (s.start, s.end, kind as u64);
+            if let Some(p) = cache.progs.borrow().get(&key) {
+                return p.clone();
+            }
+            let data = doc.decode(s).ok()?;
+            read.set(read.get() + s.raw_len() + data.len());
+            let len = data.len();
+            let p = fonts::Prog::open(data, 0, kind).map(Rc::new);
+            cache.keep_prog(key, p.clone(), len);
+            p
+        };
         let mut subst = |q: &FontQuery| -> Option<Rc<fonts::Prog>> {
             let key = (String::from(q.name), q.bold, q.italic, q.fixed, q.lang.map(String::from));
             if let Some(p) = cache.subst.borrow().get(&key) {
                 return p.clone();
             }
-            let p = source.find(q).and_then(|(data, face)| fonts::Prog::open(data, face, 2)).map(Rc::new);
+            let p = source.find(q).and_then(|(data, face)| {
+                read.set(read.get() + data.len());
+                // another name that found the same file shares its program
+                let fkey = (usize::MAX, face as usize, fingerprint(&data));
+                if let Some(p) = cache.progs.borrow().get(&fkey) {
+                    return p.clone();
+                }
+                let len = data.len();
+                let p = fonts::Prog::open(data, face, 2).map(Rc::new);
+                cache.keep_prog(fkey, p.clone(), len);
+                p
+            });
             cache.subst.borrow_mut().insert(key, p.clone());
             p
         };
-        let f = Rc::new(fonts::GFont::load(doc, &d, &mut subst));
+        let f = Rc::new(fonts::GFont::load(doc, &d, &mut embedded, &mut subst));
+        if !self.charge((read.get() / BYTES_PER_OP) as u64) {
+            return None;
+        }
         if let Some(r) = r {
             let mut c = cache.fonts.borrow_mut();
             if c.len() < 4096 {
@@ -1116,6 +1262,11 @@ impl<'d> Run<'d> {
         let Some(font) = self.gs.font.clone() else { return };
         let mut codes = core::mem::take(&mut self.codes);
         font.base.codes(s, &mut codes);
+        // each glyph counts, an invisible one too (a Type 3 glyph runs its CharProc)
+        if !self.charge(codes.len() as u64) {
+            self.codes = codes;
+            return;
+        }
         for &(code, len) in &codes {
             if self.stopped() {
                 break;
@@ -1169,7 +1320,20 @@ impl<'d> Run<'d> {
         let fill = matches!(mode, 0 | 2 | 4 | 6);
         let stroke = matches!(mode, 1 | 2 | 5 | 6);
         let clip = mode >= 4;
-        if fill && placed && self.hidden == 0 && !self.stopped() {
+        // the glyph's box around its origin on the device: one far from its origin or larger
+        // than the coverage cache takes is filled as a path (the cache draws it where every
+        // coordinate is positive, a million pixels away if need be)
+        let (mut mx, mut my, mut nx, mut ny) = (0f64, 0f64, 0f64, 0f64);
+        for &(x, y) in &g.pts {
+            let (a, b) = apply(&[dev[0], dev[1], dev[2], dev[3], 0.0, 0.0], x as f64, y as f64);
+            mx = mx.min(a);
+            my = my.min(b);
+            nx = nx.max(a);
+            ny = ny.max(b);
+        }
+        let side = (canvas::COVER_SIDE / 2) as f64;
+        let small = mx > -side && my > -side && nx < side && ny < side && (nx - mx + 4.0) * (ny - my + 4.0) < (1u64 << 22) as f64;
+        if fill && placed && small && self.hidden == 0 && !self.stopped() {
             // a glyph drawn once per font, code, size and quarter pixel, then placed
             let (gx, gy) = (qx.div_euclid(4), py);
             let phase = qx.rem_euclid(4) as u8;
@@ -1180,13 +1344,7 @@ impl<'d> Run<'d> {
                 Some(c) => c,
                 None => {
                     // drawn where every coordinate is positive (the rasterizer's rows start there)
-                    let (mut mx, mut my) = (0f64, 0f64);
-                    for &(x, y) in &g.pts {
-                        let (a, b) = apply(&[dev[0], dev[1], dev[2], dev[3], 0.0, 0.0], x as f64, y as f64);
-                        mx = mx.min(a);
-                        my = my.min(b);
-                    }
-                    let (sx, sy) = (color::ceil(-mx).clamp(0.0, 1e6) + 2.0, color::ceil(-my).clamp(0.0, 1e6) + 2.0);
+                    let (sx, sy) = (color::ceil(-mx).clamp(0.0, side) + 2.0, color::ceil(-my).clamp(0.0, side) + 2.0);
                     let local = [dev[0], dev[1], dev[2], dev[3], phase as f64 / 4.0 + sx, sy];
                     self.lines(&segs, &local);
                     let c = canvas::Cover::of(&mut self.ras, sx as i32, sy as i32).map(Rc::new);
@@ -1259,9 +1417,26 @@ impl<'d> Run<'d> {
         if self.depth >= MAX_DEPTH {
             return;
         }
-        let Ok(data) = self.doc.decode(proc_) else { return };
+        // decoded once for the page (each glyph decoded its CharProc again), within T3_CACHE
+        let key = (proc_.start, proc_.end);
+        let data = match self.t3_procs.get(&key) {
+            Some(d) => d.clone(),
+            None => {
+                let d = self.doc.decode(proc_).ok().map(Rc::new);
+                let n = d.as_ref().map_or(0, |d| d.len());
+                if !self.charge(((proc_.raw_len() + n) / BYTES_PER_OP) as u64) {
+                    return;
+                }
+                if self.t3_bytes + n <= T3_CACHE {
+                    self.t3_bytes += n;
+                    self.t3_procs.insert(key, d.clone());
+                }
+                d
+            }
+        };
+        let Some(data) = data else { return };
         let fres = match &t3.res {
-            Some(r) => Rc::new(Res::of(self.doc, r)),
+            Some(r) => t3.run_res.get_or_init(|| Rc::new(Res::of(self.doc, r))).clone(),
             None => res.clone(),
         };
         let saved = self.gs.clone();
@@ -1289,8 +1464,10 @@ impl<'d> Run<'d> {
             return f.clone();
         }
         let doc = self.doc;
+        let mut read = 0;
         let built = match doc.resolve(o) {
             Object::Stream(s) => doc.decode(&s).ok().map(|data| {
+                read = s.raw_len() + data.len();
                 let res = s.dict.get("Resources").map(|x| Rc::new(Res::of(doc, &doc.dict(x))));
                 let matrix = m6(&color::nums(doc, &doc.key(&s.dict, "Matrix"))).map(finite).unwrap_or(ID);
                 let bbox = doc.key(&s.dict, "BBox").as_rect();
@@ -1299,6 +1476,9 @@ impl<'d> Run<'d> {
             }),
             _ => None,
         };
+        if !self.charge((read / BYTES_PER_OP) as u64) {
+            return None;
+        }
         if let Some(r) = r {
             self.form_cache.insert(r, built.clone());
         }
@@ -1379,7 +1559,10 @@ impl<'d> Run<'d> {
                         Some(i) => i.clone(),
                         None => {
                             let i = image::Img::load_xobject(self, &o, res);
-                            if self.images.len() < 256 {
+                            // kept within IMAGE_CACHE bytes (256 images of a GB each before)
+                            let n = i.as_ref().map_or(0, |i| i.px.len());
+                            if self.images.len() < 256 && self.image_bytes + n <= IMAGE_CACHE {
+                                self.image_bytes += n;
                                 self.images.insert(r, i.clone());
                             }
                             i
@@ -1425,6 +1608,9 @@ impl<'d> Run<'d> {
     // ------------------------------------------------------------ the content stream
 
     fn run(&mut self, content: &[u8], res: &Rc<Res>) {
+        if !self.charge((content.len() / BYTES_PER_OP) as u64) {
+            return;
+        }
         let mut stack: Vec<Gs> = Vec::new();
         let mut extra_q = 0usize;
         let (mut tm, mut tlm) = (ID, ID);
@@ -1566,9 +1752,7 @@ impl<'d> Run<'d> {
                 b"ET" => {
                     if let Some(p) = self.text_clip.take() {
                         p.fill_lines(&mut self.ras);
-                        if let Some(c) = self.gs.clip.and_path(&mut self.ras, RULE_NONZERO) {
-                            self.gs.clip = c;
-                        }
+                        self.clip_ras(RULE_NONZERO);
                     } else if self.gs.mode >= 4 && !self.t3_clip {
                         // clip text that drew nothing clips everything away
                         self.gs.clip = Clip { rect: [0, 0, 0, 0], mask: None };

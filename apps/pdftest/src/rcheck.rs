@@ -13,6 +13,8 @@
 //   read_nav       outlines, named destinations, actions, annotations, page labels, fields,
 //                  signatures, attachments, dates
 //   read_hostile   loops, depth, bombs, huge numbers; mutated files
+//   read_budget    files of a few MB that took minutes to hours or many GB (lib review of
+//                  2026-11-27): each within 20 s, with what it should give
 
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -33,6 +35,7 @@ pub const GROUPS: &[(&str, fn(&mut T))] = &[
     ("read_cjk", read_cjk),
     ("read_nav", read_nav),
     ("read_hostile", read_hostile),
+    ("read_budget", read_budget),
 ];
 
 // ------------------------------------------------------------------ files made here
@@ -952,4 +955,186 @@ fn read_hostile(t: &mut T) {
         }
     }
     t.check(&format!("{total} mutated files read without a panic ({opened} opened)"), total == 1600 && opened > 400);
+}
+
+// ------------------------------------------------------------------ read_budget
+
+/// a case of the budgets: done within 20 s (each took minutes to hours before, or many GB)
+pub(crate) fn timed<R>(t: &mut T, name: &str, f: impl FnOnce() -> R) -> R {
+    let t0 = plat::time_us();
+    let r = f();
+    let ms = plat::time_us().saturating_sub(t0) / 1000;
+    t.check(&format!("{name}: within 20 s ({ms} ms)"), ms < 20_000);
+    r
+}
+
+/// a cross-reference stream: rows of (type, field 2 of 4 bytes, field 3 of 2 bytes)
+fn xref_rows(rows: &[(u8, u32, u16)]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(rows.len() * 7);
+    for &(k, f2, f3) in rows {
+        out.push(k);
+        out.extend_from_slice(&f2.to_be_bytes());
+        out.extend_from_slice(&f3.to_be_bytes());
+    }
+    out
+}
+
+/// an object stream: its objects (number, body) at the offsets its header gives, `pad` spaces
+/// after them
+fn objstm(objs: &[(u32, Vec<u8>)], pad: usize) -> Vec<u8> {
+    let (mut head, mut data) = (String::new(), Vec::new());
+    for (n, b) in objs {
+        head.push_str(&format!("{n} {} ", data.len()));
+        data.extend_from_slice(b);
+        data.push(b'\n');
+    }
+    data.resize(data.len() + pad, b' ');
+    flate(&format!("/Type /ObjStm /N {} /First {}", objs.len(), head.len()), &cat(&[head.as_bytes(), &data]))
+}
+
+/// the objects of `m` laid out, then a cross-reference stream of `rows` (its own row last, at
+/// number `xnum`)
+fn with_xref_stream(m: &Mk, rows: Vec<(u8, u32, u16)>, xnum: u32, trailer: &str) -> Vec<u8> {
+    let (mut out, offs) = m.body();
+    let x = out.len();
+    let mut rows = rows;
+    for r in rows.iter_mut() {
+        if r.0 == 1 {
+            r.1 = offs.get(&r.1).copied().unwrap_or(0) as u32;
+        }
+    }
+    rows.push((1, x as u32, 0));
+    let body = flate(&format!("/Type /XRef /W [1 4 2] /Size {} {trailer}", xnum + 1), &xref_rows(&rows));
+    out.extend_from_slice(format!("{xnum} 0 obj\n").as_bytes());
+    out.extend_from_slice(&body);
+    out.extend_from_slice(format!("\nendobj\nstartxref\n{x}\n%%EOF\n").as_bytes());
+    out
+}
+
+fn read_budget(t: &mut T) {
+    // a title of a million language escapes (each one was found and cut out of the string again)
+    let mut title = String::from("<FEFF");
+    for _ in 0..1_000_000 {
+        title.push_str("001B001B");
+    }
+    title.push_str("0041>");
+    let mut m = one_page(b"", None, "");
+    m.add(6, format!("<< /Title {title} >>"));
+    if let Some(doc) = open(t, "escapes: opens", m.table("/Root 1 0 R /Info 6 0 R")) {
+        let got = timed(t, "a million language escapes", || doc.info().title);
+        t.eq("language escapes are dropped", got.as_deref(), Some("A"));
+    }
+
+    // an inline image, then 300 000 candidates for its end, each with a hex string that runs on
+    // to the last one (each was read to its end for each candidate)
+    let content = cat(&[b"BI /W 1 /H 1 /BPC 8 /CS /G ID ", &b"\nEI <".repeat(300_000), b">x BT /F1 10 Tf 50 700 Td (after) Tj ET"]);
+    if let Some(doc) = open(t, "EI candidates: opens", one_page(&content, None, "").table("/Root 1 0 R")) {
+        let text = timed(t, "300 000 EI candidates", || doc.text(0).unwrap_or_default());
+        t.check(&format!("the image ends at its first EI: {text:?}"), text.contains("after"));
+    }
+
+    // a form drawn a thousand times that draws a megabyte of white space a thousand times: no
+    // operator in it, a terabyte to read
+    let mut m = one_page(&b"/A Do ".repeat(1000), None, "/XObject << /A 20 0 R >>");
+    m.add(20, flate("/Subtype /Form /Resources << /XObject << /B 21 0 R >> >>", &b"/B Do ".repeat(1000)));
+    m.add(21, flate("/Subtype /Form", &vec![b' '; 1 << 20]));
+    if let Some(doc) = open(t, "white space forms: opens", m.table("/Root 1 0 R")) {
+        timed(t, "a megabyte of white space drawn a million times (text)", || doc.text(0).ok());
+    }
+
+    // a damaged file of strings inside strings: the repair read each object to the end of the file
+    let n = 150_000;
+    let mut d = b"%PDF-1.7\n".to_vec();
+    for k in 1..=n {
+        d.extend_from_slice(format!("{k} 0 obj (").as_bytes());
+    }
+    d.resize(d.len() + n, b')');
+    let r = timed(t, "150 000 objects inside each other's strings, repaired", || Document::open(d).err());
+    t.check("the strings inside strings are no document", r.is_some());
+
+    // 4000 sections that each name one cross-reference stream of 16 MB (decoded for each, its 16
+    // million free entries kept)
+    let base = one_page(b"BT /F1 10 Tf 50 700 Td (ok) Tj ET", None, "").table("/Root 1 0 R");
+    let mut prev = startxref(&base);
+    let mut d = base;
+    let s = d.len();
+    d.extend_from_slice(b"99 0 obj\n");
+    d.extend_from_slice(&flate("/Type /XRef /W [1 0 0] /Size 16777216", &vec![0u8; 16 << 20]));
+    d.extend_from_slice(b"\nendobj\n");
+    for _ in 0..4000 {
+        let at = d.len();
+        d.extend_from_slice(format!("xref\n0 1\n0000000000 65535 f \ntrailer\n<< /Size 6 /Root 1 0 R /Prev {prev} /XRefStm {s} >>\n").as_bytes());
+        prev = at;
+    }
+    d.extend_from_slice(format!("startxref\n{prev}\n%%EOF\n").as_bytes());
+    let doc = timed(t, "4000 sections on one cross-reference stream", || Document::open(d));
+    if let Some(doc) = t.ok("4000 sections: opens", doc.map_err(|e| format!("{e}"))) {
+        t.check("4000 sections: not repaired, the text there", !doc.was_repaired() && doc.text(0).unwrap_or_default().contains("ok"));
+    }
+
+    // 400 000 pages in one object stream whose cross-reference names index 0 for each (each was
+    // looked up through the whole index)
+    let n = 400_000u32;
+    let (stm, xnum) = (n + 3, n + 4);
+    let kids: String = (3..n + 3).map(|k| format!("{k} 0 R ")).collect();
+    let mut objs = vec![(1, b"<< /Type /Catalog /Pages 2 0 R >>".to_vec()), (2, format!("<< /Type /Pages /Kids [{kids}] /Count {n} >>").into_bytes())];
+    for k in 3..n + 3 {
+        objs.push((k, b"<< /Type /Page /Parent 2 0 R >>".to_vec()));
+    }
+    let mut m = Mk::new();
+    m.add(stm, objstm(&objs, 0));
+    let mut rows = vec![(0u8, 0u32, 0xFFFFu16)];
+    rows.extend((1..n + 3).map(|_| (2, stm, 0)));
+    rows.push((1, stm, 0));
+    let d = with_xref_stream(&m, rows, xnum, "/Root 1 0 R");
+    let doc = timed(t, "400 000 objects with a wrong index", || Document::open(d).map(|d| d.page_count()));
+    t.eq("400 000 objects with a wrong index: the pages", doc.ok(), Some(n as usize));
+
+    // a form field whose name of 100 KB 50 kids inherit: the names and values all fields give
+    // stay within max_stream (a million kids were a terabyte)
+    let big = "x".repeat(100_000);
+    let kids: String = (11..61).map(|k| format!("{k} 0 R ")).collect();
+    let mut m = one_page(b"", None, "");
+    m.add(1, "<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [10 0 R] >> >>").add(10, format!("<< /T ({big}) /Kids [{kids}] >>"));
+    for k in 11..61 {
+        m.add(k, format!("<< /T (f{k}) /FT /Tx /Rect [0 0 1 1] >>"));
+    }
+    if let Some(doc) = t.ok("field names: opens", Document::open_with(m.table("/Root 1 0 R"), &Options { max_stream: 1 << 20, ..Options::default() }).map_err(|e| format!("{e}"))) {
+        let f = doc.fields();
+        let bytes: usize = f.iter().map(|x| x.name.len()).sum();
+        t.check(&format!("field names: {} fields of {bytes} bytes, within max_stream", f.len()), !f.is_empty() && f.len() < 50 && bytes <= 1 << 20);
+        t.check("field names: the first in order", f.first().is_some_and(|x| x.name.len() == 100_004 && x.name.ends_with(".f11")));
+    }
+
+    // 3000 pages inheriting a direct /Resources of 3000 entries (a copy for each page)
+    let xo: String = (0..3000).map(|k| format!("/X{k} 99 0 R ")).collect();
+    let kids: String = (3..3003).map(|k| format!("{k} 0 R ")).collect();
+    let mut m = Mk::new();
+    m.add(1, "<< /Type /Catalog /Pages 2 0 R >>").add(2, format!("<< /Type /Pages /Kids [{kids}] /Count 3000 /Resources << /XObject << {xo} >> >> >>"));
+    for k in 3..3003 {
+        m.add(k, "<< /Type /Page /Parent 2 0 R >>");
+    }
+    if let Some(doc) = open(t, "inherited resources: opens", m.table("/Root 1 0 R")) {
+        let last = doc.pages().last().and_then(|p| p.resources.get("XObject")).and_then(Object::as_dict).map(|d| d.len());
+        t.eq("inherited resources: every page has them", (doc.page_count(), last), (3000, Some(3000)));
+    }
+
+    // object streams of 3 MB each with max_stream 4 MB: older ones are let go and read again
+    let mut m = Mk::new();
+    m.add(1, "<< /Type /Catalog /Pages 2 0 R >>").add(2, "<< /Type /Pages /Kids [3 0 R 4 0 R 5 0 R] /Count 3 >>");
+    let mut rows = vec![(0u8, 0u32, 0xFFFFu16), (1, 1, 0), (1, 2, 0)];
+    for k in 0..3u32 {
+        m.add(10 + k, objstm(&[(3 + k, format!("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 600 800] /Contents {} 0 R /Resources << /Font << /F1 {} 0 R >> >> >>", 20 + k, 6 + k).into_bytes()), (6 + k, b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_vec())], 3 << 20));
+        m.add(20 + k, flate("", format!("BT /F1 10 Tf 50 700 Td (page {k}) Tj ET").as_bytes()));
+    }
+    // 3 4 5 in streams 10 11 12, 6 7 8 there too, 10 11 12 and 20 21 22 at offsets
+    rows.extend([(2, 10, 0), (2, 11, 0), (2, 12, 0), (2, 10, 1), (2, 11, 1), (2, 12, 1), (0, 0, 0)]);
+    rows.extend([(1, 10, 0), (1, 11, 0), (1, 12, 0)]);
+    rows.extend((13..20).map(|_| (0u8, 0u32, 0u16)));
+    rows.extend([(1, 20, 0), (1, 21, 0), (1, 22, 0)]);
+    let d = with_xref_stream(&m, rows, 23, "/Root 1 0 R");
+    if let Some(doc) = t.ok("object streams let go: opens", Document::open_with(d, &Options { max_stream: 4 << 20, ..Options::default() }).map_err(|e| format!("{e}"))) {
+        let texts: Vec<String> = (0..3).map(|i| doc.text(i).unwrap_or_default()).collect();
+        t.check(&format!("object streams let go and read again: {texts:?}"), (0..3).all(|i| texts[i].contains(&format!("page {i}"))));
+    }
 }

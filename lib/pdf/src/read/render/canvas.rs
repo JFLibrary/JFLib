@@ -93,14 +93,29 @@ pub(super) struct Clip {
 }
 
 impl Clip {
+    /// the pixels of the mask and_path would make (the clip's rectangle and the lines' box)
+    pub fn path_area(&self, ras: &Raster) -> u64 {
+        if !ras.has_lines() {
+            return 0;
+        }
+        let r = self.path_rect(ras);
+        if is_empty(r) {
+            return 0;
+        }
+        (r[2] - r[0]) as u64 * (r[3] - r[1]) as u64
+    }
+
+    fn path_rect(&self, ras: &Raster) -> Rect {
+        let b = ras.lbox();
+        intersect(self.rect, [floor(b[0]), floor(b[1]), ceil(b[2]) + 1, ceil(b[3]) + 1])
+    }
+
     /// the intersection with the area of the lines in `ras` (fill rule `rule`)
     pub fn and_path(&self, ras: &mut Raster, rule: u32) -> Option<Clip> {
         if !ras.has_lines() {
             return Some(Clip { rect: [0, 0, 0, 0], mask: None });
         }
-        let b = ras.lbox();
-        let bb = [floor(b[0]), floor(b[1]), ceil(b[2]) + 1, ceil(b[3]) + 1];
-        let rect = intersect(self.rect, bb);
+        let rect = self.path_rect(ras);
         if is_empty(rect) {
             return Some(Clip { rect, mask: None });
         }
@@ -454,6 +469,9 @@ pub(super) fn fill(layer: &mut Layer, ras: &mut Raster, rule: u32, src: &Src, p:
 }
 
 /// an 8-bit coverage over a rectangle (a glyph drawn once, placed many times)
+/// the longest side of a glyph's coverage (larger glyphs are filled as paths)
+pub(super) const COVER_SIDE: usize = 4096;
+
 pub(super) struct Cover {
     /// where its corner is, relative to the place it is drawn at
     pub x: i32,
@@ -466,6 +484,7 @@ pub(super) struct Cover {
 impl Cover {
     /// the coverage of the lines in `ras`, relative to (ox, oy); the lines must lie where x and y
     /// are positive (the rasterizer's rows begin there)
+    /// the coverage of the lines in `ras` (None: larger than COVER_SIDE on a side)
     pub fn of(ras: &mut Raster, ox: i32, oy: i32) -> Option<Cover> {
         if !ras.has_lines() {
             return Some(Cover { x: 0, y: 0, w: 0, h: 0, a: Vec::new() });
@@ -473,7 +492,9 @@ impl Cover {
         let b = ras.lbox();
         let r = [floor(b[0]), floor(b[1]), ceil(b[2]) + 1, ceil(b[3]) + 1];
         let (w, h) = ((r[2] - r[0]).max(0) as usize, (r[3] - r[1]).max(0) as usize);
-        if w * h > 1 << 22 {
+        // each side too: a glyph of 2 million by half a pixel passed, and the rasterizer's
+        // buffers grew to its width (w * h also wraps on 32-bit targets)
+        if w > COVER_SIDE || h > COVER_SIDE || w.checked_mul(h).is_none_or(|n| n > 1 << 22) {
             return None;
         }
         let mut a = alloc::vec![0u8; w * h];

@@ -69437,8 +69437,10 @@ where its data lies in the file; Document::decode gives the data with the filter
 - **`fn to_text(&self) -> String`**
   the name as text (bytes that are not UTF-8 become U+FFFD)
 
-- **`struct Dict(pub(crate) BTreeMap<Name, Object>)`**
-  a dictionary; a key given twice keeps its last value
+- **`struct Dict(pub(crate) Arc<BTreeMap<Name, Object>>)`**
+  a dictionary; a key given twice keeps its last value.  Copies share their entries until one
+  of them changes (inherited resources, the pages of a tree and the caches of drawing copy
+  dictionaries freely; a hostile file must not turn that into memory without end)
 
 **`impl Dict`**
 

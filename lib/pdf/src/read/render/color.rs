@@ -5,19 +5,35 @@
 // /Alternate), Indexed through its table, Separation and DeviceN through their tint transform
 // (Separation /All as black, /None paints nothing), Pattern with its underlying space.
 // Functions: sampled (type 0, multilinear), exponential (2), stitching (3) and the PostScript
-// calculator (4, compiled once, a budget per call).
+// calculator (4, compiled once).  A function and the functions in it are parsed once for each
+// reference, hold at most MAX_SAMPLES samples and MAX_NODES functions together, and one call
+// does at most PS_BUDGET steps through all of them (a stitching function may name the same
+// sampled one 1024 times, and arrays of arrays of programs run for each pixel).
 
-use super::super::object::{Dict, Object};
+use super::super::object::{Dict, Object, Ref};
 use super::super::Document;
+use alloc::collections::BTreeMap;
 use alloc::rc::Rc;
 use alloc::vec;
 use alloc::vec::Vec;
 
 const MAX_DEPTH: u32 = 8;
+/// the samples of a function and the functions inside it together
 const MAX_SAMPLES: usize = 1 << 22;
+/// the functions inside one function
+const MAX_NODES: u32 = 4096;
 const PS_STACK: usize = 100;
+/// the steps of one call: PostScript operators, the corners of sampled functions, functions
 const PS_BUDGET: u32 = 10_000;
 const PS_MAX_OPS: usize = 1 << 16;
+
+/// what parsing a function has seen: functions by reference, what is left
+struct FuncParse<'a> {
+    doc: &'a Document,
+    seen: BTreeMap<Ref, Option<Rc<Func>>>,
+    samples: usize,
+    nodes: u32,
+}
 
 pub(super) fn floor(x: f64) -> f64 {
     if !(x.abs() < 4.0e18) {
@@ -125,16 +141,35 @@ fn interp(x: f64, x0: f64, x1: f64, y0: f64, y1: f64) -> f64 {
 
 impl Func {
     pub fn parse(doc: &Document, o: &Object) -> Option<Rc<Func>> {
-        Func::parse_at(doc, o, 0)
+        let mut p = FuncParse { doc, seen: BTreeMap::new(), samples: 0, nodes: 0 };
+        Func::parse_at(&mut p, o, 0)
     }
 
-    fn parse_at(doc: &Document, o: &Object, depth: u32) -> Option<Rc<Func>> {
+    fn parse_at(p: &mut FuncParse, o: &Object, depth: u32) -> Option<Rc<Func>> {
         if depth > MAX_DEPTH {
             return None;
         }
+        if let Object::Ref(r) = o {
+            if let Some(f) = p.seen.get(r) {
+                return f.clone();
+            }
+        }
+        p.nodes += 1;
+        if p.nodes > MAX_NODES {
+            return None;
+        }
+        let f = Func::parse_one(p, o, depth);
+        if let Object::Ref(r) = o {
+            p.seen.insert(*r, f.clone());
+        }
+        f
+    }
+
+    fn parse_one(p: &mut FuncParse, o: &Object, depth: u32) -> Option<Rc<Func>> {
+        let doc = p.doc;
         let o = doc.resolve(o);
         if let Object::Array(a) = &o {
-            let fns: Option<Vec<_>> = a.iter().take(32).map(|f| Func::parse_at(doc, f, depth + 1)).collect();
+            let fns: Option<Vec<_>> = a.iter().take(32).map(|f| Func::parse_at(p, f, depth + 1)).collect();
             return Some(Rc::new(Func::Many(fns?)));
         }
         let (d, stream) = match &o {
@@ -160,6 +195,10 @@ impl Func {
                     return None;
                 }
                 let total = size.iter().try_fold(n, |acc, &s| acc.checked_mul(s).filter(|&t| t <= MAX_SAMPLES))?;
+                p.samples += total;
+                if p.samples > MAX_SAMPLES {
+                    return None;
+                }
                 let bps = doc.key(&d, "BitsPerSample").as_int()?;
                 if ![1, 2, 4, 8, 12, 16, 24, 32].contains(&bps) {
                     return None;
@@ -202,7 +241,7 @@ impl Func {
                 if fa.is_empty() || fa.len() > 1024 {
                     return None;
                 }
-                let fns: Option<Vec<_>> = fa.iter().map(|f| Func::parse_at(doc, f, depth + 1)).collect();
+                let fns: Option<Vec<_>> = fa.iter().map(|f| Func::parse_at(p, f, depth + 1)).collect();
                 let fns = fns?;
                 let bounds = nums(doc, d.get("Bounds")?);
                 let encode = nums(doc, d.get("Encode")?);
@@ -235,19 +274,21 @@ impl Func {
     /// the outputs for `input` into out (cleared first)
     pub fn eval(&self, input: &[f64], out: &mut Vec<f64>) {
         out.clear();
-        self.eval_at(input, out, 0);
+        let mut work = PS_BUDGET;
+        self.eval_at(input, out, 0, &mut work);
     }
 
-    fn eval_at(&self, input: &[f64], out: &mut Vec<f64>, depth: u32) {
-        if depth > MAX_DEPTH {
+    fn eval_at(&self, input: &[f64], out: &mut Vec<f64>, depth: u32, work: &mut u32) {
+        if depth > MAX_DEPTH || *work == 0 {
             return;
         }
+        *work -= 1;
         match self {
             Func::Many(fs) => {
                 let mut one = Vec::new();
                 for f in fs {
                     one.clear();
-                    f.eval_at(input, &mut one, depth + 1);
+                    f.eval_at(input, &mut one, depth + 1, work);
                     out.push(one.first().copied().unwrap_or(0.0));
                 }
             }
@@ -269,9 +310,10 @@ impl Func {
                 let lo = if k == 0 { domain[0] } else { bounds[k - 1] };
                 let hi = if k == bounds.len() { domain[1] } else { bounds[k] };
                 let t = interp(x, lo, hi, encode[2 * k], encode[2 * k + 1]);
-                fns[k].eval_at(&[t], out, depth + 1);
+                fns[k].eval_at(&[t], out, depth + 1, work);
             }
             Func::Sampled { m, n, domain, range, size, encode, decode, samples } => {
+                *work = work.saturating_sub(((1u32 << *m) * *n as u32).max(1));
                 // the position in the sample grid of each input, then multilinear
                 let mut idx = [0usize; 8];
                 let mut frac = [0f64; 8];
@@ -309,7 +351,7 @@ impl Func {
                 for i in 0..domain.len() / 2 {
                     st.push(V::R(clampd(input.get(i).copied().unwrap_or(0.0), domain[2 * i], domain[2 * i + 1])));
                 }
-                run(prog, &mut st);
+                run(prog, &mut st, work);
                 let n = range.len() / 2;
                 let base = st.len().saturating_sub(n);
                 for j in 0..n {
@@ -415,14 +457,14 @@ fn flatten(items: &[Item], out: &mut Vec<Ps>, depth: u32) -> Option<()> {
     Some(())
 }
 
-fn run(prog: &[Ps], st: &mut Vec<V>) {
+/// a program on the stack; `budget` is the call's, shared with the functions around it
+fn run(prog: &[Ps], st: &mut Vec<V>, budget: &mut u32) {
     let mut pc = 0usize;
-    let mut budget = PS_BUDGET;
     while pc < prog.len() {
-        budget -= 1;
-        if budget == 0 || st.len() > PS_STACK {
+        if *budget == 0 || st.len() > PS_STACK {
             return;
         }
+        *budget -= 1;
         let p = prog[pc];
         pc += 1;
         match p {
