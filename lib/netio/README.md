@@ -32,6 +32,17 @@ the answer's size. `get_to` hands a large body over piece by piece, `download` w
 file that is replaced only by a complete 2xx answer, with progress and cancellation, and
 `client::Session` keeps one connection alive for many requests.
 
+A body in gzip or br is asked for and decoded by default (zstd and deflate are decoded too, and
+`max_body` counts the decoded bytes, so a small bomb stays small). Everything else is switched on
+by the program: `with_redirects(n)` follows 301 to 308 (never from https to http; Authorization
+and Cookie do not go to another origin; `fetch` says where the answer came from),
+`with_cookies(jar)` keeps cookies in a `netpkt::cookie::Jar` (the Public Suffix List decides
+which Domain a site may set), `with_pool(Pool::new())` keeps connections open, and
+`with_proxy(proxy::Proxy::from_env()?)` goes through an HTTP proxy (CONNECT tunnels for https,
+NO_PROXY, credentials in the proxy's URL; `http_proxy` only in lower case, against httpoxy).
+`deadline_ms` limits a whole request. A connection is used again only after an answer whose
+length was known and read to its end, so a server cannot slip a second answer in.
+
 ```rust
 use jflib::netio::{trust, Client, Headers, Url};
 
@@ -42,6 +53,12 @@ match client.get(&url, &Headers::new()) {
     Ok(answer) => { /* answer.status, answer.body_bytes() */ }
     Err(e) => { /* HttpError: the address, the network, TLS, a malformed or too large answer */ }
 }
+
+// redirects, cookies and kept connections
+use alloc::sync::Arc;
+use jflib::{netio::Pool, netpkt::cookie::Jar};
+let jar = Arc::new(jflib::plat::sync::Mutex::new(Jar::new()));
+let client = client.with_redirects(5).with_cookies(jar).with_pool(Pool::new());
 ```
 
 ```rust

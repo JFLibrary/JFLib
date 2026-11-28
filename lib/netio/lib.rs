@@ -7,7 +7,9 @@
 //   http       Request, Response, Body (bytes or a stream sent chunked), Headers, status texts;
 //              the HTTP/1.1 wire format (bounded parsing, chunked transfer, keep-alive)
 //   server     Server::start(addr, ServerConfig, handler): accept thread + worker pool
-//   client     Client::request(...): blocking, timeouts, size limit
+//   client     Client::request(...): blocking, timeouts, size limits; Content-Encoding decoded,
+//              redirects, cookies (netpkt::cookie), a connection pool, proxies
+//   proxy      HTTP proxies (absolute form, CONNECT tunnels), NO_PROXY, from the environment
 //   tls        TLS 1.3 servers and clients (ChaCha20-Poly1305, AES-GCM; X25519MLKEM768,
 //              X25519, P-256, P-384; Ed25519, ECDSA, RSA keys; SNI, ALPN, mutual auth;
 //              resumption with tickets, 0-RTT where the server allows it, OCSP stapling) and the TLS 1.2
@@ -44,6 +46,7 @@ pub mod dns;
 pub mod http;
 pub mod ocsp;
 pub mod pem;
+pub mod proxy;
 pub mod roots;
 pub mod server;
 pub mod smtp;
@@ -58,7 +61,8 @@ pub mod ws;
 pub use x509;
 pub use x509::der;
 
-pub use client::{Client, HttpError, Part};
+pub use client::{Client, Fetched, HttpError, Part, Pool};
+pub use proxy::Proxy;
 pub use http::{Body, Headers, Request, Response};
 pub use server::{Server, ServerConfig};
 pub use url::Url;

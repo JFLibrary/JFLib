@@ -25,9 +25,9 @@ someone else made:
 | Crate | What it does |
 | --- | --- |
 | `crypto` | hashes (SHA-2, SHA-3, SHAKE, BLAKE), MACs, AEADs, X25519, Ed25519, P-256, P-384, RSA, ECDSA, ML-KEM, Argon2id, Base64 |
-| `netio` | TLS 1.3 / 1.2, HTTP/1.1, WebSocket, DNS, SSH client, SMTP |
+| `netio` | TLS 1.3 / 1.2, HTTP/1.1 (the client with redirects, proxies, cookies and Content-Encoding), WebSocket, DNS, SSH client, SMTP |
 | `x509` | X.509 certificates and chains (netio's and netpkt's) |
-| `netpkt` | packet and protocol parsers, a TLS and SSH core for simulators |
+| `netpkt` | packet and protocol parsers, cookies with the Public Suffix List, a TLS and SSH core for simulators |
 | `netchan` | an encrypted and authenticated channel over UDP and WebSocket |
 | `compress` | DEFLATE, zlib, gzip, Brotli, LZ4 and Zstandard decoders |
 | `formats` | JSON, XML (every XML reader of the library), text encodings |
@@ -60,10 +60,11 @@ another library. They have **not had an external audit**. What has been done ins
   Ed25519 certificates) and TLS-Anvil, its client against TLS-Anvil (`tools/tlsanvil_check.py`);
   OCSP, certificate requests and stapling against OpenSSL (`tools/tls_interop.py`); the ACME
   client against Pebble, Let's Encrypt's ACME test server (`tools/pebble_check.py`), and against
-  an ACME server in coretest that validates every challenge and plays a misbehaving CA
+  an ACME server in coretest that validates every challenge and plays a misbehaving CA; the HTTP
+  client's cookies, redirects and proxy against http-state's cookie tests (`tools/cookie_check.py`)
 - mutation fuzzing (`tools/net_fuzz.py`, `apps/nettest`, `plattest --test wirefuzz`) and
   coverage-guided fuzzing with libFuzzer and AddressSanitizer (`tools/cov_fuzz.py`) of the parsers
-  of untrusted bytes: compress, formats, X.509, OCSP, certificate requests, DNS, HTTP, TLS, netpkt, netchan and plat's
+  of untrusted bytes: compress, formats, X.509, OCSP, certificate requests, DNS, HTTP (server and client, URLs, cookies), TLS, netpkt, netchan and plat's
   decoders of other programs' data
 
 Limits that are documented in the crates: revocation only by stapled OCSP responses (a TLS client

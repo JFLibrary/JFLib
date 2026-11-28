@@ -89,9 +89,9 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [datastore](#datastore) -- an embedded journal database: JSON collections, transactions, snapshots, crash recovery, secondary indexes, encryption at rest
   <br>[lib.rs](#datastore-crate-root) · [index.rs](#datastoreindexrs) · [journal.rs](#datastorejournalrs)
 - [netio](#netio) -- HTTP/1.1 server and client, TLS 1.3 subset, X.509 of a private CA, SSH-2, DNS
-  <br>[lib.rs](#netio-crate-root) · [acme.rs](#netioacmers) · [client.rs](#netioclientrs) · [dns.rs](#netiodnsrs) · [http.rs](#netiohttprs) · [ocsp.rs](#netioocsprs) · [pem.rs](#netiopemrs) · [roots.rs](#netiorootsrs) · [server.rs](#netioserverrs) · [smtp.rs](#netiosmtprs) · [ssh.rs](#netiosshrs) · [tls/mod.rs](#netiotlsmodrs) · [tls/conn.rs](#netiotlsconnrs) · [tls/keysched.rs](#netiotlskeyschedrs) · [tls/kx.rs](#netiotlskxrs) · [tls/record.rs](#netiotlsrecordrs) · [tls/session.rs](#netiotlssessionrs) · [tls/staple.rs](#netiotlsstaplers) · [trust.rs](#netiotrustrs) · [url.rs](#netiourlrs) · [ws.rs](#netiowsrs)
+  <br>[lib.rs](#netio-crate-root) · [acme.rs](#netioacmers) · [client.rs](#netioclientrs) · [dns.rs](#netiodnsrs) · [http.rs](#netiohttprs) · [ocsp.rs](#netioocsprs) · [pem.rs](#netiopemrs) · [proxy.rs](#netioproxyrs) · [roots.rs](#netiorootsrs) · [server.rs](#netioserverrs) · [smtp.rs](#netiosmtprs) · [ssh.rs](#netiosshrs) · [tls/mod.rs](#netiotlsmodrs) · [tls/conn.rs](#netiotlsconnrs) · [tls/keysched.rs](#netiotlskeyschedrs) · [tls/kx.rs](#netiotlskxrs) · [tls/record.rs](#netiotlsrecordrs) · [tls/session.rs](#netiotlssessionrs) · [tls/staple.rs](#netiotlsstaplers) · [trust.rs](#netiotrustrs) · [url.rs](#netiourlrs) · [ws.rs](#netiowsrs)
 - [netpkt](#netpkt) -- network packets byte for byte: addresses, checksums, Ethernet to TCP codecs, DHCP, DNS, NTP, syslog, SNMP, SSH, TLS 1.3, EAP and IMAP without I/O, X.509, cookies, URI references, a dissector, pcapng
-  <br>[lib.rs](#netpkt-crate-root) · [addr.rs](#netpktaddrrs) · [arp.rs](#netpktarprs) · [checksum.rs](#netpktchecksumrs) · [decode.rs](#netpktdecoders) · [dhcp.rs](#netpktdhcprs) · [dns.rs](#netpktdnsrs) · [eth.rs](#netpktethrs) · [icmp.rs](#netpkticmprs) · [ipv4.rs](#netpktipv4rs) · [ipv6.rs](#netpktipv6rs) · [ntp.rs](#netpktntprs) · [pcapng.rs](#netpktpcapngrs) · [pkt.rs](#netpktpktrs) · [syslog.rs](#netpktsyslogrs) · [tcp.rs](#netpkttcprs) · [udp.rs](#netpktudprs) · [http.rs](#netpkthttprs) · [stp.rs](#netpktstprs) · [rip.rs](#netpktriprs) · [nat.rs](#netpktnatrs) · [icmpv6.rs](#netpkticmpv6rs) · [ospf.rs](#netpktospfrs) · [addrsel.rs](#netpktaddrselrs) · [eapol.rs](#netpkteapolrs) · [bgp.rs](#netpktbgprs) · [tftp.rs](#netpkttftprs) · [ftp.rs](#netpktftprs) · [smtp.rs](#netpktsmtprs) · [pop3.rs](#netpktpop3rs) · [imf.rs](#netpktimfrs) · [ber.rs](#netpktberrs) · [snmp.rs](#netpktsnmprs) · [mib.rs](#netpktmibrs) · [telnet.rs](#netpkttelnetrs) · [radius.rs](#netpktradiusrs) · [uri.rs](#netpkturirs) · [ssh.rs](#netpktsshrs) · [snmpv3.rs](#netpktsnmpv3rs) · [eap.rs](#netpkteaprs) · [imap.rs](#netpktimaprs) · [cookie.rs](#netpktcookiers) · [x509.rs](#netpktx509rs) · [tls.rs](#netpkttlsrs)
+  <br>[lib.rs](#netpkt-crate-root) · [addr.rs](#netpktaddrrs) · [arp.rs](#netpktarprs) · [checksum.rs](#netpktchecksumrs) · [decode.rs](#netpktdecoders) · [dhcp.rs](#netpktdhcprs) · [dns.rs](#netpktdnsrs) · [eth.rs](#netpktethrs) · [icmp.rs](#netpkticmprs) · [ipv4.rs](#netpktipv4rs) · [ipv6.rs](#netpktipv6rs) · [ntp.rs](#netpktntprs) · [pcapng.rs](#netpktpcapngrs) · [pkt.rs](#netpktpktrs) · [syslog.rs](#netpktsyslogrs) · [tcp.rs](#netpkttcprs) · [udp.rs](#netpktudprs) · [http.rs](#netpkthttprs) · [stp.rs](#netpktstprs) · [rip.rs](#netpktriprs) · [nat.rs](#netpktnatrs) · [icmpv6.rs](#netpkticmpv6rs) · [ospf.rs](#netpktospfrs) · [addrsel.rs](#netpktaddrselrs) · [eapol.rs](#netpkteapolrs) · [bgp.rs](#netpktbgprs) · [tftp.rs](#netpkttftprs) · [ftp.rs](#netpktftprs) · [smtp.rs](#netpktsmtprs) · [pop3.rs](#netpktpop3rs) · [imf.rs](#netpktimfrs) · [ber.rs](#netpktberrs) · [snmp.rs](#netpktsnmprs) · [mib.rs](#netpktmibrs) · [telnet.rs](#netpkttelnetrs) · [radius.rs](#netpktradiusrs) · [uri.rs](#netpkturirs) · [ssh.rs](#netpktsshrs) · [snmpv3.rs](#netpktsnmpv3rs) · [eap.rs](#netpkteaprs) · [imap.rs](#netpktimaprs) · [cookie.rs](#netpktcookiers) · [psl.rs](#netpktpslrs) · [x509.rs](#netpktx509rs) · [tls.rs](#netpkttlsrs)
 - [eapm](#eapm) -- EAP-MD5 and EAP-PWD as peer and server state machines without I/O
   <br>[lib.rs](#eapm-crate-root)
 - [cas](#cas) -- content-addressed backup repositories: chunking, packs, signed encrypted snapshots, GC
@@ -45712,7 +45712,9 @@ netio -- network protocols on top of plat::net
   http       Request, Response, Body (bytes or a stream sent chunked), Headers, status texts;
              the HTTP/1.1 wire format (bounded parsing, chunked transfer, keep-alive)
   server     Server::start(addr, ServerConfig, handler): accept thread + worker pool
-  client     Client::request(...): blocking, timeouts, size limit
+  client     Client::request(...): blocking, timeouts, size limits; Content-Encoding decoded,
+             redirects, cookies (netpkt::cookie), a connection pool, proxies
+  proxy      HTTP proxies (absolute form, CONNECT tunnels), NO_PROXY, from the environment
   tls        TLS 1.3 servers and clients (ChaCha20-Poly1305, AES-GCM; X25519MLKEM768,
              X25519, P-256, P-384; Ed25519, ECDSA, RSA keys; SNI, ALPN, mutual auth;
              resumption with tickets, 0-RTT where the server allows it, OCSP stapling) and the TLS 1.2
@@ -46080,16 +46082,44 @@ MAX_CHAIN: usize = 1 << 20
 Source: [`lib/netio/client.rs`](../lib/netio/client.rs)
 
 ```text
-client -- a blocking HTTP/1.1 client: one connection per request, timeouts, a size limit,
-an optional connector for https (TLS wraps the TCP connection)
+client -- a blocking HTTP/1.1 client
 
   Client::new().request("GET", &url, &headers, body) -> Result<Response, HttpError>
+  client.fetch(method, &url, &headers, body) -> Fetched { url: the last one, response }
   client.get_to(&url, &headers, max, on)   a download piece by piece (Part::Head, Part::Data)
+  client.request_on(&stream, method, &url, &headers, body)   one request over a connection the
+                                           caller opened (no proxy, no pool, no redirects)
   client.with_connector(Arc<dyn Fn(&Url, TcpStream) -> Result<Box<dyn Stream>, HttpError>>)
+  client.with_proxy(Proxy)          HTTP proxies (netio::proxy; Proxy::from_env)
+  client.with_pool(Arc<Pool>)       connections kept open for the next requests
+  client.with_cookies(Arc<Mutex<Jar>>)   netpkt::cookie's jar: Set-Cookie stored, Cookie sent
+  client.with_redirect_check(f)     f(from, to) before each redirect (false: the 3xx answer)
   client.request_async(method, &url, &headers, body) -> future of the answer (the request on
   plat::task's blocking pool: ui.spawn / block_on await it without blocking)
   client.download(&url, &headers, path, &ctl) -> future of the status: the body into the file
   (plat::AtomicFile: replaced only by a whole 2xx body), progress and cancel in ctl
+
+The fields: connect_ms, timeout_ms (any single read or write), deadline_ms (a whole request,
+its redirects included; 0: none), max_body (the body as it came and after decoding),
+user_agent, redirects (followed at most; 0: a 3xx answer comes back as it is) and decode.
+
+decode (on by default): without an Accept-Encoding or Range header of the caller's, a request
+offers "gzip, br" and a body in gzip, br, zstd (window up to 8 MiB, RFC 9659) or deflate (zlib)
+is decoded as it arrives, through compress's stream decoders; Content-Encoding and
+Content-Length then leave the answer's headers.  A body that does not decode is
+HttpError::Encoding; stacked or unknown codings come back as they are.
+
+Redirects (301, 302, 303, 307, 308 with a Location, RFC 9110 15.4): the Location is resolved
+against the request's URL (Url::join); from https to http is refused (HttpError::Redirect);
+303 (not after HEAD) and 301 / 302 after POST go on as GET without the body and its headers;
+to another origin, Authorization, Cookie, Proxy-Authorization and Host stay behind (the jar's
+cookies are those of the new URL).
+
+Answers are read as RFC 9112 6.3 says: a status line "HTTP/1.x NNN" with a code of 100 to 599,
+interim answers (1xx) skipped up to 16 of them, 101 refused (no upgrade was asked for), the
+body by Transfer-Encoding: chunked, else Content-Length, else up to the end of the connection.
+A connection carries another request (the pool, Session) only after a body of known length
+that was read to its end with no byte beyond it, and when neither side said close.
 ```
 
 - **`enum HttpError`**
@@ -46100,34 +46130,86 @@ an optional connector for https (TLS wraps the TCP connection)
   - `TooLarge` -- an answer over the size limit
   - `File` -- (download) the target file could not be created, written or put in place
   - `Cancelled` -- (download) cancelled through the Ctl, or the future was dropped
+  - `Redirect(String)` -- a redirect that is not followed: from https to http, a Location that is not a URL, more
+    than Client::redirects of them
+  - `Proxy(u16)` -- the proxy refused the tunnel (its status; 407: it wants other credentials)
+  - `Encoding` -- the body does not decode as its Content-Encoding says
 
 - **`type Connector = Arc<dyn Fn(&Url, TcpStream) -> Result<Box<dyn Stream>, HttpError> + Send + Sync>`**
+
+- **`type RedirectCheck = Arc<dyn Fn(&Url, &Url) -> bool + Send + Sync>`**
+  asked before a redirect is followed: (from, to) -> false: the 3xx answer is the result
 
 - **`enum Part<'a>`**
   a piece of an answer that Client::get_to streams
   - `Head(u16, &'a Headers)` -- the status and the headers (first)
   - `Data(&'a [u8])` -- the next bytes of the body
 
+- **`struct Fetched`**
+  an answer and the URL it came from (after redirects)
+  - `url: Url`
+  - `response: Response`
+
 - **`struct Client`**
   - `connect_ms: u32`
   - `timeout_ms: u32` -- the longest wait for any read or write
+  - `deadline_ms: u32` -- the longest a whole request may take, from connecting to the last byte of the body,
+    redirects included (0: no limit beyond timeout_ms per read)
   - `max_body: usize`
   - `user_agent: String`
+  - `redirects: u8` -- redirects followed at most (0: a 3xx answer comes back as it is)
+  - `decode: bool` -- offer gzip and br and decode the body (see the module header)
+
+- **`struct Pool`**
+  connections kept open between requests (Client::with_pool): per origin, proxy and TLS
+  layer, at most `per_host` of them and `idle_ms` long
+  - `per_host: usize`
+  - `max_idle: usize`
+  - `idle_ms: u32`
+
+**`impl Pool`**
+
+- **`fn new() -> Arc<Pool>`**
+  4 per host, 64 in all, 60 s
+- **`fn with_limits(per_host: usize, max_idle: usize, idle_ms: u32) -> Arc<Pool>`**
+- **`fn idle(&self) -> usize`**
+  the connections waiting now
+- **`fn clear(&self)`**
+  close them all
 
 **`impl Client`**
 
 - **`fn new() -> Client`**
 - **`fn with_connector(mut self, c: Connector) -> Client`**
   the TLS layer for https URLs
+- **`fn with_proxy(mut self, p: Proxy) -> Client`**
+  requests go through these proxies (netio::proxy)
+- **`fn with_pool(mut self, p: Arc<Pool>) -> Client`**
+  connections stay open for the next requests (keep-alive); clones of the client share them
+- **`fn with_cookies(mut self, jar: Arc<Mutex<Jar>>) -> Client`**
+  cookies: what answers set is stored in the jar, a request without a Cookie header of the
+  caller's sends the jar's for its URL (netpkt::cookie, with the public suffix list)
+- **`fn with_redirects(mut self, n: u8) -> Client`**
+  redirects: followed up to `n` (0: none)
+- **`fn with_redirect_check(mut self, f: RedirectCheck) -> Client`**
+  each redirect first asks f(from, to); false: the 3xx answer is the result
+- **`fn cookies(&self) -> Option<&Arc<Mutex<Jar>>>`**
+  the jar given to with_cookies
 - **`fn connect(&self, url: &Url) -> Result<Box<dyn Stream>, HttpError>`**
-  open the connection a request to `url` goes over
+  open the connection a request to `url` goes over, directly (no proxy)
 - **`fn request(&self, method: &str, url: &Url, headers: &Headers, body: &[u8]) -> Result<Response, HttpError>`**
   send one request and read the whole answer
+- **`fn fetch(&self, method: &str, url: &Url, headers: &Headers, body: &[u8]) -> Result<Fetched, HttpError>`**
+  request(), and the URL the answer came from (after redirects)
+- **`fn request_on(&self, s: &dyn Stream, method: &str, url: &Url, headers: &Headers, body: &[u8]) -> Result<Response, HttpError>`**
+  One request over a connection the caller opened (a socket of its own, a test's stream):
+  the client's headers, cookies and decoding, no proxy, pool or redirects; the request asks
+  to close the connection, and the stream is left as it is
 - **`fn get_to(&self, url: &Url, headers: &Headers, max: u64, on: &mut dyn FnMut(Part<'_>) -> bool) -> Result<(u16, Headers), HttpError>`**
   a GET whose answer goes piece by piece to `on` (downloads larger than memory): first
   Part::Head (false: skip the body), then Part::Data for every piece of the body (false:
-  stop, Err(HttpError::Bad)).  The body may have up to `max` bytes.  -> the status and the
-  headers
+  stop, Err(HttpError::Bad)).  The body may have up to `max` bytes.  Redirects the client
+  follows do not reach `on`.  -> the status and the headers
 - **`fn get(&self, url: &Url, headers: &Headers) -> Result<Response, HttpError>`**
 - **`fn request_async(&self, method: &str, url: &Url, headers: &Headers, body: Vec<u8>) -> impl Future<Output = Result<Response, HttpError>> + use<>`**
   request() on the blocking pool (plat::task::spawn_blocking): a future of the answer
@@ -46139,7 +46221,8 @@ an optional connector for https (TLS wraps the TCP connection)
   Err(Cancelled), the file unchanged.  -> the status
 
 - **`struct Session`**
-  requests over one kept-alive connection (reconnected when the server closed it)
+  requests over one kept-alive connection (reconnected when the server closed it); the
+  client's proxy, cookies and decoding apply, its pool and redirects do not
 
 **`impl Session`**
 
@@ -46438,6 +46521,75 @@ pem -- "-----BEGIN LABEL-----" blocks (RFC 7468): each marker on a line of its o
 
 - **`fn decode(text: &str, label: &str) -> Option<Vec<u8>>`**
   the first block with this label
+
+### `netio/proxy.rs`
+
+Source: [`lib/netio/proxy.rs`](../lib/netio/proxy.rs)
+
+```text
+proxy -- which HTTP proxy a request goes through (Client::with_proxy)
+
+  Proxy::new("http://user:pw@proxy.lan:3128")   one proxy for http and https
+  Proxy::none().http(..).https(..)               a proxy per scheme (Endpoint::parse)
+  proxy.no_proxy("localhost, .corp.example, 10.0.0.0/8")
+  Proxy::from_env()    http_proxy (lower case only), https_proxy / HTTPS_PROXY, all_proxy /
+                       ALL_PROXY, no_proxy / NO_PROXY -- as curl reads them: HTTP_PROXY in
+                       upper case is left alone, since a CGI program gets the request's
+                       "Proxy:" header as that variable (httpoxy, CVE-2016-5385 and others)
+  proxy.for_url(&url) -> Option<&Endpoint>
+
+http:// goes to the proxy as an absolute-form request (RFC 9112 3.2.2); https:// through a
+CONNECT tunnel (RFC 9110 9.3.6), in which TLS checks the server itself, not the proxy.  Only
+plain-HTTP proxies: an https:// or socks proxy URL is refused (None).  Loopback addresses and
+localhost never go through a proxy (as Go's net/http): a local service is not sent elsewhere.
+NO_PROXY: "*" for all, names (a leading "." or "*." optional) for themselves and the names
+below them, IP addresses and CIDR ranges for URLs that name an address (no lookup); an entry
+may end in ":port".
+```
+
+- **`struct Endpoint`**
+  a proxy server: where to connect and the credentials it gets (Basic)
+  - `host: String`
+  - `port: u16`
+
+**`impl Endpoint`**
+
+- **`fn parse(s: &str) -> Option<Endpoint>`**
+  "http://[user[:password]@]host[:port][/]" or "host[:port]" (http assumed); the port
+  defaults to 80.  None for another scheme (https://, socks5://), a path, or a bad host
+- **`fn with_auth(mut self, user: &str, password: &str) -> Endpoint`**
+  with these credentials (Basic: "user:password" in base64)
+- **`fn authorization(&self) -> Option<&str>`**
+  the Proxy-Authorization header's value
+- **`fn url(&self) -> Url`**
+  the proxy as a URL of its own (where the client connects)
+- **`fn key(&self) -> String`**
+  "host:port"
+
+- **`struct Proxy`**
+  the proxies of a client: one per scheme, and the hosts that go direct
+
+**`impl Proxy`**
+
+- **`fn none() -> Proxy`**
+  no proxy (to add them one by one)
+- **`fn new(url: &str) -> Option<Proxy>`**
+  one proxy for http and https (Endpoint::parse) -> None when it is not one
+- **`fn http(mut self, e: Endpoint) -> Proxy`**
+  the proxy for http:// URLs
+- **`fn https(mut self, e: Endpoint) -> Proxy`**
+  the proxy for https:// URLs (a CONNECT tunnel)
+- **`fn no_proxy(mut self, list: &str) -> Proxy`**
+  hosts that go direct: a comma-separated list as NO_PROXY writes it (entries that are not
+  one are left out)
+- **`fn from_env() -> Option<Proxy>`**
+  the proxies the environment names (see the module header); None when it names none
+- **`fn from_vars(get: &dyn Fn(&str) -> Option<String>) -> Option<Proxy>`**
+  from_env with the variables from `get` (tests, or a configuration of the app's own)
+- **`fn bypass(&self, url: &Url) -> bool`**
+  whether a URL goes direct: loopback, localhost, or an entry of no_proxy
+- **`fn for_url(&self, url: &Url) -> Option<&Endpoint>`**
+  the proxy a request to `url` goes through (None: direct)
 
 ### `netio/roots.rs`
 
@@ -47475,7 +47627,18 @@ UNTRUSTED: &str = "untrusted-ca"
 Source: [`lib/netio/url.rs`](../lib/netio/url.rs)
 
 ```text
-url -- absolute http(s) URLs, percent encoding, query strings
+url -- absolute http(s) URLs, references resolved against them, percent encoding, query
+strings
+
+  Url::parse("https://host:9443/api?x=1")   the host checked: a name of letters, digits,
+       - . _ ~ (no IDN: give its A-label, "xn--..."), an IPv4 address in dotted form, or an IPv6
+       literal in brackets; a name that ends in a number must be a dotted IPv4 address (no
+       "0x7f.1" or "2130706433", which some resolvers read as 127.0.0.1); no user:password@
+  url.join(reference)   RFC 3986 5.2 (netpkt::uri): "https://other/x", "//host/x", "/x", "../x"
+  url.same_origin(&other), url.authority() ("host:port", for CONNECT), url.path()
+
+Bytes beyond ASCII and " < > ` { } in a path or query are percent-encoded; a fragment is
+dropped (it never goes to a server).
 ```
 
 - **`struct Url`**
@@ -47492,10 +47655,22 @@ url -- absolute http(s) URLs, percent encoding, query strings
 - **`fn is_https(&self) -> bool`**
 - **`fn host_header(&self) -> String`**
   "host:port" for the Host header (port left out when it is the default)
+- **`fn authority(&self) -> String`**
+  "host:port" with the port always (a CONNECT request's target)
 - **`fn with_target(&self, target: &str) -> Url`**
   the URL with another target ("/api/jobs")
 - **`fn origin(&self) -> String`**
   "https://host:port"
+- **`fn same_origin(&self, other: &Url) -> bool`**
+  the same scheme, host and port (RFC 6454): what a redirect must keep for credentials to
+  go along
+- **`fn path(&self) -> &str`**
+  the path without the query
+- **`fn join(&self, reference: &str) -> Option<Url>`**
+  a reference resolved against this URL as RFC 3986 5.2 does it (netpkt::uri): absolute
+  ("https://other/x"), network-path ("//host/x"), absolute path ("/x"), relative path ("x",
+  "../x"), query ("?q") or empty; dot segments removed, the fragment dropped.  None for
+  another scheme, a reference with spaces or controls, or a URL Url::parse refuses
 
 - **`fn percent_encode(s: &str) -> String`**
   percent-encode everything but the unreserved characters (RFC 3986)
@@ -47817,6 +47992,8 @@ on every target (simulators, packet tools, tests).
   cookie    SetCookie::parse, parse_date, domain_match, path_match, default_path, site_of; Jar:
             store, header, matching, script_text, purge, drop_session; SameSite as far as a small
             browser needs it; the time comes from the caller          (RFC 6265, 6265bis)
+  psl       the Public Suffix List: public_suffix, registrable_domain, is_public_suffix (the
+            list as a table, psl_data.rs, MPL-2.0; tools/psl_gen.py makes it)  (publicsuffix.org)
   x509      certificates: the crate jflib-x509 (netio's as well), CertSpec as its builder's
             earlier name, check_chain: what is wrong with a chain as fault bits for dialogs
             signed_by, check_chain with F_* faults; no clock; uses crate crypto  (RFC 5280, 8410)
@@ -54381,8 +54558,8 @@ seconds since 1970, so a jar on a simulated clock works like one on a real one
   parse_date(text)               the tolerant date of an Expires attribute (5.1.1)
   domain_match(host, domain)     5.1.3; path_match(request, cookie) 5.1.4; default_path(path) 5.1.4
   canonical_host(host)           lower case, without the dot at the end (5.1.2, no IDNA here)
-  site_of(host)                  what "same site" compares: an address itself, else the last two
-                                 labels of the name (no public suffix list)
+  site_of(host)                  what "same site" compares: an address itself, else the name's
+                                 registrable domain by the public suffix list (netpkt::psl)
   Origin                         who stores: host, path, secure (https), http (false: a script)
   Asks                           who reads: host, path, secure, http, the site that asks (None:
                                  the user), a top-level navigation, a safe method
@@ -54398,9 +54575,10 @@ seconds since 1970, so a jar on a simulated clock works like one on a real one
 From RFC 6265bis, as far as a small browser needs it: SameSite (Strict is sent only within the
 site, Lax and no attribute also on a top-level navigation with a safe method, None always but
 only with Secure), a page without https cannot set Secure nor overwrite a Secure cookie, name and
-value together hold at most MAX_COOKIE bytes.  Without a public suffix list a Domain without a dot
-counts as a public suffix (5.3 step 5): the same name as the host makes a host-only cookie, any
-other is refused.  A jar holds at most MAX_PER_DOMAIN cookies of a domain and MAX_COOKIES in all;
+value together hold at most MAX_COOKIE bytes.  A Domain that is a public suffix (netpkt::psl, the
+Public Suffix List: "com", "co.uk", "github.io") makes a host-only cookie when it is the host's
+own name and is refused otherwise (6265bis 5.6 step 9), so a site cannot set cookies for the
+sites beside it.  A jar holds at most MAX_PER_DOMAIN cookies of a domain and MAX_COOKIES in all;
 beyond that the oldest go.
 ```
 
@@ -54460,7 +54638,8 @@ MAX_COOKIES: usize = 500
   the path a cookie without one gets from its request's (RFC 6265 5.1.4)
 
 - **`fn site_of(host: &str) -> String`**
-  what "same site" compares: an address itself, else the last two labels of the name
+  what "same site" compares: an address itself, else the name's registrable domain (the public
+  suffix and one label: "example.co.uk"); a public suffix itself is its own site
 
 - **`struct Cookie`**
   a stored cookie
@@ -54533,6 +54712,44 @@ MAX_COOKIES: usize = 500
 - **`fn remove(&mut self, name: &str, domain: &str, path: &str) -> bool`**
   one cookie goes -> there was one
 - **`fn clear(&mut self)`**
+
+### `netpkt/psl.rs`
+
+Source: [`lib/netpkt/psl.rs`](../lib/netpkt/psl.rs)
+
+```text
+psl -- the Public Suffix List (publicsuffix.org): where a name stops being one that a single
+party registers ("co.uk", "github.io", "*.ck" but not "www.ck")
+
+  public_suffix(host) -> &str        "example.co.uk" -> "co.uk", "a.b.github.io" -> "github.io";
+                                     a name the list does not know: its last label (the rule *)
+  registrable_domain(host) -> Option<&str>   one label more ("example.co.uk"); None for a public
+                                     suffix itself, an address, or ""
+  is_public_suffix(name) -> bool
+  LIST_COMMIT, LIST_DATE             the list the table was made from (tools/psl_gen.py)
+
+The names are taken as they come: lower case, A-labels ("xn--..."), without a dot at the end
+(cookie::canonical_host gives that).  Both sections of the list count, ICANN and PRIVATE, as
+browsers take them for cookies.  The table (psl_data.rs, MPL-2.0) holds the rules as one
+sorted string; a lookup is a binary search per label.
+```
+
+```rust
+/// the commit of publicsuffix/list the table was generated from
+LIST_COMMIT: &str = data::COMMIT
+/// that commit's date
+LIST_DATE: &str = data::DATE
+```
+
+- **`fn public_suffix(host: &str) -> &str`**
+  the public suffix of a name (the whole of it when it is one; "" for "" or an address)
+
+- **`fn registrable_domain(host: &str) -> Option<&str>`**
+  the public suffix and one label more: what a party registers ("example.co.uk"); None when the
+  name is a public suffix itself, an address, or not a name
+
+- **`fn is_public_suffix(name: &str) -> bool`**
+  whether a name is a public suffix ("com", "co.uk", "github.io", "foo.ck"; not "www.ck")
 
 ### `netpkt/x509.rs`
 

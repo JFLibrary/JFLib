@@ -819,6 +819,57 @@ fn roundtrip(d: &[u8]) {
 
 pub type Fun = Box<dyn Fn(&[u8]) + Send + Sync>;
 
+// ------------------------------------------------------------------ the HTTP client, URLs, cookies
+
+/// answers as servers send them: lengths, chunks, interim answers, cookies, redirects, bodies in
+/// gzip, br and zstd
+fn client_seeds() -> Vec<Vec<u8>> {
+    let with = |head: &str, body: &[u8]| {
+        let mut v = head.as_bytes().to_vec();
+        v.extend_from_slice(body);
+        v
+    };
+    let gz = compress::gzip::compress(b"hello hello hello, a body in gzip", 6);
+    let br = compress::brotli::compress(b"hello hello hello, a body in br", 5);
+    let zs = compress::zstd::compress(b"hello hello hello, a body in zstd", 3);
+    vec![
+        b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\nSet-Cookie: a=1; Path=/; Domain=example.org; Secure\r\n\r\nhello".to_vec(),
+        b"HTTP/1.1 100 Continue\r\n\r\nHTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n0\r\nX: y\r\n\r\n".to_vec(),
+        b"HTTP/1.1 302 Found\r\nLocation: ../x?y#z\r\nSet-Cookie: b=2; Max-Age=60; SameSite=Lax\r\nContent-Length: 0\r\n\r\n".to_vec(),
+        b"HTTP/1.0 200 OK\r\n\r\nto the end".to_vec(),
+        with(&format!("HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Length: {}\r\n\r\n", gz.len()), &gz),
+        with(&format!("HTTP/1.1 200 OK\r\nContent-Encoding: br\r\nTransfer-Encoding: chunked\r\n\r\n{:x}\r\n", br.len()), &[&br[..], b"\r\n0\r\n\r\n"].concat()),
+        with("HTTP/1.1 200 OK\r\nContent-Encoding: zstd\r\n\r\n", &zs),
+    ]
+}
+
+/// a URL on the first line, a reference or a NO_PROXY list on the second
+fn url_seeds() -> Vec<Vec<u8>> {
+    [
+        "http://a.example/b/c?d=1\n../x?y",
+        "https://[2001:db8::1]:8443/p;q\n//other.example:81/x",
+        "http://[fe80::1%25eth0]/\n?only",
+        "http://u:p%40w@proxy.lan:3128\nlocalhost, .corp.example, 10.0.0.0/8, [::1]:80, *",
+        "HTTP://H:/%7e?%41#f\nhttps://x/./a/../b",
+        "http://10.0.0.1/ä\"<>`{}\n#frag",
+    ]
+    .iter()
+    .map(|s| s.as_bytes().to_vec())
+    .collect()
+}
+
+/// Set-Cookie lines (one per line), which are also taken as host names for the suffix list
+fn cookie_seeds() -> Vec<Vec<u8>> {
+    [
+        "a=1; Path=/; Domain=example.co.uk; Secure; HttpOnly; SameSite=Strict\nb=2; Max-Age=0\nc=3; Expires=Wed, 21 Oct 2015 07:28:00 GMT",
+        "x=1; Domain=github.io\ny=2; Domain=.www.ck\nz=3; Domain=city.kobe.jp.\nshop.xn--fiqs8s",
+        "__Host-id=1; Path=/; Secure\n=bare\nname=\"quoted\"; SameSite=None; Secure\na.b.example.co.uk",
+    ]
+    .iter()
+    .map(|s| s.as_bytes().to_vec())
+    .collect()
+}
+
 pub fn targets(seed_dir: &str) -> Vec<(&'static str, Vec<Vec<u8>>, Fun)> {
     let (dq, dm) = dns_seed();
     let certs = pem_certs(seed_dir);
@@ -881,6 +932,71 @@ pub fn targets(seed_dir: &str) -> Vec<(&'static str, Vec<Vec<u8>>, Fun)> {
                 let _ = r.body(&h, 1 << 20, false);
                 let _ = r.head();
             }
+        })),
+        // netio's client on a response stream: status lines, interim answers, framing, the
+        // decoders of Content-Encoding, Set-Cookie into a jar, a Location resolved
+        ("http_client", client_seeds(), Box::new(|d: &[u8]| {
+            let jar = std::sync::Arc::new(plat::sync::Mutex::new(netpkt::cookie::Jar::new()));
+            let mut c = netio::Client::new().with_cookies(jar.clone());
+            c.max_body = 1 << 20;
+            let url = netio::Url::parse("https://www.example.org/a/b?c").expect("the target URL");
+            for method in ["GET", "HEAD"] {
+                let m = Mock(Mutex::new((d.to_vec(), 0)));
+                if let Ok(r) = c.request_on(&m, method, &url, &netio::Headers::new(), &[]) {
+                    assert!(r.body_bytes().len() <= 1 << 20, "a body over max_body");
+                    assert!(method == "GET" || r.body_bytes().is_empty(), "a body for HEAD");
+                    if let Some(loc) = r.headers.get("location") {
+                        let _ = url.join(loc);
+                    }
+                }
+            }
+            let a = netpkt::cookie::Asks { host: "www.example.org", path: "/a/b", secure: true, http: true, site: None, top: true, safe: true };
+            let _ = jar.lock().header(&a, 0);
+        })),
+        // URLs: parse, the text written again parses to the same URL, references joined
+        // against them and against RFC 3986's base; proxy URLs and NO_PROXY lists
+        ("url", url_seeds(), Box::new(|d: &[u8]| {
+            let s = String::from_utf8_lossy(d);
+            let (first, rest) = s.split_once('\n').unwrap_or((&s, ""));
+            let same = |u: &netio::Url, what: &str| {
+                let again = netio::Url::parse(&u.to_string());
+                assert!(again.as_ref() == Some(u), "{what} does not come back from its text: {u:?} -> {u} -> {again:?}");
+            };
+            let base = netio::Url::parse("http://a/b/c/d;p?q").expect("the base");
+            if let Some(u) = netio::Url::parse(first) {
+                same(&u, "a URL");
+                if let Some(j) = u.join(rest) {
+                    same(&j, "a joined URL");
+                }
+                let _ = netio::proxy::Proxy::none().no_proxy(rest).bypass(&u);
+            }
+            if let Some(j) = base.join(first) {
+                same(&j, "a reference joined to the base");
+            }
+            let _ = netio::proxy::Endpoint::parse(first);
+        })),
+        // cookies: Set-Cookie lines into a jar from hosts on both sides of public suffixes, the
+        // Cookie header for a cross-site request; each line as a host name for the suffix list
+        ("cookie", cookie_seeds(), Box::new(|d: &[u8]| {
+            let s = String::from_utf8_lossy(d);
+            let hosts = ["www.example.co.uk", "evil.github.io", "github.io", "192.168.1.2", "a.b.c.kobe.jp", "localhost"];
+            let mut jar = netpkt::cookie::Jar::new();
+            for (i, line) in s.lines().enumerate() {
+                let o = netpkt::cookie::Origin { host: hosts[i % hosts.len()], path: "/a/b", secure: i % 2 == 0, http: true };
+                let _ = jar.store(line, o, 1_700_000_000);
+                let h = line.trim().to_ascii_lowercase();
+                let suf = netpkt::psl::public_suffix(&h);
+                assert!(h.ends_with(suf), "a public suffix that is not the name's end: {h:?} -> {suf:?}");
+                if let Some(r) = netpkt::psl::registrable_domain(&h) {
+                    assert!(r.len() > suf.len() && r.ends_with(suf) && h.ends_with(r), "a registrable domain beside its suffix: {h:?} -> {r:?} / {suf:?}");
+                    assert!(!netpkt::psl::is_public_suffix(r), "a registrable domain that is a public suffix: {r:?}");
+                }
+            }
+            for host in hosts {
+                let a = netpkt::cookie::Asks { host, path: "/a/b/c", secure: true, http: true, site: Some("example.org"), top: false, safe: true };
+                let _ = jar.header(&a, 1_700_000_000);
+            }
+            assert!(jar.cookies().len() <= netpkt::cookie::MAX_COOKIES, "a jar over its limit");
         })),
         ("http_netpkt", http_seeds(), Box::new(|d: &[u8]| {
             let _ = netpkt::http::parse_head(d, true);

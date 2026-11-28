@@ -97,4 +97,7 @@ deep. Everything is in the
 
 ## License
 
-MIT or Apache-2.0, at your choice.
+MIT or Apache-2.0, at your choice. The exception is `psl_data.rs`, the Public Suffix List
+([publicsuffix.org](https://publicsuffix.org)) as a table that `tools/psl_gen.py` makes from it: it
+stands under the Mozilla Public License 2.0, whose text is in the crate's
+[`licenses/`](https://github.com/JFLibrary/JFLib/tree/main/lib/netpkt/licenses) folder.

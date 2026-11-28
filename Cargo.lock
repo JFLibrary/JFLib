@@ -1263,8 +1263,10 @@ dependencies = [
 name = "jflib-netio"
 version = "0.2.1"
 dependencies = [
+ "jflib-compress",
  "jflib-crypto",
  "jflib-formats",
+ "jflib-netpkt",
  "jflib-plat",
  "jflib-rt",
  "jflib-x509",

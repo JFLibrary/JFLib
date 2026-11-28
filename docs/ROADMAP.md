@@ -2608,8 +2608,8 @@ Grundbausteine am falschen Ort oder mehrfach:
   `Content-Encoding: br`) und in `coretest --only compress` / `--only stream`. Dazu
   `lz4::compress_hc` (wie `lz4 -9`). `cargo-jflib` nimmt jetzt `compress` (DEFLATE auf Stufe 9,
   LZ4 HC für das SquashFS, CRC-32) statt seines eigenen Deflate und LZ4; die Pakete werden dabei
-  0,2 bis 0,3 % kleiner. Offen: Content-Encoding gzip/br im HTTP-Client von `netio` (über die
-  Sicherheits-Sitzung, mit den Stream-Decodern).
+  0,2 bis 0,3 % kleiner. Seit 2026-11-28 (Sicherheitsplan 2e) entpackt der HTTP-Client von `netio`
+  Content-Encoding gzip, br, zstd und deflate mit diesen Stream-Decodern.
 - **P1** · *erledigt* (2026-11-21, U2) · JSON aus `agent_core` gelöst: die neue Blatt-Crate
   `formats` ([`formats/src/lib.rs`](../lib/formats/src/lib.rs), nur `alloc`) hat `json` und `jmap`
   aus `agent_core` und `xml` und `encoding` aus `base` übernommen, unverändert; die alten Pfade

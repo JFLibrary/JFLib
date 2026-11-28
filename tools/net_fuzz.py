@@ -34,6 +34,11 @@ build/net_fuzz and runs every target on its own thread for N seconds (default 60
   csr                           certificate requests (PKCS #10) of each key kind
   dns, dns_netpkt               netio's answer parser and netpkt's message parser
   http_netio, http_netpkt       netio's request reader over a stream in pieces, netpkt's heads
+  http_client                   netio's client on a response stream: status lines, interim
+                                answers, framing, Content-Encoding decoded, Set-Cookie into a jar
+  url                           Url::parse (its text parses to the same URL), join, proxy URLs
+                                and NO_PROXY lists
+  cookie                        netpkt's cookie jar and the public suffix list
   tls_server                    netio's TLS server fed a mutated ClientHello
   tls_server_psk                ... with session tickets and 0-RTT, the ClientHello offering a
                                 ticket (pre_shared_key, binders, early data behind it)
