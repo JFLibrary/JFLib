@@ -18,6 +18,9 @@ pub(crate) struct Word {
     pub(crate) notes_ui: notes_ui::NotesUi,
     pub(crate) source_sel: i32,
     pub(crate) path: String,
+    // the name shown for path (title bar): file_label, asked once per path (Android's content://
+    // documents name themselves through their provider, not in the path)
+    pub(crate) path_name: String,
     pub(crate) dialog_path: String,
     pub(crate) file_open: Shared<i32>,
     pub(crate) save_dialog: bool,
@@ -74,6 +77,7 @@ impl Default for Word {
             notes_ui: Default::default(),
             source_sel: 0,
             path: String::new(),
+            path_name: String::new(),
             dialog_path: String::new(),
             file_open: Shared::new(0),
             save_dialog: false,

@@ -95,6 +95,14 @@
 //   (jxl-module) the loadable JPEG XL writer module: jxlenc_set_path / jxlenc_ready /
 //            jxlenc_encode (modhost.rs; the records in modabi.rs)
 //
+// Where: Windows, Linux, macOS, iOS and Android have every module above (docs/ANDROID.md AN0 to
+// AN5: on Android threads, the pool, sync, net, fs, watch, certs, printing through the system's
+// dialog and the system's fonts as on the desktop; process and service are there but answer
+// ENOTSUP / an error, trash and hard links false, the tray's symbol, global hotkeys, autostart
+// and the desktop's file types false / Unavailable -- docs/ANDROID.md "Bewusst nicht"; the facade
+// jflib has every crate there but update).  The browser has no process, sync,
+// fs, service, watch, certs or rand of its own; its net is the page's WebSocket.
+//
 // The layer knows events, pixel rows, files and threads only -- no UI, no gfx.  One of the
 // four library crates that may contain `unsafe` (rt, simd, plat, gpu); nothing unsafe leaves it
 // but dl_sym and dl_close (a symbol of a library loaded at run time is the caller's to trust).

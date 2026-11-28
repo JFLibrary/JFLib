@@ -1237,8 +1237,11 @@ class Builder:
             from tools.android import build_apk, build_exe
             archive = own.cargo_out[pkg][0]
             # a program without a UI, or without android/AndroidManifest.xml (plattest, asynctest: their
-            # headless tests): an executable for `adb shell` and its test APK (tools/android.py)
-            if "ui" not in app_crates(name) or not (ROOT / "apps" / name / "android" / "AndroidManifest.xml").is_file():
+            # headless tests): an executable for `adb shell` and its test APK (tools/android.py).
+            # jfgui_ANDROID_CONSOLE=1: an app with its APK the same way instead (jfWord's self-test and
+            # scripts in an app's process, docs/ANDROID.md AN5)
+            manifest = ROOT / "apps" / name / "android" / "AndroidManifest.xml"
+            if "ui" not in app_crates(name) or not manifest.is_file() or os.environ.get("jfgui_ANDROID_CONSOLE") == "1":
                 return build_exe(self, name, archive)
             return build_apk(self, name, style, variant, archive, app_notices([style] + [c[len("style_"):] for c in extra]))
         vdir = (self.web_public / style if variant else self.web_public) / name if self.target == "web" else \
@@ -2096,7 +2099,8 @@ def run_tests(builders, out, quick, jobs=1):
     print(f"{total - len(fails)} of {total} scripts passed" + (f" ({skipped} pending)" if skipped else "")
           + (f" ({only} skipped: #!only)" if only else ""))
     # what only runs on a device (G4c): the serial of a device or emulator in jfgui_TEST_ANDROID, its builds
-    # with `app androidGallery|gputest|coretest|asynctest --target android`; nobody's phone is touched without
+    # with `app androidGallery|gputest|coretest|asynctest --target android` (jfWord: with
+    # jfgui_ANDROID_CONSOLE=1); nobody's phone is touched without
     # it (the test APKs of tools/android_console.py only on an emulator); a missing build SKIPs
     serial = os.environ.get("jfgui_TEST_ANDROID")
     if serial:
@@ -2104,7 +2108,9 @@ def run_tests(builders, out, quick, jobs=1):
                               # the programs without a UI per adb shell and in an app's process (docs/ANDROID.md, AN0)
                               ("tools/android_console.py", "coretest", "--quiet"),
                               ("tools/android_console.py", "asynctest", "--quiet", "--file", "apps/asynctest/tests/tasks.uis", "--",
-                               "--script", "tasks.uis")):
+                               "--script", "tasks.uis"),
+                              # jfWord's self-test and scripts (AN5; its build with jfgui_ANDROID_CONSOLE=1)
+                              ("apps/jfWord/tests/android.py", "--quiet")):
             r = subprocess.run([sys.executable, str(RS / script), "--serial", serial, *rest], cwd=ROOT, capture_output=True, text=True,
                                encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
             total += 1
@@ -2113,7 +2119,7 @@ def run_tests(builders, out, quick, jobs=1):
                 print(f"FAIL {' '.join([script, *rest])}\n" + (r.stdout + r.stderr).strip())
     else:
         print("note: the tests on an Android device need jfgui_TEST_ANDROID=SERIAL (apps/gputest/tests/android.py, "
-              "apps/androidGallery/tests/android_gpu.py, tools/android_console.py)")
+              "apps/androidGallery/tests/android_gpu.py, tools/android_console.py, apps/jfWord/tests/android.py)")
     if check_runs is None:
         check_runs = [check_pool.submit(run) for run, _ in checks]
     for (_, show), f in zip(checks, check_runs):

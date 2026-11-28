@@ -1,9 +1,9 @@
 // Native Office shell: start/backstage, original templates, recents and command discovery.
 use crate::{
     BIBLIOGRAPHY, CITE, COMPAT_INFO, ENDNOTE, FOOTNOTE, HOME, NAVIGATION, NEW, NEW_LETTER,
-    NEW_REPORT, NEW_RESEARCH, NEW_RESUME, OPEN, OPEN_RECENT, PAGE_SETUP, PARAGRAPH_SETUP, REDO,
+    NEW_REPORT, NEW_RESEARCH, NEW_RESUME, OPEN, OPEN_RECENT, PAGE_SETUP, PARAGRAPH_SETUP, PRINT, REDO,
     SAVE, SAVE_AS, SEARCH, SOURCE_LIBRARY, SOURCE_NEW, SOURCES, UNDO, VIEW_FOCUS, VIEW_PAGE_WIDTH,
-    Word,
+    Word, file_ui, print_ui,
 };
 use alloc::{format, rc::Rc, string::String, vec::Vec};
 use doc_core::{Document, Inline, Paragraph, ParagraphFormat, ParagraphStyle};
@@ -12,6 +12,8 @@ use ui::*;
 #[derive(Clone)]
 struct Recent {
     path: String,
+    // the name shown (file_label, asked once: a content:// document names itself through its provider)
+    name: String,
     date: String,
     pinned: bool,
 }
@@ -56,6 +58,8 @@ impl Shell {
                     {
                         self.recent.push(Recent {
                             path: String::from(path),
+                            name: ini.get(&section, "name").filter(|n| !n.is_empty() && n.len() < 1024)
+                                .map_or_else(|| file_ui::file_label(path), String::from),
                             date: String::from(ini.get(&section, "date").unwrap_or("")),
                             pinned: ini.get_int(&section, "pinned", 0) != 0,
                         });
@@ -72,15 +76,18 @@ impl Shell {
         for (index, entry) in self.recent.iter().enumerate() {
             let section = format!("recent{index}");
             ini.set(&section, "path", &entry.path);
+            ini.set(&section, "name", &entry.name);
             ini.set(&section, "date", &entry.date);
             ini.set_int(&section, "pinned", i64::from(entry.pinned));
         }
         ini.save(path)
     }
     pub(crate) fn remember(&mut self, path: &str) {
+        // a name with a scheme (Android's content://) is whole already
         let path = if path.starts_with('/')
             || path.starts_with('\\')
             || path.as_bytes().get(1) == Some(&b':')
+            || path.contains("://")
         {
             String::from(path)
         } else {
@@ -101,7 +108,8 @@ impl Shell {
         } else {
             String::new()
         };
-        self.recent.insert(0, Recent { path, pinned, date });
+        let name = file_ui::file_label(&path);
+        self.recent.insert(0, Recent { path, name, pinned, date });
         if self.recent.len() > 24 {
             let index = self
                 .recent
@@ -351,7 +359,10 @@ impl Word {
         let backstage = ui.box_rect();
         ui.draw_color(ui.color(T_LAYER));
         ui.draw_rect(backstage[0], backstage[1], backstage[2], backstage[3]);
-        ui.next_size(200, -1);
+        // a phone (ui.form_factor): a narrower side bar, the recent files without their columns
+        let phone = ui.form_factor() == FF_PHONE;
+        let panel = if phone { 150 } else { 200 };
+        ui.next_size(panel, -1);
         ui.box_begin(2111, BOX_V, 0);
         let sidebar = ui.box_rect();
         ui.draw_color(ui.style.navigation_surface(ui));
@@ -382,7 +393,7 @@ impl Word {
             (2118, "Informationen", COMPAT_INFO, self.shell.has_document),
             (SAVE, "Speichern", SAVE, self.shell.has_document),
             (SAVE_AS, "Speichern unter", SAVE_AS, self.shell.has_document),
-            (2119, "Drucken", 0, false),
+            (2119, "Drucken", PRINT, print_ui::print_available(self)),
             (2129, "Exportieren", 0, false),
             (0x550100, "Optionen", 0, false),
         ] {
@@ -486,7 +497,7 @@ impl Word {
             .enumerate()
             .filter(|(_, entry)| {
                 (self.shell.filter == 0 || entry.pinned)
-                    && entry.path.to_lowercase().contains(&query)
+                    && (entry.path.to_lowercase().contains(&query) || entry.name.to_lowercase().contains(&query))
             })
             .map(|(i, e)| (i, e.clone()))
             .collect();
@@ -502,7 +513,7 @@ impl Word {
             ui.separator();
             ui.next_size(-1, 66);
             ui.box_begin(2140 + index as u32 * 4, BOX_H | pad(4), 12);
-            let name = entry.path.rsplit(['\\', '/']).next().unwrap_or(&entry.path);
+            let name = entry.name.as_str();
             ui.next_size(-1, 0);
             ui.box_begin(0, BOX_V, 2);
             ui.next_size(-1, 28);
@@ -510,8 +521,14 @@ impl Word {
             if ui.button(2141 + index as u32 * 4, name) & EV_ACT != 0 {
                 open = Some(entry.path.clone());
             }
-            ui.text(TS_CAPTION | TX_SECONDARY | TX_ELLIPSIS, &entry.path);
+            // a document of the system's picker has no folder to show (its name is an ID)
+            let detail = if phone || file_ui::picked_by_system(&entry.path) { &entry.date } else { &entry.path };
+            ui.text(TS_CAPTION | TX_SECONDARY | TX_ELLIPSIS, detail);
             ui.box_end();
+            if phone {
+                ui.box_end();
+                continue;
+            }
             ui.next_size(112, 30);
             ui.text(TS_CAPTION | TX_SECONDARY, &entry.date);
             ui.next_size(112, 30);
@@ -547,7 +564,7 @@ impl Word {
         ui.scroll_end();
         ui.box_end();
         // Keep native controls and explicit agent activation visible without a second header.
-        let edge = ui.dp(200);
+        let edge = ui.dp(panel);
         ui.next_rect_px(
             backstage[0] + edge,
             backstage[1],

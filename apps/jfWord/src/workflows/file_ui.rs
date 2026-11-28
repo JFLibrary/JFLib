@@ -31,6 +31,17 @@ impl Default for FileUi {
         }
     }
 }
+/// The name of a file as the user knows it: the path's last segment, or the display name of a
+/// document the system's picker handed out (Android: a content:// name, whose ID says nothing).
+/// The file type comes from this name, never from the path.
+pub(crate) fn file_label(path: &str) -> String {
+    plat::display_name(path)
+}
+/// A name the system's own dialog chose or created (Android's picker: the document exists, empty,
+/// once the user confirmed it there), so asking again whether to replace it is wrong.
+pub(crate) fn picked_by_system(path: &str) -> bool {
+    path.starts_with("content://")
+}
 fn story_label(story: DocxStory) -> &'static str {
     match story {
         DocxStory::Main => "Haupttext",
@@ -64,7 +75,7 @@ impl Word {
         }
     }
     pub(crate) fn open_document(&mut self, ui: &mut Ui, path: &str) -> Result<(), doc_io::Error> {
-        let lower=path.to_ascii_lowercase();
+        let lower=file_label(path).to_ascii_lowercase();
         let imported=lower.ends_with(".rtf")||lower.ends_with(".html")||lower.ends_with(".htm");
         let (file,editor)=if imported {
             let bytes=doc_io::read_file(path,16<<20)?;
@@ -92,6 +103,7 @@ impl Word {
         self.source_query.clear();
         self.source_sel = 0;
         self.path = if imported {String::new()} else {String::from(path)};
+        self.path_name = if imported {String::new()} else {file_label(path)};
         self.dialog_path = self.path.clone();
         self.selected = 0;
         self.active_note = None;
@@ -261,6 +273,8 @@ impl Word {
                 TS_BODY_STRONG | TX_WRAP,
                 if self.path.is_empty() {
                     "Neues Dokument"
+                } else if picked_by_system(&self.path) {
+                    &self.path_name
                 } else {
                     &self.path
                 },

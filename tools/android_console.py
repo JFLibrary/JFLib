@@ -1,7 +1,8 @@
 """A program without a UI on an Android device or emulator: per `adb shell` and in an app's process.
 
     python tools/android_console.py APP [--serial SERIAL] [--mode shell|app|both] [--file PATH ...] [--dir NAME ...]
-                                    [--env NAME=VALUE ...] [--expect REGEX ...] [--allow-install] [--no-internet]
+                                    [--touch NAME ...] [--env NAME=VALUE ...] [--expect REGEX ...] [--allow-install]
+                                    [--no-internet]
                                     [-- ARGS ...]
 
 docs/ANDROID.md, AN0.  `python build_rs.py app APP --target android --android-abi ABI` makes
@@ -26,7 +27,8 @@ gives it: without PERMISSIONS, or with net.connect / net.listen there.
 
 ARGS go to the program (`-- --only crypto`); --file: a file the program reads by its name, at the root
 of the app's files (/NAME of android_files.rs: files/fs/NAME; asynctest's --script copy.uis); --dir: an
-empty folder there (copy.uis writes its shot to build/); --env: jfgui_* variables.  A run passes with exit
+empty folder there (copy.uis writes its shot to build/); --touch: an empty file there (build/x.docx: a
+script that replaces a file it expects); --env: jfgui_* variables.  A run passes with exit
 code 0 and every --expect found in its output.
 
 No device: SKIP, exit code 0; no build of the device's ABI: SKIP.  Exit code 1 when a run failed.  adb
@@ -95,12 +97,14 @@ def check(text, code, expects, label):
     return [f"{label}: {b}" for b in bad]
 
 
-def run_shell(dev, app, exe, files, dirs, env, args):
+def run_shell(dev, app, exe, files, dirs, env, args, touch=()):
     remote = f"/data/local/tmp/jfgui_{app}"
     dev.shell(f"rm -rf {remote} && mkdir -p {remote}")
     try:
         dev.run("push", str(exe), f"{remote}/{app}")
         dev.shell(f"mkdir -p {remote}/files/fs" + "".join(f" {remote}/files/fs/{quote(d)}" for d in dirs))
+        for t in touch:
+            dev.shell(f"mkdir -p {remote}/files/fs/{quote(os.path.dirname(t) or '.')} && touch {remote}/files/fs/{quote(t)}")
         for f in files:                            # the root of android_files.rs's names
             dev.run("push", str(f), f"{remote}/files/fs/{f.name}")
         dev.shell(f"chmod 755 {remote}/{app}")
@@ -120,11 +124,13 @@ def run_shell(dev, app, exe, files, dirs, env, args):
     return text, code, took
 
 
-def run_app(dev, app, apk, files, dirs, env, args):
+def run_app(dev, app, apk, files, dirs, env, args, touch=()):
     pkg = package(app)
     dev.run("install", "-r", str(apk), timeout=300)
     try:
         dev.shell(f"run-as {pkg} sh -c 'mkdir -p files/fs" + "".join(f" files/fs/{d}" for d in dirs) + " && rm -f files/console.txt'")
+        for t in touch:
+            dev.shell(f"run-as {pkg} sh -c 'mkdir -p files/fs/{os.path.dirname(t) or '.'} && touch files/fs/{t}'")
         for f in files:
             with open(f, "rb") as data:            # stdin straight into the app's folder (no SELinux detour)
                 dev.run("exec-in", "run-as", pkg, "sh", "-c", f"mkdir -p files/fs && cat > files/fs/{f.name}", stdin=data)
@@ -160,6 +166,7 @@ def main():
     ap.add_argument("--mode", choices=["shell", "app", "both"], default="both")
     ap.add_argument("--file", action="append", default=[], help="a file the program reads by its name (files/fs/NAME)")
     ap.add_argument("--dir", action="append", default=[], help="an empty folder files/fs/NAME")
+    ap.add_argument("--touch", action="append", default=[], help="an empty file files/fs/NAME (NAME may have folders)")
     ap.add_argument("--env", action="append", default=[], help="NAME=VALUE (jfgui_* only)")
     ap.add_argument("--expect", action="append", default=[], help="a regular expression the output must contain")
     ap.add_argument("--exe", help="the executable (default: build/android/APP-<the device's ABI>)")
@@ -179,9 +186,9 @@ def main():
     print(f"device: {abi}, {dev.prop('ro.product.model')}, Android {dev.prop('ro.build.version.release')} "
           f"(API {dev.prop('ro.build.version.sdk')}){', emulator' if emulator else ''}")
     files = [Path(f) for f in a.file]
-    for d in a.dir:
+    for d in a.dir + a.touch:
         if not re.fullmatch(r"[\w.-]+(/[\w.-]+)*", d) or ".." in d.split("/"):
-            raise SystemExit(f"FAIL: --dir {d}: a relative folder name")
+            raise SystemExit(f"FAIL: --dir / --touch {d}: a relative name")
     for f in files:
         if not f.is_file():
             raise SystemExit(f"FAIL: no file {f}")
@@ -195,7 +202,7 @@ def main():
             if not exe.is_file():
                 print(f"SKIP shell: no {exe} (python build_rs.py app {a.app} --target android --android-abi {abi})")
                 continue
-            text, code, took = run_shell(dev, a.app, exe, files, a.dir, a.env, a.args)
+            text, code, took = run_shell(dev, a.app, exe, files, a.dir, a.env, a.args, a.touch)
         else:
             nonet = "-nonet" if a.no_internet else ""
             apk = Path(a.apk) if a.apk else ROOT / "build" / "android" / f"{a.app}-{abi}-console{nonet}.apk"
@@ -206,7 +213,7 @@ def main():
             if not emulator and not a.allow_install:
                 print("SKIP app: installing the test APK on a device that is no emulator needs --allow-install")
                 continue
-            text, code, took = run_app(dev, a.app, apk, files, a.dir, a.env, a.args)
+            text, code, took = run_app(dev, a.app, apk, files, a.dir, a.env, a.args, a.touch)
         ran += 1
         bad = check(text, code, a.expect, mode)
         print(f"--- {mode} ({took:.1f} s) ---")

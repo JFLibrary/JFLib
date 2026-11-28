@@ -34,6 +34,7 @@ pub(crate) const SEARCH: u32 = 50;
 pub(crate) const PAGE_SETUP: u32 = 51;
 pub(crate) const PARAGRAPH_SETUP: u32 = 52;
 pub(crate) const COMPAT_INFO: u32 = 53;
+pub(crate) const PRINT: u32 = 54;
 pub(crate) const NEW_REPORT: u32 = 60;
 pub(crate) const NEW_RESEARCH: u32 = 61;
 pub(crate) const OPEN_RECENT: u32 = 62;
@@ -263,6 +264,7 @@ impl Word {
                 }
             }
             SAVE_AS => self.choose_file(true),
+            PRINT => self.print_document(ui),
             SOURCE_IMPORT => self.choose_sources(false),
             SOURCE_EXPORT => self.choose_sources(true),
             SOURCE_MERGE => self.open_source_merge(),
@@ -282,6 +284,7 @@ impl Word {
             }
             DO_SAVE => {
                 if (self.source_file || self.dialog_path != self.path)
+                    && !file_ui::picked_by_system(&self.dialog_path)
                     && plat::file_exists(&self.dialog_path) == 1
                 {
                     self.overwrite_open.set(1);

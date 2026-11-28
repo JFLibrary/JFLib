@@ -115,11 +115,8 @@ impl Word {
                 CF_DISABLED
             },
         );
-        let filename = self
-            .path
-            .rsplit(['\\', '/'])
-            .next()
-            .filter(|s| !s.is_empty())
+        let filename = Some(self.path_name.as_str())
+            .filter(|s| !self.path.is_empty() && !s.is_empty())
             .unwrap_or("Unbenannt");
         let title = format!(
             "{filename}{} · jfWord",

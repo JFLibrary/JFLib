@@ -1,0 +1,73 @@
+# JFLib on Android (docs/ANDROID.md AN5): the emulator (x86-64, API 35, no Google APIs) on an Ubuntu
+# runner with KVM, started by hand until it runs stable.  coretest, plattest (all, threads, kernel,
+# vfs), asynctest's scripts and jfWord's self-test and scripts run per `adb shell` and in their test
+# APKs, in an app's process with Zygote's seccomp filter (tools/android_console.py).  No actions from
+# outside: sdkmanager installs the SDK's parts, tools/android_ci.py builds, makes the AVD, starts the
+# emulator and runs the tests.  The phone itself (the system's picker, the print dialog, the GPU, the
+# A56's arm64) stays a hand test (docs/ANDROID.md "Testen").
+name: Android
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  PYTHONUTF8: 1
+
+jobs:
+  emulator:
+    name: Emulator (x86-64, API 35)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      # the emulator needs /dev/kvm; on GitHub's Linux runners it belongs to root
+      - name: KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm
+          nproc
+          free -m
+      - name: Rust
+        run: |
+          rustup toolchain install stable --profile minimal --target x86_64-linux-android --no-self-update
+          rustup default stable
+          rustc --version
+      # what tools/android.py and tools/android_ci.py need (NDK r29 as on the developer machines,
+      # platforms;android-36 for android.jar); the runner's SDK has cmdline-tools and a JDK 17
+      - name: Android SDK, NDK, emulator and system image
+        run: |
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          # (yes ends with SIGPIPE under pipefail: the licences' step may not fail the job, the install may)
+          yes | "$sdkmanager" --licenses > /dev/null || true
+          "$sdkmanager" --install "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;29.0.14206865" \
+            "emulator" "system-images;android-35;default;x86_64" > sdkmanager.log || { tail -50 sdkmanager.log; exit 1; }
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/29.0.14206865" >> "$GITHUB_ENV"
+          # (sed reads everything: head would end the writer with SIGPIPE, a failure under pipefail)
+          "$ANDROID_HOME/emulator/emulator" -version | sed -n 1p
+          java -version 2>&1 | sed -n 1p
+      - name: Build, start the emulator, run the tests
+        run: python tools/android_ci.py --memory 4096
+      - name: The emulator's log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: emulator-log
+          path: build/android/emulator.log
+          retention-days: 7

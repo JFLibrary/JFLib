@@ -1,6 +1,7 @@
 # Android-Plan: Android so weit wie Windows, Linux und Apple
 
-Stand 2026-11-28, auf Basis von `main` 7cdabce4. AN0 bis AN4 sind umgesetzt (Emulator und A56), AN5 nicht; die Aufwände sind geschätzt. Der Plan wartete auf ARM1 bis ARM3 ([ARM64.md](ARM64.md)): die Kernel-Tabellen
+Stand 2026-11-28, auf Basis von `main` 7cdabce4. AN0 bis AN4 sind umgesetzt (Emulator und A56), AN5 auf dem Emulator
+(der CI-Job ist lokal geprüft, auf GitHub noch nicht gelaufen); die Aufwände sind geschätzt. Der Plan wartete auf ARM1 bis ARM3 ([ARM64.md](ARM64.md)): die Kernel-Tabellen
 und `plat` auf Linux ARM64 ohne libc.
 
 ## Ziel
@@ -678,13 +679,80 @@ Offen nach AN4:
 
 ### AN5: Apps, CI, Dokumentation (M)
 
-- `TARGETS`: welche Apps zusätzlich Android bekommen, entscheidet der Nutzer (Offene Fragen).
+- `TARGETS`: welche Apps zusätzlich Android bekommen, entscheidet der Nutzer (Offene Fragen; entschieden: `jfWord`).
 - CI: ein Job auf einem Ubuntu-Runner mit KVM, der den Emulator (x86-64, API 35) startet und `coretest`,
   `plattest` und `asynctest` im Test-APK laufen lässt. Ohne fremde Actions, mit `sdkmanager` und `emulator`.
 - Dokumentation: [API.md](API.md) (welche Module auf Android da sind), [GUIDE.md](GUIDE.md), die Tabelle der Plattformen im
   README, CHANGELOG, `lib/jflib/docs`, die Website (Plattformen), [ROADMAP.md](ROADMAP.md) §9.
 
 **Fertig, wenn:** der CI-Job grün ist und die Dokumentation Android so beschreibt, wie es ist.
+
+**Stand 2026-11-28:** umgesetzt und auf dem Emulator (x86-64, API 35) geprüft. Der CI-Job ist lokal unter Windows
+gelaufen (dasselbe Skript wie auf GitHub), auf GitHub noch nicht: grün ist er erst nach dem ersten Lauf dort. Das A56
+war für `jfWord` noch nicht dran (nur auf Zuruf).
+
+- **`jfWord` hat Android** (Entscheidung des Nutzers vom 2026-11-28, Offene Frage 1): `android` in `TARGETS`, ein
+  eigenes Manifest (`apps/jfWord/android/`, Paket `org.jfreund.jfWord`, keine Berechtigung, kein `INTERNET`: jfWord
+  öffnet keine Sockets; ein Platzhalter als Symbol). Auf dem Emulator von Hand: Start, neues Dokument, Tippen über die
+  Tastatur des Systems, eine Schrift des Systems aus der Liste (Dancing Script aus `/system/fonts`; die Liste zeigt die
+  Familien von `fonts.xml`), Speichern über den Dateiwähler (die Datei enthält Text und Schrift), Öffnen einer DOCX- und
+  einer RTF-Datei über den Wähler, Bearbeiten und Speichern an Ort und Stelle (`content://`), Drucken: der Druckdialog
+  von Android zeigt die Seite (ISO A4, 1/1), „Als PDF speichern“ schreibt `Dokument.pdf` (MediaBox 595 × 841,
+  `/Producer(jfguiLib)`).
+- **Funde in `jfWord` (behoben, auf jedem Ziel):** Der Dateityp kam aus dem Pfad, ein `content://`-Name hat aber keine
+  Endung: Speichern endete mit „Bitte als .docx speichern.“, die vom Wähler angelegte Datei blieb leer. Jetzt kommen
+  Dateityp und Titel aus dem Anzeigenamen (`plat::display_name`, einmal pro Pfad). Nach dem Speicherdialog des Systems
+  fragte jfWord noch einmal „Datei ersetzen“ (der Wähler legt das Dokument schon an); bei Namen des Wählers entfällt das.
+  Die Liste „Zuletzt verwendet“ setzte `content://`-Namen hinter den Arbeitsordner und zeigte die ID als Namen; sie
+  behält jetzt den Namen (`name=` in `recent.ini`) und sucht auch darin.
+- **Drucken in `jfWord`** gab es bisher auf keinem Ziel („Drucken“ war grau). Datei / Drucken legt jetzt die Seiten so
+  an, wie die Vorschau sie umbricht, ein Bild je Seite mit 200 dpi (`PageDraw::thumbnail`), und gibt sie an
+  `plat::PrintDoc` (Windows' Dialog, das Portal unter Linux, unter Android der Druckdialog nach den Seiten), in die
+  druckbare Fläche eingepasst; der Knopf ist da, wo `CAP_PRINT` gilt und das Dokument nicht im Erhaltungsmodus ist.
+  Ein PDF mit Text (FEATURES.md OUT-005) bleibt offen.
+- **Telefon:** In der Dateiansicht ist die Leiste 150 statt 200 DIP breit, die Liste „Zuletzt verwendet“ zeigt Name und
+  Datum ohne die Spalten Datum und Anheften (sie überlagerten sich auf 411 DIP). Der Editor mit Menüband, Linealen und
+  Statusleiste war ohne Änderung bedienbar (Menüband und Statusleiste rollen). Ein größerer Umbau für Telefone (etwa
+  ein einfaches Menüband) ist eigene Arbeit.
+- **`process`, `service`, `update`, Plugins, Dateizuordnungen:** jfWord nutzt keines davon; es gibt dafür keine Menüs.
+  „Exportieren“ und „Optionen“ sind wie auf dem Desktop grau (noch nicht gebaut, mit Hinweis).
+- **Tests:** `jfgui_ANDROID_CONSOLE=1 python build_rs.py app jfWord --target android` baut jfWord wie `asynctest` als
+  Programm ohne Oberfläche mit Test-APK. [`apps/jfWord/tests/android.py`](../apps/jfWord/tests/android.py) lässt den
+  Selbsttest und `files.uis`, `editor.uis` und das neue `print.uis` (Testvariante `jfgui_PRINT_TO`) per `adb shell` und
+  im App-Prozess laufen; Skripte, die eine Datei eines früheren Laufs ersetzen, bekommen eine leere
+  (`android_console.py --touch`). Die Suite nimmt das mit `jfgui_TEST_ANDROID` mit.
+- **CI:** [`tools/android_ci.py`](../tools/android_ci.py) baut `coretest`, `plattest`, `asynctest` und `jfWord` für
+  x86-64, legt ein AVD in einem eigenen Ordner an (Bild `system-images;android-35;default;x86_64`, nichts wird
+  geladen), startet den Emulator ohne Fenster, wartet auf den Start und lässt die Tests laufen (`coretest`, `plattest`
+  `all`, `threads`, `kernel`, `vfs`, `asynctest` `tasks.uis` und `copy.uis`, `jfWord`), danach Emulator weg, AVD
+  gelöscht; `--dry-run`, `--keep`, `--only`. [`.github/workflows/android.yml`](../.github/workflows/android.yml)
+  (von Hand gestartet, `ubuntu-24.04`): eine udev-Regel öffnet `/dev/kvm`, `sdkmanager` holt platform-tools,
+  `platforms;android-36`, `build-tools;36.0.0`, NDK r29, den Emulator und das Bild, dann das Skript; das Log des
+  Emulators als Artefakt, wenn etwas scheitert. Keine fremden Actions.
+- **Lokal geprüft:** `python tools/android_ci.py` unter Windows (das SDK des Rechners, nichts geladen): Start des
+  Emulators in 104 s, dann 8 von 8 grün, je per `adb shell` und im App-Prozess (`untrusted_app`, seccomp 2): `coretest`
+  5557 und 5554 Prüfungen (345 s), `plattest` `all` 219, `threads` 32, `kernel` 65, `vfs` 132, `asynctest` `tasks.uis`
+  und `copy.uis`, `jfWord` (Selbsttest 10669 von 10669, `files.uis`, `editor.uis`, `print.uis`; 87 s); zusammen etwa
+  11 Minuten nach dem Bau. Unter WSL Ubuntu-24.04 (Linux, ohne Android-SDK): die YAML lädt, die Skripte übersetzen,
+  `android_ci.py --dry-run` nennt die Schritte, ohne SDK und ohne Zugriff auf `/dev/kvm` bricht es mit klarer Meldung ab;
+  der Schritt mit `sdkmanager` lief unter `bash -eo pipefail` (wie auf GitHub) mit einem nachgebauten `sdkmanager`:
+  ein gescheiterter Download bricht ab und zeigt das Log. Nicht lokal prüfbar: die udev-Regel (kein sudo), der Bau
+  mit dem Linux-NDK und der Emulator unter Linux.
+- **Doku:** README (Plattformen, Apps, Android-Absatz, `android_ci.py`), GUIDE §12, `plat` (welche Module wo; daraus
+  API.md und `lib/jflib/docs`), die README der Fassade, CHANGELOG, ROADMAP §9, `apps/jfWord/README.md` und
+  `FEATURES.md`. Die Website (`jflibWebsite`) ist nicht geändert; der Text für die Plattformen wird zuerst mit dem
+  Nutzer abgestimmt.
+
+Offen nach AN5:
+
+- Der erste Lauf von `android.yml` auf GitHub (dort erst wird der Job grün).
+- `jfWord` auf dem A56 von Hand (nur auf Zuruf).
+- Androids Downloads-Anbieter gibt derselben Datei je nach Weg verschiedene `content://`-Namen (angelegt:
+  `document/2`, geöffnet: `document/raw:…`); „Zuletzt verwendet“ kann sie zweimal zeigen.
+- jfWord sichert nichts, wenn Android den Prozess im Hintergrund beendet (wie auf dem Desktop beim Absturz); eine
+  Wiederherstellung wäre eigene Arbeit.
+- Drucken in jfWord als Bilder; der Druck läuft auf dem UI-Thread (ein sehr langes Dokument kann unter Android einen
+  ANR auslösen).
 
 ## Bewusst nicht
 
@@ -759,7 +827,8 @@ Fassade). AN4 braucht AN3 für die Schriften des Systems.
 | Netz ins Internet | A56 im WLAN, Emulator | nur mit Zustimmung, nur öffentliche Prüfserver wie in `tls_web_check.py` |
 | Oberfläche | Skripte der `androidGallery`, `GalleryInstrumentation` | keine echte Eingabe, solange der Nutzer das Telefon bedient |
 | Drucken | Emulator und A56 per Skript (`android_system.py`: Dialog, Zurück, „Als PDF speichern“; das A56 mit `--package --only print --save-pdf`) | „Als PDF speichern“, kein echter Drucker nötig; der Speicherdialog ist auf Samsung „Eigene Dateien“ |
-| CI | Ubuntu-Runner mit KVM und Emulator (AN5) | kein echtes Gerät |
+| CI | Ubuntu-Runner mit KVM und Emulator: `.github/workflows/android.yml` startet `tools/android_ci.py` (lokal genauso, AN5) | kein echtes Gerät, keine Oberfläche, nur x86-64 |
+| `jfWord` | `apps/jfWord/tests/android.py` (Selbsttest, Skripte; Bau mit `jfgui_ANDROID_CONSOLE=1`), das APK von Hand | der Dateiwähler und der Druckdialog nur von Hand |
 
 Die Regel gegen Fenster-Fluten gilt auch hier: höchstens drei Runden pro Variante, keine echte Eingabe unter dem
 Finger oder Zeiger des Nutzers.
@@ -768,6 +837,8 @@ Finger oder Zeiger des Nutzers.
 
 1. **Welche Apps bekommen Android?** Heute nur Test-Apps und die `androidGallery`. Vorschlag: nach AN2 `jfWord`
    oder `gallery`; JFPainter und JFNetworker entscheiden in ihren eigenen Repositories.
+   **Entschieden (Nutzer, 2026-11-28):** `jfWord` bekommt Android, sonst keine weitere App dieses Repositories.
+   JFPainter und JFNetworker entscheiden in ihren eigenen Repositories. (Umgesetzt in AN5.)
 2. **Hintergrundarbeit:** Braucht eine App (etwa der Agent von JFBackup) Arbeit, die ohne sichtbare Activity
    weiterläuft? Das wäre ein eigener Plan mit Vordergrunddienst oder WorkManager. Vorschlag: nicht in diesem Plan.
 3. **Prozesse aus dem Ordner der nativen Bibliotheken:** Braucht eine App eigene Helferprogramme auf Android?

@@ -2184,6 +2184,13 @@ if (desc.render)(&args, &mut dst) == 0 {
   The output through the GPU: `android_gpu.py --serial S` (the swapchain, its life cycle, the fallback),
   `apps/gputest/tests/android.py --serial S` (`gputest` as a program for `adb shell`); the suite runs
   these two with `jfgui_TEST_ANDROID=S`.
+  Programs without a UI (`coretest`, `plattest`, `asynctest`) build for Android as a program for
+  `adb shell` and a test APK beside it; `python tools/android_console.py APP --serial S [-- ARGS]`
+  runs them both ways, the APK in an app's process with the system's seccomp filter
+  ([ANDROID.md](ANDROID.md), AN0). An app with an APK builds that way with
+  `jfgui_ANDROID_CONSOLE=1` (`apps/jfWord/tests/android.py`: its self-test and scripts).
+  `python tools/android_ci.py` does all of it on an emulator of its own, as the workflow
+  `android.yml` does on GitHub; the suite takes these runs too with `jfgui_TEST_ANDROID=S`.
 * Look at screenshots (`shot`) with an image viewer or the Read tool; test dark and light and
   150 %. Real windows: `python tools/wincap.py build/win/NAME.exe --out cap.png`,
   `python tools/wslcap.py --title T --out cap.png -- build/linux/NAME`.

@@ -203,6 +203,7 @@ impl Word {
                 self.source_query.clear();
                 self.source_sel = 0;
                 self.path.clear();
+                self.path_name.clear();
                 self.selected = 0;
                 self.active_note = None;
                 self.active_cell = None;
@@ -230,7 +231,7 @@ impl Word {
     pub(crate) fn save(&mut self, ui: &mut Ui, path: String) -> bool {
         #[cfg(target_arch = "wasm32")]
         if self.browser_save.is_some() { self.message = String::from("Speicherung läuft noch."); return false; }
-        if !path.to_ascii_lowercase().ends_with(".docx") {
+        if !file_ui::file_label(&path).to_ascii_lowercase().ends_with(".docx") {
             self.message = String::from("Bitte als .docx speichern.");
             self.after_save = false;
             return false;
@@ -266,6 +267,7 @@ impl Word {
         if self.path != path || self.document_dirty() {
             self.document_epoch = self.document_epoch.wrapping_add(1);
         }
+        self.path_name = file_ui::file_label(&path);
         self.path = path;
         self.shell.has_document = true;
         self.editor.mark_saved();

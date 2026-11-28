@@ -98,6 +98,31 @@ python -m http.server 8765 --bind 127.0.0.1 --directory build/wordcraft-table-fo
 Der Server wird hier nur für die Bereitstellung gestartet. Die Web-App benötigt keinen
 Backenddienst; Agentensteuerung bleibt auch im Browser bis zur ausdrücklichen Aktivierung aus.
 
+### Android
+
+`android` steht in `TARGETS` ([ANDROID.md](../../docs/ANDROID.md), AN5). Das APK nimmt den
+gemeinsamen Java-Host der Bibliothek unter dem Paket `org.jfreund.jfWord` (`android/`):
+
+```powershell
+python build_rs.py app jfWord --target android --android-abi x86_64   # Emulator; ohne --android-abi arm64-v8a
+adb install -r build/android/jfWord-x86_64-debug.apk
+```
+
+Dokumente öffnet und speichert jfWord über den Dateiwähler des Systems (`content://`-Namen;
+Dateityp und Titel kommen aus dem Anzeigenamen des Dokuments), **Datei / Drucken** geht in den
+Druckdialog von Android (auch „Als PDF speichern“), die Schriftliste zeigt die Schriften des
+Systems. Auf einem Telefon ist die Leiste der Dateiansicht schmaler und die Liste „Zuletzt
+verwendet“ zeigt Name und Datum ohne Spalten. Prozesse, Updates außerhalb des Stores, Plugins und
+Dateizuordnungen nutzt jfWord nicht.
+
+Ohne Oberfläche laufen der Selbsttest und die Skripte `files.uis`, `editor.uis` und `print.uis`
+per `adb shell` und im App-Prozess:
+
+```powershell
+$env:jfgui_ANDROID_CONSOLE = '1'; python build_rs.py app jfWord --target android --android-abi x86_64
+python apps/jfWord/tests/android.py --serial emulator-5554
+```
+
 ```powershell
 # Mit einem unterstützten Dokument starten:
 python build_rs.py run jfWord --target win -- --file build/jfword-check/win/sample.docx

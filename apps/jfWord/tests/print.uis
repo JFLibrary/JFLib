@@ -1,0 +1,11 @@
+#!args --editor
+#!only linux android
+# Datei / Drucken through plat::PrintDoc's test variant: jfgui_PRINT_TO writes the pages as our PDF
+# into the file, without a dialog (Windows' test variant needs a printer, macOS shows its dialog).
+theme light
+click #10000
+type "Gedruckte Seite"
+system env jfgui_PRINT_TO build/jfword-print.pdf
+cmd 54
+expect text:"Druckauftrag mit 1 Seite übergeben" exists
+expect_nowarn

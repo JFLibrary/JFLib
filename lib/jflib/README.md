@@ -103,7 +103,7 @@ strip = "symbols"
 | macOS | `cargo build` on a Mac; `cargo jflib mac` makes `NAME.app` | Apple silicon; Apple's linker needs nothing in `.cargo/config.toml` |
 | iOS | `cargo build --target aarch64-apple-ios` (or `aarch64-apple-ios-sim`) on a Mac | devices and the simulator; `cargo jflib` makes no iOS app yet |
 | Browser | `cargo jflib web` | scalar, SIMD and with threads, the page around them and the licences in `target/jflib-web/NAME/`; threads need `rustup component add rust-src` |
-| Android | `cargo jflib android` | an APK for `arm64-v8a` (or `--abi x86_64` for the emulator) in `target/jflib-android/`; needs the Android SDK, the NDK, a JDK and `rustup target add aarch64-linux-android`; the app's code in `src/lib.rs` as the template has it |
+| Android | `cargo jflib android` | an APK for `arm64-v8a` (or `--abi x86_64` for the emulator) in `target/jflib-android/`; needs the Android SDK, the NDK, a JDK and `rustup target add aarch64-linux-android`; the app's code in `src/lib.rs` as the template has it. Threads, the network (`netio`), files (`datastore`, `cas`), printing and the system's fonts work as on the desktop; `plat::process` and `plat::service` answer that they are not supported, `update` is missing (apps update through their store) |
 
 The style: `jflib::style` is WinUI unless the environment variable `JFLIB_STYLE` names another
 (`classic`, `kde`, `macos`, `netlab`). All five are always there under their own names for the

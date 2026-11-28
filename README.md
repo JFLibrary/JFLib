@@ -164,7 +164,7 @@ The following table describes the build paths available in the current repositor
 | --- | --- | --- |
 | **Windows** | Native x86-64 and ARM64 app, `--target win` (`--arch aarch64`) | Win32 windows and desktop integration; ARM64 checked on GitHub's `windows-11-arm` runner, not yet on a device of its own ([ARM64 plan](docs/ARM64.md)) |
 | **Linux** | Native x86-64 and ARM64 app, `--target linux` (`--arch aarch64`) | Wayland and X11; the backend is selected at startup; ARM64 checked on GitHub's `ubuntu-24.04-arm` runner and in an ARM64 VM, GPU there only with lavapipe |
-| **Android** | Native APK, `--target android` | `androidGallery`, ARM64 and x86-64 emulator; Android 8 / API 26 or later |
+| **Android** | Native APK, `--target android` | `androidGallery` and `jfWord`, ARM64 and x86-64 emulator; Android 8 / API 26 or later; threads, network, files, printing and the system's fonts as on the desktop, tested on the emulator and an Android 16 phone, the emulator's run also as the workflow `android.yml` ([Android plan](docs/ANDROID.md)) |
 | **macOS** | Native ARM64 app, `--target mac` (built on a Mac) | AppKit windows, menus, Dock, notifications and services; GPU through Metal; `NAME.app` and `.dmg`, updates of the whole bundle; Apple silicon, macOS 13 or later |
 | **iOS** | Native ARM64 app, `--target ios` (built on a Mac; `--sim` for the simulator) | `androidGallery` as an iPhone app: UIKit host, touch, Apple Pencil, keyboards, sensors, files, clipboard, GPU through Metal; iOS 16 or later |
 | **Web** | WebAssembly and a shared browser host, `--target web` | Includes `template`, `gallery`, `Kritzel`, and `jfWord` |
@@ -173,11 +173,15 @@ The documented browser test matrix covers Chromium and Firefox. Separate Safari/
 validation has not yet been documented here. The `macos` style is independent of the
 target platform: it can also be built into a Windows app, for example.
 
-The Android port is currently available through the Pocket Gallery. The Android adapter
-uses the system's file picker (Storage Access Framework, with access kept across restarts),
-persistent app storage, and the system clipboard; other desktop services are more limited.
-The [Android documentation](apps/androidGallery/README.md) describes the port and its
-current limitations.
+On Android the apps run on a Java host of their own (no Gradle): the system's file picker
+(Storage Access Framework, with access kept across restarts), persistent app storage, the
+system clipboard, printing through the system's print dialog (also "Save as PDF") and the
+system's fonts. Below the UI the library has the same services as on the desktop: real threads
+and the pool, sockets and TLS, the file system with folder watching, `datastore` and `cas`.
+What Android does not have answers as unsupported instead of failing to build: child processes,
+system services, updates outside the store, the tray symbol, global hotkeys and autostart
+([Android plan](docs/ANDROID.md), "Bewusst nicht"). The
+[Android documentation](apps/androidGallery/README.md) describes the host and its tests.
 
 ## Apps
 
@@ -189,7 +193,7 @@ The first column is the app's folder under `apps/`: `cd apps/NAME`, then `cargo 
 | [`gallery`](apps/gallery/main.rs) | A widget gallery for exploring controls, layout, and styles | Windows, Linux, Web |
 | [`Kritzel`](apps/Kritzel/README.md) | A drawing app with brushes, shapes, text, selections, and layers | Windows, Linux, Web |
 | [JFPainter](https://github.com/JFLibrary/JFPainter) | An image editor with layers, history, effects, many image formats, and native plugins; formerly PaintCraft, now in its own repository and built from the crate `jflib` on crates.io | Windows, Linux, Web |
-| [`jfWord`](apps/jfWord/README.md) | A word processor with a ribbon, page view, text styles, tables, references, and DOCX support | Windows, Linux, Web |
+| [`jfWord`](apps/jfWord/README.md) | A word processor with a ribbon, page view, text styles, tables, references, and DOCX support | Windows, Linux, Web, Android |
 | [`buildManager`](apps/buildManager/README.md) | A graphical build app for applications, styles, profiles, tests, and release packages | Windows, Linux |
 | [`BackupCraft`](apps/BackupCraft/README.md) | A backup suite: console, server (`bc-server`), agents (`bc-agent`), and `bcctl`; deduplicated, encrypted, signed backups with schedules, roles, and audit; copy jobs, replication with failover, continuous protection, tape, QEMU/KVM VMs with instant start and boot checks, volume images, a central view of several servers | Windows, Linux |
 | [JFNetworker](https://github.com/JFLibrary/JFNetworker) | A network simulator and lab for distributed systems, an alternative to Cisco Packet Tracer: a topology editor with cables and port choice, IOS-like and Linux consoles, ARP, IPv4, VLANs, DHCP, DNS, TCP and HTTP byte for byte, a step-by-step simulation mode with event list and packet view, pcapng export; German and English; now in its own repository, with JFScript for the scripts in its hosts | Windows, Linux |
@@ -415,7 +419,11 @@ signed with a local debug key. `--release` signs with the release key named by
 `<app>-<abi>-release.apk`; without them the build stops and names what is missing
 (`jfgui_ANDROID_DEBUG_SIGN=1` keeps the debug key for test builds; docs/PACKAGING.md,
 "Signing"). Only builds under the debug key are debuggable (the self-tests' `jfgui_*`
-extras); a manifest that sets `android:debuggable` stops a release build. Other apps
+extras); a manifest that sets `android:debuggable` stops a release build.
+`python tools/android_ci.py` runs the tests without a UI on an emulator of its own (an AVD
+from the local `system-images;android-35;default;x86_64`, nothing downloaded): `coretest`,
+`plattest`, `asynctest` and `jfWord`'s self-test per `adb shell` and in an app's process,
+as the workflow `android.yml` does on GitHub. Other apps
 need an Android entry in `TARGETS` and a suitable manifest and resources.
 
 An app of your own builds for the browser (`cargo jflib web`), Android (`cargo jflib android`) and iOS

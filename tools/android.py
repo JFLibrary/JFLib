@@ -5,7 +5,8 @@ with `android` in TARGETS and supply android/AndroidManifest.xml and android/res
 A program without a UI (`android` in TARGETS, ui not among its crates: apps/gputest; or without
 android/AndroidManifest.xml: plattest, asynctest) is a plain executable for `adb shell` instead
 (build_exe, android/exe_main.c), with a test APK that runs it in an app's process (build_console_apk,
-tools/android_console.py).
+tools/android_console.py).  jfgui_ANDROID_CONSOLE=1 builds an app with android/AndroidManifest.xml that
+way too, instead of its APK (jfWord's self-test and headless scripts in an app's process).
 jfgui_ANDROID_PACKAGE=NAME (test builds): the APK under another package, beside what is installed
 on a phone, which it leaves alone (other debug keys, the user's data there).
 """
@@ -113,7 +114,8 @@ def sdk_tools():
     if not platform.is_file():
         raise RuntimeError('Android SDK Platform 36 missing; install platforms;android-36.')
     java_home = os.environ.get('JAVA_HOME')
-    java = Path(java_home) / 'bin' if java_home and (Path(java_home) / 'bin' / 'javac.exe').exists() else None
+    javac_name = 'javac.exe' if os.name == 'nt' else 'javac'
+    java = Path(java_home) / 'bin' if java_home and (Path(java_home) / 'bin' / javac_name).exists() else None
     if java is None:
         javac = shutil.which('javac')
         if not javac:
