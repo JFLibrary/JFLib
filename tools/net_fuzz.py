@@ -1,5 +1,5 @@
 """net_fuzz.py -- mutation fuzzing of the parsers that read untrusted bytes in compress, formats, netchan,
-netio, netpkt and plat.
+netio, netpkt, plat and the image decoders img_jp2 and img_jbig2.
     python tools/net_fuzz.py [--seconds N] [--only T,..]
 Builds tools/net_fuzz/fuzz.rs (with panic = "unwind", overflow checks and debug assertions) into
 build/net_fuzz and runs every target on its own thread for N seconds (default 60):
@@ -46,9 +46,20 @@ build/net_fuzz and runs every target on its own thread for N seconds (default 60
   ipv4_reassembly, ipv6_reassembly   netpkt's fragment reassembly fed mutated, reordered,
                                 duplicated and overlapping fragments
   netpkt_decode, netpkt_app     the dissector, and SNMP, RADIUS, BGP, mail, SSH KEXINIT parsers
-The seeds are built by the program itself, plus the system's certificates and frames of the
-reference `zstd` (levels, --long, --ultra) when that tool is there.  No coverage feedback: this
-finds panics, hangs and slow inputs near the seeds, not deep paths (cargo-fuzz would).
+  img_jp2                       the JPEG 2000 decoder: img_all's codec (into ARGB) and a lower
+                                resolution with the components as coded, under a cap of 2^20
+                                pixels; seeds: pdftest's images, JP2 headers made around them
+                                (palette, ICC, channel definitions, sYCC, CIELab, 64-bit boxes)
+                                and small files of Pillow (OpenJPEG) when it is there
+  img_jbig2                     the JBIG2 decoder: files (every page, and img_all's codec) and
+                                PDF's embedded form with its globals (the input: their length in
+                                two bytes, them, the page's segments), under a cap of 2^22 pixels;
+                                seeds: every kind of segment, made in targets.rs
+The seeds are built by the program itself, plus the system's certificates, frames of the
+reference `zstd` (levels, --long, --ultra) when that tool is there and JPEG 2000 files of Pillow
+(tiles, precincts, the progressions, layers, the 9/7 wavelet, 16 bits, PLT) when it is there.
+No coverage feedback: this finds panics, hangs and slow inputs near the seeds, not deep paths
+(cargo-fuzz would).
 A panic (a crash under panic = "abort", the library's setting), a hang (a call over 10 s) or a call
 over --slow seconds fails the run, and so does a run in which the target selftest_panic (a
 deliberate panic) found nothing; the inputs are in build/net_fuzz/out.  Linux (from Windows:
@@ -84,7 +95,10 @@ def build():
         dep("netpkt", "jflib-netpkt"),
         dep("netio", "jflib-netio"),
         dep("formats", "jflib-formats"),
-        dep("netchan", "jflib-netchan"), "",
+        dep("netchan", "jflib-netchan"),
+        dep("img_core", "jflib-img-core"),
+        dep("img_jp2", "jflib-img-jp2"),
+        dep("img_jbig2", "jflib-img-jbig2"), "",
         "[profile.release]", "opt-level = 3", "debug = 1", "debug-assertions = true", "overflow-checks = true",
         'panic = "unwind"', "",
     ]), encoding="utf-8")
@@ -98,9 +112,54 @@ def build():
     return OUT / "target" / "release" / "fuzz"
 
 
+# small JPEG 2000 files of Pillow (OpenJPEG) for the seeds of img_jp2: (name, mode, size, save options),
+# the options of tools/jp2_check.py's made suite at small sizes (OpenJPEG asserts on some others)
+JP2_SEEDS = [
+    ("tiles", "RGB", (40, 30), {"tile_size": (16, 16), "num_resolutions": 3}),
+    ("lossy", "RGB", (48, 40), {"irreversible": True, "quality_layers": [30, 10], "quality_mode": "rates"}),
+] + [("prog-" + p, "RGB", (33, 29), {"progression": p, "tile_size": (16, 24), "num_resolutions": 3, "precinct_size": (32, 32), "codeblock_size": (8, 8)})
+     for p in ("LRCP", "RLCP", "RPCL", "PCRL", "CPRL")] + [
+    ("gray16", "I;16", (24, 20), {}),
+    ("la-97", "LA", (20, 20), {"irreversible": True}),
+    ("rgba-cblk4", "RGBA", (40, 36), {"codeblock_size": (4, 4)}),
+    ("offset", "RGB", (30, 26), {"offset": (5, 3), "tile_offset": (2, 1), "tile_size": (12, 10)}),
+    ("plt", "L", (32, 32), {"plt": True}),
+    ("layers-53", "RGB", (32, 24), {"quality_layers": [40, 10, 0], "quality_mode": "rates"}),
+    ("no-mct", "RGB", (24, 24), {"mct": 0}),
+    ("res6", "L", (64, 64), {"num_resolutions": 6}),
+    ("tiny", "L", (1, 1), {"num_resolutions": 1}),
+    ("raw", "L", (16, 16), {"no_jp2": True, "num_resolutions": 2}),
+]
+
+
+def jp2_seeds(d):
+    """the files of JP2_SEEDS into d (pil-NAME.jp2, .j2k for a raw codestream), when Pillow is there"""
+    try:
+        from PIL import Image
+    except ImportError:
+        print("net_fuzz: no Pillow; img_jp2 starts from the library's own images only")
+        return
+    r = random.Random(11)
+    for name, mode, (w, h), opt in JP2_SEEDS:
+        top = 65535 if mode == "I;16" else 255
+        nch = len(Image.new(mode, (1, 1)).getbands())
+        # a gradient with some noise, shifted per band: code-blocks with data in every band
+        px = []
+        for y in range(h):
+            for x in range(w):
+                v = ((x * 7 + y * 5) * top // (w * 7 + h * 5) + r.randrange(0, top // 16)) % (top + 1)
+                px.append(v if nch == 1 else tuple((v + 60 * c) % (top + 1) for c in range(nch)))
+        im = Image.new(mode, (w, h))
+        im.putdata(px)
+        try:
+            im.save(d / f"pil-{name}.{'j2k' if opt.get('no_jp2') else 'jp2'}", format="JPEG2000", **opt)
+        except (OSError, ValueError) as e:
+            print(f"net_fuzz: Pillow did not write the JPEG 2000 seed {name} ({e})")
+
+
 def seeds():
-    """build/net_fuzz/seeds: the system's certificates, the reference zstd's frames and (when
-    fetched) google/brotli's test streams"""
+    """build/net_fuzz/seeds: the system's certificates, the reference zstd's frames, (when fetched)
+    google/brotli's test streams and (with Pillow) JPEG 2000 files"""
     d = OUT / "seeds"
     d.mkdir(parents=True, exist_ok=True)
     for b in CA_BUNDLES:
@@ -112,6 +171,7 @@ def seeds():
     # google/brotli's test streams, where tools/brotli_check.py --vectors fetched them
     for f in sorted(ROOT.glob("build/vectors/brotli-*/tests/testdata/*.compressed*")):
         shutil.copyfile(f, d / f"{f.name}.br")
+    jp2_seeds(d)
     if shutil.which("zstd") is None:
         print("net_fuzz: no zstd tool; zstd starts from the library's own frames only")
         return d
