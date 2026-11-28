@@ -1,0 +1,50 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD21: Start › Bearbeiten › Shape ändern (SP-11, RS-28, SH-G05) -- the gallery shows
+# the quick shapes of the active stencil and the open stencils, unfolded on a click; the selected
+# shape becomes an instance of the master chosen, with its place, size, text and its connector;
+# several shapes at once; one undo step each
+click button:"Weitere Shapes"
+click "Allgemein"
+click "Standard-Shapes"
+cmd 4404
+drag 500,330 640,420
+drag 820,330 960,420
+cmd 4401
+drag 640,375 820,375
+cmd 4400
+click 1000,650
+expect button:"Shape ändern" disabled
+click 570,375
+type "Antrag"
+click 1000,650
+click 570,375
+expect listitem:"Antrag" selected
+expect button:"Breite: 60 mm  Höhe: 40 mm  Winkel: 0°" exists
+click button:"Shape ändern"
+expect menuitem:"Ellipse" exists
+expect menuitem:"Raute" missing
+click menuitem:"Ellipse"
+expect listitem:"Antrag" selected
+expect button:"Breite: 60 mm  Höhe: 40 mm  Winkel: 0°" exists
+# the connector stays glued: the new shape moved, its end follows
+wait 600
+drag 570,375 570,475
+expect listitem:"Sheet.6" rect 651 374 179 101
+key ctrl+z
+key ctrl+z
+expect listitem:"Antrag" exists
+# several at once, from a stencil unfolded in the gallery
+click 570,375
+click 890,375 shift
+click button:"Shape ändern"
+click menuitem:"▸ Standard-Shapes"
+expect menuitem:"▾ Standard-Shapes" exists
+click menuitem:"Raute"
+expect listitem:"Antrag" selected
+expect listitem:"Raute.9" selected
+click 1000,650
+click 890,375
+expect button:"Breite: 50 mm  Höhe: 40 mm  Winkel: 0°" exists
+key ctrl+z
+expect listitem:"Sheet.5" exists
+expect listitem:"Raute.9" missing

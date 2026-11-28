@@ -275,8 +275,9 @@ They are now refused on every system and need no entry. The known differences ar
 
 ### badssl.com through `Trust::System`
 
-`python tools/tls_web_check.py --internet-only [--target linux|win|mac]` connects with
-`coretest --tls-web` (`Trust::System`) to public hosts:
+`python tools/tls_web_check.py --internet-only [--target linux|win|mac|android]` connects with
+`coretest --tls-web` (`Trust::System`) to public hosts. For `android` it runs on a device or
+emulator by adb, from `adb shell` and in the test APK (docs/ANDROID.md, AN2):
 
 - **Must work:** www.google.com, github.com, and badssl.com's TLS 1.2-only, RSA-2048/4096 and
   P-256/384 hosts.
@@ -285,10 +286,10 @@ They are now refused on every system and need no entry. The known differences ar
   trusted").
 - **Shown, not counted:** revoked and incomplete-chain. The answers differ by system:
   - Revocation: Windows reads its cache and the staple, Apple works without network access,
-    Linux sees only a staple, and badssl's server sends none. On the 2026-11-27 runs all three
-    systems took revoked.badssl.com.
-  - A missing intermediate: Windows fetches it and takes incomplete-chain; macOS and Linux
-    refuse it as "not trusted".
+    Linux and Android see only a staple, and badssl's server sends none. On the 2026-11-27 runs
+    all four systems took revoked.badssl.com.
+  - A missing intermediate: Windows fetches it and takes incomplete-chain; macOS, Linux and
+    Android refuse it as "not trusted".
 
 badssl's known-bad roots (superfish and the like) serve expired certificates, so netio says
 "expired" before it asks about the root. They are not in the list.

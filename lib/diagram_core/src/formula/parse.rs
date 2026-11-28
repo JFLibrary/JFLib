@@ -121,6 +121,9 @@ funcs! {
     Pnt = "PNT", PntX = "PNTX", PntY = "PNTY", Par = "PAR", Loc = "LOC", Nurbs = "NURBS",
     Polyline = "POLYLINE", Bound = "BOUND", AngleToLoc = "ANGLETOLOC", AngleToPar = "ANGLETOPAR",
     LocToLoc = "LOCTOLOC", LocToPar = "LOCTOPAR",
+    // (JD21) the meeting point of two lines (an end glued to a guide: Visio writes
+    // INTERSECTX/Y(guide's pin and angle, the end's own point, the guide's angle + 90 deg))
+    IntersectX = "INTERSECTX", IntersectY = "INTERSECTY",
     // colour and theme (FX-08)
     Rgb = "RGB", Hsl = "HSL", Red = "RED", Green = "GREEN", Blue = "BLUE", Hue = "HUE", Sat = "SAT",
     Lum = "LUM", HueDiff = "HUEDIFF", SatDiff = "SATDIFF", LumDiff = "LUMDIFF", Tint = "TINT",

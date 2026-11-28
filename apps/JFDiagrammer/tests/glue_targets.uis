@@ -1,0 +1,60 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD21 glue (CN-02): static glue to a guide, a vertex and a handle -- a line's end
+# dropped near a guide goes onto it (the handle green: glued) and follows the guide when it moves
+# (arrow keys, Nach Typ auswählen); Ausrichten und Kleben › Kleben an Shape-Scheitelpunkte and
+# Shape-Ziehpunkte (off at first): a line's end on a rectangle's corner glues there and follows the
+# vertex when it is dragged with the pencil tool, another one on the middle of its left side
+# glues to that handle and follows the rectangle
+drag #23296 700,300
+cmd 4406
+drag 500,450 600,302
+expect listitem:"Sheet.5" rect 500 301 101 148
+cmd 4400
+expect pixel 598 298 #2E9E44
+click 1000,700
+cmd 4472
+click checkbox:"Shapes"
+click checkbox:"Gruppen"
+click checkbox:"Bilder"
+click checkbox:"Verbinder"
+click checkbox:"Führungslinien"
+click button:"OK"
+key up
+expect listitem:"Sheet.4" rect 400 275 746 1
+expect listitem:"Sheet.5" rect 500 275 101 174
+key ctrl+z
+expect listitem:"Sheet.5" rect 500 301 101 148
+# the guide goes (Del): the line keeps its place, its end free again
+key delete
+expect listitem:"Sheet.5" rect 500 301 101 148
+click 1000,700
+# Kleben an: off as in Visio, then on
+cmd 5131
+expect checkbox:"Shape-Scheitelpunkte" unchecked
+expect checkbox:"Shape-Ziehpunkte" unchecked
+click checkbox:"Shape-Scheitelpunkte"
+click checkbox:"Shape-Ziehpunkte"
+click button:"OK"
+cmd 4404
+drag 700,400 800,480
+cmd 4406
+drag 900,300 801,401
+drag 600,560 701,442
+expect listitem:"Sheet.7" rect 802 299 100 100
+expect listitem:"Sheet.8" rect 601 437 100 113
+# the corner dragged with the pencil tool: the first line follows it
+cmd 4409
+click 750,440
+wait 600
+drag button:"Scheitelpunkt 3" 850,360
+expect listitem:"Sheet.6" rect 701 349 151 126
+expect listitem:"Sheet.7" rect 852 299 50 50
+# the rectangle moved up: both lines follow
+cmd 4400
+click 1000,700
+wait 600
+click 750,440
+wait 600
+drag 750,440 750,400
+expect listitem:"Sheet.7" rect 852 299 50 1
+expect listitem:"Sheet.8" rect 601 361 100 189

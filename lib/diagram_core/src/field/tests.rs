@@ -319,3 +319,13 @@ fn field_marks_in_written_text() {
     tx.commit();
     assert_eq!(f.text(), "Seite: Ablauf");
 }
+
+// (JD19) esc(n) is Visio's code of a general picture (FIELDPICTURE(0), the Format of its callout
+// fields): numbers as with no picture, texts unchanged
+#[test]
+fn esc_pictures_are_general() {
+    let env = Env::default();
+    assert_eq!(num(1234.5, None, "esc(0)", &env), num(1234.5, None, "", &env));
+    assert_eq!(format(&Shown::Text("Kosten: 1.999,50 €"), "esc(0)", &env), "Kosten: 1.999,50 €");
+    assert_ne!(num(1234.5, None, "esc(", &env), "");
+}

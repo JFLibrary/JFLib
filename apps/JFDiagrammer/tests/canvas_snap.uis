@@ -24,7 +24,9 @@ expect checkbox:"Ausrichten" checked
 expect checkbox:"Kleben" checked
 expect checkbox:"Dynamisches Gitter" checked
 expect checkbox:"Raster" checked
-expect checkbox:"Führungslinien" checked
+# (JD21 glue) "Führungslinien" twice: Ausrichten an (#2052063238) and Kleben an (#2052063240)
+expect #2052063238 checked
+expect #2052063240 checked
 expect checkbox:"Verbindungspunkte anzeigen" unchecked
 click checkbox:"Dynamisches Gitter"
 click checkbox:"Verbindungspunkte anzeigen"

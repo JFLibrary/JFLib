@@ -18,7 +18,8 @@ use crate::{out, H};
 const FILES: [&str; 3] = ["Zeichnung2.vsdx", "Zeichnung 3.vsdx", "Favoriten.vssx"];
 
 // the folder: --corpus DIR, else the first apps/JFDiagrammer/context/files above the current folder
-fn folder(arg: Option<String>) -> Option<String> {
+// ((JD21) route.rs reads the connectors' cells there too)
+pub(crate) fn folder(arg: Option<String>) -> Option<String> {
     if let Some(d) = arg {
         return Some(d);
     }

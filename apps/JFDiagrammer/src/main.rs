@@ -46,6 +46,14 @@
 //                     Format, Shapes verbinden, the Verbindungspfeile
 //   src/structures_cff.rs   (JD10) the register Funktionsübergreifendes Flussdiagramm
 //   src/layout_ui.rs  (JD10) Layout-Verhalten per shape, Seite einrichten › Layout und Routing
+//   src/jumps_ui.rs   (JD21) line jumps: Linienübergänge anzeigen, the dialog Verbinder-Verhalten
+//   src/route_ui.rs   (JD21) a connector's midpoints and vertices on the canvas, routing styles
+//                     with their directions in the dialogs, shapes connectors may cross
+//   src/addons.rs     (JD21) Ansicht › Add-Ons: Shapes nummerieren (dlg_number.rs), vervielfältigen
+//                     (dlg_array.rs), Maßlinien (tools_dim.rs); the container styles as galleries
+//                     (container_styles.rs) and Kategorien (dlg_categories.rs)
+//   src/glue_tools.rs (JD21) control points that glue, Kleben an (vertices, handles, guides), the
+//                     connection point tool, several vertices and arcs' handles in vertex editing
 //   src/templates.rs  (JD13) the templates: built-in (build.rs builds them from templates/ into
 //                     .vstx), the own ones, a new drawing from one, Speichern als Vorlage
 //   src/templates_ui.rs  (JD13) Datei › Neu: the catalogue with rendered previews
@@ -55,6 +63,10 @@
 //                     (JD17) and the binary stencils of 2003-2010 (.vss) converted for the
 //                     Shapes panel: import only, never written back (a save writes .vssx)
 //   src/cmds_arrange.rs  (JD8 rest) Automatisch ausrichten
+//   src/layout_cmds.rs   (JD21) Seitenlayout neu anordnen (diagram_core::layout) with the live
+//                     preview of its rows, Positionieren: Automatischer Abstand, Automatische
+//                     Ausrichtung und Abstände, page breaks, Diagramm drehen
+//   src/dlg_layout.rs (JD21) Layout konfigurieren, Abstandsoptionen, Shapes verteilen
 //   src/cmds_later.rs    (JD8 rest) the commands left for later with their reasons, the check
 //   src/cmds_myshapes.rs (JD8 rest) Zu meinen Shapes hinzufügen (shapes of the page into Favoriten)
 //   src/pane_sizepos.rs, pane_data.rs, pane_panzoom.rs  (JD8 rest) the task panes Größe und
@@ -81,11 +93,28 @@
 //                     close (UI-12); Öffnen schreibgeschützt and als Kopie (DM-09, UI-06, UI-05)
 //   src/dlg_shape_name.rs  (JD15) the dialog Shape-Name (SP-01)
 //   src/dlg_snap.rs   (JD15) the dialog Ausrichten und Kleben
+//   src/reports*.rs   (JD19) shape reports: reports (Überprüfen › Shape-Berichte, the dialog
+//                     Berichte, running a report as a table shape, .xlsx, .csv, .html; Bericht
+//                     aktualisieren), reports_wizard (Berichtsdefinition), reports_builtin (the
+//                     predefined reports), reports_export (Datei › Exportieren › Daten
+//                     exportieren, EX-16)
 //   src/data_*.rs     (JD18) external data: data_cmds (when the commands run), data_source
 //                     (reading .xlsx/.csv), data_import (Benutzerdefinierter Import), data_pane
 //                     (Externe Daten), data_refresh (aktualisieren, Intervall, Konflikte),
 //                     data_link (Daten verknüpfen), data_ask (Abfrage beim Ablegen),
 //                     data_textdraw (Zeichnung aus Text)
+//   src/shapeops_cmds.rs  (JD21) the shape operations and Ausrichtungsfeld aktualisieren
+//                     (Start › Anordnen › Gruppieren › Vorgänge until JD23)
+//   src/groups_cmds.rs, groups_view.rs, change_shape.rs  (JD21) Zu Gruppe hinzufügen, Aus Gruppe
+//                     entfernen, Gruppe öffnen (an isolated view on the canvas), the ungroup
+//                     warning, Verhalten, SelectMode and the other group cells on the canvas;
+//                     Start › Bearbeiten › Shape ändern
+//   src/data_graphics*.rs  (JD19) data graphics (diagram_core::datagraphic, the callout masters of
+//                     stencils/datagraphics): data_graphics (the commands, the shapes and fields
+//                     they work on, changes in one undo step), data_graphics_gallery (Daten ›
+//                     Datengrafiken and Erweiterte Datengrafiken with rendered tiles),
+//                     data_graphics_pane (Datengrafikfelder), data_graphics_dlg (Datengrafik
+//                     bearbeiten, Element bearbeiten, Umbenennen)
 //   build.rs, build_steps.rs, stencils/   (JD9) the stencil sources and their build into .vssx
 //                     when the app is built (README there; build_rs.py's derived builds for the
 //                     browser and Android run build_steps.rs too); templates/ (JD13) the
@@ -127,8 +156,12 @@ extern crate alloc;
 
 // (JD15) the question before changes are lost, the ways a file opens
 mod ask_save;
+// (JD21 autoconn) the connector automatics: splitting, healing, the quick shapes bar
+mod autoconn;
 mod backstage;
 mod cmds_actions;
+// (JD21 groups) Shape ändern
+mod change_shape;
 mod cmds_arrange;
 mod cmds_later;
 mod cmds_myshapes;
@@ -138,9 +171,21 @@ mod cmds_paste;
 mod cmds_picture;
 mod cmds_text;
 mod commands;
+// (JD21 tools) Ansicht › Add-Ons, container styles, categories
+mod addons;
+mod container_styles;
+mod dlg_array;
+mod dlg_categories;
+mod dlg_number;
+mod tools_dim;
 // (JD18) data: the register Daten, the pane Externe Daten, import, link, refresh, drawing from text
 mod data_ask;
 mod data_cmds;
+// (JD19) data graphics: the gallery, the pane Datengrafikfelder, the dialogs, the legend
+mod data_graphics;
+mod data_graphics_dlg;
+mod data_graphics_gallery;
+mod data_graphics_pane;
 mod data_import;
 mod data_link;
 mod data_pane;
@@ -167,10 +212,22 @@ mod format_cells;
 mod format_menus;
 mod format_pane;
 mod format_quick;
+// (JD21 groups) Zu/Aus Gruppe, Gruppe öffnen, Verhalten, the groups on the canvas
+mod groups_cmds;
+mod groups_view;
 mod icons;
 mod lang;
 mod layers;
+// (JD21 layout) Seitenlayout neu anordnen, Positionieren: spacing, page breaks, Diagramm drehen
+mod dlg_layout;
+mod layout_cmds;
 mod layout_ui;
+// (JD21 jumps) Linienübergänge anzeigen, Verbinder-Verhalten
+mod jumps_ui;
+// (JD21 route) a connector's way by hand, routing styles with directions, permeable shapes
+mod route_ui;
+// (JD21 glue) glued control points, Kleben an, the connection point tool, arcs' handles
+mod glue_tools;
 // (JD13) the legend of a network plan counts its devices
 mod legend;
 mod options;
@@ -183,10 +240,18 @@ mod panes;
 mod print_layout;
 mod print_ui;
 mod qat;
+// (JD19) shape reports, Daten exportieren
+mod reports;
+mod reports_builtin;
+mod reports_export;
+mod reports_wizard;
 // (JD13) equipment snaps onto the units of a rack
 mod rack;
 mod ribbon;
 mod select_type;
+// (JD21) Vorgänge: Gesamtmenge, Kombinieren, In Einzelmengen zerlegen, Schnittmenge bilden,
+// Subtrahieren, Ausrichtungsfeld aktualisieren
+mod shapeops_cmds;
 mod shell;
 mod stencils;
 mod stencils_drop;
@@ -334,6 +399,26 @@ pub(crate) struct Diagrammer {
     pub dlink: data_link::LinkState,
     pub dask: data_ask::AskState,
     pub textdraw: data_textdraw::TextDrawState,
+    /// (JD21 layout) the layout commands: live preview, Seitenumbrüche vermeiden, the dialogs
+    pub lay: layout_cmds::LayoutCmds,
+    /// (JD21 jumps) Verbinder-Verhalten, Linienübergänge anzeigen (jumps_ui.rs)
+    pub jumps: jumps_ui::JumpsState,
+    /// (JD21 autoconn) the connector automatics: a move's split, the tool "once", marked tiles,
+    /// the quick shapes bar
+    pub autoconn: autoconn::AutoConn,
+    /// (JD21 tools) Add-Ons' dialogs, the container styles' galleries (addons.rs)
+    pub addons: addons::Addons,
+    /// (JD21 groups) the open group, the ungroup warning, Verhalten, Shape ändern's gallery
+    pub groups: groups_cmds::GroupsState,
+    /// (JD21 route) the routing rows of Verbinder-Verhalten, Layout-Verhalten and Seite
+    /// einrichten (route_ui.rs)
+    pub route: route_ui::RouteState,
+    /// (JD21 glue) Kleben an: Shape-Ziehpunkte, Shape-Scheitelpunkte (glue_tools.rs)
+    pub glue: glue_tools::GlueState,
+    /// (JD19) data graphics: the field chosen, the tiles, the dialogs
+    pub dg: data_graphics::DgState,
+    /// (JD19) the dialog Berichte, the wizard, running reports, Daten exportieren (reports*.rs)
+    pub reports: reports::ReportsState,
 }
 
 impl Diagrammer {
@@ -407,6 +492,15 @@ impl Diagrammer {
             dlink: data_link::LinkState::default(),
             dask: data_ask::AskState::default(),
             textdraw: data_textdraw::TextDrawState::default(),
+            lay: layout_cmds::LayoutCmds::default(),
+            jumps: jumps_ui::JumpsState::default(),
+            autoconn: autoconn::AutoConn::default(),
+            addons: addons::Addons::default(),
+            groups: groups_cmds::GroupsState::default(),
+            route: route_ui::RouteState::default(),
+            glue: glue_tools::GlueState::default(),
+            dg: data_graphics::DgState::default(),
+            reports: reports::ReportsState::default(),
             page_views: alloc::vec::Vec::new(),
             view_page: None,
         }
@@ -505,6 +599,8 @@ impl App for Diagrammer {
         self.icons = Some(icons::Icons::install(ui));
         self.opts = options::open(ui);
         self.load_layout();
+        // (JD21 layout) Abstandsoptionen's spacing
+        dlg_layout::load_spacing(self);
         self.preview = match plat::arg_value("--shell-preview").as_deref() {
             Some("shape") => ribbon::SEL_SHAPE,
             Some("container") => ribbon::SEL_CONTAINER,
@@ -553,10 +649,17 @@ impl App for Diagrammer {
         commands::states(self, ui);
         // (JD15) the lane commands show in a lane's menu only (ST-05); QuickInfos off (UI-13)
         structures_cff::menu_states(self, ui);
+        // (JD21 jumps) Verbinder-Verhalten in a connector's menu only
+        jumps_ui::menu_states(self, ui);
+        // (JD19) Bericht aktualisieren in a report table's menu only (DA-13)
+        reports::menu_states(self, ui);
         ui.tooltips_set(self.opts.get(&options::TIPS) != 2);
         stencils_panel::states(self, ui);
         shell::frame(self, ui);
         design_gallery::after(self, ui);
+        // (JD21 layout) a layout's live preview goes when its row is left; the dialogs
+        layout_cmds::after(self, ui);
+        dlg_layout::dialogs(self, ui);
         design_store::dialog(self, ui);
         format_menus::after(self, ui);
         export_ui::dialogs(self, ui);
@@ -590,6 +693,17 @@ impl App for Diagrammer {
         data_link::dialog(self, ui);
         data_ask::dialog(self, ui);
         data_textdraw::dialog(self, ui);
+        // (JD21 jumps) Verbinder-Verhalten
+        jumps_ui::dialog(self, ui);
+        // (JD21 tools) a container style's preview goes when its tile is left; the dialogs
+        addons::after(self, ui);
+        addons::dialogs(self, ui);
+        // (JD21 groups) the ungroup warning, Verhalten
+        groups_cmds::dialogs(self, ui);
+        // (JD19) Datengrafik bearbeiten, Element bearbeiten, Umbenennen
+        data_graphics_dlg::dialogs(self, ui);
+        // (JD19) Berichte, the wizard, Bericht ausführen, Daten exportieren
+        reports::dialog(self, ui);
     }
 
     fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {

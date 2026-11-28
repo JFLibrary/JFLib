@@ -1,14 +1,23 @@
 #!args --no-system-fonts
 # JFDiagrammer, JD7, golden images (light theme, the style's fonts): a dynamic connector glued
-# to two shapes routes around a third one between them (both ends glued: green); the third
+# to two shapes routes around a third one between them (both ends glued: green; JD21v: out of the
+# first shape's facing side, over the third one into the second's top, as Visio 16); the third
 # shape turned by its rotation handle and moved into the connector's way: the connector routes
-# again (below), the turned frame shows its eight handles and the rotation handle.
+# again (below), the turned frame shows its eight handles and the rotation handle.  (JD21v) The
+# third shape is made placeable first (Layout-Verhalten: Layout und Routing um das Shape, ObjType
+# 1): Visio 16 routes only around placeable shapes, a drawn one (0) it crosses.
 # New references: the same script with "shot FILE X Y W H" in place of "expect same" (look first)
 theme light
 cmd 4404
 drag 500,330 640,420
 drag 840,330 980,420
 drag 690,290 770,470
+cmd 4400
+click 730,380
+cmd 5422
+expect dialog:"Layout-Verhalten" exists
+click radio:"Layout und Routing um das Shape"
+click button:"OK"
 cmd 4401
 drag 560,370 900,370
 expect same apps/JFDiagrammer/tests/golden/edit_route.png 380 180 640 380

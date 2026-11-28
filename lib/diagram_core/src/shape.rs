@@ -234,6 +234,10 @@ pub(crate) struct Node {
 
 // the first ID a new tree hands out
 const FIRST_ID: u32 = 4;
+/// (JD19) the first ID of a new master's tree: Visio's masters start at 5, and Visio takes a data
+/// graphic's callout master only when its shape has ID 5 (JD19's Visio check: the same master
+/// with ID 4 was no callout master, its items did not count)
+pub(crate) const FIRST_MASTER_ID: u32 = 5;
 
 /// the ID of the deleted subshapes Visio writes (Del="1", no Type): no ID of its own, any number
 /// of shapes of a tree may have it (see ShapeTree)
@@ -264,6 +268,11 @@ impl ShapeTree {
     /// an empty tree; new shapes get IDs from 4 on ([MS-VSDX] ShapeSheet_Type: an ID is at least 4)
     pub fn new() -> ShapeTree {
         ShapeTree { next_id: FIRST_ID as u64, ..ShapeTree::default() }
+    }
+
+    /// (crate) an empty tree whose new shapes get IDs from `first` on (a master's: FIRST_MASTER_ID)
+    pub(crate) fn starting_at(first: u32) -> ShapeTree {
+        ShapeTree { next_id: first.max(FIRST_ID) as u64, ..ShapeTree::default() }
     }
 
     /// add a shape with its file ID under `parent` (None: top level), on top of its siblings

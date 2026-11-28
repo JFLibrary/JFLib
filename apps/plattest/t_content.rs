@@ -326,9 +326,6 @@ fn tree_streams(t: &mut T, at: &dyn Fn(&str) -> String) {
     t.check(plat::read_file(&at("neu/strom.bin")).as_deref() == Some(&b"\0\0ab"[..]), "content: its bytes");
     t.check(File::open(&at("neu/fehlt.bin"), FO_READ).is_none() && File::open(&at("neu"), FO_RW).is_none(), "content: no stream on a missing name or a folder");
     // File::create_new: the host creates the document; a taken name is refused
-    #[cfg(target_os = "android")]
-    t.later("content: File::create_new (AN3)");
-    #[cfg(not(target_os = "android"))]
     {
         t.check(File::create_new(&at("neu/strom.bin")).is_none() && text(&at("neu/strom.bin")).is_some_and(|s| s.len() == 4), "content: File::create_new on a taken name is refused (the file kept)");
         let f = File::create_new(&at("neu/exklusiv.txt"));
@@ -377,19 +374,13 @@ fn tree_races(t: &mut T, tree: &str, at: &dyn Fn(&str) -> String) {
     *RACE.lock() = Some((String::from("strom.txt"), false));
     let f = File::open(&at("strom.txt"), FO_WRITE);
     t.check(f.is_some_and(|f| f.write_at(0, b"strom") == Some(5)) && text(&at("strom.txt")).as_deref() == Some("strom"), "content: File FO_WRITE: ... the stream is that document");
-    #[cfg(target_os = "android")]
-    t.later("content: File::create_new against a name taken meanwhile (AN3)");
-    #[cfg(not(target_os = "android"))]
-    {
-        *RACE.lock() = Some((String::from("exkl.txt"), false));
-        t.check(File::create_new(&at("exkl.txt")).is_none() && text(&at("exkl.txt")).as_deref() == Some("fremd"), "content: File::create_new: refused, the other app's file kept");
-    }
+    *RACE.lock() = Some((String::from("exkl.txt"), false));
+    t.check(File::create_new(&at("exkl.txt")).is_none() && text(&at("exkl.txt")).as_deref() == Some("fremd"), "content: File::create_new: refused, the other app's file kept");
     *RACE.lock() = Some((String::from("ordner"), true));
     t.check(plat::mkdir(&at("ordner/sub")) && plat::file_exists(&at("ordner/sub")) == 2, "content: mkdir: the folder made meanwhile is used");
-    let exkl = !cfg!(target_os = "android"); // (Android: no File::create_new yet, no exkl.txt)
     let want = ["exkl.txt=5", "hello.txt=15", "ordner/", "rennen.txt=5", "strom.txt=5"];
-    t.check(names(tree) == &want[usize::from(!exkl)..], "content: no \"name (1)\" left behind");
-    t.check(plat::delete(&at("ordner/sub")) && plat::delete(&at("ordner")) && plat::delete(&at("rennen.txt")) && plat::delete(&at("strom.txt")) && (!exkl || plat::delete(&at("exkl.txt"))), "content: races cleaned up");
+    t.check(names(tree) == want, "content: no \"name (1)\" left behind");
+    t.check(plat::delete(&at("ordner/sub")) && plat::delete(&at("ordner")) && plat::delete(&at("rennen.txt")) && plat::delete(&at("strom.txt")) && plat::delete(&at("exkl.txt")), "content: races cleaned up");
     *RACE.lock() = None;
 }
 

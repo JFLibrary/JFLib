@@ -20,6 +20,8 @@
 //
 //   diagramiotest --write-templates DIR   every .vstx into a folder (to look at in Visio), and
 //                        the first page of each starter diagram as PNG
+//   diagramiotest --write-all-stencils DIR   every stencil as .vssx, metric and US (for a
+//                        check in Visio: visio_check)
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -72,6 +74,35 @@ pub(crate) fn stencils(m: Measure) -> Result<Vec<stencil::Built>, String> {
         v.push(stencil::build(&files, m).map_err(|e| format!("stencils/{f}/{e}"))?);
     }
     Ok(v)
+}
+
+/// every stencil of apps/JFDiagrammer/stencils as .vssx into dir, metric and US
+pub fn write_stencils(dir: &str) -> i32 {
+    let mut status = 0;
+    for f in folders("stencils") {
+        let files = files_of("stencils", f);
+        if files("stencil.txt").is_none() {
+            continue;
+        }
+        for m in [Measure::Metric, Measure::Us] {
+            match stencil::build_vssx(&files, m) {
+                Ok((b, bytes)) => {
+                    let path = format!("{dir}/{}", b.vssx_name());
+                    if plat::write_file(&path, &bytes) {
+                        out(&format!("wrote {path} ({} KB)\n", bytes.len() / 1024));
+                    } else {
+                        out(&format!("error: cannot write {path}\n"));
+                        status = 1;
+                    }
+                }
+                Err(e) => {
+                    out(&format!("error: stencils/{f}/{e}\n"));
+                    status = 1;
+                }
+            }
+        }
+    }
+    status
 }
 
 /// every template built for measure m with the stencils of m: (folder, forms with their bytes)

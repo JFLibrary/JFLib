@@ -937,7 +937,7 @@ fn base_doc(h: &Head, src: &TSource, m: Measure, rules: Option<&RuleSet>) -> Res
     {
         let mut tx = doc.transaction("Vorlage");
         for sec in src.sections("Style") {
-            let r = tx.doc().style_by_name_u(&sec.arg).ok_or_else(|| err(F, sec.line, format!("Formatvorlage „{}“ gibt es nicht (No Style, Theme, Normal, Connector, Guide, Text Only)", sec.arg)))?;
+            let r = tx.doc().style_by_name_u(&sec.arg).ok_or_else(|| err(F, sec.line, format!("Formatvorlage „{}“ gibt es nicht (No Style, Text Only, None, Normal, Guide, Theme, Connector)", sec.arg)))?;
             let cells = cells_of(F, &sec.cells, m, &style_cell_ok, &format!("[Style {}]", sec.arg), &[])?;
             for c in &cells {
                 let addr = style_addr(&mut tx, &c.name);
@@ -1551,7 +1551,7 @@ fn localize_shape(tx: &mut Transaction, s: ShapeRef, lang: usize) -> bool {
             }
         }
     }
-    // translated cells (Controls.Row_1.Tip ...) where the shape shows one of their texts
+    // translated cells (Control.Row_1.Prompt ...) where the shape shows one of their texts
     for (c, values) in &texts.translated {
         let want = pick(values, lang);
         if want.is_empty() {

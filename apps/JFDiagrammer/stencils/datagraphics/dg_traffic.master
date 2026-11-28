@@ -1,0 +1,87 @@
+# Ampel: drei Leuchten übereinander im Gehäuse, die aktive gefüllt (0 grün unten, 1 gelb Mitte, 2 rot oben).
+# Datengrafik-Element Symbolsatz (JD19, DA-07): User.msvCalloutIconNumber (-1 keins, 0 bis 2) wählt
+# das Symbol (Visios Zelle; die App schreibt dort die aus den Regeln übersetzte Formel), NoShow
+# und NoFill der Geometrieabschnitte folgen ihr.  Die Farben sind die Bedeutung der Symbole und
+# deshalb fest (begründete Ausnahme der Stilregeln); Linie dunkelgrau.  Verborgener Master.
+master: DG Traffic lights
+name.de: Ampel
+name.en: Traffic light
+name.es: Semáforo
+name.it: Semaforo
+name.fr: Feu tricolore
+prompt.de: Datengrafik: Ampel mit grüner, gelber und roter Leuchte.
+prompt.en: Data graphic: traffic light with a green, a yellow and a red lamp.
+prompt.es: Gráfico de datos: semáforo con luz verde, amarilla y roja.
+prompt.it: Grafico dati: semaforo con luce verde, gialla e rossa.
+prompt.fr: Graphique de données : feu tricolore avec un feu vert, orange et rouge.
+hidden: true
+
+[Shape]
+Width = 4 mm
+Width.us = 0.16 in
+Height = 10 mm
+Height.us = 0.4 in
+FillForegnd = IF(User.msvCalloutIconNumber=0,RGB(58,154,74),IF(User.msvCalloutIconNumber=1,RGB(230,180,34),RGB(200,60,60)))
+FillPattern = 1
+LineColor = #404040
+LineWeight = 0.5 pt
+Rounding = 0 mm
+
+[User]
+msvCalloutType:  Value = "Icon Set"
+# Visios Kennzeichen eines Datengrafik-Callouts (JD19, Visio-Gegenprobe: ohne sie und ohne die
+# Shape-ID 5 des Masters zählt Visio die Elemente einer Datengrafik nicht)
+visDGCalloutItem:  Value = 5
+visDGDefaultPos:  Value = 0
+visDGStackHeight:  Value = 0
+msvCalloutIconCount:  Value = 3
+msvCalloutIconNumber:  Value = 0
+
+[Property]
+msvCalloutField:  Type = 0; Value = ""; Prompt = "String"; SortKey = "Wert"
+        Label.de = Datenfeld
+        Label.en = Data field
+        Label.es = Campo de datos
+        Label.it = Campo dati
+        Label.fr = Champ de données
+
+# das Gehäuse
+[Geometry]
+NoFill = TRUE
+NoShow = User.msvCalloutIconNumber<0
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = 0; Y = 0
+
+# Leuchte 0
+[Geometry]
+NoFill = User.msvCalloutIconNumber<>0
+NoShow = User.msvCalloutIconNumber<0
+MoveTo  X = Width*0.2; Y = Height*0.1667-Width*0.3
+LineTo  X = Width*0.8; Y = Height*0.1667-Width*0.3
+LineTo  X = Width*0.8; Y = Height*0.1667+Width*0.3
+LineTo  X = Width*0.2; Y = Height*0.1667+Width*0.3
+LineTo  X = Width*0.2; Y = Height*0.1667-Width*0.3
+
+# Leuchte 1
+[Geometry]
+NoFill = User.msvCalloutIconNumber<>1
+NoShow = User.msvCalloutIconNumber<0
+MoveTo  X = Width*0.2; Y = Height*0.5-Width*0.3
+LineTo  X = Width*0.8; Y = Height*0.5-Width*0.3
+LineTo  X = Width*0.8; Y = Height*0.5+Width*0.3
+LineTo  X = Width*0.2; Y = Height*0.5+Width*0.3
+LineTo  X = Width*0.2; Y = Height*0.5-Width*0.3
+
+# Leuchte 2
+[Geometry]
+NoFill = User.msvCalloutIconNumber<>2
+NoShow = User.msvCalloutIconNumber<0
+MoveTo  X = Width*0.2; Y = Height*0.8333-Width*0.3
+LineTo  X = Width*0.8; Y = Height*0.8333-Width*0.3
+LineTo  X = Width*0.8; Y = Height*0.8333+Width*0.3
+LineTo  X = Width*0.2; Y = Height*0.8333+Width*0.3
+LineTo  X = Width*0.2; Y = Height*0.8333-Width*0.3
+

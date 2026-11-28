@@ -1,0 +1,26 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD21 (SP-08): Schnittmenge bilden -- what two overlapping rectangles share; two
+# shapes that do not overlap leave nothing (Visio deletes them too)
+cmd 4404
+drag 500,330 640,420
+drag 580,380 720,470
+cmd 4400
+key ctrl+a
+click button:"Gruppieren"
+click menuitem:"Schnittmenge bilden"
+expect listitem:"Sheet.6" selected
+expect listitem:"Sheet.4" missing
+expect listitem:"Sheet.6" rect 576 374 75 50
+expect button:"Breite: 30 mm  Höhe: 20 mm  Winkel: 0°" exists
+# apart: nothing is left
+cmd 4404
+drag 900,300 960,340
+cmd 4400
+key ctrl+a
+click button:"Gruppieren"
+click menuitem:"Schnittmenge bilden"
+expect listitem:"Sheet.6" missing
+expect listitem:"Sheet.7" missing
+key ctrl+z
+expect listitem:"Sheet.6" exists
+expect listitem:"Sheet.7" exists

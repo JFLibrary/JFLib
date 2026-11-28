@@ -51,8 +51,10 @@ pub fn t_trash(t: &mut T) {
     t.check(!plat::trash(&format!("{base}/work/missing.txt")), "trash: a missing file is no success");
     t.check(plat::write_file("mem://t.txt", b"m") && !plat::trash("mem://t.txt") && plat::file_exists("mem://t.txt") == 1,
         "trash: mem:// has no trash (the file stays)");
-    if cfg!(target_os = "ios") {
-        t.check(!plat::trash(&format!("{base}/work")), "trash: iOS has none");
+    if cfg!(any(target_os = "ios", target_os = "android")) {
+        // (docs/ANDROID.md: Android has no trash an app could put files into)
+        t.check(!plat::trash(&format!("{base}/work")) && plat::file_exists(&format!("{base}/work")) == 2, "trash: iOS and Android have none (the folder stays)");
+        rm_tree(&base);
         return;
     }
     if cfg!(windows) {

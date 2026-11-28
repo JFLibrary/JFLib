@@ -249,7 +249,7 @@ fn scheme_ok(s: &str) -> bool {
 }
 
 /// (fs) whether name is a vfs name ("scheme:" ...), not an OS path
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 pub(crate) fn has_scheme(name: &str) -> bool {
     split(name).is_some()
 }

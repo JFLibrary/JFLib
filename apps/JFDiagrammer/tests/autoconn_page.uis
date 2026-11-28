@@ -1,0 +1,41 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD21: Seite einrichten › Layout und Routing (PR-09) -- "Shapes auf Verbinder
+# teilen" off (PageShapeSplit 0): a shape dropped on a connector does not split it; "Shapes beim
+# Ablegen verschieben" on (PlowCode 1): a dropped shape pushes the shape it covers out of the way
+# to the page's spacing (the shortest way), its connector follows.  (JD21v, as Visio 16) The
+# diamond and the square of the Standard-Shapes are not placeable (ObjType 0, as Visio's Basic
+# Shapes): the connector stays straight through the diamond, after the push it runs as an L
+# through the middles of the sides, across the square
+click button:"Weitere Shapes"
+click "Allgemein"
+click "Standard-Shapes"
+drag button:"Rechteck" 560,300
+wait 600
+drag button:"Ellipse" 900,300
+click 560,300
+click 900,300 shift
+cmd 5421
+expect listitem:"Sheet.6" rect 610 297 252 6
+cmd 4886
+expect dialog:"Seite einrichten" exists
+expect checkbox:"Shapes auf Verbinder teilen" checked
+expect checkbox:"Shapes beim Ablegen verschieben" unchecked
+click checkbox:"Shapes auf Verbinder teilen"
+click checkbox:"Shapes beim Ablegen verschieben"
+click button:"OK"
+expect dialog:"Seite einrichten" missing
+wait 600
+drag button:"Raute" 736,300
+expect listitem:"Raute" rect 698 262 76 76
+expect listitem:"Sheet.8" missing
+expect listitem:"Sheet.6" rect 610 297 252 6
+key ctrl+z
+# dropped onto the rectangle: the rectangle goes up (the shortest way) to the page's spacing
+wait 600
+drag button:"Quadrat" 600,320
+expect listitem:"Quadrat" rect 562 282 76 76
+expect listitem:"Rechteck" rect 510 213 100 50
+expect listitem:"Sheet.6" rect 560 263 302 40
+shot build/JFDiagrammer-autoconn-plow.png
+key ctrl+z
+expect listitem:"Rechteck" rect 510 275 100 50

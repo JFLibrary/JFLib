@@ -39,6 +39,9 @@ TxtPinX = Width*0.5
 TxtPinY = Height*0.5
 TxtLocPinX = TxtWidth*0.5
 TxtLocPinY = TxtHeight*0.5
+# die Pfeilspitze des Designs auch in Visio: ein 1D-Shape ohne ObjType 2 bekommt sie dort
+# nur mit QuickStyleType 3 (die Verbinder-Liste des Designs)
+QuickStyleType = 3
 
 [Geometry]
 NoFill = TRUE

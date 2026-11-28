@@ -271,7 +271,7 @@ struct Rule {
 
 // an address a permitted name resolved to: the port range and ask tag of the name's rule, the
 // name (plugins check it against their own rules)
-#[cfg_attr(not(any(windows, target_os = "linux", target_vendor = "apple")), allow(dead_code))]
+#[cfg_attr(not(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android")), allow(dead_code))]
 struct Resolved {
     ip: [u8; 16],
     lo: u16,
@@ -281,7 +281,7 @@ struct Resolved {
 }
 
 #[derive(Default)]
-#[cfg_attr(not(any(windows, target_os = "linux", target_vendor = "apple")), allow(dead_code))]
+#[cfg_attr(not(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android")), allow(dead_code))]
 struct Policy {
     fs: Vec<Rule>,
     /// the user's files (Key::grant, with fs.user)
@@ -829,12 +829,12 @@ pub(crate) fn trusted_scope<R>(f: impl FnOnce() -> R) -> R {
     Key(()).trusted(f)
 }
 
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 fn tid() -> u64 {
     crate::plat_tid()
 }
 
-#[cfg(not(any(windows, target_os = "linux", target_vendor = "apple")))]
+#[cfg(not(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android")))]
 fn tid() -> u64 {
     0
 }
@@ -874,9 +874,9 @@ enum Req<'a> {
     Location,
     Sensors,
     Gamepad,
-    #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+    #[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
     Connect([u8; 16], u16),
-    #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+    #[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
     Listen([u8; 16], u16),
     Name(String),
     /// (G7d) a host as written (a name, an address, localhost) and a port: the browser's WebSocket
@@ -922,7 +922,7 @@ fn fs_match(r: &Rule, segs: &[String], mode: u32) -> bool {
 impl Policy {
     // granted: the user's files this policy may use; resolved: the app's resolved names
     // (own: their rules' ports; a plugin's: checked against its own name rules)
-    #[cfg_attr(not(any(windows, target_os = "linux", target_vendor = "apple")), allow(unused_variables))]
+    #[cfg_attr(not(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android")), allow(unused_variables))]
     fn grant(&self, req: &Req, granted: &[Rule], resolved: &[Resolved], own: bool) -> Grant {
         match req {
             Req::Fs(segs, mode) => grant(
@@ -943,7 +943,7 @@ impl Policy {
             Req::Location => flag(self.location),
             Req::Sensors => flag(self.sensors),
             Req::Gamepad => flag(self.gamepad),
-            #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+            #[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
             Req::Connect(ip, port) => {
                 let dns = *port == 53 && self.connect.iter().any(|r| matches!(r.host, Host::Any | Host::Name(_)));
                 let names = resolved.iter().filter(|a| a.ip == *ip).filter_map(|a| {
@@ -959,7 +959,7 @@ impl Policy {
                         .chain(dns.then_some(0)),
                 )
             }
-            #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+            #[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
             Req::Listen(ip, port) => grant(self.listen.iter().filter(|r| (r.lo..=r.hi).contains(port) && r.host.has_ip(ip)).map(|r| r.ask)),
             Req::Name(h) => grant(self.connect.iter().filter(|r| r.host.has_name(h)).map(|r| r.ask)),
             Req::HostPort(h, port) => {
@@ -1037,7 +1037,7 @@ static WAIT: AtomicU32 = AtomicU32::new(u32::MAX);
 
 fn bump() {
     EPOCH.fetch_add(1, Ordering::AcqRel);
-    #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+    #[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
     crate::sync::wake_all(&EPOCH);
 }
 
@@ -1065,7 +1065,7 @@ pub(crate) fn read_env() {
     }
 }
 
-#[cfg_attr(not(any(windows, target_os = "linux", target_vendor = "apple")), allow(dead_code))]
+#[cfg_attr(not(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android")), allow(dead_code))]
 fn wait_ms() -> u32 {
     let v = WAIT.load(Ordering::Acquire);
     if v != u32::MAX {
@@ -1135,7 +1135,7 @@ fn ask_user(kind: &'static str, target: &str, rule: &str, reason: &str, plugin: 
 
 // another thread: wait until question id is answered (Some(allowed)), withdrawn or the time is
 // up (None)
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 fn wait_answer(id: u32, rule: &str) -> Option<bool> {
     let deadline = crate::time_us().saturating_add(wait_ms() as u64 * 1000);
     loop {
@@ -1156,7 +1156,7 @@ fn wait_answer(id: u32, rule: &str) -> Option<bool> {
 }
 
 // the browser has one thread: it is the asking one
-#[cfg(not(any(windows, target_os = "linux", target_vendor = "apple")))]
+#[cfg(not(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android")))]
 fn wait_answer(_id: u32, _rule: &str) -> Option<bool> {
     None
 }
@@ -2073,9 +2073,9 @@ fn appimage_dir() -> Option<String> {
 
 // ---------------------------------------------------------------- the network
 
-/// the host of a net.connect / net.listen rule (the browser asks net.connect for its WebSocket only,
-/// Android keeps the rules unused)
-#[cfg_attr(not(any(windows, target_os = "linux", target_vendor = "apple")), allow(dead_code))]
+/// the host of a net.connect / net.listen rule (the browser asks net.connect for its WebSocket only;
+/// Android checks both since AN2, docs/ANDROID.md)
+#[cfg_attr(not(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android")), allow(dead_code))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Host {
     Any,
@@ -2087,7 +2087,7 @@ enum Host {
     Loopback,
 }
 
-#[cfg_attr(not(any(windows, target_os = "linux", target_vendor = "apple")), allow(dead_code))]
+#[cfg_attr(not(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android")), allow(dead_code))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct NetRule {
     host: Host,
@@ -2096,7 +2096,7 @@ struct NetRule {
     ask: u16,
 }
 
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 const RESOLVED_MAX: usize = 4096;
 const V6_LOOPBACK: [u8; 16] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
 
@@ -2200,7 +2200,7 @@ fn ip16(s: &str) -> Option<([u8; 16], bool)> {
     }
 }
 
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 fn to16(ip: &crate::net::IpAddr) -> [u8; 16] {
     match ip {
         crate::net::IpAddr::V4(a) => mapped(*a),
@@ -2210,34 +2210,34 @@ fn to16(ip: &crate::net::IpAddr) -> [u8; 16] {
 
 /// whether a TCP connection or a UDP datagram to addr is allowed: a net.connect rule with
 /// that address, an address a permitted name resolved to, or port 53 (DNS) with name rules
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 pub fn net_connect_allowed(addr: &crate::net::SocketAddr) -> bool {
     decide("net.connect", &alloc::format!("{}", addr), &Req::Connect(to16(&addr.ip), addr.port), false) == Verdict::Allow
 }
 
 /// whether a TCP listener (or a UDP socket with a fixed port) may bind addr
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 pub fn net_listen_allowed(addr: &crate::net::SocketAddr) -> bool {
     decide("net.listen", &alloc::format!("{}", addr), &Req::Listen(to16(&addr.ip), addr.port), false) == Verdict::Allow
 }
 
 /// whether net.listen allows a socket on addr now, quietly (nothing recorded, nobody asked; an ask line only by its
 /// answer): a UDP socket on port 0, which needs no rule, may answer its peers when one covers it (net.rs)
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 pub fn net_listen_granted(addr: &crate::net::SocketAddr) -> bool {
     granted(&Req::Listen(to16(&addr.ip), addr.port))
 }
 
 /// whether a manifest or a plugin's scope on this thread restricts the network (else every datagram may go: a UDP
 /// socket keeps no answers)
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 pub(crate) fn net_restricted() -> bool {
     active() || scoped_here()
 }
 
 /// whether a UDP socket bound on `bound` may send answers on this thread: outside plugin scopes always (its bind was
 /// allowed), inside them only when every scope's own net.listen covers `bound` (quietly)
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 pub(crate) fn net_answer_scoped(bound: &crate::net::SocketAddr) -> bool {
     let req = Req::Listen(to16(&bound.ip), bound.port);
     !scopes_here().iter().any(|s| s.p.as_ref().is_some_and(|pp| pp.grant(&req, &[], &[], false) != Grant::Allow))
@@ -2260,7 +2260,7 @@ pub fn net_name_allowed(host: &str) -> bool {
 }
 
 /// (resolvers) host resolved to addrs: connections to them get the ports of host's rules
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 pub fn net_resolved(host: &str, addrs: &[crate::net::SocketAddr]) {
     if !active() && SCOPED.load(Ordering::Acquire) == 0 {
         return;

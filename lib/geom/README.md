@@ -9,8 +9,11 @@ projection in metres. Union, difference and intersection of convex solids, as br
 decided with exact arithmetic (results closed, faces outward, ready for the next operation), and
 chamfered or rounded edges. The checks say whether a model is closed and manifold, whether its faces
 point outward, whether it has degenerate triangles and where the first problem lies, how large it is,
-its area and volume. It is plain Rust, without the standard library and without a line of `unsafe`
-code.
+its area and volume. For flat shapes it has Boolean operations on plane regions with holes (union,
+intersection, difference, exclusive or, and the decomposition of overlapping areas into their pieces;
+open lines as cutters), decided by snap rounding on an integer grid, where every output edge names
+the input edge it lies on. It is plain Rust, without the standard library and without a line of
+`unsafe` code.
 
 ## How it is used
 

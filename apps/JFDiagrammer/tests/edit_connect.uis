@@ -2,7 +2,8 @@
 # JFDiagrammer, JD7: the connector tool draws a dynamic connector glued to both shapes (the
 # whole shapes: dynamic glue, both ends green); moving a shape reroutes it (right angles); undo
 # takes the move back with the route; an end dragged off a shape is free, so a move no longer
-# moves it; dragged back onto the shape it glues again and follows
+# moves it; dragged back onto the shape it glues again and follows.  (JD21v) The L leaves the upper
+# shape at its bottom and comes into the lower one's left side, as Visio 16 lays it
 cmd 4404
 drag 500,330 640,420
 drag 820,430 960,520
@@ -10,7 +11,7 @@ drag 820,430 960,520
 cmd 4401
 drag 560,370 880,470
 expect listitem:"Sheet.6" selected
-expect listitem:"Sheet.6" rect 651 374 242 50
+expect listitem:"Sheet.6" rect 576 424 251 54
 expect button:"Anfangspunkt" exists
 expect button:"Endpunkt" exists
 shot build/JFDiagrammer-edit-connect.png
@@ -18,12 +19,12 @@ shot build/JFDiagrammer-edit-connect.png
 cmd 4400
 drag 900,500 900,625
 expect listitem:"Sheet.5" rect 827 550 126 101
-expect listitem:"Sheet.6" rect 651 374 242 176
+expect listitem:"Sheet.6" rect 576 424 251 179
 key ctrl+z
 expect listitem:"Sheet.5" rect 827 424 126 101
-expect listitem:"Sheet.6" rect 651 374 242 50
+expect listitem:"Sheet.6" rect 576 424 251 54
 # a click on the line selects the connector; its end dragged into the free page
-click 760,375
+click 700,477
 expect listitem:"Sheet.6" selected
 drag button:"Endpunkt" 760,640
 expect listitem:"Sheet.6" rect 651 374 104 277
@@ -35,6 +36,6 @@ expect listitem:"Sheet.5" rect 827 424 126 101
 click 752,500
 expect listitem:"Sheet.6" selected
 drag button:"Endpunkt" 890,475
-expect listitem:"Sheet.6" rect 651 374 242 50
+expect listitem:"Sheet.6" rect 576 424 251 54
 drag 900,500 900,625
-expect listitem:"Sheet.6" rect 651 374 242 176
+expect listitem:"Sheet.6" rect 576 424 251 179

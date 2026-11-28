@@ -40,6 +40,8 @@ pub(crate) const P_EXTERNAL: u32 = 15;
 /// (JD18, DA-05) Aktualisierungskonflikte: on the right, shown after a refresh with conflicts
 /// (data_refresh.rs)
 pub(crate) const P_CONFLICTS: u32 = 16;
+/// (JD19, AB-12, DA-08) Datengrafikfelder: on the right (data_graphics_pane.rs)
+pub(crate) const P_DG_FIELDS: u32 = 19;
 
 pub(crate) const ID_DOCK: u32 = 500;
 /// the canvas (JD8 rest: the task panes hand the keyboard back to it after Enter)
@@ -51,7 +53,7 @@ const ID_STATUS: u32 = 0x5800;
 const SIDEBAR_W: i32 = 240;
 
 /// the panels (titles in the current language)
-pub(crate) fn panels() -> [DockPanel<'static>; 7] {
+pub(crate) fn panels() -> [DockPanel<'static>; 8] {
     [
         DockPanel::new(P_SHAPES, t("Shapes"), JD_STENCIL_MENU).at(DOCK_LEFT, 0),
         DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_FORMAT, crate::tc("Shape formatieren|Bereich"), JD_FILL).at(DOCK_RIGHT, 0) },
@@ -60,6 +62,7 @@ pub(crate) fn panels() -> [DockPanel<'static>; 7] {
         DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_PANZOOM, t("Verschieben und Zoomen"), JD_ZOOM).at(DOCK_RIGHT, 0) },
         DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_EXTERNAL, t("Externe Daten"), JD_EXTERNAL_DATA).at(DOCK_BOTTOM, 0) },
         DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_CONFLICTS, t("Aktualisierungskonflikte"), JD_REFRESH_ALL).at(DOCK_RIGHT, 0) },
+        DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_DG_FIELDS, t("Datengrafikfelder"), JD_DG_FIELDS).at(DOCK_RIGHT, 0) },
     ]
 }
 
@@ -80,6 +83,7 @@ pub(crate) fn content(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
         P_PANZOOM => pan_zoom(app, ui),
         P_EXTERNAL => crate::data_pane::pane(app, ui),
         P_CONFLICTS => crate::data_refresh::pane(app, ui),
+        P_DG_FIELDS => crate::data_graphics_pane::pane(app, ui, crate::data_graphics_pane::ID_PANE_BOX),
         _ => {}
     }
 }
@@ -87,20 +91,26 @@ pub(crate) fn content(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
 // ------------------------------------------------------------------ the context menus
 
 // i18n
-static SHAPE_MENU: [Mi; 22] = [
+static SHAPE_MENU: [Mi; 25] = [
     // (JD15, SP-12) the rows of the shape's Actions section first, as in Visio (cmds_actions.rs)
     Mi::List(crate::cmds_actions::ACTION_ROWS, crate::cmds_actions::ACTION_ROWS_MAX, ""),
     Mi::Cmd(CUT), Mi::Cmd(COPY), Mi::Cmd(PASTE), Mi::Sep,
-    Mi::Sub("Gruppierung", &[Mi::Cmd(GROUP), Mi::Cmd(UNGROUP)]),
+    // (JD21 groups) Zu/Aus Gruppe, Gruppe öffnen, Verhalten
+    Mi::Sub("Gruppierung", &[Mi::Cmd(GROUP), Mi::Cmd(UNGROUP), Mi::Cmd(ADD_TO_GROUP), Mi::Cmd(REMOVE_FROM_GROUP), Mi::Sep, Mi::Cmd(OPEN_GROUP), Mi::Cmd(CLOSE_GROUP), Mi::Cmd(GROUP_BEHAVIOR)]),
     // (JD8 rest) ZF-12's Shape ▸
     Mi::Sub("Shape", &[Mi::Cmd(ROTATE_LEFT), Mi::Cmd(ROTATE_RIGHT), Mi::Cmd(FLIP_H), Mi::Cmd(FLIP_V), Mi::Sep, Mi::Cmd(PANE_SIZEPOS)]),
     Mi::Sub("Container", &[Mi::Cmd(CT_ADD), Mi::Cmd(CT_REMOVE), Mi::Sep, Mi::Cmd(CT_SELECT), Mi::Cmd(CT_LOCK), Mi::Cmd(CT_DISBAND)]),
-    Mi::Cmd(CONNECT_SHAPES), Mi::Cmd(LAYOUT_BEHAVIOR),
+    // (JD21 autoconn, CN-11) Verbinder (einmal)
+    Mi::Cmd(CONNECT_SHAPES), Mi::Cmd(CONNECTOR_ONCE), Mi::Cmd(LAYOUT_BEHAVIOR),
+    // (JD21 jumps) a connector's line jumps (hidden for other shapes)
+    Mi::Cmd(CONN_BEHAVIOR),
     // (JD15, ST-05) a lane's commands (hidden for other shapes)
     Mi::Cmd(CFF_LANE_BEFORE), Mi::Cmd(CFF_LANE_AFTER),
     Mi::Sub("Anordnen", &[Mi::Cmd(BRING_FRONT), Mi::Cmd(BRING_FORWARD), Mi::Cmd(SEND_BACK), Mi::Cmd(SEND_BACKWARD)]),
     // (JD18) Verknüpfung mit Zeile aufheben (data_pane.rs)
-    Mi::Sub("Daten", &[Mi::Cmd(PANE_DATA), Mi::Cmd(SHAPE_DATA_DEFINE), Mi::Sep, Mi::Cmd(DATA_UNLINK)]),
+    Mi::Sub("Daten", &[Mi::Cmd(PANE_DATA), Mi::Cmd(SHAPE_DATA_DEFINE), Mi::Sep, Mi::Cmd(DATA_UNLINK), Mi::Sep, Mi::Cmd(DG_EDIT_GRAPHIC), Mi::Cmd(PANE_DG_FIELDS)]),
+    // (JD19, DA-13) a report table's menu (reports.rs; hidden for other shapes)
+    Mi::Cmd(REPORT_REFRESH),
     // (JD8 rest) the shape's links follow its Hyperlink row (cmds_text::LINK_ROWS, ZF-12)
     Mi::Cmd(HYPERLINK), Mi::List(crate::cmds_text::LINK_ROWS, crate::cmds_text::LINK_ROWS_MAX, ""), Mi::Cmd(COMMENT_NEW),
     Mi::Sub("Formatieren", &[Mi::Cmd(FORMAT_TEXT), Mi::Cmd(FORMAT_LINE), Mi::Cmd(FORMAT_FILL), Mi::Cmd(FORMAT_SHADOW)]),
@@ -116,6 +126,9 @@ static PAGE_MENU: [Mi; 4] = [
     Mi::Sep,
     Mi::Cmd(PAGE_SETUP),
 ];
+// i18n
+// (JD21 glue) the chosen connection point's kind (the connection point tool)
+static CPOINT_MENU: [Mi; 3] = [Mi::Cmd(CPOINT_INWARD), Mi::Cmd(CPOINT_OUTWARD), Mi::Cmd(CPOINT_BOTH)];
 static TAB_MENU: [Mi; 8] = [
     Mi::Cmd(PAGE_INSERT), Mi::Cmd(PAGE_DELETE), Mi::Cmd(PAGE_RENAME), Mi::Cmd(PAGE_DUPLICATE), Mi::Cmd(PAGE_REORDER), Mi::Sep,
     Mi::Cmd(PAGE_SETUP), Mi::Cmd(DRAWING_SCALE),
@@ -127,6 +140,8 @@ static TAB_MENU: [Mi; 8] = [
 pub(crate) fn center(app: &mut Diagrammer, ui: &mut Ui) {
     ui.next_size(-1, -1);
     ui.box_begin(0, BOX_V, 0);
+    // (JD21 groups) the bar of a group opened on the canvas (groups_view.rs)
+    crate::groups_view::bar(app, ui);
     // (JD7) the canvas with the rulers and the edit layer (edit_canvas.rs); the shape's menu while
     // a shape is selected, else the page's (the edit layer selects on the right click first)
     crate::edit_canvas::canvas(app, ui, ID_CANVAS, |app, ui| {
@@ -134,7 +149,13 @@ pub(crate) fn center(app: &mut Diagrammer, ui: &mut Ui) {
         if app.se.right_taken() {
             return;
         }
-        let menu: &'static [Mi] = if matches!(app.selection_kind(), SEL_SHAPE | SEL_CONTAINER | SEL_TEXT) { &SHAPE_MENU } else { &PAGE_MENU };
+        let menu: &'static [Mi] = if crate::glue_tools::point_menu(app) {
+            &CPOINT_MENU
+        } else if matches!(app.selection_kind(), SEL_SHAPE | SEL_CONTAINER | SEL_TEXT) {
+            &SHAPE_MENU
+        } else {
+            &PAGE_MENU
+        };
         ui.context_menu(i18n::menu(menu));
     });
     if app.fit_again {

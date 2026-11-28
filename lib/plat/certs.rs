@@ -12,18 +12,19 @@
 //        and the stapled response, without network access.  Either way the system's policy
 //        applies to the extra CAs as well, and its answer is the whole answer.  Some(Err) says
 //        why the system refuses.  Linux: None (netio checks against the bundle, then the extra
-//        CAs).
+//        CAs).  Android: None as well (the same way with the system's CA folders).
 //   verify_tls_server_roots(chain, host, roots, time) -> Option<Result<(), Refused>>
 //        the same with only these CAs as trust anchors (DER), not the system's: nothing
 //        fetched, no revocation; the system's checks against a PKI of one's own
-//        (tools/limbo_check.py --system).  An empty host: no name checked.  Linux: None.
+//        (tools/limbo_check.py --system).  An empty host: no name checked.  Linux, Android: None.
 //   Refused { reason, text }   Reason: UnknownCa, Expired, Name, Revoked, Usage, Other; text:
 //        the system's own words (and its code)
 //   root_bundle() -> Option<Vec<u8>>
 //        Linux: PEM -- the file SSL_CERT_FILE names, else the distribution's CA bundle (Debian /
 //        Ubuntu, Fedora / RHEL, openSUSE, Alpine), and the files in the folders of SSL_CERT_DIR
-//        (':' between them), as OpenSSL takes the two; macOS: /etc/ssl/cert.pem.  Windows,
-//        iOS: None.
+//        (':' between them), as OpenSSL takes the two; macOS: /etc/ssl/cert.pem; Android: the
+//        system's CA folder (/apex/com.android.conscrypt/cacerts, else
+//        /system/etc/security/cacerts; only the system's CAs).  Windows, iOS: None.
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -100,14 +101,101 @@ pub fn root_bundle() -> Option<Vec<u8>> {
     None
 }
 
-#[cfg(target_os = "linux")]
+/// the CA folders of Android, newest first: Conscrypt's APEX (Android 14 and later, updated with
+/// Conscrypt), else the system image's
+#[cfg(target_os = "android")]
+pub const ANDROID_CA_DIRS: [&str; 2] = ["/apex/com.android.conscrypt/cacerts", "/system/etc/security/cacerts"];
+
+/// Android: the system's CAs (docs/ANDROID.md decision 6) -- the files of the first folder of
+/// ANDROID_CA_DIRS that has any, one certificate per file (its PEM, then a text dump), in the
+/// order of their names.  The CAs the user installed stay out, as for every Android app since API
+/// 24 (Network Security Config); so do SSL_CERT_FILE and SSL_CERT_DIR
+#[cfg(target_os = "android")]
+pub fn root_bundle() -> Option<Vec<u8>> {
+    for dir in ANDROID_CA_DIRS {
+        let mut names = android::dir_names(dir);
+        names.sort();
+        let mut pem = Vec::new();
+        for n in names {
+            if let Some(t) = crate::proc_file(&alloc::format!("{dir}/{n}\0")) {
+                pem.extend_from_slice(t.as_bytes());
+                pem.push(b'\n');
+            }
+        }
+        if !pem.is_empty() {
+            return Some(pem);
+        }
+    }
+    None
+}
+
+/// (Android) the folder root_bundle reads: the first of ANDROID_CA_DIRS with files in it
+#[cfg(target_os = "android")]
+pub fn android_ca_dir() -> Option<&'static str> {
+    ANDROID_CA_DIRS.into_iter().find(|d| !android::dir_names(d).is_empty())
+}
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub fn verify_tls_server(_chain: &[&[u8]], _host: &str, _ocsp: Option<&[u8]>, _extra: &[&[u8]], _time: i64) -> Option<Result<(), Refused>> {
     None
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub fn verify_tls_server_roots(_chain: &[&[u8]], _host: &str, _roots: &[&[u8]], _time: i64) -> Option<Result<(), Refused>> {
     None
+}
+
+/// Android: a folder's names through the kernel (getdents64; plat::fs comes with AN3)
+#[cfg(target_os = "android")]
+mod android {
+    use alloc::string::String;
+    use alloc::vec::Vec;
+    use rt::os::{syscall3, syscall6, AT_FDCWD, O_CLOEXEC, O_DIRECTORY, O_RDONLY, SYS_CLOSE, SYS_GETDENTS64, SYS_OPENAT};
+
+    const EINTR: isize = 4;
+
+    /// the names of the files in a folder (no "." and ".."; empty when it cannot be read)
+    pub fn dir_names(dir: &str) -> Vec<String> {
+        let mut out = Vec::new();
+        let mut z = dir.as_bytes().to_vec();
+        z.push(0);
+        // SAFETY: a NUL-terminated path; read-only, close-on-exec, our own descriptor.
+        let fd = unsafe { syscall6(SYS_OPENAT, AT_FDCWD, z.as_ptr() as usize, O_RDONLY | O_DIRECTORY | O_CLOEXEC, 0, 0, 0) };
+        if fd < 0 {
+            return out;
+        }
+        let mut buf = alloc::vec![0u8; 16 * 1024];
+        loop {
+            // SAFETY: buf is writable for its length.
+            let n = unsafe { syscall3(SYS_GETDENTS64, fd as usize, buf.as_mut_ptr() as usize, buf.len()) };
+            if n == -EINTR {
+                continue;
+            }
+            if n <= 0 {
+                break;
+            }
+            // struct linux_dirent64: ino (8), off (8), reclen (2), type (1), the NUL-terminated name
+            let mut at = 0;
+            while at + 19 < n as usize {
+                let len = u16::from_ne_bytes([buf[at + 16], buf[at + 17]]) as usize;
+                if len < 20 || at + len > n as usize {
+                    break;
+                }
+                let name = &buf[at + 19..at + len];
+                let name = &name[..name.iter().position(|&b| b == 0).unwrap_or(name.len())];
+                // DT_REG 8 or DT_LNK 10 (the system's folders hold files; a link is read through)
+                if matches!(buf[at + 18], 8 | 10) && name != b"." && name != b".." {
+                    if let Ok(s) = core::str::from_utf8(name) {
+                        out.push(String::from(s));
+                    }
+                }
+                at += len;
+            }
+        }
+        // SAFETY: our own descriptor, opened above.
+        unsafe { syscall3(SYS_CLOSE, fd as usize, 0, 0) };
+        out
+    }
 }
 
 /// the name as the systems take it: no trailing dot, an IPv6 address without brackets

@@ -23,6 +23,7 @@ Width = 30 mm
 Width.us = 1.25 in
 Height = 30 mm
 Height.us = 1.25 in
+ShapeSplit = 1
 
 [User]
 # die Breite des Streifens an der Unterkante und an der linken Kante

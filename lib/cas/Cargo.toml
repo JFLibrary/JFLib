@@ -24,6 +24,6 @@ crypto.workspace = true
 compress.workspace = true
 formats.workspace = true
 
-# docs.rs: Windows and Linux only (plat has no files and no network in the browser and on Android), not docs.rs's five defaults
+# docs.rs: Windows, Linux and Android (plat has no files in the browser), not docs.rs's five defaults
 [package.metadata.docs.rs]
-targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
+targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc", "aarch64-linux-android"]

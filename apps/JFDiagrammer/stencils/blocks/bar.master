@@ -26,6 +26,7 @@ Width = 40 mm
 Width.us = 1.5 in
 Height = 10 mm
 Height.us = 0.375 in
+ShapeSplit = 1
 
 [Property]
 Closed:  Type = 3; Value = FALSE

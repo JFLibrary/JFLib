@@ -23,6 +23,7 @@ Width = 40 mm
 Width.us = 1.5 in
 Height = 20 mm
 Height.us = 0.75 in
+ShapeSplit = 1
 
 [User]
 Shaft:  Value = MIN(MAX(Controls.Row_1.Y, Height*0.5), Height)

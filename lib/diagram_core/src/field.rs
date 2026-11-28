@@ -131,6 +131,9 @@ pub enum Shown<'a> {
 
 /// a value in a format picture (see the file header)
 pub fn format(v: &Shown, picture: &str, env: &Env) -> String {
+    // (JD19) esc(n) is Visio's own code for a general picture (FIELDPICTURE(0) gives "esc(0)",
+    // the Format of Visio's callout fields)
+    let picture = if is_esc(picture) { "" } else { picture };
     match *v {
         Shown::Nothing => String::new(),
         Shown::Text(s) => text_picture(s, picture),
@@ -148,6 +151,12 @@ pub fn format(v: &Shown, picture: &str, env: &Env) -> String {
             number_picture(x, unit, picture, env)
         }
     }
+}
+
+// "esc(0)", "esc(12)" ...: a picture by Visio's number
+fn is_esc(p: &str) -> bool {
+    let p = p.trim();
+    p.len() > 5 && p[..4].eq_ignore_ascii_case("esc(") && p.ends_with(')') && p[4..p.len() - 1].chars().all(|c| c.is_ascii_digit())
 }
 
 // ---- texts

@@ -4,9 +4,11 @@
 //   stencils/structure/<set>/<measure>   both measures build, write -> read -> write is the same
 //                       (roundtrip); the masters with NameU, msvStructureType and Hidden (the CFF
 //                       Container and the two lists are hidden); the engine keeps nothing
-//   stencils/structure/container   all 6 container styles x 4 heading styles dropped and
-//                       recalculated: JFD_HeadingEdge/Size from msvSDHeadingStyle, the text hidden
-//                       without a heading, the heading band and the corner brackets per style
+//   stencils/structure/container   (JD21) all 14 container styles x 4 heading styles dropped
+//                       and recalculated: msvSDHeadingStyleCount per style, JFD_HeadingEdge/Size
+//                       from msvSDHeadingStyle (none beyond the count, style 14 at the bottom /
+//                       right), the text hidden without a heading, the heading band, the corner
+//                       brackets, the inner frame, the shadow and the tab per style
 //   stencils/structure/heading-off  JFD_HeadingSize = 0 on the list, the lanes, the separators
 //                       and the CFF Container: no band, no text; lanes turn their label with
 //                       JFD_LabelUpright
@@ -15,7 +17,8 @@
 //
 //   diagramiotest --write-stencil-previews DIR   containers.png, cff.png, callouts.png: every
 //                       master (also the hidden ones) in several sizes and with all styles,
-//                       heading styles and pointer positions, for a look at them
+//                       heading styles and pointer positions, for a look at them; (JD21)
+//                       container-styles.png: the 14 container styles with their heading styles
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -296,6 +299,10 @@ pub fn run(h: &mut H) {
     }
 }
 
+/// (JD21, ST-02) the container master's styles and the number of heading styles of each
+pub(crate) const CONTAINER_STYLES: usize = 14;
+pub(crate) const HEADING_COUNTS: [usize; CONTAINER_STYLES] = [4, 4, 4, 4, 4, 4, 4, 4, 3, 2, 3, 2, 4, 4];
+
 fn shape_of(shapes: &[(String, ShapeRef)], nu: &str) -> Option<ShapeRef> {
     shapes.iter().find(|(n, _)| n == nu).map(|(_, s)| *s)
 }
@@ -304,28 +311,51 @@ fn containers(h: &mut H, mut doc: Document, shapes: &[(String, ShapeRef)]) {
     let Some(c) = shape_of(shapes, "Container") else { return h.check("stencils/structure/container", false, String::from("no Container")) };
     let sc = SheetRef::Shape(c);
     let mut fails: Vec<String> = Vec::new();
-    for style in 1..=6 {
+    // (JD21, ST-02) 14 styles; 1-6 as in JD10, each with its count of heading styles
+    let count = user_num(&doc, sc, "msvSDContainerStyleCount");
+    if count != 14.0 {
+        fails.push(format!("msvSDContainerStyleCount {count}"));
+    }
+    for style in 1..=CONTAINER_STYLES {
+        let heads = HEADING_COUNTS[style - 1];
         for head in 1..=4 {
             let bad = edit(&mut doc, c, |tx| {
                 set_user(tx, c, "msvSDContainerStyle", style as f64, None);
                 set_user(tx, c, "msvSDHeadingStyle", head as f64, None);
             });
+            let n = user_num(&doc, sc, "msvSDHeadingStyleCount");
             let edge = user_text(&doc, sc, "JFD_HeadingEdge");
             let size = user_num(&doc, sc, "JFD_HeadingSize") / MM;
-            let want_edge = ["Top", "Top", "Left", "None"][head - 1];
-            let want_size = if head == 4 { 0.0 } else { 8.0 };
+            // beyond the style's count: no heading
+            let k = if head > heads { 4 } else { head };
+            let want_edge = if style == 14 { ["Bottom", "Bottom", "Right", "None"][k - 1] } else { ["Top", "Top", "Left", "None"][k - 1] };
+            let want_size = if k == 4 { 0.0 } else { 8.0 };
             let hide = num(&doc, sc, None, None, "HideText") != 0.0;
             let band_shown = !geo_flag(&doc, sc, 1, "NoShow");
-            let want_band = head != 2 && head != 4 && [1, 2, 5].contains(&style);
+            let want_band = k != 2 && k != 4 && [1, 2, 5, 7, 9, 13, 14].contains(&style);
             let corners = !geo_flag(&doc, sc, 3, "NoShow");
+            let inner = !geo_flag(&doc, sc, 7, "NoShow");
+            let shadow = !geo_flag(&doc, sc, 8, "NoShow");
+            let tab = !geo_flag(&doc, sc, 9, "NoShow");
             let angle = num(&doc, sc, None, None, "TxtAngle");
-            let want_angle = if head == 3 { core::f64::consts::FRAC_PI_2 } else { 0.0 };
-            if bad != 0 || edge != want_edge || (size - want_size).abs() > 1e-9 || hide != (head == 4) || band_shown != want_band || corners != (style == 5) || (angle - want_angle).abs() > 1e-9 {
-                fails.push(format!("style {style} heading {head}: {bad} errors, {edge} {size} mm, hide {hide}, band {band_shown}, corners {corners}, angle {angle}"));
+            let want_angle = if k == 3 { core::f64::consts::FRAC_PI_2 } else { 0.0 };
+            let parts_ok = corners == [5, 12].contains(&style) && inner == (style == 8) && shadow == (style == 9) && tab == (style == 10 && k == 1);
+            if bad != 0
+                || n != heads as f64
+                || edge != want_edge
+                || (size - want_size).abs() > 1e-9
+                || hide != (k == 4)
+                || band_shown != want_band
+                || !parts_ok
+                || (angle - want_angle).abs() > 1e-9
+            {
+                fails.push(format!(
+                    "style {style} heading {head}: {bad} errors, count {n}, {edge} {size} mm, hide {hide}, band {band_shown}, corners {corners}, inner {inner}, shadow {shadow}, tab {tab}, angle {angle}"
+                ));
             }
         }
     }
-    h.check("stencils/structure/container/styles", fails.is_empty(), if fails.is_empty() { String::from("6 styles x 4 heading styles") } else { fails.join("; ") });
+    h.check("stencils/structure/container/styles", fails.is_empty(), if fails.is_empty() { String::from("14 styles with 2-4 heading styles") } else { fails.join("; ") });
     // the list: no heading with JFD_HeadingSize = 0
     if let Some(l) = shape_of(shapes, "List") {
         let bad = edit(&mut doc, l, |tx| set_user(tx, l, "JFD_HeadingSize", 0.0, Some(Unit::Millimeters)));
@@ -490,6 +520,30 @@ pub fn previews(dir: &str) -> i32 {
         put(&mut tx, &cs, page, "List item", (45.0, 40.0), (0.0, 0.0), None, &none);
         let _ = tx.commit();
         ok &= render_page(&mut doc, page, &format!("{dir}/containers.png"));
+    }
+    // (JD21, ST-02) the sample sheet of the 14 container styles: two blocks of seven styles
+    // (rows), each with its heading styles (columns)
+    {
+        let names = ["Klar", "Akzent", "Gestrichelt", "Fläche", "Eckwinkel", "Abgerundet", "Leiste", "Doppelrahmen", "Schiefer", "Reiter", "Kopflinie", "Klammer", "Signal", "Kopf unten"];
+        let (cw, ch, gap) = (64.0, 40.0, 8.0);
+        let (pw, ph) = (2.0 * 4.0 * (cw + gap) + 3.0 * gap, 7.0 * (ch + gap) + 2.0 * gap);
+        let Some((mut doc, page)) = sheet_doc(pw, ph) else { return 1 };
+        let mut tx = doc.transaction("previews");
+        for style in 1..=CONTAINER_STYLES {
+            let block = (style - 1) / 7;
+            let row = (style - 1) % 7;
+            for head in 1..=HEADING_COUNTS[style - 1] {
+                let x = gap + block as f64 * (4.0 * (cw + gap) + gap) + (head - 1) as f64 * (cw + gap) + cw * 0.5;
+                let y = ph - gap - row as f64 * (ch + gap) - ch * 0.5;
+                let label = format!("{style} {} / {head}", names[style - 1]);
+                put(&mut tx, &cs, page, "Container", (x, y), (cw, ch), Some(&label), &|tx, s| {
+                    set_user(tx, s, "msvSDContainerStyle", style as f64, None);
+                    set_user(tx, s, "msvSDHeadingStyle", head as f64, None);
+                });
+            }
+        }
+        let _ = tx.commit();
+        ok &= render_page(&mut doc, page, &format!("{dir}/container-styles.png"));
     }
     // the cross-functional flowchart: a horizontal and a vertical one built by hand, single
     // lanes and separators in other sizes, upright labels, no heading

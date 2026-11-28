@@ -7,6 +7,8 @@
 //                                   (JD7, rebuild.rs) the items of some top-level shapes made
 //                                   anew in their place; false: shapes came, went or changed
 //                                   their order (build anew)
+//   render::affected(&doc, &drawing, &Options, &shapes) -> tops   (JD21) the top-level shapes
+//                                   rebuild makes anew for these shapes
 //   Drawing { width, height, scale, items, fonts, notes }   in paper inches, y up, the origin at
 //                                   the page's bottom left corner; items in painter's order
 //   drawing.query(rect, &mut out)   the items whose boxes touch a rectangle (a grid over the
@@ -30,6 +32,8 @@
 // picture, the lines of the sections without NoLine with their line ends, the text.  Not
 // drawn: deleted subshapes (Del, ID 4294967295, no Type), guides, sections with NoShow,
 // shapes whose layers are all hidden.  A layer's colour (Color not 255) colours its members.
+// (JD21) Line jumps are rows of the connectors' Geometry (crate::jumps writes them when
+// connectors are laid): drawn as the rest of the geometry.
 //
 // Values Visio caches as "Themed" (the Theme style and a few shapes) are resolved against the
 // page's theme: the theme part whose schemeEnum the page's ThemeIndex names (colours by
@@ -61,7 +65,7 @@ use crate::sheet::{CellAddr, RowKey, SecKey};
 use crate::strings::Sym;
 
 pub use index::Grid;
-pub use rebuild::rebuild;
+pub use rebuild::{affected, rebuild};
 pub use text::{measure_text, ApproxMeasure, Face, Measure, TextItem, TextRun};
 pub use theme::{no_theme_color, ThemeInfo};
 pub(crate) use theme::unescape;
@@ -712,22 +716,7 @@ impl<'d, 'm> Builder<'d, 'm> {
         let w = self.num_sym(sheet, names::WIDTH).unwrap_or(0.0);
         let h = self.num_sym(sheet, names::HEIGHT).unwrap_or(0.0);
         if geometry {
-            let sections = doc.geometry_paths(sheet, w, h);
-            let mut fill = Path::default();
-            let mut line = Path::default();
-            for g in sections.iter().filter(|g| !g.no_show) {
-                if !g.no_fill {
-                    fill.subs.extend(g.path.subs.iter().filter(|s| s.closed).cloned());
-                }
-                if !g.no_line {
-                    line.subs.extend(g.path.subs.iter().cloned());
-                }
-            }
-            let rounding = self.num_sym(sheet, names::ROUNDING).unwrap_or(0.0);
-            if rounding > 0.0 {
-                fill = round_corners(&fill, rounding);
-                line = round_corners(&line, rounding);
-            }
+            let (fill, line) = self.outlines(sheet, w, h);
             let fill = fill.map(m);
             let line = line.map(m);
             if self.effects(sheet) {
@@ -745,6 +734,29 @@ impl<'d, 'm> Builder<'d, 'm> {
             }
         }
         self.text(r, m, w, h, layer_color);
+    }
+
+    /// a shape's geometry in its local coordinates: the area (the closed sub-paths of the
+    /// sections without NoFill) and the line (the sections without NoLine), sections with
+    /// NoShow left out, Rounding applied
+    fn outlines(&self, sheet: SheetRef, w: f64, h: f64) -> (Path, Path) {
+        let sections = self.doc.geometry_paths(sheet, w, h);
+        let mut fill = Path::default();
+        let mut line = Path::default();
+        for g in sections.iter().filter(|g| !g.no_show) {
+            if !g.no_fill {
+                fill.subs.extend(g.path.subs.iter().filter(|s| s.closed).cloned());
+            }
+            if !g.no_line {
+                line.subs.extend(g.path.subs.iter().cloned());
+            }
+        }
+        let rounding = self.num_sym(sheet, names::ROUNDING).unwrap_or(0.0);
+        if rounding > 0.0 {
+            fill = round_corners(&fill, rounding);
+            line = round_corners(&line, rounding);
+        }
+        (fill, line)
     }
 
     fn effects(&self, sheet: SheetRef) -> bool {
@@ -802,6 +814,12 @@ impl<'d, 'm> Builder<'d, 'm> {
             style::FillKind::Solid => {
                 if fg >> 24 != 0 {
                     self.push_fill(r, Role::Shape, fill.clone(), Paint::Solid(fg));
+                }
+            }
+            style::FillKind::Tint(k) => {
+                let c = mix(bg, fg, k);
+                if c >> 24 != 0 {
+                    self.push_fill(r, Role::Shape, fill.clone(), Paint::Solid(c));
                 }
             }
             style::FillKind::Hatch(fams) => {

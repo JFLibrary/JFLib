@@ -161,7 +161,7 @@ pub(crate) enum Created {
     // taken or refused
     Refused,
     // no step that checks and creates at once: neither Provider::create_new nor the OS's
-    // exclusive create (no os_path, or a system without one: Android, the browser)
+    // exclusive create (no os_path, or a system without one: the browser)
     Unsupported,
 }
 
@@ -175,7 +175,7 @@ pub(crate) fn create_new_in(p: &Arc<dyn Provider>, path: &str) -> Created {
         Opened::File(s) => Created::New(File(Inner::Vfs(s))),
         Opened::Refused => Created::Refused,
         Opened::Generic => match p.os_path(path) {
-            #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+            #[cfg(any(windows, target_os = "linux", target_os = "android", target_vendor = "apple"))]
             Some(o) => match fs_allowed(&o, FS_WRITE).then(|| OsFile::create_new_raw(&o)).flatten() {
                 Some(f) => Created::New(File(Inner::Os(f))),
                 None => Created::Refused,
@@ -273,7 +273,7 @@ impl Drop for Whole {
 
 // (fs.rs: Dir, set_file_times / set_file_mode) a File of an OS file opened there; the OS file
 // behind a File
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_os = "android", target_vendor = "apple"))]
 impl File {
     pub(crate) fn from_os(f: OsFile) -> File {
         File(Inner::Os(f))
@@ -301,7 +301,7 @@ impl File {
     /// Create a named file exclusively; never open an existing path.  A mount: the
     /// provider's own check-and-create (Provider::create_new: mem://, content://, overlays) or
     /// the OS's of a folder mount; None on a provider with neither.
-    #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+    #[cfg(any(windows, target_os = "linux", target_os = "android", target_vendor = "apple"))]
     pub fn create_new(path: &str) -> Option<File> {
         match vfs::route(path) {
             Route::Os if fs_allowed(path, FS_WRITE) => OsFile::create_new_raw(path).map(|f| File(Inner::Os(f))),
