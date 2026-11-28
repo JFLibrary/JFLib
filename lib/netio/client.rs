@@ -16,7 +16,8 @@
 //   (plat::AtomicFile: replaced only by a whole 2xx body), progress and cancel in ctl
 //
 // The fields: connect_ms, timeout_ms (any single read or write), deadline_ms (a whole request,
-// its redirects included; 0: none), max_body (the body as it came and after decoding),
+// its redirects included, each connect, read and write within the time left; the name lookup has
+// the resolver's own timeouts; 0: none), max_body (the body as it came and after decoding),
 // user_agent, redirects (followed at most; 0: a 3xx answer comes back as it is) and decode.
 //
 // decode (on by default): without an Accept-Encoding or Range header of the caller's, a request
@@ -26,14 +27,16 @@
 // HttpError::Encoding; stacked or unknown codings come back as they are.
 //
 // Redirects (301, 302, 303, 307, 308 with a Location, RFC 9110 15.4): the Location is resolved
-// against the request's URL (Url::join); from https to http is refused (HttpError::Redirect);
+// against the request's URL (Url::join) and handed to the redirect check; one from https to http
+// that it lets pass is refused (HttpError::Redirect);
 // 303 (not after HEAD) and 301 / 302 after POST go on as GET without the body and its headers;
 // to another origin, Authorization, Cookie, Proxy-Authorization and Host stay behind (the jar's
 // cookies are those of the new URL).
 //
 // Answers are read as RFC 9112 6.3 says: a status line "HTTP/1.x NNN" with a code of 100 to 599,
-// interim answers (1xx) skipped up to 16 of them, 101 refused (no upgrade was asked for), the
-// body by Transfer-Encoding: chunked, else Content-Length, else up to the end of the connection.
+// interim answers (1xx) skipped up to 16 of them, 101 refused (no upgrade was asked for); no body
+// after HEAD or with 204 and 304 (whatever Content-Length says), else the body by
+// Transfer-Encoding: chunked, else Content-Length, else up to the end of the connection.
 // A connection carries another request (the pool, Session) only after a body of known length
 // that was read to its end with no byte beyond it, and when neither side said close.
 
@@ -141,7 +144,9 @@ pub struct Client {
     /// the longest wait for any read or write
     pub timeout_ms: u32,
     /// the longest a whole request may take, from connecting to the last byte of the body,
-    /// redirects included (0: no limit beyond timeout_ms per read)
+    /// redirects and retries included: the connect and every read and write wait at most the
+    /// time left; the name lookup has the resolver's own timeouts (0: no limit beyond
+    /// timeout_ms per read)
     pub deadline_ms: u32,
     pub max_body: usize,
     pub user_agent: String,
@@ -190,7 +195,7 @@ fn status_line(start: &str) -> Option<(u8, u16)> {
 
 /// the final answer's head, after up to MAX_INTERIM interim ones
 fn read_head(rd: &mut Reader<'_>) -> Result<Head, ReadError> {
-    for i in 0..MAX_INTERIM {
+    for i in 0..=MAX_INTERIM {
         // only an end before the first answer is a closed connection (a reused one, to retry)
         let (start, headers) = rd.head().map_err(|e| if i > 0 && e == ReadError::Closed { ReadError::Bad } else { e })?;
         let (minor, status) = status_line(&start).ok_or(ReadError::Bad)?;
@@ -214,6 +219,16 @@ fn read_err(e: ReadError) -> HttpError {
 
 fn reset() -> HttpError {
     HttpError::Net(NetError::new(NetErrorKind::Reset, 0))
+}
+
+/// `ms`, or less when the deadline comes sooner (TimedOut when it has passed)
+fn within(ms: u32, deadline: Option<u64>) -> Result<u32, HttpError> {
+    let Some(d) = deadline else { return Ok(ms) };
+    let left = d.saturating_sub(plat::time_us()) / 1000;
+    if left == 0 {
+        return Err(HttpError::Net(NetError::new(NetErrorKind::TimedOut, 0)));
+    }
+    Ok(ms.min(left.min(u32::MAX as u64) as u32))
 }
 
 fn is_redirect(status: u16) -> bool {
@@ -362,11 +377,13 @@ impl Incoming<'_, '_> {
 
 type ReadFn<'f> = &'f mut dyn FnMut(u16, &Headers, &mut Incoming<'_, '_>) -> Result<Response, HttpError>;
 
-/// a kept connection: the stream and the proxy it goes through as absolute-form requests
+/// a kept connection: the stream, the proxy it goes through as absolute-form requests, and the
+/// TLS layer it was made with (held, so that its address in the key stays its own)
 struct Idle {
     key: String,
     conn: Box<dyn Stream>,
     via: Option<Endpoint>,
+    _tls: Option<Connector>,
     since_us: u64,
 }
 
@@ -413,7 +430,7 @@ impl Pool {
         None
     }
 
-    fn put(&self, key: String, conn: Box<dyn Stream>, via: Option<Endpoint>) {
+    fn put(&self, key: String, conn: Box<dyn Stream>, via: Option<Endpoint>, tls: Option<Connector>) {
         if self.per_host == 0 || self.max_idle == 0 {
             return;
         }
@@ -426,7 +443,7 @@ impl Pool {
         if v.len() >= self.max_idle {
             v.remove(0);
         }
-        v.push(Idle { key, conn, via, since_us: plat::time_us() });
+        v.push(Idle { key, conn, via, _tls: tls, since_us: plat::time_us() });
     }
 }
 
@@ -494,22 +511,24 @@ impl Client {
         (self.deadline_ms > 0).then(|| plat::time_us() + self.deadline_ms as u64 * 1000)
     }
 
-    // a TCP connection, within the deadline
+    // A TCP connection, within the deadline: the name lookup has the resolver's own timeouts
+    // (the deadline is checked before and after it), the connect and every later read and
+    // write wait at most the time that is left
     fn tcp(&self, url: &Url, deadline: Option<u64>) -> Result<TcpStream, HttpError> {
-        let mut ms = self.connect_ms;
-        if let Some(d) = deadline {
-            let left = d.saturating_sub(plat::time_us()) / 1000;
-            if left == 0 {
-                return Err(HttpError::Net(NetError::new(NetErrorKind::TimedOut, 0)));
-            }
-            ms = ms.min(left.min(u32::MAX as u64) as u32);
-        }
+        within(self.connect_ms, deadline)?;
         let addrs = crate::dns::resolve(&url.host, url.port)?;
-        let tcp = TcpStream::connect_any(&addrs, ms)?;
+        let tcp = TcpStream::connect_any(&addrs, within(self.connect_ms, deadline)?)?;
         let _ = tcp.set_nodelay(true);
-        tcp.set_read_timeout(Some(self.timeout_ms));
-        tcp.set_write_timeout(Some(self.timeout_ms));
+        self.bound(&tcp, deadline)?;
         Ok(tcp)
+    }
+
+    // the client's timeout for each read and write on s, or the time left when that is less
+    // (a kept connection gets this client's, not those of the one that opened it)
+    fn bound(&self, s: &dyn Stream, deadline: Option<u64>) -> Result<(), HttpError> {
+        let ms = within(self.timeout_ms, deadline)?;
+        s.set_timeouts(Some(ms), Some(ms));
+        Ok(())
     }
 
     fn tls(&self, url: &Url, tcp: TcpStream) -> Result<Box<dyn Stream>, HttpError> {
@@ -558,12 +577,22 @@ impl Client {
             return Ok((Box::new(tcp), Some(ep)));
         }
         self.tunnel(&tcp, &ep, url, deadline)?;
+        self.bound(&tcp, deadline)?;
         Ok((self.tls(url, tcp)?, None))
     }
 
-    // what tells kept connections apart: the origin, the proxy, the TLS layer
+    // What tells kept connections apart: the origin, the proxy with its credentials (a hash:
+    // a tunnel or a proxy connection is not lent to a client with other ones), the TLS layer
+    // (its address; the pool holds the connector while its connections wait, so the address
+    // cannot pass to another one meanwhile)
     fn pool_key(&self, url: &Url) -> String {
-        let via = self.proxy.as_ref().and_then(|p| p.for_url(url)).map(|e| e.key()).unwrap_or_default();
+        let via = match self.proxy.as_ref().and_then(|p| p.for_url(url)) {
+            Some(e) => {
+                let who = e.authorization().map(|a| crypto::sha256(a.as_bytes())).unwrap_or_default();
+                format!("{}#{}", e.key(), who.iter().map(|b| format!("{:02x}", b)).collect::<String>())
+            }
+            None => String::new(),
+        };
         let tls = self.connector.as_ref().map_or(0, |c| Arc::as_ptr(c) as *const () as usize);
         format!("{}|{}|{}|{:x}", url.scheme, url.authority(), via, tls)
     }
@@ -617,7 +646,11 @@ impl Client {
                 }
                 format!("{}", req.url) // absolute form (RFC 9112 3.2.2)
             }
-            None => req.url.target.clone(),
+            None => {
+                // credentials for a proxy are no business of the server's (RFC 9110 11.7.2)
+                h.remove("proxy-authorization");
+                req.url.target.clone()
+            }
         };
         if !http::write_request(s, req.method, &target, &h, req.body) {
             return Err((reset(), true));
@@ -662,10 +695,11 @@ impl Client {
                 Some(c) => c,
                 None => self.open(req.url, deadline)?,
             };
+            self.bound(&*s, deadline)?;
             match self.on_stream(&*s, req, via.as_ref(), key.is_some(), deadline, read) {
                 Ok((r, again)) => {
                     match (&self.pool, key) {
-                        (Some(p), Some(k)) if again => p.put(k, s, via),
+                        (Some(p), Some(k)) if again => p.put(k, s, via, self.connector.clone()),
                         _ => s.shutdown(),
                     }
                     return Ok(r);
@@ -694,10 +728,10 @@ impl Client {
                     if follow && is_redirect(status) {
                         if let Some(loc) = hd.get("location") {
                             let to = cur.join(loc.trim()).ok_or_else(|| HttpError::Redirect(String::from("a Location that is not an http(s) URL")))?;
-                            if cur.is_https() && !to.is_https() {
-                                return Err(HttpError::Redirect(format!("from https to http ({})", to)));
-                            }
                             if check.as_ref().is_none_or(|f| f(cur, &to)) {
+                                if cur.is_https() && !to.is_https() {
+                                    return Err(HttpError::Redirect(format!("from https to http ({})", to)));
+                                }
                                 if hops >= limit {
                                     return Err(HttpError::Redirect(format!("more than {} redirects", limit)));
                                 }
@@ -859,13 +893,13 @@ impl Session {
         &self.url
     }
 
-    fn once(&mut self, method: &str, target: &str, headers: &Headers, body: &[u8], max_body: usize) -> Result<Response, (HttpError, bool)> {
-        let deadline = self.client.deadline();
+    fn once(&mut self, deadline: Option<u64>, method: &str, target: &str, headers: &Headers, body: &[u8], max_body: usize) -> Result<Response, (HttpError, bool)> {
         let reused = self.conn.is_some();
         if self.conn.is_none() {
             self.conn = Some(self.client.open(&self.url, deadline).map_err(|e| (e, false))?);
         }
         let (s, via) = self.conn.as_ref().ok_or((HttpError::Bad, false))?;
+        self.client.bound(&**s, deadline).map_err(|e| (e, false))?;
         let url = self.url.with_target(target);
         let req = Hop { method, url: &url, headers, body };
         let r = self.client.on_stream(&**s, &req, via.as_ref(), true, deadline, &mut |status, headers, inc| {
@@ -888,8 +922,10 @@ impl Session {
 
     /// one request (an answer of at most `max_body` bytes)
     pub fn request(&mut self, method: &str, target: &str, headers: &Headers, body: &[u8], max_body: usize) -> Result<Response, HttpError> {
+        // one deadline for both tries
+        let deadline = self.client.deadline();
         for attempt in 0..2 {
-            match self.once(method, target, headers, body, max_body) {
+            match self.once(deadline, method, target, headers, body, max_body) {
                 Ok(r) => return Ok(r),
                 // a request that may have run already is not sent twice
                 Err((e, retry)) => {

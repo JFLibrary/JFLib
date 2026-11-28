@@ -47,7 +47,11 @@ fn check_host(auth_host: &str, bracketed: bool) -> Option<String> {
         let (addr, zone) = h.split_once('%').map_or((h.as_str(), None), |(a, z)| (a, Some(z)));
         let ok = matches!(plat::net::IpAddr::parse(addr), Some(plat::net::IpAddr::V6(_)))
             && zone.is_none_or(|z| !z.is_empty() && z.bytes().all(|b| b.is_ascii_alphanumeric() || b"-._~".contains(&b)));
-        return ok.then(|| h.to_ascii_lowercase());
+        // the address in lower case, the zone as written (interface names are case-sensitive)
+        return ok.then(|| match zone {
+            Some(z) => format!("{}%{}", addr.to_ascii_lowercase(), z),
+            None => addr.to_ascii_lowercase(),
+        });
     }
     let h = auth_host;
     if h.is_empty() || h.len() > 253 || h.starts_with('.') || !h.bytes().all(|b| b.is_ascii_alphanumeric() || b"-._~".contains(&b)) {

@@ -124,7 +124,8 @@ fn no_proxy_entry(e: &str) -> Option<NoProxy> {
     // "[v6]:port", "name:port", "v4:port"; a bare v6 address has colons of its own
     let (body, port) = if let Some(r) = e.strip_prefix('[') {
         let (h, p) = r.split_once(']')?;
-        (String::from(h), p.strip_prefix(':').and_then(|p| p.parse().ok()))
+        // nothing after the bracket, or ":port" (anything else drops the entry)
+        (String::from(h), if p.is_empty() { None } else { Some(p.strip_prefix(':')?.parse().ok()?) })
     } else if e.matches(':').count() == 1 {
         let (h, p) = e.split_once(':')?;
         (String::from(h), Some(p.parse().ok()?))

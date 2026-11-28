@@ -313,8 +313,8 @@ impl<'a> Reader<'a> {
         self.got = 0;
     }
 
-    /// reads fail with TimedOut once plat::time_us() is past this (a limit for a whole head,
-    /// where the stream's timeout counts each read)
+    /// reads fail with TimedOut once plat::time_us() is past this, and a read waits for bytes
+    /// only until then (a limit for a whole head, where the stream's timeout counts each read)
     pub fn set_deadline(&mut self, deadline_us: Option<u64>) {
         self.deadline_us = deadline_us;
     }
@@ -337,8 +337,12 @@ impl<'a> Reader<'a> {
             self.buf.clear();
             self.pos = 0;
         }
-        if self.deadline_us.is_some_and(|d| plat::time_us() > d) {
-            return Err(NetError::new(NetErrorKind::TimedOut, 0));
+        if let Some(d) = self.deadline_us {
+            // a read starts only with bytes there before the deadline (not a stream timeout later)
+            let left = d.saturating_sub(plat::time_us()) / 1000;
+            if left == 0 || !self.s.wait_readable(left.min(u32::MAX as u64) as u32) {
+                return Err(NetError::new(NetErrorKind::TimedOut, 0));
+            }
         }
         if let Some((t0, grace, r)) = self.rate {
             if plat::time_us() > t0 + grace + self.got.saturating_mul(1_000_000) / r {

@@ -36,6 +36,8 @@ fn urls(t: &mut T) {
         ["http://0x7f.1/", "http://2130706433/", "http://1.2.3/", "http://0177.0.0.1/", "http://127.1/"].iter().all(|s| Url::parse(s).is_none()));
     t.eq("url: a dotted IPv4 address", host("http://10.0.0.1:8080/"), Some(String::from("10.0.0.1")));
     t.eq("url: an IPv6 literal", host("http://[2001:DB8::1]/"), Some(String::from("2001:db8::1")));
+    t.eq("url: an IPv6 zone keeps its case (interface names)", host("http://[FE80::1%25LAN0]/"), Some(String::from("fe80::1%LAN0")));
+    t.eq("url: ... and is written back", format!("{}", u("http://[fe80::1%25LAN0]:81/")), String::from("http://[fe80::1%25LAN0]:81/"));
     t.check("url: IPv6 without brackets refused", Url::parse("http://::1/").is_none() && Url::parse("http://[::1/").is_none() && Url::parse("http://[nothost]/").is_none());
     t.check("url: odd hosts refused (%, space, !, IDN in Unicode, a leading dot, empty)",
         ["http://a%62.example/", "http://a!b/", "http://bücher.example/", "http://.example/", "http:///x", "http://exa\tmple/"].iter().all(|s| Url::parse(s).is_none()));
@@ -90,7 +92,7 @@ fn proxies(t: &mut T) {
     let vars = |kv: &'static [(&'static str, &'static str)]| move |n: &str| kv.iter().find(|(k, _)| *k == n).map(|(_, v)| String::from(*v));
     t.check("proxy env: HTTP_PROXY in upper case is left alone (httpoxy)", Proxy::from_vars(&vars(&[("HTTP_PROXY", "http://evil:1")])).is_none());
     t.check("proxy env: none set", Proxy::from_vars(&vars(&[])).is_none() && Proxy::from_vars(&vars(&[("http_proxy", "  ")])).is_none());
-    let p = Proxy::from_vars(&vars(&[("http_proxy", "p:1"), ("HTTPS_PROXY", "http://s:2"), ("NO_PROXY", "corp.example, .lan,10.0.0.0/8, [::1]:8080, *.dev.example, 192.168.1.7, bad/x")]));
+    let p = Proxy::from_vars(&vars(&[("http_proxy", "p:1"), ("HTTPS_PROXY", "http://s:2"), ("NO_PROXY", "corp.example, .lan,10.0.0.0/8, [::1]:8080, *.dev.example, 192.168.1.7, bad/x, web.example:8080, [2001:db8::1]:8080, [2001:db8::2]:oops, [2001:db8::3]x")]));
     let via = |s: &str| p.as_ref().and_then(|p| p.for_url(&u(s))).map(|e| e.key());
     t.eq("proxy env: http_proxy for http", via("http://example.org/"), Some(String::from("p:1")));
     t.eq("proxy env: HTTPS_PROXY for https", via("https://example.org/"), Some(String::from("s:2")));
@@ -99,6 +101,10 @@ fn proxies(t: &mut T) {
     t.check("proxy env: NO_PROXY does not take a mere ending", via("http://xcorp.example/").is_some() && via("http://notlan/").is_some());
     t.check("proxy env: a leading dot also takes the name itself (as curl)", via("http://lan/").is_none());
     t.check("proxy env: NO_PROXY addresses and ranges", via("http://10.1.2.3/").is_none() && via("http://11.0.0.1/").is_some() && via("http://192.168.1.7/").is_none() && via("http://192.168.1.8/").is_some());
+    t.check("proxy env: NO_PROXY with a port takes that port only",
+        via("http://web.example:8080/").is_none() && via("http://web.example:8081/").is_some() && via("http://[2001:db8::1]:8080/").is_none() && via("http://[2001:db8::1]:8081/").is_some());
+    t.check("proxy env: NO_PROXY drops a bracket with a bad port or more after it",
+        via("http://[2001:db8::2]:8080/").is_some() && via("http://[2001:db8::2]/").is_some() && via("http://[2001:db8::3]/").is_some());
     t.check("proxy: loopback and localhost go direct", via("http://127.0.0.1:5000/").is_none() && via("http://[::1]/").is_none() && via("http://localhost/").is_none() && via("http://app.localhost/").is_none());
     let all = Proxy::from_vars(&vars(&[("all_proxy", "http://a:3")]));
     t.check("proxy env: all_proxy for both", all.as_ref().is_some_and(|p| p.for_url(&u("http://x/")).is_some() && p.for_url(&u("https://x/")).is_some()));
@@ -159,6 +165,8 @@ fn answers(t: &mut T) {
         t.check(&format!("answer: status line refused ({name})"), r.err() == Some(HttpError::Bad));
     }
     t.check("answer: interim answers skipped", ok(&on(&c, b"HTTP/1.1 100 Continue\r\n\r\nHTTP/1.1 103 Early Hints\r\nLink: </a>\r\n\r\nHTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\nx"), b"x"));
+    let sixteen: Vec<u8> = b"HTTP/1.1 100 Continue\r\n\r\n".repeat(16).into_iter().chain(b"HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\nx".iter().copied()).collect();
+    t.check("answer: 16 interim answers, then the answer", ok(&on(&c, &sixteen), b"x"));
     let flood: Vec<u8> = b"HTTP/1.1 100 Continue\r\n\r\n".repeat(17).into_iter().chain(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n".iter().copied()).collect();
     t.check("answer: more than 16 interim answers refused", on(&c, &flood).err() == Some(HttpError::Bad));
     t.check("answer: 101 without an upgrade asked for", on(&c, b"HTTP/1.1 101 Switching Protocols\r\nUpgrade: x\r\n\r\n").err() == Some(HttpError::Bad));
@@ -182,8 +190,13 @@ fn answers(t: &mut T) {
     let _ = c.request_on(&s, "GET", &url, &h, &[]);
     t.check("request: a Range request offers no coding", !s.sent().contains("Accept-Encoding"));
     let s = Scripted::new(b"HTTP/1.1 200 OK\r\nContent-Length: 9\r\n\r\n");
-    let _ = c.request_on(&s, "HEAD", &url, &Headers::new(), &[]);
-    t.check("request: HEAD offers no coding, reads no body", !s.sent().contains("Accept-Encoding"));
+    let r = c.request_on(&s, "HEAD", &url, &Headers::new(), &[]);
+    t.check("request: HEAD offers no coding, reads no body", !s.sent().contains("Accept-Encoding") && matches!(r, Ok(ref r) if r.status == 200 && r.body_bytes().is_empty()));
+    let s = Scripted::new(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
+    let mut h = Headers::new();
+    h.set("Proxy-Authorization", "Basic c2VjcmV0");
+    let _ = c.request_on(&s, "GET", &url, &h, &[]);
+    t.check("request: the caller's Proxy-Authorization does not go to a server", !s.sent().to_ascii_lowercase().contains("proxy-authorization"));
     let mut nd = Client::new();
     nd.decode = false;
     let s = Scripted::new(b"HTTP/1.1 204 No Content\r\n\r\n");
@@ -319,6 +332,8 @@ impl Raw {
                 }));
             }
         }));
+        // no accept thread, no server (the group reports that, not failed requests)
+        th.as_ref()?;
         Some(Raw { port, conns, stop, th })
     }
 
@@ -508,8 +523,10 @@ fn cookies(t: &mut T) {
 
 fn pool(t: &mut T) {
     let ok = |s: &TcpStream, body: &str, extra: &str| w(s, format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\n{}\r\n{}", body.len(), extra, body).as_bytes());
-    let once_per_conn = Arc::new(Mutex::new(Vec::<u32>::new()));
-    let seen = once_per_conn.clone();
+    // /once: the requests of each connection (by the client's port), and the POSTs it got
+    let seen = Arc::new(Mutex::new(Vec::<(u16, u32)>::new()));
+    let posts = Arc::new(AtomicU32::new(0));
+    let posted = posts.clone();
     let Some(srv) = Raw::start(Arc::new(move |r: &Request, s: &TcpStream| match r.path() {
         "/a" => {
             ok(s, "a", "");
@@ -541,9 +558,22 @@ fn pool(t: &mut T) {
         }
         "/once" => {
             // answers the first request of a connection, ends it without an answer at the second
+            if r.method == "POST" {
+                posted.fetch_add(1, SeqCst);
+            }
+            let port = s.peer_addr().map_or(0, |a| a.port);
             let mut v = seen.lock();
-            v.push(1);
-            if v.len() % 2 == 1 {
+            let n = match v.iter_mut().find(|(p, _)| *p == port) {
+                Some(e) => {
+                    e.1 += 1;
+                    e.1
+                }
+                None => {
+                    v.push((port, 1));
+                    1
+                }
+            };
+            if n == 1 {
                 ok(s, "1", "");
                 true
             } else {
@@ -582,20 +612,26 @@ fn pool(t: &mut T) {
     let second = get(&c, "/once");
     t.check(&format!("pool: a kept connection closed at the next request: GET once more ({} new)", srv.conns() - n), first.as_deref() == Some("1") && second.as_deref() == Some("1") && srv.conns() - n == 2);
     p.clear();
-    once_per_conn.lock().clear();
     let _ = get(&c, "/once");
+    let before = posts.load(SeqCst);
     let post = c.request("POST", &srv.url("/once"), &Headers::new(), b"x");
-    t.check("pool: ... but a POST is not sent twice", post.is_err());
+    t.check(&format!("pool: ... but a POST is not sent twice ({} sent)", posts.load(SeqCst) - before), post.is_err() && posts.load(SeqCst) - before == 1);
     p.clear();
     let n = srv.conns();
     let plain = Client::new();
     let _ = (get(&plain, "/a"), get(&plain, "/a"));
     t.check("pool: without one, a connection per request", srv.conns() - n == 2);
-    let other = Client::new().with_pool(p.clone()).with_connector(Arc::new(|_u: &Url, tcp: TcpStream| Ok(Box::new(tcp) as Box<dyn netio::Stream>)));
+    let layer: netio::client::Connector = Arc::new(|_u: &Url, tcp: TcpStream| Ok(Box::new(tcp) as Box<dyn netio::Stream>));
+    let other = Client::new().with_pool(p.clone()).with_connector(layer.clone());
     let _ = get(&c, "/a");
     let n = srv.conns();
     let _ = get(&other, "/a");
     t.check("pool: another TLS layer does not take the connection", srv.conns() - n == 1);
+    let held = Arc::strong_count(&layer);
+    drop(other);
+    t.check("pool: a kept connection holds its TLS layer (its address stays its own)", held == 3 && Arc::strong_count(&layer) == 2);
+    p.clear();
+    t.check("pool: ... until the connection goes", Arc::strong_count(&layer) == 1);
 
     // Session: an answer without a length is read to the end, not taken as empty (the rest
     // would be the next answer)
@@ -613,6 +649,11 @@ fn pool(t: &mut T) {
 
 fn deadline(t: &mut T) {
     let Some(srv) = Raw::start(Arc::new(|r: &Request, s: &TcpStream| {
+        if r.path() == "/stall" {
+            w(s, b"HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\nx");
+            plat::sleep_ms(3000);
+            return false;
+        }
         if r.path() == "/drip" {
             w(s, b"HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\n");
         }
@@ -634,6 +675,13 @@ fn deadline(t: &mut T) {
     let r = c.get(&srv.url("/drip"), &Headers::new());
     let ms = (plat::time_us() - t0) / 1000;
     t.check(&format!("deadline: a body that drips ends at the deadline ({ms} ms)"), matches!(r, Err(HttpError::Net(ref e)) if e.kind == NetErrorKind::TimedOut) && ms < 2000);
+    let mut c = Client::new();
+    c.timeout_ms = 10_000;
+    c.deadline_ms = 400;
+    let t0 = plat::time_us();
+    let r = c.get(&srv.url("/stall"), &Headers::new());
+    let ms = (plat::time_us() - t0) / 1000;
+    t.check(&format!("deadline: a body that stops ends at the deadline, not the read timeout ({ms} ms)"), matches!(r, Err(HttpError::Net(ref e)) if e.kind == NetErrorKind::TimedOut) && ms < 2000);
     let t0 = plat::time_us();
     let r = Client::new().get(&srv.url("/interim"), &Headers::new());
     let ms = (plat::time_us() - t0) / 1000;
@@ -702,14 +750,20 @@ fn proxy_at_work(t: &mut T) {
     t.check("proxy: http in absolute form, with credentials, no lookup of the host",
         matches!(r, Ok(ref r) if r.body_bytes() == b"via proxy: GET http://no-such-host.invalid:81/x?y=1 host=no-such-host.invalid:81"));
     // https through the tunnel; the "TLS layer" here hands the tunnel on as it is
-    let pass: netio::client::Connector = Arc::new(|_u: &Url, tcp: TcpStream| Ok(Box::new(tcp) as Box<dyn netio::Stream>));
+    let layered = Arc::new(AtomicU32::new(0));
+    let l2 = layered.clone();
+    let pass: netio::client::Connector = Arc::new(move |_u: &Url, tcp: TcpStream| {
+        l2.fetch_add(1, SeqCst);
+        Ok(Box::new(tcp) as Box<dyn netio::Stream>)
+    });
     let tc = Client::new().with_proxy(good.clone()).with_connector(pass.clone());
     let r = tc.get(&u(&format!("https://origin.test:{}/hello", op)), &Headers::new());
-    t.check("proxy: a CONNECT tunnel to origin.test", matches!(r, Ok(ref r) if r.body_bytes().starts_with(b"origin GET len=0")));
+    t.check("proxy: a CONNECT tunnel to origin.test, then the TLS layer", matches!(r, Ok(ref r) if r.body_bytes().starts_with(b"origin GET len=0")) && layered.load(SeqCst) == 1);
     let bad = Client::new().with_proxy(with(&format!("http://u:wrong@127.0.0.1:{}", px.port))).with_connector(pass.clone());
     t.eq("proxy: wrong credentials (407)", bad.get(&u(&format!("https://origin.test:{}/", op)), &Headers::new()).err(), Some(HttpError::Proxy(407)));
     let r = tc.get(&u(&format!("https://junk.test:{}/", op)), &Headers::new());
     t.eq("proxy: bytes after the tunnel's 200 refused", r.err(), Some(HttpError::Bad));
+    t.check("proxy: a refused tunnel never reaches the TLS layer", layered.load(SeqCst) == 1);
     let direct = Client::new().with_proxy(good.clone());
     let r = direct.get(&u(&format!("http://127.0.0.1:{}/x", op)), &Headers::new());
     t.check("proxy: loopback goes direct", matches!(r, Ok(ref r) if r.body_bytes().starts_with(b"origin GET")));
@@ -719,6 +773,10 @@ fn proxy_at_work(t: &mut T) {
     let r1 = pooled.get(&u("http://a.example:81/1"), &Headers::new());
     let r2 = pooled.get(&u("http://a.example:81/2"), &Headers::new());
     t.check(&format!("proxy: kept connections to the proxy ({} new)", px.conns() - n), r1.is_ok() && r2.is_ok() && px.conns() - n == 1);
+    let stranger = Client::new().with_proxy(with(&format!("http://u:wrong@127.0.0.1:{}", px.port))).with_pool(p.clone());
+    let n = px.conns();
+    let r3 = stranger.get(&u("http://a.example:81/3"), &Headers::new());
+    t.check(&format!("proxy: a pooled proxy connection is not lent to other credentials ({} new)", px.conns() - n), matches!(r3, Ok(ref r) if r.status == 407) && px.conns() - n == 1);
     origin.stop();
 }
 

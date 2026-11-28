@@ -34,7 +34,7 @@ file that is replaced only by a complete 2xx answer, with progress and cancellat
 
 A body in gzip or br is asked for and decoded by default (zstd and deflate are decoded too, and
 `max_body` counts the decoded bytes, so a small bomb stays small). Everything else is switched on
-by the program: `with_redirects(n)` follows 301 to 308 (never from https to http; Authorization
+by the program: `with_redirects(n)` follows 301, 302, 303, 307 and 308 (never from https to http; Authorization
 and Cookie do not go to another origin; `fetch` says where the answer came from),
 `with_cookies(jar)` keeps cookies in a `netpkt::cookie::Jar` (the Public Suffix List decides
 which Domain a site may set), `with_pool(Pool::new())` keeps connections open, and

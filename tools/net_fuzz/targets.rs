@@ -850,6 +850,7 @@ fn url_seeds() -> Vec<Vec<u8>> {
         "https://[2001:db8::1]:8443/p;q\n//other.example:81/x",
         "http://[fe80::1%25eth0]/\n?only",
         "http://u:p%40w@proxy.lan:3128\nlocalhost, .corp.example, 10.0.0.0/8, [::1]:80, *",
+        "http://web.corp.example:8080/x\nlocalhost, .corp.example:8080, 10.0.0.0/8, [2001:db8::1]:80, [::2]:x",
         "HTTP://H:/%7e?%41#f\nhttps://x/./a/../b",
         "http://10.0.0.1/ä\"<>`{}\n#frag",
     ]

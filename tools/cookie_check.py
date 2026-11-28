@@ -15,8 +15,9 @@ of the suite need no /etc/hosts.  Each case runs `coretest --http-get URL --prox
 --cookies` (python build_rs.py app coretest --target linux first).
 
 Cases where RFC 6265bis (which netpkt::cookie follows) reads a header otherwise than the 2011
-suite are KNOWN, each with its reason; a case that becomes right while KNOWN is reported too, so
-the list stays true.  Exit code 1 on any other difference."""
+suite are KNOWN, each with the answer it gives and the reason; any other answer of such a case is
+a failure, and a case that becomes right while KNOWN is reported too, so the list stays true.
+Exit code 1 on any other difference."""
 import argparse
 import http.server
 import re
@@ -46,14 +47,15 @@ NAMES = (
     + [f"value{i:04d}" for i in range(1, 7)]
 )
 
-# where netio's client gives another answer than the 2011 suite, by case, with the reason
-_PAST = "its Expires is 2019, a date that has passed (the suite is of 2011): the cookie is gone"
+# where netio's client gives another answer than the 2011 suite, by case: (that answer, the reason);
+# None is the result page reached without a Cookie header
+_PAST = (None, "its Expires is 2019, a date that has passed (the suite is of 2011): the cookie is gone")
 KNOWN = {
     "0002": _PAST,
     "comma0006": _PAST,
     "comma0007": _PAST,
-    "disabled-path0029": "disabled in the suite: the request's %6F is not decoded for path matching (RFC 6265 5.1.4 compares the paths as written)",
-    "disabled-chromium0022": "disabled in the suite: a NUL in a header line makes netio refuse the answer (RFC 9110 5.5 allows rejecting it)",
+    "disabled-path0029": (None, "disabled in the suite: the request's %6F is not decoded for path matching (RFC 6265 5.1.4 compares the paths as written)"),
+    "disabled-chromium0022": ("(error: error: malformed HTTP answer)", "disabled in the suite: a NUL in a header line makes netio refuse the answer (RFC 9110 5.5 allows rejecting it)"),
 }
 
 
@@ -86,9 +88,10 @@ class Suite(http.server.BaseHTTPRequestHandler):
                 lines.append(f"Location: /cookie-parser-result?{name}".encode())
             self.answer(302, lines)
         elif u.path == "/cookie-parser-result" or u.path.startswith("/cookie-parser-result/"):
-            # http.server reads header lines as Latin-1; the client sent UTF-8
-            got = self.headers.get("Cookie")
-            self.seen[u.query] = got.encode("latin-1").decode("utf-8", "replace") if got is not None else None
+            # http.server reads header lines as Latin-1; the client sent UTF-8.  More than one
+            # Cookie header is a difference of its own
+            got = [v.encode("latin-1").decode("utf-8", "replace") for v in self.headers.get_all("Cookie") or []]
+            self.seen[u.query] = got[0] if len(got) == 1 else None if not got else f"({len(got)} Cookie headers: {got!r})"
             self.answer(200, [b"Content-Type: text/plain"], b"ok")
         else:
             self.answer(404, [])
@@ -105,6 +108,10 @@ def main():
     ap.add_argument("--only", default="")
     ap.add_argument("-v", action="store_true", help="every case")
     a = ap.parse_args()
+    names = [n for n in a.only.split(",") if n] or NAMES
+    unknown = [n for n in names if n not in NAMES]
+    if unknown:
+        ap.error(f"--only: no such case: {', '.join(unknown)}")
     exe = ROOT / "build" / a.target / ("coretest.exe" if a.target == "win" else "coretest")
     if not exe.exists():
         print(f"cookie_check: {exe.relative_to(ROOT)} is missing (python build_rs.py app coretest --target {a.target})")
@@ -117,19 +124,24 @@ def main():
     srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Suite)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     proxy = f"http://127.0.0.1:{srv.server_address[1]}"
-    names = [n for n in a.only.split(",") if n] or NAMES
     counts = {"pass": 0, "known": 0, "fail": 0}
     for name in names:
         url = f"http://home.example.org:8888/cookie-parser?{name}"
-        p = subprocess.run([str(exe), "--http-get", url, "--proxy", proxy, "--redirects", "5", "--cookies"], capture_output=True, text=True, timeout=60)
         want = expected(folder, name)
-        got = Suite.seen.pop(name, "(no request)") if p.returncode == 0 else f"(error: {p.stdout.strip()})"
+        try:
+            p = subprocess.run([str(exe), "--http-get", url, "--proxy", proxy, "--redirects", "5", "--cookies"], capture_output=True, text=True, timeout=60)
+            got = Suite.seen.pop(name, "(no request)") if p.returncode == 0 else f"(error: {p.stdout.strip()})"
+        except subprocess.TimeoutExpired:
+            Suite.seen.pop(name, None)
+            got = "(no answer within 60 s)"
         if got == want:
             kind = "pass" if name not in KNOWN else "fail"
             note = "" if name not in KNOWN else "  now right: take it out of KNOWN"
+        elif name in KNOWN and got == KNOWN[name][0]:
+            kind, note = "known", f"  ({KNOWN[name][1]})"
         else:
-            kind = "known" if name in KNOWN else "fail"
-            note = f"  ({KNOWN[name]})" if name in KNOWN else ""
+            kind = "fail"
+            note = f"  (KNOWN gives {KNOWN[name][0]!r})" if name in KNOWN else ""
         counts[kind] += 1
         if a.v or kind == "fail" or note.startswith("  now"):
             print(f"  {kind.upper():<5} {name}: got {got!r}, expected {want!r}{note}")

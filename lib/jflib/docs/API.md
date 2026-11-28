@@ -46237,7 +46237,8 @@ client -- a blocking HTTP/1.1 client
   (plat::AtomicFile: replaced only by a whole 2xx body), progress and cancel in ctl
 
 The fields: connect_ms, timeout_ms (any single read or write), deadline_ms (a whole request,
-its redirects included; 0: none), max_body (the body as it came and after decoding),
+its redirects included, each connect, read and write within the time left; the name lookup has
+the resolver's own timeouts; 0: none), max_body (the body as it came and after decoding),
 user_agent, redirects (followed at most; 0: a 3xx answer comes back as it is) and decode.
 
 decode (on by default): without an Accept-Encoding or Range header of the caller's, a request
@@ -46247,14 +46248,16 @@ Content-Length then leave the answer's headers.  A body that does not decode is
 HttpError::Encoding; stacked or unknown codings come back as they are.
 
 Redirects (301, 302, 303, 307, 308 with a Location, RFC 9110 15.4): the Location is resolved
-against the request's URL (Url::join); from https to http is refused (HttpError::Redirect);
+against the request's URL (Url::join) and handed to the redirect check; one from https to http
+that it lets pass is refused (HttpError::Redirect);
 303 (not after HEAD) and 301 / 302 after POST go on as GET without the body and its headers;
 to another origin, Authorization, Cookie, Proxy-Authorization and Host stay behind (the jar's
 cookies are those of the new URL).
 
 Answers are read as RFC 9112 6.3 says: a status line "HTTP/1.x NNN" with a code of 100 to 599,
-interim answers (1xx) skipped up to 16 of them, 101 refused (no upgrade was asked for), the
-body by Transfer-Encoding: chunked, else Content-Length, else up to the end of the connection.
+interim answers (1xx) skipped up to 16 of them, 101 refused (no upgrade was asked for); no body
+after HEAD or with 204 and 304 (whatever Content-Length says), else the body by
+Transfer-Encoding: chunked, else Content-Length, else up to the end of the connection.
 A connection carries another request (the pool, Session) only after a body of known length
 that was read to its end with no byte beyond it, and when neither side said close.
 ```
@@ -46291,7 +46294,9 @@ that was read to its end with no byte beyond it, and when neither side said clos
   - `connect_ms: u32`
   - `timeout_ms: u32` -- the longest wait for any read or write
   - `deadline_ms: u32` -- the longest a whole request may take, from connecting to the last byte of the body,
-    redirects included (0: no limit beyond timeout_ms per read)
+    redirects and retries included: the connect and every read and write wait at most the
+    time left; the name lookup has the resolver's own timeouts (0: no limit beyond
+    timeout_ms per read)
   - `max_body: usize`
   - `user_agent: String`
   - `redirects: u8` -- redirects followed at most (0: a 3xx answer comes back as it is)
@@ -46578,8 +46583,8 @@ MAX_HEADERS: usize = 100
   call, counted after a first `grace_ms` (a body that dribbles in a byte now and then, each
   within the stream's timeout, must not hold the reader for hours); None: no such limit
 - **`fn set_deadline(&mut self, deadline_us: Option<u64>)`**
-  reads fail with TimedOut once plat::time_us() is past this (a limit for a whole head,
-  where the stream's timeout counts each read)
+  reads fail with TimedOut once plat::time_us() is past this, and a read waits for bytes
+  only until then (a limit for a whole head, where the stream's timeout counts each read)
 - **`fn has_buffered(&self) -> bool`**
   whether unread bytes are buffered (a pipelined next request)
 - **`fn take_buffered(&mut self) -> Vec<u8>`**
