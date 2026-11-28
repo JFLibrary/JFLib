@@ -507,8 +507,9 @@ Teile sind bei 384 px kaum zu sehen (`--size 1024` hilft). Die Reihenfolge der W
   dem Lauf und im Fehler beim Aufruf.
 - **Benannte Argumente** (seit S3): Die VM bindet sie nach den Formen der Beschreibung und gibt dem Host die Werte
   in der Reihenfolge der Parameter, `nil` für ausgelassene davor ([Die Skript-API](#die-skript-api)); der Host ist
-  dafür nicht geändert. Eine Grenze: Er sieht nicht, ob ein Argument benannt war, also ist `m.scale(sx: 2)` für ihn
-  `m.scale(2)`, in allen Achsen 2. Die Namen der Parameter sind damit Teil der Schnittstelle (G9.3).
+  dafür nicht geändert. Ein Parameter ohne `?` und ohne Vorgabewert darf dabei nicht fehlen: `m.scale(sx: 2)` ist
+  der Fehler „mesh.scale: der Parameter sy fehlt“ (vor dem Lauf eine Warnung), statt beim Host als `m.scale(2)`
+  anzukommen, in allen Achsen 2. Die Namen der Parameter sind damit Teil der Schnittstelle (G9.3).
 - **Namen englisch, Texte deutsch** (Entscheidung G9.3 in JFScripts `docs/RICHTUNG.md`): Funktionen und ihre
   Parameter heißen englisch wie die Sprache und ihre Bibliothek (`m.bevel(width, segments, axis)`, `list.range(start,
   end, step)`); mit benannten Argumenten werden auch die Namen der Parameter Teil der Schnittstelle. Bis S1 hießen sie
