@@ -33,6 +33,12 @@
 //   reg_create_in / reg_delete_in / reg_delete_tree_in / reg_delete_value_in(Root, ..)   the
 //                                   same in HKCU (Root::User) or HKLM (Root::Machine: a setup
 //                                   for all users, with administrator rights)
+//   reg_exists_in(root, subkey) / reg_get_sz_in(root, subkey, name)   reading: whether a key is
+//                                   there, a string value
+//   secure_dir(path) -> bool        (administrator rights) a folder for all users: created, or
+//                                   taken over, with the administrators as owner and a DACL of
+//                                   its own -- SYSTEM and the administrators full, the users read
+//                                   and run (what the folder had from above does not count)
 //   assoc_changed()                 SHChangeNotify(SHCNE_ASSOCCHANGED): Explorer re-reads the
 //                                   file types and URL schemes
 //   run_cmdline(cmdline, dir, hidden) -> bool    CreateProcessW (dir None = the current one,
@@ -63,6 +69,16 @@ unsafe extern "system" {
     fn GetLastError() -> u32;
     fn WaitForSingleObject(h: isize, ms: u32) -> u32;
     fn GetExitCodeProcess(h: isize, code: *mut u32) -> i32;
+    fn CreateDirectoryW(name: *const u16, sa: usize) -> i32;
+    fn LocalFree(memory: *mut core::ffi::c_void) -> *mut core::ffi::c_void;
+}
+
+/// SECURITY_ATTRIBUTES
+#[repr(C)]
+struct SecurityAttributes {
+    len: u32,
+    descriptor: usize,
+    inherit: i32,
 }
 
 /// STARTUPINFOW (x64, 104 bytes)
@@ -107,6 +123,9 @@ const HKLM: isize = 0xFFFF_FFFF_8000_0002u64 as isize;
 /// CreateProcessW's limit of a command line (wide chars, with the NUL)
 const CMDLINE_CAP: usize = 32768;
 const KEY_WRITE: u32 = 0x20006;
+const KEY_READ: u32 = 0x20019;
+// RegGetValueW: a REG_SZ or REG_EXPAND_SZ value, the latter not expanded
+const RRF_RT_SZ: u32 = 0x2 | 0x4 | 0x1000_0000;
 const REG_SZ: u32 = 1;
 const REG_DWORD: u32 = 4;
 const CLSCTX_INPROC: u32 = 1;
@@ -147,8 +166,12 @@ const P_REGTREE: usize = 6;
 const P_REGDELVAL: usize = 7;
 const P_CHANGENOTIFY: usize = 8;
 const P_PVCLEAR: usize = 9;
+const P_REGOPEN: usize = 10;
+const P_REGGET: usize = 11;
+const P_SDDL: usize = 12;
+const P_SETFILESEC: usize = 13;
 static LOADED: AtomicU32 = AtomicU32::new(0); // 0 not loaded, 1 loading, 2 loaded (PROCS valid)
-static PROCS: [AtomicUsize; 10] = [const { AtomicUsize::new(0) }; 10];
+static PROCS: [AtomicUsize; 14] = [const { AtomicUsize::new(0) }; 14];
 
 /// resolve the optional APIs once and initialise COM  [sh_load]
 fn inst_load() {
@@ -169,6 +192,10 @@ fn inst_load() {
         set(P_REGDELVAL, b"advapi32.dll\0", b"RegDeleteKeyValueW\0");
         set(P_CHANGENOTIFY, b"shell32.dll\0", b"SHChangeNotify\0");
         set(P_PVCLEAR, b"ole32.dll\0", b"PropVariantClear\0");
+        set(P_REGOPEN, b"advapi32.dll\0", b"RegOpenKeyExW\0");
+        set(P_REGGET, b"advapi32.dll\0", b"RegGetValueW\0");
+        set(P_SDDL, b"advapi32.dll\0", b"ConvertStringSecurityDescriptorToSecurityDescriptorW\0");
+        set(P_SETFILESEC, b"advapi32.dll\0", b"SetFileSecurityW\0");
         let p = PROCS[P_COINIT].load(Ordering::SeqCst);
         if p != 0 {
             // SAFETY: CoInitializeEx(LPVOID reserved, DWORD) -> HRESULT; S_FALSE / RPC_E_CHANGED_MODE
@@ -549,6 +576,83 @@ impl Drop for RegKey {
             unsafe { f(self.0) };
         }
     }
+}
+
+/// whether root\subkey exists (and may be read)
+pub fn reg_exists_in(root: Root, subkey: &str) -> bool {
+    let p = proc_(P_REGOPEN);
+    if p == 0 {
+        return false;
+    }
+    let w_key = wide_cap(subkey, PATH_CAP);
+    let mut hkey: isize = 0;
+    // SAFETY: RegOpenKeyExW(HKEY, LPCWSTR, DWORD, REGSAM, PHKEY) -> LSTATUS; RegKey closes the key.
+    let f: unsafe extern "system" fn(isize, *const u16, u32, u32, *mut isize) -> i32 = unsafe { core::mem::transmute(p) };
+    if unsafe { f(root.hkey(), w_key.as_ptr(), 0, KEY_READ, &mut hkey) } != 0 || hkey == 0 {
+        return false;
+    }
+    drop(RegKey(hkey));
+    true
+}
+
+/// a string value of root\subkey ("" = its default value; REG_EXPAND_SZ as stored) -> None when
+/// it or the key is missing, or of another type
+pub fn reg_get_sz_in(root: Root, subkey: &str, name: &str) -> Option<String> {
+    let p = proc_(P_REGGET);
+    if p == 0 {
+        return None;
+    }
+    let (w_key, w_name) = (wide_cap(subkey, PATH_CAP), wide_cap(name, NAME_CAP));
+    // SAFETY: RegGetValueW(HKEY, LPCWSTR, LPCWSTR, DWORD, LPDWORD, PVOID, LPDWORD) -> LSTATUS:
+    // first the size in bytes, then a buffer of it (a value that grew in between: None).
+    let f: unsafe extern "system" fn(isize, *const u16, *const u16, u32, *mut u32, *mut u8, *mut u32) -> i32 = unsafe { core::mem::transmute(p) };
+    let mut n: u32 = 0;
+    if unsafe { f(root.hkey(), w_key.as_ptr(), w_name.as_ptr(), RRF_RT_SZ, core::ptr::null_mut(), core::ptr::null_mut(), &mut n) } != 0 {
+        return None;
+    }
+    let mut buf = alloc::vec![0u16; (n as usize).div_ceil(2) + 1];
+    let mut m = (buf.len() * 2) as u32;
+    // SAFETY: as above, buf holds m bytes.
+    if unsafe { f(root.hkey(), w_key.as_ptr(), w_name.as_ptr(), RRF_RT_SZ, core::ptr::null_mut(), buf.as_mut_ptr() as *mut u8, &mut m) } != 0 {
+        return None;
+    }
+    Some(utf8_cap(&buf, buf.len() * 3 + 1))
+}
+
+/// the folder of an installation for all users (administrator rights): created with, or (when it
+/// is there) given, the administrators as owner and a protected DACL -- SYSTEM and the
+/// administrators full access, the users read and run, inherited by what is made in it.  A
+/// folder chosen elsewhere than in Program Files kept what its parent gave (on D:\ the
+/// authenticated users may change files): a user could swap the program or the uninstaller
+/// that runs with administrator rights.  What lies in an existing folder keeps its own rights
+pub fn secure_dir(path: &str) -> bool {
+    let (sddl_p, set_p) = (proc_(P_SDDL), proc_(P_SETFILESEC));
+    if sddl_p == 0 || set_p == 0 {
+        return false;
+    }
+    // FILE_GENERIC_READ | FILE_GENERIC_EXECUTE for BU
+    let sddl = wide_cap("O:BAD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1200a9;;;BU)", 128);
+    let mut sd = 0usize;
+    // SAFETY: ConvertStringSecurityDescriptorToSecurityDescriptorW(LPCWSTR, DWORD, PSECURITY_DESCRIPTOR*,
+    // PULONG) -> BOOL: a valid SDDL, revision 1; the descriptor is freed with LocalFree below.
+    let conv: unsafe extern "system" fn(*const u16, u32, *mut usize, *mut u32) -> i32 = unsafe { core::mem::transmute(sddl_p) };
+    if unsafe { conv(sddl.as_ptr(), 1, &mut sd, core::ptr::null_mut()) } == 0 || sd == 0 {
+        return false;
+    }
+    let w = wide_cap(path, PATH_CAP);
+    let sa = SecurityAttributes { len: core::mem::size_of::<SecurityAttributes>() as u32, descriptor: sd, inherit: 0 };
+    // SAFETY: a NUL-terminated path and valid security attributes.
+    let ok = unsafe { CreateDirectoryW(w.as_ptr(), &sa as *const SecurityAttributes as usize) } != 0 || {
+        // OWNER_ | DACL_ | PROTECTED_DACL_SECURITY_INFORMATION
+        const INFO: u32 = 0x1 | 0x4 | 0x8000_0000;
+        // SAFETY: SetFileSecurityW(LPCWSTR, SECURITY_INFORMATION, PSECURITY_DESCRIPTOR) -> BOOL on the
+        // existing folder with the descriptor above.
+        let set: unsafe extern "system" fn(*const u16, u32, usize) -> i32 = unsafe { core::mem::transmute(set_p) };
+        unsafe { set(w.as_ptr(), INFO, sd) != 0 }
+    };
+    // SAFETY: the descriptor of ConvertString..., no longer used.
+    unsafe { LocalFree(sd as *mut core::ffi::c_void) };
+    ok
 }
 
 /// RegDeleteKeyW(HKCU, subkey)  [sh_reg_delete, real mode]

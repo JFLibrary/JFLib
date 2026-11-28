@@ -755,10 +755,16 @@ impl Store {
     fn start_log(&self, st: &mut State) -> StoreResult<()> {
         let wal_path = join(&self.dir, &wal_name(st.seq + 1));
         if wal_path != st.wal_path {
-            st.wal = plat::File::open(&wal_path, plat::FO_RW).ok_or_else(|| io("cannot open", &wal_path))?;
+            // the file, its name and its length change together, once it is empty: on an error
+            // the log open so far stays the one written to (the new one was set beside it with
+            // the old length)
+            let wal = plat::File::open(&wal_path, plat::FO_RW).ok_or_else(|| io("cannot open", &wal_path))?;
+            if !wal.set_len(0) {
+                return Err(io("cannot truncate", &wal_path));
+            }
+            st.wal = wal;
             st.wal_path = wal_path;
-        }
-        if !st.wal.set_len(0) {
+        } else if !st.wal.set_len(0) {
             return Err(io("cannot truncate", &st.wal_path));
         }
         st.wal_len = 0;
@@ -783,12 +789,16 @@ impl Store {
         if !plat::fs::write_file_private(&path, &bytes) {
             return Err(io("cannot write", &path));
         }
-        // the new log, empty (no frame can be in it yet: it starts after the snapshot)
-        self.start_log(&mut st)?;
+        // the newest snapshot is under the new key now: so is everything written after it, also
+        // when the new log does not start (the frames then follow in the open one; an open
+        // skips those up to the snapshot unread)
         st.snap_seq = st.seq;
         st.keys = keys;
+        // the new log, empty (no frame can be in it yet: it starts after the snapshot)
+        self.start_log(&mut st)?;
         let (keep_snap, keep_wal) = (st.seq, st.seq + 1);
-        drop(st);
+        // still locked: a commit or compact of another thread would make a newer snapshot and
+        // log, which this would take for old ones (all commits after them lost)
         let mut left = Vec::new();
         for e in plat::fs::read_dir(&self.dir).unwrap_or_default() {
             let old = parse_hex_name(&e.name, "snap-", ".bcs").is_some_and(|s| s != keep_snap) || parse_hex_name(&e.name, "wal-", ".log").is_some_and(|w| w != keep_wal);

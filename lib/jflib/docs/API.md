@@ -22685,6 +22685,8 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
   prepared before the removal does not record (Invalid): it prepares again
 - **`fn material_count(&self) -> u32`**
   (G7f) live materials
+- **`fn has_material(&self, id: MaterialId) -> bool`**
+  whether the material is there (false once it was removed)
 - **`fn alpha_class(&self, id: MaterialId) -> AlphaClass`**
   the alpha class of a material (Opaque for one the renderer does not have)
 - **`fn double_sided(&self, id: MaterialId) -> bool`**
@@ -34886,6 +34888,12 @@ apps" entry (HKLM for a setup for all users), starting a command line
   reg_create_in / reg_delete_in / reg_delete_tree_in / reg_delete_value_in(Root, ..)   the
                                   same in HKCU (Root::User) or HKLM (Root::Machine: a setup
                                   for all users, with administrator rights)
+  reg_exists_in(root, subkey) / reg_get_sz_in(root, subkey, name)   reading: whether a key is
+                                  there, a string value
+  secure_dir(path) -> bool        (administrator rights) a folder for all users: created, or
+                                  taken over, with the administrators as owner and a DACL of
+                                  its own -- SYSTEM and the administrators full, the users read
+                                  and run (what the folder had from above does not count)
   assoc_changed()                 SHChangeNotify(SHCNE_ASSOCCHANGED): Explorer re-reads the
                                   file types and URL schemes
   run_cmdline(cmdline, dir, hidden) -> bool    CreateProcessW (dir None = the current one,
@@ -34957,6 +34965,21 @@ PATH_CAP: usize = 520
   a REG_SZ value (UTF-8 in, UTF-16 stored, PATH_CAP wide chars)  [sh_reg_sz]
 - **`fn set_dword(&self, name: &str, value: u32)`**
   a REG_DWORD value  [sh_reg_dword]
+
+- **`fn reg_exists_in(root: Root, subkey: &str) -> bool`**
+  whether root\\subkey exists (and may be read)
+
+- **`fn reg_get_sz_in(root: Root, subkey: &str, name: &str) -> Option<String>`**
+  a string value of root\\subkey ("" = its default value; REG_EXPAND_SZ as stored) -> None when
+  it or the key is missing, or of another type
+
+- **`fn secure_dir(path: &str) -> bool`**
+  the folder of an installation for all users (administrator rights): created with, or (when it
+  is there) given, the administrators as owner and a protected DACL -- SYSTEM and the
+  administrators full access, the users read and run, inherited by what is made in it.  A
+  folder chosen elsewhere than in Program Files kept what its parent gave (on D:\\ the
+  authenticated users may change files): a user could swap the program or the uninstaller
+  that runs with administrator rights.  What lies in an existing folder keeps its own rights
 
 - **`fn reg_delete(subkey: &str) -> bool`**
   RegDeleteKeyW(HKCU, subkey)  [sh_reg_delete, real mode]
@@ -59150,7 +59173,9 @@ linked to shapes (DA-04, DA-05, DF-12)
   auto_link(tx, shapes, rs, pairs, replace)   AS-04: a column against a shape field (text,
                                   name or a shape data field) -> the rows bound where they match
   refresh(tx, rs, columns, rows, now)   DA-05: new data for a recordset: rows matched by key
-                                  (or by order), linked shapes updated, conflicts reported
+                                  (or by order), linked shapes updated, conflicts reported;
+                                  missing_key(doc, rs, columns): key columns the source lacks
+                                  (refresh refuses those)
   user_edited(tx, sheet, name)    a user's change of a linked value: DataLinked = 0, so a
                                   refresh keeps it (unless the recordset overwrites all)
   resolve_*                       what the user decides about a conflict
@@ -59419,6 +59444,10 @@ DATA_LINKED: &str = "DataLinked"
   - `conflicts: Vec<Conflict>` -- what needs the user
   - `written: Vec<Written>` -- the Value cells written
 
+- **`fn missing_key(doc: &Document, rs: u32, headers: &[String]) -> Vec<String>`**
+  the key columns of recordset `rs` (their source names) that the source's `headers` lack:
+  refresh refuses such data (ask the user to choose the key again)
+
 - **`fn refresh(tx: &mut Transaction, rs: u32, headers: &[String], rows: Vec<Vec<DataValue>>, now: &str) -> Result<Refreshed, EditError>`**
   DA-05: new data for recordset `rs` (the source's columns by name and its rows in source
   order).  Rows keep their IDs while their key matches (without key: their position); new
@@ -59426,7 +59455,9 @@ DATA_LINKED: &str = "DataLinked"
   new ones are added.  Every bound shape gets the new values -- a value the user changed
   (DataLinked = 0) only when the recordset overwrites all, else it stays and is reported.
   Shapes whose row is gone stay bound and are reported (and kept as RefreshConflict).
-  `now` is the time to note ("2026-11-23T14:05:00").
+  `now` is the time to note ("2026-11-23T14:05:00").  Invalid, with nothing changed, when the
+  source lacks a key column (missing_key): matched by position instead, each bound shape got
+  another row's data without a word
 
 - **`fn resolve_take_data(tx: &mut Transaction, shape: ShapeRef, rs: u32, column: &str) -> Result<Vec<Written>, EditError>`**
   a conflict resolved by taking the source's value over the user's (DataLinked = 1 again)
@@ -72210,7 +72241,7 @@ the same frames on every target loads with Loading::Frames.
 - **`fn state_of(&self, id: AssetId) -> Option<State>`**
   the state of an entry by its id (None: gone)
 - **`fn get(&self, h: &Handle<T>) -> Option<&T>`**
-  the value once Ready
+  the value once Ready (while it is read again by reload: the one so far)
 - **`fn get_id(&self, id: AssetId) -> Option<&T>`**
   the value of an entry by its id (None: not ready, failed or gone)
 - **`fn error(&self, h: &Handle<T>) -> Option<&str>`**
@@ -72230,7 +72261,8 @@ the same frames on every target loads with Loading::Frames.
   the ids of every entry that lives, in index order
 - **`fn reload(&mut self, h: &Handle<T>)`**
   read and decode the asset again (a file that changed): Loading until then; its value stays until the new
-  one has come (a failed reload keeps the old value and reports Failed only when there was none)
+  one has come: get() gives it meanwhile (a failed reload keeps the old value, without a change, and reports
+  Failed only when there was none)
 - **`fn update(&mut self) -> Vec<Change>`**
   once a frame: decodes that finished (Frames: decoded now, within the budget) become Ready or Failed; assets
   nobody holds are unloaded -> what happened
@@ -75063,6 +75095,8 @@ last: a write that would change nothing is left out.
   - `switched: u32` -- meshes or materials switched (Scene::set_mesh, set_material)
   - `moved: u32` -- transforms written (Scene::set_transform)
   - `visited: u32` -- poses looked at (changed since the last sync, or between two ticks)
+  - `failed: u32` -- entities render3d refused (a mesh or material it does not have, a transform that is not finite): left out,
+    the others go on; tried again by the next sync (a pose: when it changes again)
 
 ```rust
 /// the origin's step unless set (metres): f32 has a step of 0.06 mm at 1 km from the origin
@@ -75095,9 +75129,10 @@ ORIGIN_STEP: f64 = 512.0
   instances using material m
 - **`fn sync(&mut self, world: &World, scene: &mut Scene, alpha: f64) -> Result<SyncStats>`**
   the world into the scene for a frame at `alpha` (FixedTick::alpha; Pose::interpolate) -> what it
-  did.  The scene is the one the bridge has filled so far (another one after reset).  An error of
-  render3d (a mesh or material it does not have, a removed one) ends the sync there; the next one goes
-  on from the same place
+  did.  The scene is the one the bridge has filled so far (another one after reset).  An entity render3d
+  refuses (a mesh or material it does not have, a removed one, a transform that is not finite) is left
+  out and counted (SyncStats::failed); the others go on, and the next sync tries it again (so far
+  nothing else fails: the Result stays for what would not be one entity's)
 - **`fn reset(&mut self)`**
   the scene went with its device (GpuContent::detach): forget every instance, the next sync adds
   everything to the new scene
@@ -75139,7 +75174,8 @@ ready, and entities that draw a model (docs/GAMECORE.md "Assets")
                              scene (Bridge::sync_models); nothing while the model loads or failed
   Models                     the models on a Renderer: update(&assets, &changes, &mut renderer) puts what became
                              Ready on the GPU (meshes, textures, materials) and takes off what was unloaded
-                             (Renderer::remove_mesh / remove_material / remove_texture); parts(id)
+                             (Renderer::remove_mesh / remove_material / remove_texture; what instances still use
+                             comes off with the next update, waiting()); parts(id)
   Textures                   the same for images: texture(id) -> TextureId once it is up
   Bridge::sync_models        entities with a ModelRef as instances: they appear when their model is up, follow
                              their poses (only what changed), go with the entity, the component or the model
@@ -75191,7 +75227,8 @@ IMAGE_PIXELS: u64 = 1 << 26
   once a frame, after Assets::update (its changes) and before the bridge: what became Ready goes up, what was
   unloaded comes off.  The first update on a renderer (and the first after reset) puts every Ready model up.
   A model the renderer refuses counts as not up (its entities show nothing); the first error is returned after
-  everything else was done
+  everything else was done.  What the renderer will not take off yet (the bridge's instances still use it until
+  sync_models) comes off with the next update
 - **`fn parts(&self, id: AssetId) -> Option<&[Part]>`**
   the parts of a model that is up
 - **`fn serial(&self, id: AssetId) -> Option<u64>`**
@@ -75203,6 +75240,9 @@ IMAGE_PIXELS: u64 = 1 << 26
 - **`fn len(&self) -> usize`**
   models up now
 - **`fn is_empty(&self) -> bool`**
+- **`fn waiting(&self) -> usize`**
+  meshes, materials and textures of models that came off and wait for the renderer to let them go (the next
+  update, once no instance uses them)
 - **`fn reset(&mut self)`**
   the renderer went with its device: forget what was up (the next update puts every Ready model up again)
 
@@ -75215,9 +75255,12 @@ IMAGE_PIXELS: u64 = 1 << 26
 
 - **`fn new() -> Textures`**
 - **`fn update(&mut self, assets: &Assets<Image>, changes: &[Change], r: &mut Renderer) -> Result<u32>`**
-  once a frame after Assets::update: Ready images up, unloaded ones off -> textures put up now
+  once a frame after Assets::update: Ready images up, unloaded ones off -> textures put up now.  A texture that
+  a material still names stays on the renderer until the material lets it go; each update tries again
 - **`fn texture(&self, id: AssetId) -> Option<TextureId>`**
   the texture of an image once it is up
+- **`fn waiting(&self) -> usize`**
+  textures of images that came off and wait for the renderer to let them go
 - **`fn reset(&mut self)`**
   the renderer went: forget every texture (the next update puts them up again)
 
@@ -75227,7 +75270,7 @@ IMAGE_PIXELS: u64 = 1 << 26
   the entities with a ModelRef into the scene for a frame at `alpha` (see the module header): an entity whose
   model is up (Models) gets an instance per part, at its Pose composed with the part's place; a model that is
   not up shows nothing; a pose that changed moves every part.  Instances it adds are the bridge's (clear,
-  reset); the counts as sync's
+  reset); the counts as sync's, an entity render3d refuses left out as there
 - **`fn model_entities(&self) -> u32`**
   entities drawn through sync_models now
 
@@ -76204,8 +76247,9 @@ client -- a game client's channel to its server (G7d)
 
 Nothing blocks.  UDP (Windows, Linux, Apple): a thread of its own reads the socket, keeps only
 the server's datagrams (a bounded queue) and wakes the UI (plat::wake); sends go out at once.
-WebSocket: netchan::ws (the browser's own, or netio's on threads).  In the browser only
-Endpoint::WebSocket exists; on Android nothing yet (Unsupported).
+WebSocket: netchan::ws (the browser's own, or netio's on threads); a packet of the client's own
+that it cannot queue (max_unsent bytes waiting) ends the connection, Disconnected(Closed(1011)).
+In the browser only Endpoint::WebSocket exists; on Android nothing yet (Unsupported).
 ```
 
 - **`enum Endpoint`**

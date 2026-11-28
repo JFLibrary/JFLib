@@ -1275,6 +1275,11 @@ impl Renderer {
         self.material_ids.count()
     }
 
+    /// whether the material is there (false once it was removed)
+    pub fn has_material(&self, id: MaterialId) -> bool {
+        self.material_ids.get(id.0).is_some()
+    }
+
     /// the alpha class of a material (Opaque for one the renderer does not have)
     pub fn alpha_class(&self, id: MaterialId) -> AlphaClass {
         self.material_ids.get(id.0).map_or(AlphaClass::Opaque, |i| AlphaClass::of_words(&self.materials[i]))

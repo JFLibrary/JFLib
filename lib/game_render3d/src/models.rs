@@ -8,7 +8,8 @@
 //                              scene (Bridge::sync_models); nothing while the model loads or failed
 //   Models                     the models on a Renderer: update(&assets, &changes, &mut renderer) puts what became
 //                              Ready on the GPU (meshes, textures, materials) and takes off what was unloaded
-//                              (Renderer::remove_mesh / remove_material / remove_texture); parts(id)
+//                              (Renderer::remove_mesh / remove_material / remove_texture; what instances still use
+//                              comes off with the next update, waiting()); parts(id)
 //   Textures                   the same for images: texture(id) -> TextureId once it is up
 //   Bridge::sync_models        entities with a ModelRef as instances: they appear when their model is up, follow
 //                              their poses (only what changed), go with the entity, the component or the model
@@ -139,6 +140,8 @@ pub struct Models {
     version: u64,
     /// the ready models of the store were not all put up yet (a new renderer)
     fresh: bool,
+    /// what the renderer did not take off yet
+    waiting: Waiting,
 }
 
 fn sampling(s: &::gltf::Sampler) -> Sampling {
@@ -260,30 +263,67 @@ fn upload(r: &mut Renderer, doc: &::gltf::Document) -> Result<Uploaded> {
 }
 
 fn remove(r: &mut Renderer, u: &Uploaded) {
-    for m in &u.materials {
-        let _ = r.remove_material(*m);
+    Waiting::default().remove(r, &u.materials, &u.meshes, &u.textures);
+}
+
+/// what came off a store but not yet off the renderer, which refused it: instances of a scene still used it (the
+/// bridge's, which sync_models drops after the update) or a material of the app named a texture.  Each update tries
+/// again; dropped, the ids were lost and the GPU memory with them
+#[derive(Default)]
+struct Waiting {
+    materials: Vec<MaterialId>,
+    meshes: Vec<MeshId>,
+    textures: Vec<TextureId>,
+}
+
+impl Waiting {
+    /// these off the renderer (materials first: they hold textures); what it refuses and still has waits
+    fn remove(&mut self, r: &mut Renderer, materials: &[MaterialId], meshes: &[MeshId], textures: &[TextureId]) {
+        for &m in materials {
+            if r.remove_material(m).is_err() && r.has_material(m) {
+                self.materials.push(m);
+            }
+        }
+        for &m in meshes {
+            if r.remove_mesh(m).is_err() && r.mesh_info(m).is_some() {
+                self.meshes.push(m);
+            }
+        }
+        for &t in textures {
+            if r.remove_texture(t).is_err() && r.texture_info(t).is_some() {
+                self.textures.push(t);
+            }
+        }
     }
-    for m in &u.meshes {
-        let _ = r.remove_mesh(*m);
+
+    /// the next try
+    fn retry(&mut self, r: &mut Renderer) {
+        if self.len() > 0 {
+            let old = core::mem::take(self);
+            self.remove(r, &old.materials, &old.meshes, &old.textures);
+        }
     }
-    for t in &u.textures {
-        let _ = r.remove_texture(*t);
+
+    fn len(&self) -> usize {
+        self.materials.len() + self.meshes.len() + self.textures.len()
     }
 }
 
 impl Models {
     pub fn new() -> Models {
-        Models { up: BTreeMap::new(), version: 0, fresh: true }
+        Models { up: BTreeMap::new(), version: 0, fresh: true, waiting: Waiting::default() }
     }
 
     /// once a frame, after Assets::update (its changes) and before the bridge: what became Ready goes up, what was
     /// unloaded comes off.  The first update on a renderer (and the first after reset) puts every Ready model up.
     /// A model the renderer refuses counts as not up (its entities show nothing); the first error is returned after
-    /// everything else was done
+    /// everything else was done.  What the renderer will not take off yet (the bridge's instances still use it until
+    /// sync_models) comes off with the next update
     pub fn update(&mut self, assets: &Assets<Model>, changes: &[Change], r: &mut Renderer) -> Result<ModelStats> {
         let mut st = ModelStats::default();
         let mut first_err = None;
         let mut want: Vec<AssetId> = Vec::new();
+        self.waiting.retry(r);
         if self.fresh {
             self.fresh = false;
             want.extend(assets.ids().into_iter().filter(|id| assets.get_id(*id).is_some()));
@@ -293,7 +333,7 @@ impl Models {
                 Change::Ready(id) => {
                     // (a reload: the old one comes off first)
                     if let Some(u) = self.up.remove(&id) {
-                        remove(r, &u);
+                        self.waiting.remove(r, &u.materials, &u.meshes, &u.textures);
                         st.removed += 1;
                         self.version += 1;
                     }
@@ -301,7 +341,7 @@ impl Models {
                 }
                 Change::Unloaded(id) | Change::Failed(id) => {
                     if let Some(u) = self.up.remove(&id) {
-                        remove(r, &u);
+                        self.waiting.remove(r, &u.materials, &u.meshes, &u.textures);
                         st.removed += 1;
                         self.version += 1;
                     }
@@ -362,9 +402,16 @@ impl Models {
         self.up.is_empty()
     }
 
+    /// meshes, materials and textures of models that came off and wait for the renderer to let them go (the next
+    /// update, once no instance uses them)
+    pub fn waiting(&self) -> usize {
+        self.waiting.len()
+    }
+
     /// the renderer went with its device: forget what was up (the next update puts every Ready model up again)
     pub fn reset(&mut self) {
         self.up.clear();
+        self.waiting = Waiting::default();
         self.fresh = true;
         self.version += 1;
     }
@@ -378,16 +425,20 @@ pub struct Textures {
     /// the images are data, not colour (normal maps, masks): linear
     pub linear: bool,
     pub nearest: bool,
+    /// textures the renderer did not take off yet (a material still names them)
+    waiting: Waiting,
 }
 
 impl Textures {
     pub fn new() -> Textures {
-        Textures { up: BTreeMap::new(), fresh: true, linear: false, nearest: false }
+        Textures { up: BTreeMap::new(), fresh: true, linear: false, nearest: false, waiting: Waiting::default() }
     }
 
-    /// once a frame after Assets::update: Ready images up, unloaded ones off -> textures put up now
+    /// once a frame after Assets::update: Ready images up, unloaded ones off -> textures put up now.  A texture that
+    /// a material still names stays on the renderer until the material lets it go; each update tries again
     pub fn update(&mut self, assets: &Assets<Image>, changes: &[Change], r: &mut Renderer) -> Result<u32> {
         let mut want: Vec<AssetId> = Vec::new();
+        self.waiting.retry(r);
         if self.fresh {
             self.fresh = false;
             want.extend(assets.ids().into_iter().filter(|id| assets.get_id(*id).is_some()));
@@ -396,13 +447,13 @@ impl Textures {
             match *c {
                 Change::Ready(id) => {
                     if let Some(t) = self.up.remove(&id) {
-                        let _ = r.remove_texture(t);
+                        self.waiting.remove(r, &[], &[], &[t]);
                     }
                     want.push(id);
                 }
                 Change::Unloaded(id) | Change::Failed(id) => {
                     if let Some(t) = self.up.remove(&id) {
-                        let _ = r.remove_texture(t);
+                        self.waiting.remove(r, &[], &[], &[t]);
                     }
                 }
             }
@@ -425,9 +476,15 @@ impl Textures {
         self.up.get(&id).copied()
     }
 
+    /// textures of images that came off and wait for the renderer to let them go
+    pub fn waiting(&self) -> usize {
+        self.waiting.len()
+    }
+
     /// the renderer went: forget every texture (the next update puts them up again)
     pub fn reset(&mut self) {
         self.up.clear();
+        self.waiting = Waiting::default();
         self.fresh = true;
     }
 }
@@ -458,19 +515,55 @@ fn compose(e: &render3d::Transform, p: &render3d::Transform) -> render3d::Transf
 }
 
 impl Bridge {
+    /// an entity's instances leave the scene (all it can remove; the first error after them)
     pub(crate) fn drop_model(&mut self, index: usize, scene: &mut Scene) -> Result<()> {
+        let mut r = Ok(());
         if let Some(s) = self.models[index].take() {
             for i in s.insts {
-                scene.remove(i)?;
+                if let Err(e) = scene.remove(i) {
+                    r = r.and(Err(e));
+                }
             }
         }
+        r
+    }
+
+    // entity e's model into the scene (its parts as instances at t), all or none
+    fn put_model(&mut self, e: Entity, m: &ModelRef, t: render3d::Transform, models: &Models, scene: &mut Scene, st: &mut SyncStats) -> Result<()> {
+        let i = e.index() as usize;
+        if self.models.len() <= i {
+            self.models.resize(i + 1, None);
+        }
+        if self.models[i].as_ref().is_some_and(|s| s.entity == e && s.asset == m.model.id() && models.serial(s.asset) == Some(s.serial)) {
+            return Ok(());
+        }
+        if let Some(s) = &self.models[i] {
+            st.removed += s.insts.len() as u32;
+            self.drop_model(i, scene)?;
+        }
+        let (Some(parts), Some(serial)) = (models.parts(m.model.id()), models.serial(m.model.id())) else { return Ok(()) };
+        let mut insts = Vec::with_capacity(parts.len());
+        for p in parts {
+            match scene.add(Instance { mesh: p.mesh, material: p.material, transform: compose(&t, &p.local) }) {
+                Ok(id) => insts.push(id),
+                Err(err) => {
+                    // (the parts added so far go again: nothing held them)
+                    for id in insts {
+                        let _ = scene.remove(id);
+                    }
+                    return Err(err);
+                }
+            }
+        }
+        st.added += insts.len() as u32;
+        self.models[i] = Some(ModelSlot { entity: e, asset: m.model.id(), serial, insts, t });
         Ok(())
     }
 
     /// the entities with a ModelRef into the scene for a frame at `alpha` (see the module header): an entity whose
     /// model is up (Models) gets an instance per part, at its Pose composed with the part's place; a model that is
     /// not up shows nothing; a pose that changed moves every part.  Instances it adds are the bridge's (clear,
-    /// reset); the counts as sync's
+    /// reset); the counts as sync's, an entity render3d refuses left out as there
     pub fn sync_models(&mut self, world: &World, scene: &mut Scene, alpha: f64, models: &Models) -> Result<SyncStats> {
         let mut st = SyncStats::default();
         let refs = world.column::<ModelRef>();
@@ -485,40 +578,35 @@ impl Bridge {
             for i in 0..self.models.len() {
                 if let Some(s) = &self.models[i] {
                     if !valid(s) {
-                        let n = s.insts.len() as u32;
-                        self.drop_model(i, scene)?;
-                        st.removed += n;
+                        st.removed += s.insts.len() as u32;
+                        if self.drop_model(i, scene).is_err() {
+                            st.failed += 1;
+                        }
                     }
                 }
             }
             self.model_removals = removals;
         }
-        // new and changed ModelRefs (all of them when what is up changed)
+        // new and changed ModelRefs (all of them when what is up changed), then the ones refused at the last sync
+        let mut retry = core::mem::take(&mut self.model_retry);
         if let Some(refs) = refs.filter(|m| all || m.version() > self.model_seen) {
             let since = if all { 0 } else { self.model_seen };
             for (e, m) in refs.changed_since(since) {
-                let i = e.index() as usize;
-                if self.models.len() <= i {
-                    self.models.resize(i + 1, None);
+                retry.retain(|x| *x != e);
+                if self.put_model(e, m, at(e), models, scene, &mut st).is_err() {
+                    st.failed += 1;
+                    self.model_retry.push(e);
                 }
-                if self.models[i].as_ref().is_some_and(|s| s.entity == e && s.asset == m.model.id() && models.serial(s.asset) == Some(s.serial)) {
-                    continue;
-                }
-                if let Some(s) = &self.models[i] {
-                    let n = s.insts.len() as u32;
-                    self.drop_model(i, scene)?;
-                    st.removed += n;
-                }
-                let (Some(parts), Some(serial)) = (models.parts(m.model.id()), models.serial(m.model.id())) else { continue };
-                let t = at(e);
-                let mut insts = Vec::with_capacity(parts.len());
-                for p in parts {
-                    insts.push(scene.add(Instance { mesh: p.mesh, material: p.material, transform: compose(&t, &p.local) })?);
-                    st.added += 1;
-                }
-                self.models[i] = Some(ModelSlot { entity: e, asset: m.model.id(), serial, insts, t });
             }
             self.model_seen = refs.version();
+        }
+        for e in retry {
+            if let Some(m) = refs.and_then(|c| c.get(e)) {
+                if self.put_model(e, m, at(e), models, scene, &mut st).is_err() {
+                    st.failed += 1;
+                    self.model_retry.push(e);
+                }
+            }
         }
         self.models_version = models.version();
         // poses that changed (or moved in the latest tick): every part of the entity's model
@@ -535,11 +623,19 @@ impl Bridge {
                     continue;
                 }
                 let Some(parts) = models.parts(s.asset) else { continue };
+                let mut ok = true;
                 for (inst, part) in s.insts.iter().zip(parts.iter()) {
-                    scene.set_transform(*inst, &compose(&t, &part.local))?;
+                    if scene.set_transform(*inst, &compose(&t, &part.local)).is_err() {
+                        ok = false;
+                        break;
+                    }
                     st.moved += 1;
                 }
-                s.t = t;
+                if ok {
+                    s.t = t;
+                } else {
+                    st.failed += 1;
+                }
             }
             self.model_pose_seen = poses.version();
         }
