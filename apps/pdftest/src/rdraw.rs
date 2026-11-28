@@ -21,6 +21,7 @@
 //                    2026-11-27): each within 20 s, with what it should give
 
 use alloc::format;
+use alloc::rc::Rc;
 use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
@@ -37,6 +38,7 @@ pub const GROUPS: &[(&str, fn(&mut T))] = &[
     ("render_shade", render_shade),
     ("render_transp", render_transp),
     ("render_text", render_text),
+    ("render_cjk", render_cjk),
     ("render_annot", render_annot),
     ("render_hostile", render_hostile),
     ("render_budget", render_budget),
@@ -627,6 +629,69 @@ fn type1_font() -> Vec<u8> {
     let tail = cat(&["0".repeat(512).as_bytes(), b"\ncleartomark\n"]);
     let data = cat(&[clear, &enc, &tail]);
     stream(&format!("/Length1 {} /Length2 {} /Length3 {}", clear.len(), enc.len(), tail.len()), &data)
+}
+
+/// a font source that keeps the queries and gives no font
+struct Queries(core::cell::RefCell<Vec<(String, Option<String>, bool)>>);
+
+impl pdf::read::FontSource for Queries {
+    fn find(&self, q: &pdf::read::FontQuery) -> Option<(Vec<u8>, u32)> {
+        self.0.borrow_mut().push((String::from(q.name), q.lang.map(String::from), q.text));
+        None
+    }
+}
+
+/// a CJK font that is not embedded asks for a font of its collection's language
+fn render_cjk(t: &mut T) {
+    let font = |name: &str, enc: &str, ord: &str| {
+        format!("<< /Type /Font /Subtype /Type0 /BaseFont /{name} /Encoding /{enc} /DescendantFonts [<< /Type /Font /Subtype /CIDFontType0 /BaseFont /{name} /CIDSystemInfo << /Registry (Adobe) /Ordering ({ord}) /Supplement 2 >> /FontDescriptor << /Type /FontDescriptor /FontName /{name} /Flags 4 /FontBBox [0 0 1000 1000] >> >>] >>")
+    };
+    let res = format!(
+        "/Font << /J {} /G {} /C {} /K {} /L << /Type /Font /Subtype /Type1 /BaseFont /Arial >> >>",
+        font("Ryumin-Light", "90ms-RKSJ-H", "Japan1"),
+        font("STSong-Light", "GBK-EUC-H", "GB1"),
+        font("MSung-Light", "ETenms-B5-H", "CNS1"),
+        font("HYSMyeongJo-Medium", "Identity-H", "Korea1")
+    );
+    let data = page(b"BT /J 10 Tf 10 80 Td <82A0> Tj /G 10 Tf 0 -15 Td <D6D0> Tj /C 10 Tf 0 -15 Td <A4A4> Tj /K 10 Tf 0 -15 Td <0001> Tj /L 10 Tf 0 -15 Td (a) Tj ET", &res, &[], "");
+    let q = Rc::new(Queries(core::cell::RefCell::new(Vec::new())));
+    let opt = RenderOptions { fonts: Some(q.clone()), ..Default::default() };
+    let _ = draw_opt(t, "cjk", data, &opt);
+    let mut got: Vec<(String, Option<String>)> = q.0.borrow().iter().map(|(n, l, _)| (n.clone(), l.clone())).collect();
+    got.sort();
+    let want: Vec<(String, Option<String>)> = [("Arial", None), ("HYSMyeongJo-Medium", Some("ko")), ("MSung-Light", Some("zh-Hant")), ("Ryumin-Light", Some("ja")), ("STSong-Light", Some("zh-Hans"))]
+        .iter()
+        .map(|(n, l)| (String::from(*n), l.map(String::from)))
+        .collect();
+    t.eq("the language of each font's collection", got, want);
+    // vertical writing with a substitute (here DejaVu Serif for every font): A and B one below the
+    // other, each centred on the pen (half its width to the left) and hanging 0.88 em below it
+    let vert = format!("/Font << /V {} >>", font("Mincho", "UniJIS-UCS2-V", "Japan1"));
+    let data = page(b"0 g BT /V 20 Tf 50 80 Td <00410042> Tj ET", &vert, &[], "");
+    let opt = RenderOptions { fonts: Some(Rc::new(Serif)), ..Default::default() };
+    if let Some(px) = draw_opt(t, "vertical", data, &opt) {
+        let (mut x0, mut x1, mut y0, mut y1) = (usize::MAX, 0, usize::MAX, 0);
+        for y in 0..px.h {
+            for x in 0..px.w {
+                if px.dev(x, y)[0] < 128 {
+                    (x0, x1, y0, y1) = (x0.min(x), x1.max(x), y0.min(y), y1.max(y));
+                }
+            }
+        }
+        // in page points (y up): the ink between 40 and 80, around x = 50
+        let (top, bottom) = (px.h as f64 - y0 as f64, px.h as f64 - y1 as f64);
+        let mid = (x0 + x1) as f64 / 2.0;
+        t.check(&format!("vertical: below the pen ({x0}..{x1}, {bottom}..{top})"), x1 > 0 && (top - 77.0).abs() < 4.0 && (bottom - 44.0).abs() < 6.0 && (mid - 50.0).abs() < 4.0);
+    }
+}
+
+/// a font source that gives DejaVu Serif for every font
+struct Serif;
+
+impl pdf::read::FontSource for Serif {
+    fn find(&self, _q: &pdf::read::FontQuery) -> Option<(Vec<u8>, u32)> {
+        Some((crate::sample::SERIF.to_vec(), 0))
+    }
 }
 
 fn render_text(t: &mut T) {

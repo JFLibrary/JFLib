@@ -136,6 +136,8 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
   <br>[lib.rs](#img_jp2-crate-root)
 - [img_jbig2](#img_jbig2) -- JBIG2 decoder
   <br>[lib.rs](#img_jbig2-crate-root)
+- [cidmap](#cidmap) -- a JFLib library crate
+  <br>[lib.rs](#cidmap-crate-root)
 
 ## ui
 
@@ -69294,10 +69296,13 @@ references, page trees, outlines and form XObjects are bounded; every decoded st
 most Options::max_stream bytes.  Permissions are reported, not enforced: what a program
 allows its user to do with the document is its own decision.
 
+Composite fonts: every predefined CMap of ISO 32000-1 Table 118 (lib/cidmap: the code space,
+code -> CID), and without a ToUnicode the text of Adobe's four CJK collections through their
+CID -> Unicode tables (9.10.2); both unpacked once per document.
+
 Not here: the image filters for decode_until_image (it stops before DCT, JPX, JBIG2 and
-CCITTFax; drawing decodes DCT, CCITTFax, JPX and JBIG2), the predefined CMaps
-of East Asian fonts other than Identity and the Unicode ones, verifying signatures, changing
-and saving documents.
+CCITTFax; drawing decodes DCT, CCITTFax, JPX and JBIG2), verifying signatures, changing and
+saving documents.
 ```
 
 - **`struct Options`**
@@ -69361,7 +69366,6 @@ and saving documents.
 - **`fn resolve(&self, o: &Object) -> Object`**
   follow references until an object that is none (Null after too many)
 - **`fn decode(&self, s: &Stream) -> Result<Vec<u8>, Error>`**
-  a stream's data with all its filters applied (an image filter is Error::Unsupported)
 - **`fn decode_until_image(&self, s: &Stream) -> Result<(Vec<u8>, Option<(Name, Dict)>), Error>`**
   a stream's data with its filters applied up to an image filter: the data, and the image
   filter with its parameters (DCTDecode is a JPEG file then, JPXDecode a JPEG 2000 one)
@@ -69664,6 +69668,8 @@ a page that needs more gives Error::Limit.
   - `fixed: bool`
   - `symbolic: bool`
   - `text: bool` -- a simple font (one byte per code), not a composite one
+  - `lang: Option<&'a str>` -- a composite font of one of Adobe's CJK collections: the language of its text (zh-Hans,
+    zh-Hant, ja, ko), so a substitute has its characters (in its forms)
 
 - **`trait FontSource`**
   where substitutes for fonts that are not embedded come from: a TrueType, OpenType or Type 1
@@ -69673,7 +69679,9 @@ a page that needs more gives Error::Limit.
 - **`struct SystemFonts`**
   the system's fonts (text::fontdb), searched once: for the 14 standard fonts their
   metric-compatible families (URW's Nimbus, Liberation, the Windows fonts), others by name and
-  flags
+  flags; a font with a language (`FontQuery::lang`) by its own name, else the system's serif or
+  sans-serif font for the language (text::fontconf: fontconfig's rules on Linux, Noto Sans CJK
+  JP for ja, say; the built-in ones elsewhere)
 
 **`impl SystemFonts`**
 
@@ -78064,3 +78072,98 @@ has run out (mq.rs).
 
 - **`static CODEC: Codec`**
   jbig2_codec: the first page of a JBIG2 file as 8-bit ARGB (black on white)
+
+## cidmap
+
+*a JFLib library crate* -- crate root [`lib/cidmap/src/lib.rs`](../lib/cidmap/src/lib.rs)
+
+```text
+cidmap -- the predefined CMaps of Adobe's Chinese, Japanese and Korean character collections
+(character code -> CID) and their CID -> Unicode tables
+
+  predefined(name) -> Option<CMap>      a CMap of ISO 32000-1 Table 118 by its name
+                                        (90ms-RKSJ-H, GBK-EUC-H, UniJIS-UTF16-V, ...)
+  names() -> Vec<&'static str>          the CMaps this crate has (59)
+  CMap { name, collection, vertical, codespace }
+    code_len(bytes) -> usize            the length of the code at the start (1 to 4 bytes)
+    cid(code, len) -> Option<u32>       a code's CID (its CID range, else its notdef range)
+    ranges() -> &[CidRange]             every code -> CID range, with what usecmap brings in
+  Collection { Gb1, Cns1, Japan1, Korea1 }
+    from_ordering(b"Japan1"), ordering(), lang() (zh-Hans, zh-Hant, ja, ko)
+  to_unicode(collection) -> ToUnicode   CID -> text (Adobe's Adobe-Japan1-UCS2 and the like)
+    get(cid) -> Option<&str>, len()
+
+The data (data/cidmap.bin, made by tools/cidmap_gen.py from Adobe's files, BSD-3-Clause:
+licenses/adobe-cmap-resources-LICENSE.md) is one zstd frame per collection, unpacked when a
+CMap or table of it is asked for; callers keep what they use.  Identity-H and -V are not here:
+their CID is the two-byte code, with no collection.
+```
+
+### `cidmap` crate root
+
+- **`enum Collection`**
+  one of Adobe's four CJK character collections (Registry "Adobe")
+  - `Gb1` -- Adobe-GB1: simplified Chinese
+  - `Cns1` -- Adobe-CNS1: traditional Chinese
+  - `Japan1` -- Adobe-Japan1: Japanese
+  - `Korea1` -- Adobe-Korea1: Korean
+
+**`impl Collection`**
+
+- **`const ALL: [Collection; 4] = [Collection::Gb1, Collection::Cns1, Collection::Japan1, C ...`**
+- **`fn from_ordering(o: &[u8]) -> Option<Collection>`**
+  a CIDSystemInfo's Ordering (with Registry "Adobe")
+- **`fn ordering(self) -> &'static str`**
+- **`fn lang(self) -> &'static str`**
+  the language tag of its text, for choosing a font (Han characters take its forms)
+
+- **`struct CodeSpace`**
+  a range of the code space: codes of `len` bytes whose every byte lies between that of `lo`
+  and `hi`
+  - `len: u8`
+  - `lo: [u8; 4]`
+  - `hi: [u8; 4]`
+
+- **`struct CidRange`**
+  the codes `lo..=hi` of `len` bytes (big-endian, as u32) -> the CIDs from `cid` on
+  - `len: u8`
+  - `lo: u32`
+  - `hi: u32`
+  - `cid: u32`
+
+- **`struct CMap`**
+  a predefined CMap, with what it takes in by usecmap
+  - `name: &'static str`
+  - `collection: Collection`
+  - `vertical: bool` -- WMode 1: vertical writing
+  - `codespace: Vec<CodeSpace>`
+
+**`impl CMap`**
+
+- **`fn code_len(&self, b: &[u8]) -> usize`**
+  the length of the code at the start of `b` (1 to 4 bytes): the shortest the code space
+  has for it, else the code space's shortest length
+- **`fn cid(&self, code: u32, len: u8) -> Option<u32>`**
+  the CID of a code of `len` bytes: its CID range's, else its notdef range's
+- **`fn ranges(&self) -> &[CidRange]`**
+  every code -> CID range, sorted by (len, lo)
+
+- **`struct ToUnicode`**
+  CID -> Unicode text of a collection
+
+**`impl ToUnicode`**
+
+- **`fn get(&self, cid: u32) -> Option<&str>`**
+  a CID's text (a character, or a few of them)
+- **`fn len(&self) -> usize`**
+  the number of CIDs (with text or not)
+- **`fn is_empty(&self) -> bool`**
+
+- **`fn predefined(name: &[u8]) -> Option<CMap>`**
+  a predefined CMap by its name (ISO 32000-1 Table 118: GB-EUC-H to UniKS-UTF16-V)
+
+- **`fn names() -> Vec<&'static str>`**
+  the names of the CMaps this crate has, in the order of the data file
+
+- **`fn to_unicode(c: Collection) -> ToUnicode`**
+  a collection's CID -> Unicode table (empty if the data is damaged, which the tests rule out)

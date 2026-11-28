@@ -2653,7 +2653,7 @@ Grundbausteine am falschen Ort oder mehrfach:
 
 Crates, die einer JF-App folgen:
 
-- **P2** · *teilweise* (2026-11-23, U15 und U16; 2026-11-26, U19; 2026-11-27, U20) · `pdf`: Lesen ist da ([`pdf/src/read/`](../lib/pdf/src/read/mod.rs),
+- **P2** · *teilweise* (2026-11-23, U15 und U16; 2026-11-26, U19; 2026-11-27, U20; 2026-11-28, U21) · `pdf`: Lesen ist da ([`pdf/src/read/`](../lib/pdf/src/read/mod.rs),
   `pdf::read::Document`). PDF 1.0 bis 2.0 mit klassischen Tabellen, Querverweis- und Objektströmen,
   inkrementellen Updates und hybriden Dateien; beschädigte, abgeschnittene und Dateien ohne Tabelle
   werden aus ihren Objekten neu aufgebaut. Verschlüsselung mit dem Standard-Handler (RC4 40 bis
@@ -2750,10 +2750,26 @@ Crates, die einer JF-App folgen:
   - **Behoben** im CCITT-Decoder von pdf: Er suchte den Bezugspunkt einer Zeile vom Zeilenanfang
     an, was mit vielen Wechseln quadratisch wurde.
 
+  CMaps Ostasiens (U21): Die neue Crate [`cidmap`](../lib/cidmap/src/lib.rs) hat die 59
+  vordefinierten CMaps aus ISO 32000-1 Tabelle 118 (Adobe-GB1, -CNS1, -Japan1, -Korea1) und die
+  Tabellen CID → Unicode der vier Sammlungen, 261 KB aus Adobes Dateien (BSD-3-Clause).
+  - **In pdf:** Codes werden richtig zerlegt (Shift-JIS, EUC, GBK, Big Five, UHC), CIDs und
+    damit Breiten und eingebettete CID-Glyphen stimmen; ohne ToUnicode kommt der Text aus der
+    Tabelle der Sammlung (9.10.2), auch unter Identity-H.
+  - **Zeichnen:** Eine nicht eingebettete CJK-Schrift bekommt eine Systemschrift ihrer Sprache
+    (`FontQuery::lang`: Noto CJK, Yu Gothic, Microsoft YaHei …), senkrechte Satzzeichen ihre
+    senkrechte Form.
+  - **Behoben:** Senkrechte Schrift wurde um das Mehrfache der Schriftgröße versetzt gezeichnet,
+    meist außerhalb der Seite.
+  - **Geprüft:**
+    - `tools/cidmap_gen.py --check`: jeder Code und jede CID wie in Adobes Dateien
+    - `tools/cjk_check.py`: 57 CMaps mit Text aus Pythons Codecs, als Originaltext gelesen und
+      wie pdftoppm gezeichnet
+
   Offen: Knockout- und nicht
   isolierte Gruppen (wie isolierte gezeichnet), Überdrucken, ICC-Profile (wie ihre Gerätefarben),
   Formulare ausfüllen und schreiben, Verschlüsselung, PDF/A und Signaturen beim Schreiben,
-  Signaturen prüfen, die vordefinierten CMaps Ostasiens außer Identity und den Unicode-CMaps.
+  Signaturen prüfen, senkrechte Formen, die nur das `vert`-Feature einer Ersatzschrift kennt (ー).
 - **P2** · *erledigt* (2026-11-24, U18) · `physics`: Starrkörper mit Kontakten, Gelenken und einem Löser
   ([`physics/src/sim.rs`](../lib/physics/src/sim.rs), [PHYSICS.md](PHYSICS.md) „Starrkörper“). `Simulation` bewegt statische,
   kinematische und dynamische Körper in ihrer `World`, Strahlen, Casts und der Character-Controller sehen sie; Masse aus Form

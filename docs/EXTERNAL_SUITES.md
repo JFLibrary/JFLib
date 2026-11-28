@@ -573,3 +573,35 @@ and Poppler never agree against ours.
 
 The same PDFs drawn by lib/pdf equal the decode. Four files go through img_all, and 8000 damaged
 copies decode without a crash.
+
+## Adobe's CMaps of East Asia
+
+`tools/cidmap_gen.py` makes `lib/cidmap/data/cidmap.bin` (in git) from Adobe's files, BSD-3-Clause,
+fetched once into `build/vectors/`:
+
+- **The 59 CMaps** of ISO 32000-1 Table 118, from
+  [adobe-type-tools/cmap-resources](https://github.com/adobe-type-tools/cmap-resources) at commit
+  f5cf3bca7fdf (2.3 MB), with each collection's `cid2code.txt` (about 7.7 MB, for `--check` only)
+  and the licence.
+- **The CID → Unicode tables** Adobe-GB1-UCS2, -CNS1-UCS2, -Japan1-UCS2 and -Korea1-UCS2 (Adobe's,
+  2023). The repository no longer holds them; they come from the poppler-data 0.4.12 release tarball
+  (4.5 MB, pinned by its SHA-256).
+
+`--check` compares the file with what the sources give. It also compares every code of every CMap,
+and every CID of every table, as `pdftest --cidmap NAME` decodes them, with Adobe's files: 63 of 63
+agree. Only reported:
+
+- the copies of poppler-data and Ghostscript installed here differ in 288 codes of GBK2K and
+  UniGB-UTF16 (Adobe-GB1-6 is newer)
+- a few hundred CIDs per collection have another first value in `cid2code.txt`'s UTF-32 column
+
+`tools/cjk_check.py` downloads nothing. It makes a PDF per CMap (57: CNS-EUC has no Python codec)
+with a line encoded by Python's codecs, in a font that is not embedded and without a ToUnicode.
+
+| Check | Pass | Fail |
+| --- | ---: | ---: |
+| text read by pdftest as the original | 57 | 0 |
+| drawn as `pdftoppm` draws it (at most 5 % of the inked pixels differ) | 57 | 0 |
+
+Poppler's `pdftotext` gives the same text for 39: for vertical writing it gives the vertical
+presentation forms (︑ for 、), and for GB-EUC and GBK-EUC full-width Latin letters.

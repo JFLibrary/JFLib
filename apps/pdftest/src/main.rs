@@ -16,6 +16,11 @@
 //   build/win/pdftest.exe --render FILE --out PREFIX [--page N] [--dpi D] [--password PW]
 //                                            pages drawn as PREFIX-<page>.ppm
 //                                            (tools/pdf_render_check.py)
+//   build/win/pdftest.exe --cidmap NAME      a predefined CMap of lib/cidmap, a line
+//                                            "length code cid" per code (the code in hex), or
+//                                            the table Adobe-<Ordering>-UCS2, a line "cid text"
+//                                            per CID with text (its code points in hex, joined
+//                                            by +) (tools/cidmap_gen.py --check)
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
@@ -73,6 +78,31 @@ impl T {
     }
 }
 
+/// --cidmap NAME: every code of a predefined CMap, or every CID of a CID -> Unicode table
+fn cidmap_dump(name: &str) -> i32 {
+    use core::fmt::Write;
+    let mut out = String::new();
+    if let Some(ord) = name.strip_prefix("Adobe-").and_then(|n| n.strip_suffix("-UCS2")) {
+        let Some(c) = cidmap::Collection::from_ordering(ord.as_bytes()) else { return 2 };
+        let t = cidmap::to_unicode(c);
+        for cid in 0..t.len() as u32 {
+            if let Some(s) = t.get(cid) {
+                let hex: alloc::vec::Vec<String> = s.chars().map(|ch| format!("{:X}", ch as u32)).collect();
+                let _ = writeln!(out, "{cid} {}", hex.join("+"));
+            }
+        }
+    } else {
+        let Some(m) = cidmap::predefined(name.as_bytes()) else { return 2 };
+        for r in m.ranges() {
+            for code in r.lo..=r.hi {
+                let _ = writeln!(out, "{} {:x} {}", r.len, code, m.cid(code, r.len).unwrap_or(u32::MAX));
+            }
+        }
+    }
+    plat::write_stdout(out.as_bytes());
+    0
+}
+
 fn run() -> i32 {
     if let Some(path) = plat::arg_value("--render") {
         let out = plat::arg_value("--out").unwrap_or_else(|| String::from("page"));
@@ -80,6 +110,9 @@ fn run() -> i32 {
     }
     if let Some(path) = plat::arg_value("--read") {
         return rdump::dump(&path, plat::arg_value("--password"));
+    }
+    if let Some(name) = plat::arg_value("--cidmap") {
+        return cidmap_dump(&name);
     }
     if let Some(path) = plat::arg_value("--sample") {
         let bytes = match sample::build() {

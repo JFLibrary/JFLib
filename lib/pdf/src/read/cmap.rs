@@ -1,11 +1,15 @@
 // CMaps (ISO 32000-1, 9.7.5 and 9.10.3; Adobe technical note 5014): the code space of a
 // composite font's encoding (how many bytes each character code takes), the CIDs of its codes,
-// and ToUnicode maps from codes to text.  Embedded CMaps are parsed; of the predefined ones
-// Identity-H / -V are known, and the Unicode ones (Uni...-UCS2-H, Uni...-UTF16-H) give their
-// text directly.  Ranges are kept as ranges, so <0000> <FFFF> costs one entry.
+// and ToUnicode maps from codes to text.  Embedded CMaps are parsed; the predefined ones are
+// Identity-H / -V and those of lib/cidmap (Table 118: code space and CIDs; a CMap that names one
+// with usecmap keeps it under its own entries).  The Unicode ones (Uni...-UCS2-H,
+// Uni...-UTF16-H) give their text directly, a surrogate pair of four bytes as one character.
+// Ranges are kept as ranges, so <0000> <FFFF> costs one entry.
 
 use super::lex::{Lexer, Tok};
+use super::Document;
 use alloc::collections::BTreeMap;
+use alloc::rc::Rc;
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -26,6 +30,9 @@ pub(crate) struct CMap {
     pub unicode: bool,
     /// WMode 1: vertical writing
     pub vertical: bool,
+    /// a predefined CMap of lib/cidmap (this one, or the one its usecmap names): the CIDs of the
+    /// codes this one has none for
+    pub base: Option<Rc<cidmap::CMap>>,
 }
 
 fn units(b: &[u8]) -> Vec<u16> {
@@ -45,13 +52,19 @@ fn code_of(b: &[u8]) -> u32 {
 
 impl CMap {
     /// a predefined CMap by name
-    pub fn predefined(name: &[u8]) -> CMap {
+    pub fn predefined(doc: &Document, name: &[u8]) -> CMap {
         let vertical = name.ends_with(b"-V");
         let mut c = CMap { vertical, ..CMap::default() };
+        let unicode = name.starts_with(b"Uni") && (name.windows(4).any(|w| w == b"UCS2") || name.windows(5).any(|w| w == b"UTF16"));
         if name.starts_with(b"Identity") {
             c.identity = true;
             c.codespace.push((2, [0; 4], [0xFF, 0xFF, 0, 0]));
-        } else if name.starts_with(b"Uni") && (name.windows(4).any(|w| w == b"UCS2") || name.windows(5).any(|w| w == b"UTF16")) {
+        } else if let Some(p) = doc.cidmap(name) {
+            c.codespace = p.codespace.iter().map(|s| (s.len, s.lo, s.hi)).collect();
+            c.vertical = p.vertical;
+            c.unicode = unicode;
+            c.base = Some(p);
+        } else if unicode {
             c.unicode = true;
             // UTF-16: two bytes, four for a surrogate pair (taken as two codes of two)
             c.codespace.push((2, [0; 4], [0xFF, 0xFF, 0, 0]));
@@ -63,7 +76,7 @@ impl CMap {
     }
 
     /// parse an embedded CMap (`usecmap` of a predefined one is taken in)
-    pub fn parse(data: &[u8]) -> CMap {
+    pub fn parse(doc: &Document, data: &[u8]) -> CMap {
         let mut c = CMap::default();
         let mut lx = Lexer::new(data, 0);
         let mut last_name: Option<Vec<u8>> = None;
@@ -82,12 +95,7 @@ impl CMap {
                 }
                 Tok::Kw(b"usecmap") => {
                     if let Some(n) = last_name.take() {
-                        let base = CMap::predefined(&n);
-                        if c.codespace.is_empty() {
-                            c.codespace = base.codespace;
-                        }
-                        c.identity |= base.identity;
-                        c.unicode |= base.unicode;
+                        c.use_cmap(CMap::predefined(doc, &n));
                     }
                 }
                 Tok::Kw(b"begincodespacerange") => loop {
@@ -183,6 +191,19 @@ impl CMap {
         c
     }
 
+    /// take in a CMap that usecmap names: its code space when this one has none, its CIDs
+    /// under this one's
+    pub fn use_cmap(&mut self, base: CMap) {
+        if self.codespace.is_empty() {
+            self.codespace = base.codespace;
+        }
+        self.identity |= base.identity;
+        self.unicode |= base.unicode;
+        if self.base.is_none() {
+            self.base = base.base;
+        }
+    }
+
     /// the length of the code at the start of `b` (1 to 4 bytes)
     pub fn code_len(&self, b: &[u8]) -> usize {
         if self.codespace.is_empty() {
@@ -217,6 +238,11 @@ impl CMap {
             }
         }
         if self.unicode {
+            // a surrogate pair: one code of four bytes
+            if code > 0xFFFF {
+                let units = [(code >> 16) as u16, code as u16];
+                return char::decode_utf16(units).collect::<Result<String, _>>().ok();
+            }
             return char::from_u32(code).map(String::from);
         }
         None
@@ -232,6 +258,11 @@ impl CMap {
             if r.0 <= code && code <= r.1 {
                 return r.2.saturating_add(code - r.0);
             }
+        }
+        // a predefined CMap's: the code's length from its value (Adobe's CMaps have no code
+        // that a shorter one of the same value would shadow), its notdef CID when none fits
+        if let Some(b) = &self.base {
+            return (1..=4u8).filter(|&n| n == 4 || code < 1u32 << (8 * n as u32)).find_map(|n| b.cid(code, n)).unwrap_or(0);
         }
         if self.identity || (self.cids.is_empty() && self.cid_ranges.is_empty()) {
             return code;

@@ -30,6 +30,20 @@ use text::cff::Cff;
 use text::outline::Outline;
 use text::ttf::{Tb, TtFont, TFK_CFF, TT_CFF, TT_CMAP};
 
+/// the vertical presentation form of a character (Unicode's Vertical Forms, FE10 to FE19, and CJK
+/// Compatibility Forms, FE30 to FE48): what a vertical CMap's CID of it looks like
+fn vertical_form(u: u32) -> Option<u32> {
+    const FORMS: [(u32, u32); 33] = [
+        (0xFF0C, 0xFE10), (0x3001, 0xFE11), (0x3002, 0xFE12), (0xFF1A, 0xFE13), (0xFF1B, 0xFE14), (0xFF01, 0xFE15),
+        (0xFF1F, 0xFE16), (0x3016, 0xFE17), (0x3017, 0xFE18), (0x2026, 0xFE19), (0x2025, 0xFE30), (0x2014, 0xFE31),
+        (0x2013, 0xFE32), (0xFF3F, 0xFE33), (0xFE4F, 0xFE34), (0xFF08, 0xFE35), (0xFF09, 0xFE36), (0xFF5B, 0xFE37),
+        (0xFF5D, 0xFE38), (0x3014, 0xFE39), (0x3015, 0xFE3A), (0x3010, 0xFE3B), (0x3011, 0xFE3C), (0x300A, 0xFE3D),
+        (0x300B, 0xFE3E), (0x3008, 0xFE3F), (0x3009, 0xFE40), (0x300C, 0xFE41), (0x300D, 0xFE42), (0x300E, 0xFE43),
+        (0x300F, 0xFE44), (0xFF3B, 0xFE47), (0xFF3D, 0xFE48),
+    ];
+    FORMS.iter().find(|f| f.0 == u).map(|f| f.1)
+}
+
 /// a name of tables::GLYPH_NAMES
 pub(super) fn glyph_name(i: usize) -> &'static [u8] {
     let s = tables::GLYPH_START.get(i).copied().unwrap_or(0) as usize;
@@ -600,6 +614,7 @@ impl GFont {
     /// both share what they opened between fonts
     pub fn load(doc: &Document, d: &Dict, embedded: &mut dyn FnMut(&Stream, u8) -> Option<Rc<Prog>>, subst: &mut dyn FnMut(&FontQuery) -> Option<Rc<Prog>>) -> GFont {
         let base = Rc::new(Font::load(doc, d));
+        let lang = base.collection.map(|c| c.lang());
         let sub = d.name("Subtype").unwrap_or(b"Type1").to_vec();
         let composite = sub == b"Type0";
         let desc = if composite {
@@ -653,6 +668,7 @@ impl GFont {
                 fixed: flags & 1 != 0,
                 symbolic: symbolic && flags & 32 == 0,
                 text: !composite,
+                lang,
             };
             subst(&q)
         });
@@ -890,9 +906,13 @@ impl GFont {
         let (gid, name) = if self.composite {
             let cid = self.base.cid(code);
             let gid = if !self.embedded {
-                // a substitute: through the code's text
+                // a substitute: through the code's text; in vertical writing a character's
+                // vertical form where Unicode has one and the font draws it (、 as ︑) -- not
+                // for traditional Chinese, whose punctuation stands in the middle either way
                 let u = self.base.text(code)?.chars().next()? as u32;
-                prog.unicode(u)
+                let forms = self.base.vertical && self.base.collection != Some(cidmap::Collection::Cns1);
+                let v = if forms { vertical_form(u).map_or(0, |v| prog.unicode(v)) } else { 0 };
+                if v != 0 { v } else { prog.unicode(u) }
             } else {
                 match &self.cid_gid {
                     Some(m) => *m.get(cid as usize)? as u32,

@@ -1,0 +1,27 @@
+[package]
+name = "jflib-cidmap"
+description = "The predefined CMaps of Adobe's Chinese, Japanese and Korean character collections and their CID to Unicode tables, for JFLib"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "(MIT OR Apache-2.0) AND BSD-3-Clause"
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+name = "cidmap"
+path = "src/lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+compress.workspace = true
+
+# docs.rs: Linux, Windows, the browser and Android, not docs.rs's five defaults (32-bit Windows is none
+# of JFLib's targets; macOS and iOS are, their pages are not built on docs.rs yet)
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc", "wasm32-unknown-unknown", "aarch64-linux-android"]

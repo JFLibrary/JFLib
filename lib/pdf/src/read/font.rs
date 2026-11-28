@@ -9,6 +9,7 @@ use super::cmap::CMap;
 use super::object::{Dict, Object};
 use super::tables;
 use super::Document;
+use alloc::rc::Rc;
 use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
@@ -136,6 +137,10 @@ pub(crate) struct Font {
     /// vertical writing: the vertical advance (DW2's second number, negative)
     pub vertical: bool,
     vy: f64,
+    /// a composite font of one of Adobe's CJK collections: the collection (its predefined
+    /// CMap's, else its CIDSystemInfo's) and its CID -> Unicode table
+    pub collection: Option<cidmap::Collection>,
+    cid_text: Option<Rc<cidmap::ToUnicode>>,
 }
 
 /// a width array of a Type 0 font's descendant (9.7.4.3): c [w1 w2 ...] or c1 c2 w
@@ -211,30 +216,37 @@ impl Font {
         let sub = d.name("Subtype").unwrap_or(b"Type1");
         let name = strip_subset(d.name("BaseFont").unwrap_or(b""));
         let to_unicode = match doc.key(d, "ToUnicode") {
-            Object::Stream(s) => doc.decode(&s).ok().map(|b| CMap::parse(&b)).filter(|c| !c.is_empty()),
+            Object::Stream(s) => doc.decode(&s).ok().map(|b| CMap::parse(doc, &b)).filter(|c| !c.is_empty()),
             _ => None,
         };
         if sub == b"Type0" {
             let cmap = match doc.key(d, "Encoding") {
-                Object::Name(n) => CMap::predefined(&n.0),
+                Object::Name(n) => CMap::predefined(doc, &n.0),
                 Object::Stream(s) => {
-                    let mut c = doc.decode(&s).ok().map(|b| CMap::parse(&b)).unwrap_or_default();
+                    let mut c = doc.decode(&s).ok().map(|b| CMap::parse(doc, &b)).unwrap_or_default();
+                    if let Some(Object::Name(n)) = s.dict.get("UseCMap") {
+                        c.use_cmap(CMap::predefined(doc, &n.0));
+                    }
                     if c.codespace.is_empty() {
                         c.codespace.push((2, [0; 4], [0xFF, 0xFF, 0, 0]));
                     }
-                    if let Some(Object::Name(n)) = s.dict.get("UseCMap") {
-                        let b = CMap::predefined(&n.0);
-                        c.identity |= b.identity;
-                        c.unicode |= b.unicode;
-                    }
                     c
                 }
-                _ => CMap::predefined(b"Identity-H"),
+                _ => CMap::predefined(doc, b"Identity-H"),
             };
             let desc = match doc.key(d, "DescendantFonts") {
                 Object::Array(a) => a.first().map(|o| doc.dict(o)).unwrap_or_default(),
                 _ => Dict::new(),
             };
+            // the collection (9.10.2): a predefined CMap's, else the CIDFont's CIDSystemInfo
+            // (Registry Adobe) -- also under Identity-H, as pdf.js reads it
+            let info = doc.dict(&desc.get("CIDSystemInfo").cloned().unwrap_or_default());
+            let from_info = match (doc.key(&info, "Registry"), doc.key(&info, "Ordering")) {
+                (Object::String(r), Object::String(o)) if r == b"Adobe" => cidmap::Collection::from_ordering(&o),
+                _ => None,
+            };
+            let collection = cmap.base.as_ref().map(|b| b.collection).or(from_info);
+            let cid_text = collection.map(|c| doc.cid_text(c));
             let dw = doc.key(&desc, "DW").as_f64().unwrap_or(1000.0) / 1000.0;
             let vy = match doc.key(&desc, "DW2") {
                 Object::Array(a) => a.get(1).and_then(|v| doc.resolve(v).as_f64()).unwrap_or(-1000.0) / 1000.0,
@@ -242,7 +254,7 @@ impl Font {
             };
             let cid_w = desc.get("W").map(|w| cid_widths(doc, w, 0.001)).unwrap_or_default();
             let name = if name.is_empty() { strip_subset(desc.name("BaseFont").unwrap_or(b"")) } else { name };
-            return Font { name, vertical: cmap.vertical, cmap: Some(cmap), to_unicode, simple: Vec::new(), widths: Vec::new(), cid_widths: cid_w, dw, vy };
+            return Font { name, vertical: cmap.vertical, cmap: Some(cmap), to_unicode, simple: Vec::new(), widths: Vec::new(), cid_widths: cid_w, dw, vy, collection, cid_text };
         }
         // a simple font: Type1, MMType1, TrueType, Type3
         let desc = doc.dict(&d.get("FontDescriptor").cloned().unwrap_or_default());
@@ -349,7 +361,7 @@ impl Font {
                 };
             }
         }
-        Font { name, cmap: None, to_unicode, simple, widths, cid_widths: Vec::new(), dw: 1.0, vertical: false, vy: -1.0 }
+        Font { name, cmap: None, to_unicode, simple, widths, cid_widths: Vec::new(), dw: 1.0, vertical: false, vy: -1.0, collection: None, cid_text: None }
     }
 
     /// the codes of a string: (code, its length in bytes)
@@ -368,14 +380,16 @@ impl Font {
         }
     }
 
-    /// the text of a code (empty when the font does not say)
+    /// the text of a code (empty when the font does not say): ToUnicode, else a simple
+    /// font's encoding; a composite font's own CMap (the code itself for the Unicode CMaps),
+    /// else its CID in its collection's CID -> Unicode table (9.10.2)
     pub fn text(&self, code: u32) -> Option<String> {
         if let Some(t) = self.to_unicode.as_ref().and_then(|tu| tu.lookup(code)) {
             return Some(t);
         }
         match &self.cmap {
             None => self.simple.get(code as usize).cloned().flatten(),
-            Some(cm) => cm.lookup(code),
+            Some(cm) => cm.lookup(code).or_else(|| self.cid_text.as_ref()?.get(cm.cid(code)).map(String::from)),
         }
     }
 

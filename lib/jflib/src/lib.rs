@@ -79,6 +79,7 @@ pub use netchan;
 pub use sheet_io;
 pub use img_jp2;
 pub use img_jbig2;
+pub use cidmap;
 #[doc(hidden)]
 pub use style_assets;
 

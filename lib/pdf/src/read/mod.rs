@@ -31,10 +31,13 @@
 // most Options::max_stream bytes.  Permissions are reported, not enforced: what a program
 // allows its user to do with the document is its own decision.
 //
+// Composite fonts: every predefined CMap of ISO 32000-1 Table 118 (lib/cidmap: the code space,
+// code -> CID), and without a ToUnicode the text of Adobe's four CJK collections through their
+// CID -> Unicode tables (9.10.2); both unpacked once per document.
+//
 // Not here: the image filters for decode_until_image (it stops before DCT, JPX, JBIG2 and
-// CCITTFax; drawing decodes DCT, CCITTFax, JPX and JBIG2), the predefined CMaps
-// of East Asian fonts other than Identity and the Unicode ones, verifying signatures, changing
-// and saving documents.
+// CCITTFax; drawing decodes DCT, CCITTFax, JPX and JBIG2), verifying signatures, changing and
+// saving documents.
 
 mod cmap;
 mod content;
@@ -181,6 +184,9 @@ pub struct Document {
     max_stream: usize,
     /// what drawing keeps across pages (fonts, the system's font list)
     render: render::Cache,
+    /// the predefined CMaps of lib/cidmap and the CID -> Unicode tables, unpacked once
+    cidmaps: RefCell<BTreeMap<Vec<u8>, Option<Rc<cidmap::CMap>>>>,
+    cid_texts: RefCell<BTreeMap<cidmap::Collection, Rc<cidmap::ToUnicode>>>,
 }
 
 impl Document {
@@ -218,6 +224,8 @@ impl Document {
             version,
             max_stream: opt.max_stream,
             render: render::Cache::default(),
+            cidmaps: RefCell::new(BTreeMap::new()),
+            cid_texts: RefCell::new(BTreeMap::new()),
         };
         doc.setup_crypt(&opt.password)?;
         // a catalog that does not load: rebuild from the objects
@@ -483,6 +491,24 @@ impl Document {
     }
 
     /// a stream's data with all its filters applied (an image filter is Error::Unsupported)
+    /// a predefined CMap of lib/cidmap by its name, unpacked once per document
+    pub(crate) fn cidmap(&self, name: &[u8]) -> Option<Rc<cidmap::CMap>> {
+        if let Some(c) = self.cidmaps.borrow().get(name) {
+            return c.clone();
+        }
+        let c = cidmap::predefined(name).map(Rc::new);
+        let mut m = self.cidmaps.borrow_mut();
+        if m.len() < 256 {
+            m.insert(name.to_vec(), c.clone());
+        }
+        c
+    }
+
+    /// a collection's CID -> Unicode table, unpacked once per document
+    pub(crate) fn cid_text(&self, c: cidmap::Collection) -> Rc<cidmap::ToUnicode> {
+        self.cid_texts.borrow_mut().entry(c).or_insert_with(|| Rc::new(cidmap::to_unicode(c))).clone()
+    }
+
     pub fn decode(&self, s: &Stream) -> Result<Vec<u8>, Error> {
         match self.decode_d(s, 0)? {
             (d, None) => Ok(d),
