@@ -30,6 +30,7 @@ pub const GROUPS: &[(&str, fn(&mut T))] = &[
     ("read_filters", read_filters),
     ("read_crypt", read_crypt),
     ("read_text", read_text),
+    ("read_cjk", read_cjk),
     ("read_nav", read_nav),
     ("read_hostile", read_hostile),
 ];
@@ -665,6 +666,76 @@ fn read_text(t: &mut T) {
     );
     let got = text0(t, "hebrew", m.table("/Root 1 0 R"));
     t.eq("right to left: reading order", got.as_str(), "ab 12 לום\n");
+}
+
+/// a composite font over a CIDFontType0 that is not embedded: its encoding (a name, or an
+/// object), its collection's Ordering, its widths
+fn cjk_font(encoding: &str, ordering: &str, w: &str) -> Vec<u8> {
+    format!("<< /Type /Font /Subtype /Type0 /BaseFont /CJK-Test /Encoding {encoding} /DescendantFonts [<< /Type /Font /Subtype /CIDFontType0 /BaseFont /CJK-Test /CIDSystemInfo << /Registry (Adobe) /Ordering ({ordering}) /Supplement 2 >> /DW 1000 /W [{w}] >>] >>").into_bytes()
+}
+
+/// the predefined CMaps of East Asia (lib/cidmap): code lengths, CIDs and, without a ToUnicode,
+/// the text of the collection's CID -> Unicode table (ISO 32000-1 9.10.2)
+fn read_cjk(t: &mut T) {
+    // Shift-JIS (90ms-RKSJ-H): A in one byte (CID 264), あ and 漢 in two (843, 1533)
+    let f = cjk_font("/90ms-RKSJ-H", "Japan1", "264 [250]");
+    if let Some(doc) = open(t, "rksj", one_page(b"BT /F1 20 Tf 50 700 Td <4182A08ABF> Tj ET", Some(&f), "").table("/Root 1 0 R")) {
+        let p = doc.page_text(0).unwrap_or_default();
+        t.eq("90ms-RKSJ-H: text", p.text(), String::from("Aあ漢\n"));
+        // the widths go by CID: 264 is 250, the others DW
+        t.eq("90ms-RKSJ-H: widths by CID", p.items.iter().map(|i| rnd(i.dx * 10.0)).collect::<Vec<_>>(), vec![50, 200, 200]);
+    }
+    // Chinese and Korean in their encodings
+    for (enc, ord, code, want) in [
+        ("/GBK-EUC-H", "GB1", &b"<D6D0CEC4>"[..], "中文"),
+        ("/ETenms-B5-H", "CNS1", &b"<A4A4A4E5>"[..], "中文"),
+        ("/KSCms-UHC-H", "Korea1", &b"<C7D1B1DB>"[..], "한글"),
+        ("/GB-EUC-H", "GB1", &b"<D6D0CEC4>"[..], "中文"),
+    ] {
+        let content = cat(&[b"BT /F1 20 Tf 50 700 Td ", code, b" Tj ET"]);
+        let got = text0(t, enc, one_page(&content, Some(&cjk_font(enc, ord, "")), "").table("/Root 1 0 R"));
+        t.eq(&format!("{enc}: text"), got.as_str(), format!("{want}\n").as_str());
+    }
+    // UTF-16 with a surrogate pair: four bytes, one character; あ's CID (843) takes its width
+    let f = cjk_font("/UniJIS-UTF16-H", "Japan1", "843 [500]");
+    if let Some(doc) = open(t, "utf16", one_page(b"BT /F1 20 Tf 50 700 Td <3042D840DC0B> Tj ET", Some(&f), "").table("/Root 1 0 R")) {
+        let p = doc.page_text(0).unwrap_or_default();
+        t.eq("UniJIS-UTF16-H: a surrogate pair", p.text(), String::from("あ\u{2000B}\n"));
+        t.eq("UniJIS-UTF16-H: the CID's width", p.items.iter().map(|i| rnd(i.dx * 10.0)).collect::<Vec<_>>(), vec![100, 200]);
+    }
+    // vertical: 90ms-RKSJ-V's comma is the vertical form (CID 7887), its text the comma
+    let f = cjk_font("/90ms-RKSJ-V", "Japan1", "");
+    if let Some(doc) = open(t, "rksj-v", one_page(b"BT /F1 20 Tf 300 700 Td <8141889F> Tj ET", Some(&f), "").table("/Root 1 0 R")) {
+        let p = doc.page_text(0).unwrap_or_default();
+        t.check("90ms-RKSJ-V: one below the other", p.items.len() == 2 && p.items[0].x == p.items[1].x && p.items[1].y < p.items[0].y);
+        t.eq("90ms-RKSJ-V: text", p.text(), String::from("、亜\n"));
+    }
+    // an embedded CMap over a predefined one (usecmap): its own entries first
+    let cm = b"/CIDInit /ProcSet findresource begin 12 dict begin begincmap /90ms-RKSJ-H usecmap\n1 begincidchar <82A0> 845 endcidchar\nendcmap CMapName currentdict /CMap defineresource pop end end";
+    let mut m = one_page(b"BT /F1 20 Tf 50 700 Td <4182A08ABF> Tj ET", Some(&cjk_font("6 0 R", "Japan1", "")), "");
+    m.add(6, flate("/Type /CMap /CMapName /Test-H", cm));
+    let got = text0(t, "usecmap", m.table("/Root 1 0 R"));
+    t.eq("usecmap: own CIDs over the predefined ones", got.as_str(), "Aい漢\n");
+    // the stream's /UseCMap the same way
+    let cm = b"begincmap 1 begincidchar <82A0> 845 endcidchar endcmap";
+    let mut m = one_page(b"BT /F1 20 Tf 50 700 Td <4182A08ABF> Tj ET", Some(&cjk_font("6 0 R", "Japan1", "")), "");
+    m.add(6, flate("/Type /CMap /CMapName /Test-H /UseCMap /90ms-RKSJ-H", cm));
+    let got = text0(t, "UseCMap", m.table("/Root 1 0 R"));
+    t.eq("/UseCMap: code space and CIDs of the predefined one", got.as_str(), "Aい漢\n");
+    // Identity-H with a collection: the CID's text (also as pdf.js reads it)
+    let got = text0(t, "identity", one_page(b"BT /F1 20 Tf 50 700 Td <034B05FD> Tj ET", Some(&cjk_font("/Identity-H", "Japan1", "")), "").table("/Root 1 0 R"));
+    t.eq("Identity-H, Adobe-Japan1: text by CID", got.as_str(), "あ漢\n");
+    // a ToUnicode that lacks a code: the collection's text for that one
+    let mut f = cjk_font("/90ms-RKSJ-H", "Japan1", "");
+    f.truncate(f.len() - 2);
+    f.extend_from_slice(b" /ToUnicode 6 0 R >>");
+    let mut m = one_page(b"BT /F1 20 Tf 50 700 Td <4182A08ABF> Tj ET", Some(&f), "");
+    m.add(6, flate("", b"begincmap 1 beginbfchar <41> <005A> endbfchar endcmap"));
+    let got = text0(t, "tounicode", m.table("/Root 1 0 R"));
+    t.eq("ToUnicode first, the collection for the rest", got.as_str(), "Zあ漢\n");
+    // a Unicode CMap that lib/cidmap does not have (not in Table 118): the code is the text
+    let got = text0(t, "uni2004", one_page(b"BT /F1 20 Tf 50 700 Td <30423044> Tj ET", Some(&cjk_font("/UniJIS2004-UTF16-H", "Japan1", "")), "").table("/Root 1 0 R"));
+    t.eq("UniJIS2004-UTF16-H: the code as text", got.as_str(), "あい\n");
 }
 
 // ------------------------------------------------------------------ navigation and forms

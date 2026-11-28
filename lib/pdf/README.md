@@ -51,8 +51,12 @@ PDF/A, encryption and forms. Fonts whose licence (OS/2 `fsType`) forbids embeddi
 - **Text**: every glyph with its characters, position, advance and size, and each page's text
   in reading order, laid out as Poppler's `pdftotext -raw` does (words apart where the glyphs
   are, Hebrew and Arabic in reading order, fake bold once). Simple fonts through their ToUnicode
-  map, their encoding and the Adobe Glyph List; Type 0 fonts through their CMaps; Type 3 fonts;
-  the 14 standard fonts with their widths; text in form XObjects.
+  map, their encoding and the Adobe Glyph List; Type 0 fonts through their CMaps, also every
+  predefined one of Chinese, Japanese and Korean encodings
+  ([`jflib-cidmap`](https://crates.io/crates/jflib-cidmap): Shift-JIS, EUC, GBK, Big Five, UHC,
+  the Unicode ones), and without a ToUnicode through the CID → Unicode table of the font's
+  collection (Adobe-GB1, -CNS1, -Japan1, -Korea1); Type 3 fonts; the 14 standard fonts with their
+  widths; text in form XObjects.
 - **Navigation**: the document information, the XMP metadata, the language, the outline with
   explicit and named destinations, links and other annotations with their actions.
 - **Forms**: every field of the interactive form with its full name, kind, value, options and
@@ -63,8 +67,7 @@ PDF/A, encryption and forms. Fonts whose licence (OS/2 `fsType`) forbids embeddi
 A damaged or hostile file gives an error or less than it claims, never a panic, a hang or memory
 without end: nesting, the depth of references, page trees, outlines and form XObjects are
 bounded, every decoded stream is at most `Options::max_stream` bytes (256 MiB). Not supported:
-the predefined CMaps of East Asian fonts other than Identity and the Unicode ones, verifying
-signatures, and changing and saving a document.
+verifying signatures, and changing and saving a document.
 
 ## What it draws
 
@@ -81,7 +84,9 @@ region of it (tiles for a viewer), over paper of any colour or none:
 - **Text** through the glyph outlines of the embedded fonts -- Type 1, CFF (with seac accents),
   TrueType, OpenType, CID-keyed fonts, Type 3 -- and for fonts that are not embedded substitutes
   from a `FontSource` (by default the system's fonts: URW's Nimbus, Liberation or the Windows
-  fonts for the 14 standard fonts); every text render mode.
+  fonts for the 14 standard fonts; for a Chinese, Japanese or Korean font one of its language,
+  `FontQuery::lang`: Noto Sans CJK, Yu Gothic, Microsoft YaHei, Hiragino and the like, vertical
+  punctuation in its vertical form); every text render mode, horizontal and vertical writing.
 - **Images** of every bit depth and colour space with Decode, stencil masks, colour-key and
   explicit masks, soft masks with Matte, inline images, JPEG (CMYK too) and CCITT Group 3 and 4;
   shrunk images averaged over the pixels they cover, enlarged ones sampled bilinearly.
@@ -97,9 +102,10 @@ long. JPEG 2000 images (`JPXDecode`) are decoded by
 [`jflib-img-jp2`](https://crates.io/crates/jflib-img-jp2): their own size and bit depth, the colour
 space of the JP2 header when the dictionary names none (an ICC profile there counts by its
 channels only), `SMaskInData`. JBIG2 images (`JBIG2Decode`, with their `JBIG2Globals`) are decoded
-by [`jflib-img-jbig2`](https://crates.io/crates/jflib-img-jbig2). Not drawn:
-knockout groups and groups that are not isolated (drawn as isolated ones), overprint. The work of a page is bounded: a hostile page gives
-`Error::Limit`, never a hang.
+by [`jflib-img-jbig2`](https://crates.io/crates/jflib-img-jbig2). Not drawn: knockout groups and
+groups that are not isolated (drawn as isolated ones), overprint, the vertical forms that only a
+substitute's `vert` feature knows (the long vowel mark ー stands upright). The work of a page is
+bounded: a hostile page gives `Error::Limit`, never a hang.
 
 ## How it is used
 

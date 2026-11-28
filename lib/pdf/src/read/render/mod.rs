@@ -81,6 +81,9 @@ pub struct FontQuery<'a> {
     pub symbolic: bool,
     /// a simple font (one byte per code), not a composite one
     pub text: bool,
+    /// a composite font of one of Adobe's CJK collections: the language of its text (zh-Hans,
+    /// zh-Hant, ja, ko), so a substitute has its characters (in its forms)
+    pub lang: Option<&'a str>,
 }
 
 /// where substitutes for fonts that are not embedded come from: a TrueType, OpenType or Type 1
@@ -91,14 +94,17 @@ pub trait FontSource {
 
 /// the system's fonts (text::fontdb), searched once: for the 14 standard fonts their
 /// metric-compatible families (URW's Nimbus, Liberation, the Windows fonts), others by name and
-/// flags
+/// flags; a font with a language (`FontQuery::lang`) by its own name, else the system's serif or
+/// sans-serif font for the language (text::fontconf: fontconfig's rules on Linux, Noto Sans CJK
+/// JP for ja, say; the built-in ones elsewhere)
 pub struct SystemFonts {
     db: RefCell<Option<text::fontdb::FontDb>>,
+    conf: RefCell<Option<text::fontconf::FontConf>>,
 }
 
 impl Default for SystemFonts {
     fn default() -> SystemFonts {
-        SystemFonts { db: RefCell::new(None) }
+        SystemFonts { db: RefCell::new(None), conf: RefCell::new(None) }
     }
 }
 
@@ -133,6 +139,32 @@ fn families(q: &FontQuery) -> Vec<&'static str> {
     if q.serif { serif.to_vec() } else { sans.to_vec() }
 }
 
+/// the families for a CJK font's language, best first: Noto CJK and Source Han (any system), then
+/// those of Windows, macOS and Linux; a serif font tries the serif ones (Mincho, Song, Ming,
+/// Batang) first
+fn cjk_families(lang: &str, serif: bool) -> Vec<&'static str> {
+    let (sans, ser): (&[&str], &[&str]) = match lang {
+        "ja" => (
+            &["Noto Sans CJK JP", "Source Han Sans JP", "Yu Gothic", "Meiryo", "MS Gothic", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "IPAexGothic", "IPAGothic", "TakaoGothic", "VL Gothic"],
+            &["Noto Serif CJK JP", "Source Han Serif JP", "Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", "IPAexMincho", "IPAMincho", "TakaoMincho"],
+        ),
+        "zh-Hans" => (
+            &["Noto Sans CJK SC", "Source Han Sans SC", "Microsoft YaHei", "DengXian", "SimHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", "WenQuanYi Micro Hei", "WenQuanYi Zen Hei"],
+            &["Noto Serif CJK SC", "Source Han Serif SC", "SimSun", "NSimSun", "STSong", "Songti SC", "AR PL UMing CN", "AR PL SungtiL GB"],
+        ),
+        "zh-Hant" => (
+            &["Noto Sans CJK TC", "Source Han Sans TC", "Microsoft JhengHei", "PingFang TC", "Heiti TC", "WenQuanYi Micro Hei", "WenQuanYi Zen Hei"],
+            &["Noto Serif CJK TC", "Source Han Serif TC", "PMingLiU", "MingLiU", "LiSong Pro", "Songti TC", "AR PL UMing TW", "AR PL New Sung"],
+        ),
+        "ko" => (
+            &["Noto Sans CJK KR", "Source Han Sans KR", "Malgun Gothic", "Gulim", "Dotum", "Apple SD Gothic Neo", "NanumGothic", "UnDotum", "Baekmuk Gulim"],
+            &["Noto Serif CJK KR", "Source Han Serif KR", "Batang", "AppleMyungjo", "NanumMyeongjo", "UnBatang", "Baekmuk Batang"],
+        ),
+        _ => (&[], &[]),
+    };
+    if serif { ser.iter().chain(sans).copied().collect() } else { sans.iter().chain(ser).copied().collect() }
+}
+
 impl FontSource for SystemFonts {
     fn find(&self, q: &FontQuery) -> Option<(Vec<u8>, u32)> {
         let mut db = self.db.borrow_mut();
@@ -148,7 +180,19 @@ impl FontSource for SystemFonts {
         if !own.is_empty() && !q.name.to_ascii_lowercase().contains("helvetica") && !q.name.to_ascii_lowercase().starts_with("times") {
             tries.push(own.into());
         }
-        tries.extend(families(q).into_iter().map(String::from));
+        // a CJK font: the usual fonts of its language (a Latin family lacks its characters), then
+        // what fontconfig's rules put first for the language, then its serif or sans-serif choice
+        if let Some(lang) = q.lang {
+            tries.extend(cjk_families(lang, q.serif).into_iter().map(String::from));
+            let mut conf = self.conf.borrow_mut();
+            let conf = conf.get_or_insert_with(text::fontconf::FontConf::system);
+            tries.extend(conf.lang_families(lang));
+            if let Some((_, _, fam)) = db.resolve(conf, if q.serif { "serif" } else { "sans-serif" }, lang, weight, q.italic) {
+                tries.push(fam);
+            }
+        } else {
+            tries.extend(families(q).into_iter().map(String::from));
+        }
         for fam in &tries {
             if let Some((i, _)) = db.find(fam, weight, q.italic) {
                 let face = db.face(i)?;
@@ -171,7 +215,7 @@ pub(crate) struct Cache {
     /// glyphs drawn: (font, code, the glyph's device matrix, its quarter-pixel phase)
     glyphs: RefCell<BTreeMap<(usize, u32, [u64; 4], u8), (Rc<fonts::GFont>, Option<Rc<canvas::Cover>>)>>,
     glyph_bytes: core::cell::Cell<usize>,
-    subst: RefCell<BTreeMap<(String, bool, bool, bool), Option<Rc<fonts::Prog>>>>,
+    subst: RefCell<BTreeMap<(String, bool, bool, bool, Option<String>), Option<Rc<fonts::Prog>>>>,
     system: OnceCell<Rc<dyn FontSource>>,
 }
 
@@ -1050,7 +1094,7 @@ impl<'d> Run<'d> {
         }
         let source = self.opt.fonts.clone().unwrap_or_else(|| cache.system.get_or_init(|| Rc::new(SystemFonts::new())).clone());
         let mut subst = |q: &FontQuery| -> Option<Rc<fonts::Prog>> {
-            let key = (String::from(q.name), q.bold, q.italic, q.fixed);
+            let key = (String::from(q.name), q.bold, q.italic, q.fixed, q.lang.map(String::from));
             if let Some(p) = cache.subst.borrow().get(&key) {
                 return p.clone();
             }
@@ -1080,9 +1124,10 @@ impl<'d> Run<'d> {
             let w0 = font.base.width(code);
             let mut trm = mul(&[gs.size * gs.th, 0.0, 0.0, gs.size, 0.0, gs.rise], tm);
             if font.base.vertical {
-                // the origin of a vertical glyph: half its width left, 0.88 up
+                // the origin of a vertical glyph: half its width left, 0.88 up -- in glyph space,
+                // which trm scales by the size (and the horizontal scaling) itself
                 let hw = font.base.h_width(code);
-                trm = mul(&[1.0, 0.0, 0.0, 1.0, -hw / 2.0 * gs.size * gs.th, -0.88 * gs.size], &trm);
+                trm = mul(&[1.0, 0.0, 0.0, 1.0, -hw / 2.0, -0.88], &trm);
             }
             self.glyph(&font, code, &trm, res);
             let w0 = font.width(code).unwrap_or(w0);

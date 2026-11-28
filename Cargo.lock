@@ -663,6 +663,7 @@ dependencies = [
  "jflib-archive",
  "jflib-base",
  "jflib-cas",
+ "jflib-cidmap",
  "jflib-compress",
  "jflib-crypto",
  "jflib-datastore",
@@ -792,6 +793,14 @@ dependencies = [
  "jflib-crypto",
  "jflib-formats",
  "jflib-plat",
+ "jflib-rt",
+]
+
+[[package]]
+name = "jflib-cidmap"
+version = "0.2.1"
+dependencies = [
+ "jflib-compress",
  "jflib-rt",
 ]
 
@@ -1298,6 +1307,7 @@ dependencies = [
 name = "jflib-pdf"
 version = "0.2.1"
 dependencies = [
+ "jflib-cidmap",
  "jflib-compress",
  "jflib-crypto",
  "jflib-gfx",
@@ -1617,6 +1627,7 @@ name = "pdftest"
 version = "0.0.0"
 dependencies = [
  "jflib-build",
+ "jflib-cidmap",
  "jflib-compress",
  "jflib-gfx",
  "jflib-img-core",

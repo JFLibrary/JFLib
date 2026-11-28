@@ -26,6 +26,8 @@ text_shape.workspace = true
 # drawing pages: glyph outlines (TrueType, CFF), the system's fonts, JPEG, JPEG 2000 and JBIG2 images
 text.workspace = true
 plat.workspace = true
+# the predefined CMaps of Chinese, Japanese and Korean fonts and their CID -> Unicode tables
+cidmap.workspace = true
 img_core.workspace = true
 img_jpeg.workspace = true
 img_jp2.workspace = true
