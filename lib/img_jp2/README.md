@@ -37,8 +37,9 @@ without a line of `unsafe` code. It reads JP2 files, the JPX files JP2 readers m
 a preview or a small rendering of a large page much cheaper.
 
 A file that is cut short gives what was decoded up to there, as the common readers do. Limits on
-the pixels, the tiles and components, code-blocks, precincts and the packets looked at refuse a
-hostile file before it costs memory or time. Every target
+the pixels, the tiles and components, code-blocks, precincts, the packets looked at and the bytes
+a tile's structures hold refuse a hostile file before it costs memory or time; `Options::max_mem`
+bounds all the decode holds at once (img_all's codec takes it from `ImgDec::maxmem`). Every target
 gets the same bits: the 9/7 wavelet runs in `f32` with each step written out.
 
 Not decoded: Part 2 of the standard (other wavelets, multiple-component transforms beyond RCT and

@@ -17,6 +17,11 @@
 //   jp2_box64        a JP2 box whose 64-bit size wraps the next box to the start (28 bytes)
 //   jp2_ppm          PPM and PPT segments of length 2 (no Zppm / Zppt)
 //   jp2_cut          a tile-part cut after each byte of its data, that byte made 0xFF
+//   jp2_layers       8192 empty components, 65535 layers, 33 resolutions (LRCP, RLCP; 25 KB)
+//   jp2_poc          7281 POC volumes over all of them (88 KB); again with one component that
+//                    has a packet per layer (the passes count until the budget ends them)
+//   jp2_precincts    2 million empty packets of 1 x 1 precincts (2 MB of zeros)
+//   jp2_mem          Options::max_mem and the codec's ImgDec::maxmem against a 4096 x 4096 image
 //
 // --only NAME runs the groups above whose names start with NAME.  (build_rs.py test codectest
 // runs it through tests/hostile.uis; --script is ignored)
@@ -621,6 +626,60 @@ pub fn run(only: Option<&str>) -> i32 {
         }
         t.check("jp2_cut", done == psot - 14 && slowest < QUICK_US, format!("{done} cut tiles, the slowest in {} ms", slowest / 1000));
     }
+    // JPEG 2000 (third review, group 4): the layer-resolution orders passed over every component
+    // in every layer and resolution, also over components without a precinct, at no cost; a
+    // precinct's structures cost about a KB even when its packets are empty; Options had no
+    // memory limit and the codec ignored ImgDec::maxmem
+    // (on 1 x 1 at (1, 1) a component sub-sampled by 2 has no sample)
+    let empty = J2k { x0: 1, y0: 1, x1: 2, y1: 2, comps: vec![(8, 2, 2); 8192], layers: 65535, levels: 32, ..J2k::default() };
+    if t.on("jp2_layers") {
+        for (name, prog) in [("jp2_layers/lrcp", 0u8), ("jp2_layers/rlcp", 1)] {
+            let d = j2k(&J2k { prog, ..empty.clone() });
+            let (r, us) = jp2_dec(&d);
+            t.check(name, r.is_ok() && us < QUICK_US, format!("{} bytes: {} in {} ms", d.len(), if r.is_ok() { "decoded" } else { "refused" }, us / 1000));
+        }
+    }
+    if t.on("jp2_poc") {
+        // a POC segment full of volumes (9 bytes each with more than 256 components): every layer,
+        // every resolution, every component, LRCP
+        let mut vols = Vec::new();
+        for _ in 0..7281 {
+            vols.extend_from_slice(&[0, 0, 0, 0xFF, 0xFF, 33, 0, 0, 0]);
+        }
+        let mut poc = Vec::new();
+        j2k_seg(&mut poc, 0x5F, &vols);
+        let d = j2k(&J2k { main: poc.clone(), ..empty.clone() });
+        let (r, us) = jp2_dec(&d);
+        t.check("jp2_poc/empty", r.is_ok() && us < QUICK_US, format!("{} bytes: {r:?} in {} ms", d.len(), us / 1000));
+        // component 0 has its 1 x 1 sample at the top resolution, one empty packet per layer:
+        // each volume passes over its 65535 layers again until the budget of passes ends it
+        let mut comps = vec![(8, 2, 2); 8192];
+        comps[0] = (8, 1, 1);
+        let d = j2k(&J2k { comps, main: poc, data: vec![0; 65535], ..empty.clone() });
+        let (r, us) = jp2_dec(&d);
+        // (2^28 passes: about 1.5 s; the old code went on for days)
+        t.check("jp2_poc/live", r == Err(img_jp2::Error::Limit) && us < 8 * QUICK_US, format!("{} bytes: {r:?} in {} ms", d.len(), us / 1000));
+    }
+    if t.on("jp2_precincts") {
+        // 2048 x 2048 with one level: 1 x 1 precincts at resolution 0, 2 x 2 at resolution 1 (one
+        // sample of each band), each of the 2^21 packets one byte: empty
+        let d = j2k(&J2k { x1: 2048, y1: 2048, levels: 1, precincts: Some(vec![0x00, 0x11]), data: vec![0; 1 << 21], ..J2k::default() });
+        let (r, us) = jp2_dec(&d);
+        t.check("jp2_precincts", r == Err(img_jp2::Error::Limit) && us < QUICK_US, format!("{} bytes: {r:?} in {} ms", d.len(), us / 1000));
+    }
+    if t.on("jp2_mem") {
+        // 4096 x 4096 grey without data: 64 MB of samples, the plane being made twice that
+        let d = j2k(&J2k { x1: 4096, y1: 4096, tw: 4096, th: 4096, levels: 5, ..J2k::default() });
+        let dec = |m: u64| img_jp2::decode(&d, &img_jp2::Options { max_mem: m, ..img_jp2::Options::default() }).map(|i| i.width);
+        t.check("jp2_mem/options", dec(128 << 20) == Err(img_jp2::Error::Limit) && dec(512 << 20) == Ok(4096) && dec(0) == Ok(4096), format!("128 MB: {:?}, 512 MB: {:?}, no limit: {:?}", dec(128 << 20), dec(512 << 20), dec(0)));
+        let codec = |m: u64| {
+            let mut sf = Surface::default();
+            let mut meta = ImgMeta::default();
+            let dec = ImgDec { maxmem: m, ..Default::default() };
+            img_jp2::CODEC.decode.map_or(-1, |f| f(&d, &mut sf, &dec, &mut meta))
+        };
+        t.check("jp2_mem/codec", codec(128 << 20) == ERR_LIMIT && codec(1 << 30) == 0 && codec(0) == 0, format!("ImgDec::maxmem 128 MB: {}, 1 GB: {}, none: {}", codec(128 << 20), codec(1 << 30), codec(0)));
+    }
     plat::write_stdout(format!("hostile: {} of {} checks passed\n", t.ok, t.ok + t.failed).as_bytes());
     if t.failed != 0 { 1 } else { 0 }
 }
@@ -635,6 +694,72 @@ fn jp2_dec(d: &[u8]) -> (Result<(), img_jp2::Error>, u64) {
 /// where the first SOT marker of a codestream is
 fn jp2_sot(d: &[u8]) -> usize {
     d.windows(2).position(|w| w == [0xFF, 0x90]).unwrap_or(0)
+}
+
+/// a raw JPEG 2000 codestream to build (`j2k`)
+#[derive(Clone)]
+struct J2k {
+    /// the image on the reference grid
+    x0: u32,
+    y0: u32,
+    x1: u32,
+    y1: u32,
+    /// one tile of tw x th at (0, 0) (0: as large as the image)
+    tw: u32,
+    th: u32,
+    /// per component: precision, dx, dy
+    comps: Vec<(u8, u8, u8)>,
+    prog: u8,
+    layers: u16,
+    levels: u8,
+    /// the precinct exponents per resolution (PPy << 4 | PPx), or none (2^15)
+    precincts: Option<Vec<u8>>,
+    /// more marker segments for the main header
+    main: Vec<u8>,
+    /// the data of the one tile-part
+    data: Vec<u8>,
+}
+
+impl Default for J2k {
+    fn default() -> J2k {
+        J2k { x0: 0, y0: 0, x1: 8, y1: 8, tw: 0, th: 0, comps: vec![(8, 1, 1)], prog: 0, layers: 1, levels: 0, precincts: None, main: Vec::new(), data: Vec::new() }
+    }
+}
+
+/// a marker segment 0xFF `m` with its length
+fn j2k_seg(v: &mut Vec<u8>, m: u8, body: &[u8]) {
+    v.extend_from_slice(&[0xFF, m]);
+    v.extend_from_slice(&(body.len() as u16 + 2).to_be_bytes());
+    v.extend_from_slice(body);
+}
+
+/// SIZ, COD (5/3, code-blocks of 64 x 64), QCD (no quantisation, one guard bit, exponent 8 per
+/// band), the extra segments, SOT (Psot 0: to EOC), SOD, the data, EOC
+fn j2k(j: &J2k) -> Vec<u8> {
+    let mut v = vec![0xFF, 0x4F];
+    let mut siz = vec![0, 0];
+    let (tw, th) = (if j.tw == 0 { j.x1 } else { j.tw }, if j.th == 0 { j.y1 } else { j.th });
+    for x in [j.x1, j.y1, j.x0, j.y0, tw, th, 0, 0] {
+        siz.extend_from_slice(&x.to_be_bytes());
+    }
+    siz.extend_from_slice(&(j.comps.len() as u16).to_be_bytes());
+    for &(prec, dx, dy) in &j.comps {
+        siz.extend_from_slice(&[prec - 1, dx, dy]);
+    }
+    j2k_seg(&mut v, 0x51, &siz);
+    let mut cod = vec![j.precincts.is_some() as u8, j.prog];
+    cod.extend_from_slice(&j.layers.to_be_bytes());
+    cod.extend_from_slice(&[0, j.levels, 4, 4, 0, 1]);
+    cod.extend_from_slice(j.precincts.as_deref().unwrap_or(&[]));
+    j2k_seg(&mut v, 0x52, &cod);
+    let mut qcd = vec![0x20];
+    qcd.resize(1 + 1 + 3 * j.levels as usize, 8 << 3);
+    j2k_seg(&mut v, 0x5C, &qcd);
+    v.extend_from_slice(&j.main);
+    v.extend_from_slice(&[0xFF, 0x90, 0, 10, 0, 0, 0, 0, 0, 0, 0, 1, 0xFF, 0x93]);
+    v.extend_from_slice(&j.data);
+    v.extend_from_slice(&[0xFF, 0xD9]);
+    v
 }
 
 /// `d` with `ins` put in at `at`

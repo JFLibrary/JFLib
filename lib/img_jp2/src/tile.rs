@@ -28,8 +28,23 @@ use alloc::vec::Vec;
 pub(crate) struct Budget {
     pub cblks: u64,
     pub precincts: u64,
-    /// the packets the progressions looked at (sent or not)
+    /// the packets the progressions looked at (sent or not) and their layer and resolution passes
     pub visits: u64,
+    /// the bytes the current tile holds in its structures (resolutions, precincts, code-blocks, the
+    /// coded data, the progression lists), at most `max_bytes`
+    pub bytes: u64,
+    pub max_bytes: u64,
+}
+
+impl Budget {
+    /// `n` more bytes held by the tile
+    fn hold(&mut self, n: u64) -> Result<(), Error> {
+        self.bytes = self.bytes.saturating_add(n);
+        if self.bytes > self.max_bytes {
+            return Err(Error::Limit);
+        }
+        Ok(())
+    }
 }
 
 pub(crate) const MAX_CBLKS: u64 = 1 << 22;
@@ -123,9 +138,29 @@ struct TagTree {
 }
 
 impl TagTree {
+    /// the nodes of a tree over w x h leaves (none without leaves)
+    fn nodes(w: u32, h: u32) -> u64 {
+        if w == 0 || h == 0 {
+            return 0;
+        }
+        let (mut lw, mut lh, mut n) = (w as u64, h as u64, 0u64);
+        loop {
+            n += lw * lh;
+            if lw == 1 && lh == 1 {
+                return n;
+            }
+            lw = lw.div_ceil(2);
+            lh = lh.div_ceil(2);
+        }
+    }
+
     fn new(w: u32, h: u32) -> TagTree {
         let mut levels = Vec::new();
-        let (mut lw, mut lh, mut off) = (w.max(1), h.max(1), 0usize);
+        if w == 0 || h == 0 {
+            // a band without code-blocks in this precinct: nothing is ever decoded from it
+            return TagTree { levels, low: Vec::new(), val: Vec::new() };
+        }
+        let (mut lw, mut lh, mut off) = (w, h, 0usize);
         loop {
             levels.push((lw, lh, off));
             off += (lw * lh) as usize;
@@ -267,6 +302,7 @@ fn build_comp(rect: (u32, u32, u32, u32), c: &crate::codestream::CompSiz, st: &S
             return Err(Error::Limit);
         }
         let kinds: &[(u8, u32, u32)] = if r == 0 { &[(0, 0, 0)] } else { &[(1, 1, 0), (2, 0, 1), (3, 1, 1)] };
+        budget.hold((size_of::<Res>() + kinds.len() * size_of::<Band>()) as u64 + np * size_of::<Option<Vec<PBand>>>() as u64)?;
         let nb = if r == 0 { nl } else { nl - r + 1 };
         let sub = (r > 0) as u32;
         let mut bands = Vec::with_capacity(kinds.len());
@@ -346,6 +382,8 @@ fn precinct(res: &mut Res, r: u32, k: usize, budget: &mut Budget) -> Result<(), 
         if budget.cblks > MAX_CBLKS {
             return Err(Error::Limit);
         }
+        // the band, its code-blocks and its two tag trees (the values and the lowest bounds)
+        budget.hold(size_of::<PBand>() as u64 + n * size_of::<Cblk>() as u64 + 2 * TagTree::nodes(ncx, ncy) * 8)?;
         let mut cblks = Vec::with_capacity(n as usize);
         for j in 0..ncy {
             for i in 0..ncx {
@@ -526,6 +564,8 @@ fn packet(s: &mut Stream, tc: &mut TComp, r: u32, k: usize, layer: u32, budget: 
         // cut short: an arithmetic-coded part still decodes (its end reads as the padding of
         // C.3.4); raw bits that are not there would be made up
         if whole || take > 0 && !raw_pass(style, cb.passes) {
+            // the coded bytes are kept (a copy of the data) and each segment's own record
+            budget.hold(take as u64 + if c.new_seg.is_some() { size_of::<SegBuf>() as u64 } else { 0 })?;
             if let Some(first) = c.new_seg {
                 cb.segs.push(SegBuf { first, passes: 0, data: Vec::new() });
             }
@@ -604,6 +644,7 @@ fn positions(comps: &[Geo], rect: (u32, u32, u32, u32), budget: &mut Budget) -> 
             if budget.visits > MAX_VISITS {
                 return Err(Error::Limit);
             }
+            budget.hold(n * size_of::<At>() as u64)?;
             for py in 0..res.npy {
                 let y = at(py, rect.1, res.y0, res.ppy, lv, g.dy);
                 for px in 0..res.npx {
@@ -626,6 +667,15 @@ fn progression(comps: &[Geo], rect: (u32, u32, u32, u32), g: &Global, pocs: &[Po
     let mut next: Vec<Vec<Vec<u16>>> = comps.iter().map(|c| c.res.iter().map(|r| vec![0u16; r.npx as usize * r.npy as usize]).collect()).collect();
     let default = [Poc { rs: 0, cs: 0, lye: g.layers, re: 33, ce: nc as u16, prog: g.prog }];
     let vols: &[Poc] = if pocs.is_empty() { &default } else { pocs };
+    // per resolution the components that have precincts there: the layer-resolution orders pass
+    // over these only (a tile of 16384 empty components and 65535 layers was 3.5 * 10^10 passes
+    // that sent nothing and cost nothing)
+    let live: Vec<Vec<usize>> = (0..maxres as usize).map(|r| (0..nc).filter(|&c| comps[c].res.get(r).is_some_and(|x| x.npx != 0 && x.npy != 0)).collect()).collect();
+    // the live components c0 <= c < c1 of resolution r
+    fn between(live: &[Vec<usize>], r: u32, c0: usize, c1: usize) -> &[usize] {
+        let cs = &live[r as usize];
+        &cs[cs.partition_point(|&c| c < c0)..cs.partition_point(|&c| c < c1)]
+    }
     // the precincts in the order of each position progression (RPCL, PCRL, CPRL), made once
     let mut orders: [Option<Vec<At>>; 3] = [None, None, None];
     // emit (l, r, c, k) when it is the precinct's next layer
@@ -647,18 +697,19 @@ fn progression(comps: &[Geo], rect: (u32, u32, u32, u32), g: &Global, pocs: &[Po
             continue;
         }
         if v.prog <= 1 {
+            // the resolutions of the volume where a component has precincts; each pass over
+            // (layer, resolution) counts
+            let rs: Vec<u32> = (r0..r1).filter(|&r| !between(&live, r, c0, c1).is_empty()).collect();
             let lrcp = v.prog == 0;
-            let (outer, inner) = if lrcp { (l1, r1) } else { (r1, l1) };
+            let (outer, inner) = if lrcp { (l1 as usize, rs.len()) } else { (rs.len(), l1 as usize) };
             for a in 0..outer {
                 for bb in 0..inner {
-                    let (l, r) = if lrcp { (a, bb) } else { (bb, a) };
-                    if r < r0 {
-                        continue;
+                    let (l, r) = if lrcp { (a as u32, rs[bb]) } else { (bb as u32, rs[a]) };
+                    budget.visits += 1;
+                    if budget.visits > MAX_VISITS {
+                        return Err(Error::Limit);
                     }
-                    for c in c0..c1 {
-                        if r > comps[c].levels {
-                            continue;
-                        }
+                    for &c in between(&live, r, c0, c1) {
                         let res = &comps[c].res[r as usize];
                         for k in 0..res.npx as usize * res.npy as usize {
                             if !emit(l, r, c, k, &mut next, budget)? {
@@ -718,12 +769,18 @@ pub(crate) struct OutComp {
     pub data: Vec<i32>,
 }
 
-/// the band's coefficients from its code-blocks
+/// the band's coefficients from its code-blocks; none (an empty buffer) when no code-block of it
+/// has data: the band is zero
 fn band_coefs(tc: &TComp, r: usize, bi: usize, t1: &mut T1) -> Result<Coefs, Error> {
     let res = &tc.res[r];
     let b = &res.bands[bi];
     let (bw, bh) = ((b.x1 - b.x0) as usize, (b.y1 - b.y0) as usize);
-    let mut out = if tc.reversible { Coefs::Int(vec![0; bw * bh]) } else { Coefs::Float(vec![0.0; bw * bh]) };
+    let coded = res.precincts.iter().flatten().any(|p| p[bi].cblks.iter().any(|cb| cb.passes != 0 && cb.x1 > cb.x0 && cb.y1 > cb.y0));
+    let n = if coded { bw * bh } else { 0 };
+    let mut out = if tc.reversible { Coefs::Int(vec![0; n]) } else { Coefs::Float(vec![0.0; n]) };
+    if !coded {
+        return Ok(out);
+    }
     let mut segs: Vec<Seg> = Vec::new();
     for pbands in res.precincts.iter().flatten() {
         let pb = &pbands[bi];
@@ -770,9 +827,19 @@ fn band_coefs(tc: &TComp, r: usize, bi: usize, t1: &mut T1) -> Result<Coefs, Err
     Ok(out)
 }
 
-/// the tile-component's samples at resolution `top` (inverse wavelet from resolution 0)
+/// the tile-component's samples at resolution `top` (inverse wavelet from resolution 0); the
+/// buffers of zero bands are empty until a level needs them
 fn comp_plane(tc: &TComp, top: usize, t1: &mut T1) -> Result<Plane, Error> {
     let mut cur = band_coefs(tc, 0, 0, t1)?;
+    if top == 0 {
+        // resolution 0 only: its LL band is the plane
+        let n = (tc.res[0].x1 - tc.res[0].x0) as usize * (tc.res[0].y1 - tc.res[0].y0) as usize;
+        match &mut cur {
+            Coefs::Int(v) if v.is_empty() => v.resize(n, 0),
+            Coefs::Float(v) if v.is_empty() => v.resize(n, 0.0),
+            _ => {}
+        }
+    }
     for r in 1..=top {
         let res = &tc.res[r];
         let hl = band_coefs(tc, r, 0, t1)?;
@@ -822,6 +889,8 @@ pub(crate) fn decode(cs: &Codestream, t: usize, reduce: u32, budget: &mut Budget
     let rect = siz.tile_rect(t as u32);
     let tp = &td.params;
     let g = tp.global.or(cs.main.global).ok_or(Error::Corrupt)?;
+    // what the tile holds is freed after it
+    budget.bytes = 0;
     let mut comps = Vec::with_capacity(siz.comps.len());
     for (c, cz) in siz.comps.iter().enumerate() {
         let (st, q, roi) = comp_params(&cs.main, tp, c).ok_or(Error::Corrupt)?;
@@ -833,81 +902,111 @@ pub(crate) fn decode(cs: &Codestream, t: usize, reduce: u32, budget: &mut Budget
     let pocs: &[Poc] = if tp.poc.is_empty() { &cs.main.poc } else { &tp.poc };
     let geo: Vec<Geo> = comps.iter().map(Geo::of).collect();
     progression(&geo, rect, &g, pocs, budget, |l, r, c, k, budget| packet(&mut s, &mut comps[c], r, k, l, budget))?;
-    // the samples
-    let mut planes: Vec<(Plane, u32, u32, u32, u32, u32)> = Vec::with_capacity(comps.len());
-    for tc in &comps {
+    // the samples, one component after the other into the image (its code-blocks freed after it);
+    // the first three wait for each other when a multiple-component transform joins them
+    let mct = g.mct != 0 && comps.len() >= 3;
+    let mut held: Vec<TPlane> = Vec::new();
+    for c in 0..comps.len() {
+        let tc = &comps[c];
         let red = reduce.min(tc.levels);
         let top = (tc.levels - red) as usize;
         let res = &tc.res[top];
-        planes.push((comp_plane(tc, top, t1)?, res.x0, res.y0, res.x1, res.y1, red));
-    }
-    // the multiple-component transform
-    if g.mct != 0 && planes.len() >= 3 {
-        let same = (1..3).all(|i| planes[i].1 == planes[0].1 && planes[i].2 == planes[0].2 && planes[i].3 == planes[0].3 && planes[i].4 == planes[0].4);
-        if same {
-            let (a, rest) = planes.split_at_mut(1);
-            let (b, c) = rest.split_at_mut(1);
-            match (&mut a[0].0, &mut b[0].0, &mut c[0].0) {
-                (Plane::Int(y), Plane::Int(u), Plane::Int(v)) => {
-                    for ((y, u), v) in y.iter_mut().zip(u.iter_mut()).zip(v.iter_mut()) {
-                        let g = y.wrapping_sub(u.wrapping_add(*v) >> 2);
-                        let r = v.wrapping_add(g);
-                        let bb = u.wrapping_add(g);
-                        *y = r;
-                        *u = g;
-                        *v = bb;
-                    }
-                }
-                (Plane::Float(y), Plane::Float(u), Plane::Float(v)) => {
-                    for ((y, u), v) in y.iter_mut().zip(u.iter_mut()).zip(v.iter_mut()) {
-                        let (yy, cb, cr) = (*y, *u, *v);
-                        *y = yy + 1.402 * cr;
-                        *u = yy - 0.344_13 * cb - 0.714_14 * cr;
-                        *v = yy + 1.772 * cb;
-                    }
-                }
-                _ => {}
-            }
+        let p = TPlane { plane: comp_plane(tc, top, t1)?, x0: res.x0, y0: res.y0, x1: res.x1, y1: res.y1, red };
+        for r in &mut comps[c].res {
+            r.precincts = Vec::new();
         }
-    }
-    // DC level shift, clamp, into the image
-    for (c, (plane, x0, y0, x1, y1, red)) in planes.into_iter().enumerate() {
-        let tc = &comps[c];
-        let o = &mut out[c];
-        let shift = reduce - red;
-        let (pw, ph) = ((x1 - x0) as usize, (y1 - y0) as usize);
-        let prec = tc.prec.min(31);
-        let (lo, hi, dc) = if tc.signed {
-            (-(1i64 << (prec - 1)), (1i64 << (prec - 1)) - 1, 0i64)
+        if mct && c < 3 {
+            held.push(p);
+            if c == 2 {
+                transform(&mut held);
+                for (i, p) in held.drain(..).enumerate() {
+                    put(&comps[i], &mut out[i], p, reduce);
+                }
+            }
         } else {
-            (0, (1i64 << prec) - 1, 1i64 << (prec - 1))
-        };
-        // the target rectangle at `reduce` levels
-        let (tx0, ty0, tx1, ty1) = (ceil_shift(tc.x0, reduce.min(31)), ceil_shift(tc.y0, reduce.min(31)), ceil_shift(tc.x1, reduce.min(31)), ceil_shift(tc.y1, reduce.min(31)));
-        for ty in ty0..ty1 {
-            if ty < o.y0 || ty - o.y0 >= o.h {
-                continue;
-            }
-            let sy = (((ty as u64) << shift) as u32).saturating_sub(y0) as usize;
-            if sy >= ph {
-                continue;
-            }
-            let orow = ((ty - o.y0) * o.w) as usize;
-            for tx in tx0..tx1 {
-                if tx < o.x0 || tx - o.x0 >= o.w {
-                    continue;
-                }
-                let sx = (((tx as u64) << shift) as u32).saturating_sub(x0) as usize;
-                if sx >= pw {
-                    continue;
-                }
-                let v = match &plane {
-                    Plane::Int(p) => p[sy * pw + sx] as i64,
-                    Plane::Float(p) => round_even(p[sy * pw + sx]) as i64,
-                };
-                o.data[orow + (tx - o.x0) as usize] = (v + dc).clamp(lo, hi) as i32;
-            }
+            put(&comps[c], &mut out[c], p, reduce);
         }
     }
     Ok(())
+}
+
+/// a decoded tile-component plane and its rectangle at the resolution it was decoded to (`red`
+/// levels below its full one)
+struct TPlane {
+    plane: Plane,
+    x0: u32,
+    y0: u32,
+    x1: u32,
+    y1: u32,
+    red: u32,
+}
+
+/// the multiple-component transform of the first three planes (when they cover the same area)
+fn transform(planes: &mut [TPlane]) {
+    let same = (1..3).all(|i| planes[i].x0 == planes[0].x0 && planes[i].y0 == planes[0].y0 && planes[i].x1 == planes[0].x1 && planes[i].y1 == planes[0].y1);
+    if !same {
+        return;
+    }
+    let (a, rest) = planes.split_at_mut(1);
+    let (b, c) = rest.split_at_mut(1);
+    match (&mut a[0].plane, &mut b[0].plane, &mut c[0].plane) {
+        (Plane::Int(y), Plane::Int(u), Plane::Int(v)) => {
+            for ((y, u), v) in y.iter_mut().zip(u.iter_mut()).zip(v.iter_mut()) {
+                let g = y.wrapping_sub(u.wrapping_add(*v) >> 2);
+                let r = v.wrapping_add(g);
+                let bb = u.wrapping_add(g);
+                *y = r;
+                *u = g;
+                *v = bb;
+            }
+        }
+        (Plane::Float(y), Plane::Float(u), Plane::Float(v)) => {
+            for ((y, u), v) in y.iter_mut().zip(u.iter_mut()).zip(v.iter_mut()) {
+                let (yy, cb, cr) = (*y, *u, *v);
+                *y = yy + 1.402 * cr;
+                *u = yy - 0.344_13 * cb - 0.714_14 * cr;
+                *v = yy + 1.772 * cb;
+            }
+        }
+        _ => {}
+    }
+}
+
+/// a tile-component's plane into the image: the DC level shift, clamped to the precision
+fn put(tc: &TComp, o: &mut OutComp, p: TPlane, reduce: u32) {
+    let TPlane { plane, x0, y0, x1, y1, red } = p;
+    let shift = reduce - red;
+    let (pw, ph) = ((x1 - x0) as usize, (y1 - y0) as usize);
+    let prec = tc.prec.min(31);
+    let (lo, hi, dc) = if tc.signed {
+        (-(1i64 << (prec - 1)), (1i64 << (prec - 1)) - 1, 0i64)
+    } else {
+        (0, (1i64 << prec) - 1, 1i64 << (prec - 1))
+    };
+    // the target rectangle at `reduce` levels
+    let (tx0, ty0, tx1, ty1) = (ceil_shift(tc.x0, reduce.min(31)), ceil_shift(tc.y0, reduce.min(31)), ceil_shift(tc.x1, reduce.min(31)), ceil_shift(tc.y1, reduce.min(31)));
+    for ty in ty0..ty1 {
+        if ty < o.y0 || ty - o.y0 >= o.h {
+            continue;
+        }
+        let sy = (((ty as u64) << shift) as u32).saturating_sub(y0) as usize;
+        if sy >= ph {
+            continue;
+        }
+        let orow = ((ty - o.y0) * o.w) as usize;
+        for tx in tx0..tx1 {
+            if tx < o.x0 || tx - o.x0 >= o.w {
+                continue;
+            }
+            let sx = (((tx as u64) << shift) as u32).saturating_sub(x0) as usize;
+            if sx >= pw {
+                continue;
+            }
+            let v = match &plane {
+                Plane::Int(p) => p[sy * pw + sx] as i64,
+                Plane::Float(p) => round_even(p[sy * pw + sx]) as i64,
+            };
+            o.data[orow + (tx - o.x0) as usize] = (v + dc).clamp(lo, hi) as i32;
+        }
+    }
 }

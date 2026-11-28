@@ -1929,7 +1929,7 @@ pub fn targets(seed_dir: &str) -> Vec<(&'static str, Vec<Vec<u8>>, Fun)> {
             // img_all's way: the codec at full resolution, into ARGB
             img_codec(&img_jp2::CODEC, d, JP2_PIXELS);
             // a lower resolution, the components as they are coded: each holds its samples
-            let opt = img_jp2::Options { reduce: 1 + (d.len() % 3) as u8, max_pixels: JP2_PIXELS, convert_sycc: false };
+            let opt = img_jp2::Options { reduce: 1 + (d.len() % 3) as u8, max_pixels: JP2_PIXELS, convert_sycc: false, ..img_jp2::Options::default() };
             if let Ok(img) = img_jp2::decode(d, &opt) {
                 for c in &img.components {
                     assert_eq!(c.data.len() as u64, c.width as u64 * c.height as u64, "a component of {} x {}", c.width, c.height);
