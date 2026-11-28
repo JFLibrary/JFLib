@@ -403,26 +403,46 @@ fn render_image(t: &mut T) {
     huge[11..15].copy_from_slice(&(1u32 << 20).to_be_bytes());
     huge[15..19].copy_from_slice(&(1u32 << 20).to_be_bytes());
     expect(t, "JBIG2 too large", jb("/Width 8 /Height 2 /ColorSpace /DeviceGray /BitsPerComponent 1 /Filter /JBIG2Decode", &huge), &[(50.0, 50.0, WHITE)], 0);
+    // data of unknown length (7.2.7): the row count after the end marker decides the rows, also
+    // under a header height of 2 -- one row, the bottom one stays white
+    let mut unknown = Vec::new();
+    jbig2_seg(&mut unknown, 0, 48, None, &jbig2_info(8, 2));
+    let mut region = jbig2_mmr_region(8, 2, &[0x36, 0xF0]);
+    region.extend_from_slice(&[0, 0, 0, 0, 0, 1]); // MMR's end marker, 1 row
+    jbig2_seg(&mut unknown, 1, 39, Some(0xFFFF_FFFF), &region);
+    jbig2_seg(&mut unknown, 2, 49, None, &[]);
+    let dict = "/Width 8 /Height 2 /ColorSpace /DeviceGray /BitsPerComponent 1 /Filter /JBIG2Decode";
+    expect(t, "JBIG2 unknown length, its row count", jb(dict, &unknown), &[(80.0, 70.0, BLACK), (20.0, 70.0, WHITE), (80.0, 30.0, WHITE)], 0);
+    // a region of unknown length without its end marker: the segments before it still draw
+    let mut cut = jbig2_page(8, 2, &[0x36, 0xF0]);
+    cut.truncate(cut.len() - 11); // the end of page
+    jbig2_seg(&mut cut, 2, 38, Some(0xFFFF_FFFF), &jbig2_mmr_region(8, 2, &[0x36]));
+    expect(t, "JBIG2 unknown length cut off", jb(dict, &cut), &[(80.0, 70.0, BLACK), (80.0, 30.0, BLACK), (20.0, 50.0, WHITE)], 0);
 }
 
-/// an embedded JBIG2 stream (ITU-T T.88 7.2): page information w x h, an immediate lossless generic
-/// region of the whole page coded with MMR (`mmr`), the end of the page
-fn jbig2_page(w: u32, h: u32, mmr: &[u8]) -> Vec<u8> {
-    let mut v = Vec::new();
-    let seg = |v: &mut Vec<u8>, num: u32, ty: u8, data: &[u8]| {
-        v.extend_from_slice(&num.to_be_bytes());
-        v.push(ty);
-        v.push(0); // no referred-to segments
-        v.push(1); // page 1
-        v.extend_from_slice(&(data.len() as u32).to_be_bytes());
-        v.extend_from_slice(data);
-    };
+/// a segment of an embedded JBIG2 stream (ITU-T T.88 7.2): no referred-to segments, page 1, the
+/// data length `len` (None: the data's)
+fn jbig2_seg(v: &mut Vec<u8>, num: u32, ty: u8, len: Option<u32>, data: &[u8]) {
+    v.extend_from_slice(&num.to_be_bytes());
+    v.push(ty);
+    v.push(0); // no referred-to segments
+    v.push(1); // page 1
+    v.extend_from_slice(&len.unwrap_or(data.len() as u32).to_be_bytes());
+    v.extend_from_slice(data);
+}
+
+/// a page information segment's data: w x h, no flags, no striping
+fn jbig2_info(w: u32, h: u32) -> Vec<u8> {
     let mut info = Vec::new();
     for x in [w, h, 0, 0] {
         info.extend_from_slice(&x.to_be_bytes());
     }
     info.extend_from_slice(&[0, 0, 0]); // flags, striping
-    seg(&mut v, 0, 48, &info);
+    info
+}
+
+/// a generic region segment's data: w x h at (0, 0) with OR, coded with MMR (`mmr`)
+fn jbig2_mmr_region(w: u32, h: u32, mmr: &[u8]) -> Vec<u8> {
     let mut region = Vec::new();
     for x in [w, h, 0, 0] {
         region.extend_from_slice(&x.to_be_bytes());
@@ -430,8 +450,16 @@ fn jbig2_page(w: u32, h: u32, mmr: &[u8]) -> Vec<u8> {
     region.push(0); // OR
     region.push(1); // MMR
     region.extend_from_slice(mmr);
-    seg(&mut v, 1, 39, &region);
-    seg(&mut v, 2, 49, &[]);
+    region
+}
+
+/// an embedded JBIG2 stream (ITU-T T.88 7.2): page information w x h, an immediate lossless generic
+/// region of the whole page coded with MMR (`mmr`), the end of the page
+fn jbig2_page(w: u32, h: u32, mmr: &[u8]) -> Vec<u8> {
+    let mut v = Vec::new();
+    jbig2_seg(&mut v, 0, 48, None, &jbig2_info(w, h));
+    jbig2_seg(&mut v, 1, 39, None, &jbig2_mmr_region(w, h, mmr));
+    jbig2_seg(&mut v, 2, 49, None, &[]);
     v
 }
 

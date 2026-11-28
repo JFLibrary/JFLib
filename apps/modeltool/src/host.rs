@@ -13,10 +13,14 @@
 //
 // One description, api(): the functions, the two types with their members and operators, as script::Api with
 // TypeScript-like signatures (English names, parameters included: decision G9.3 of JFScript's docs/RICHTUNG.md;
-// German texts).  From it come `modeltool --api`, the names compile_with knows, the language services' check of
-// the script (run.rs: unknown members of a mesh or a vec as warnings), the most arguments of each function for
-// the warning about extra ones, and the messages about members a type does not have.  A signature names the
-// longest form (m.move(x, y, z)); the shorter ones (m.move(v)) are in its text.
+// German texts).  From it come `modeltool --api`, the program and the language services' warnings of
+// script::compile_api (run.rs: unknown members of a mesh or a vec, removed names), the named arguments of a call
+// (the VM binds them by these signatures and hands the host the values in parameter order), the most arguments
+// of each function for the warning about extra ones, and the messages about members a type does not have.
+// Since JFScript S3 a function or method that takes several forms is declared once per form (m.move(x, y, z) and
+// m.move(v: vec | list), geom.merge(...meshes) and geom.merge(meshes: list<mesh>)), a parameter that may be left
+// out without a default is written `name?`, and the names S2 removed (geom.move(m, ..): a mesh's method called as
+// a function) are Api::removed with what to take instead.
 //
 // Wrong arguments throw a message that names the function and the parameter; the VM adds the line and column of
 // the call.  What the host accepts but is very likely a mistake (arguments beyond the last parameter, a value for
@@ -38,9 +42,46 @@ use script::{Cx, Fail, Host, Object, Operator, Position, Value, Vm};
 pub const ARENA_TRIANGLES: usize = 4_000_000;
 
 /// The script's interface: every function, value and type with its members, signatures in TypeScript's form and
-/// what each does (German).  See the module comment for what is made from it.
+/// what each does (German); a function or method that takes several forms has one signature per form, in the
+/// order a call by name tries them (JFScript's script::api::bind).  See the module comment for what is made from
+/// it.
 pub fn api() -> Api {
-    Api::new("modeltool")
+    let mesh = Type::new("mesh", "Ein Mesh: das Skript kann es nicht öffnen und nicht ändern, jede Methode gibt ein neues; == ist dasselbe Mesh; print zeigt mesh(12 Dreiecke).")
+        .prop("readonly tris: int", "die Zahl der Dreiecke")
+        .method("move(x: float, y: float, z: float): mesh", "verschoben um (x, y, z)")
+        .method("move(v: vec | list): mesh", "verschoben um v (ein vec oder [x, y, z])")
+        .method("place(x: float, y: float, z: float): mesh", "so verschoben, dass die Mitte der Unterseite der Box bei (x, y, z) liegt")
+        .method("place(v: vec | list): mesh", "so verschoben, dass die Mitte der Unterseite der Box bei v liegt (ein vec oder [x, y, z])")
+        .method("center(): mesh", "so verschoben, dass die Mitte der Box im Ursprung liegt")
+        .method("rotate_x(deg: float): mesh", "um die X-Achse gedreht (rechtshändig; Vielfache von 90 exakt)")
+        .method("rotate_y(deg: float): mesh", "um die Y-Achse gedreht (rechtshändig; Vielfache von 90 exakt)")
+        .method("rotate_z(deg: float): mesh", "um die Z-Achse gedreht (rechtshändig; Vielfache von 90 exakt)")
+        .method("rotate(deg: float, ax: float, ay: float, az: float): mesh", "um die Achse (ax, ay, az) durch den Ursprung gedreht")
+        .method("rotate(deg: float, axis: vec | list): mesh", "um die Achse axis durch den Ursprung gedreht (ein vec oder [ax, ay, az])")
+        .method("scale(sx: float, sy: float, sz: float): mesh", "skaliert um den Ursprung")
+        .method("scale(s: float): mesh", "in allen Achsen um s skaliert")
+        .method("scale(v: vec | list): mesh", "je Achse skaliert (ein vec oder [sx, sy, sz])")
+        .method("mirror(axis: str): mesh", "gespiegelt an der Ebene durch den Ursprung (\"x\": x -> -x; \"y\", \"z\"), Flächen bleiben außen")
+        .method("flip(): mesh", "Flächen umgedreht (innen nach außen)")
+        .method("weld(tolerance: float = 0): mesh", "Ecken an derselben Stelle zu einem Punkt verbunden (eine Hälfte und ihr Spiegelbild zu einer Fläche)")
+        .method("array(count: int, dx: float, dy: float, dz: float): mesh", "count Kopien, Kopie i um i * (dx, dy, dz) verschoben")
+        .method("array(count: int, v: vec | list): mesh", "count Kopien, Kopie i um i * v verschoben (ein vec oder [dx, dy, dz])")
+        .method("radial(count: int, step: float = 360 / count): mesh", "count Kopien um die Y-Achse, Kopie i um i * step Grad gedreht")
+        .method("flat(): mesh", "flache Normalen (harte Kanten)")
+        .method("smooth(deg: float = 30): mesh", "glatte Normalen über Kanten flacher als deg Grad")
+        .method("bevel(width: float, segments: int = 1, axis?: str): mesh", "Kanten und Ecken abgeschrägt (segments 1) oder gerundet (Flächen je Viertelkreis), width = Radius; axis \"x\", \"y\" oder \"z\": nur die Kanten entlang dieser Achse; nur konvexe Körper")
+        .method("bounds(): map | nil", "{min, max, size, center} in Metern, jedes ein vec; nil bei einem leeren Mesh")
+        .method("area(): float", "Oberfläche in m²")
+        .method("volume(): float", "Volumen in m³ (bei geschlossenen Meshes)")
+        .method("check(): map", "{ok, closed, outward, open_edges, flipped_edges, degenerate, triangles}");
+    // (S2) a mesh's methods no longer go as functions geom.NAME(m, ..) (undocumented until then): what to take
+    let mut gone: Vec<String> = Vec::new();
+    for m in &mesh.methods {
+        if !gone.contains(&m.name) {
+            gone.push(m.name.clone());
+        }
+    }
+    let mut api = Api::new("modeltool")
         .doc("Modelle aus Regeln und Bausteinen: das Skript beschreibt, lib/geom rechnet. Längen in Metern, Winkel in Grad, Y oben, vorn ist +Z; jeder Grundkörper steht auf y = 0, mittig über dem Ursprung. Ein Mesh ändert sich nie: jede Operation gibt ein neues. Punkte und Vektoren: ein vec oder eine Liste [x, y, z]; Profile: Listen von Punkten [x, y].")
         .namespace("geom", "Grundkörper, Körper aus Profilen, Zusammenfügen und Boolesche Operationen")
         .func("geom.box(w: float, h: float, d: float): mesh", "Quader w x h x d (x, y, z) in Metern; steht auf y = 0, mittig über dem Ursprung")
@@ -54,10 +95,14 @@ pub fn api() -> Api {
         .func("geom.prism(footprint: list, h: float): mesh", "Grundriss [[x, z], ...] (Ansicht von oben) von y = 0 um h nach oben")
         .func("geom.sweep(profile: list, path: list, closed: bool = false, smooth: float = 30): mesh", "Profil [[x, y], ...] entlang eines Pfads aus Punkten (vec oder [x, y, z]); Ecken auf Gehrung")
         .func("geom.lathe(profile: list, segments: int = 32, smooth: float = 30): mesh", "Drehkörper: Profil [[radius, y], ...] um die Y-Achse")
-        .func("geom.merge(...meshes: mesh): mesh", "Meshes zu einem zusammenfügen (Teile bleiben getrennt, auch wenn sie sich durchdringen); auch geom.merge([m1, m2, ...])")
-        .func("geom.union(...meshes: mesh): mesh", "Vereinigung zu einem geschlossenen Körper (konvexe Körper oder Ergebnisse Boolescher Operationen); auch mit einer Liste")
-        .func("geom.difference(m: mesh, ...cuts: mesh): mesh", "m ohne die Abzüge (ein Fenster aus einer Wand, ein Loch durch eine Platte); auch geom.difference([m, cut1, ...])")
-        .func("geom.intersection(...meshes: mesh): mesh", "was in allen liegt; auch mit einer Liste")
+        .func("geom.merge(...meshes: mesh): mesh", "Meshes zu einem zusammenfügen (Teile bleiben getrennt, auch wenn sie sich durchdringen)")
+        .func("geom.merge(meshes: list<mesh>): mesh", "dasselbe mit einer Liste [m1, m2, ...]")
+        .func("geom.union(...meshes: mesh): mesh", "Vereinigung zu einem geschlossenen Körper (konvexe Körper oder Ergebnisse Boolescher Operationen)")
+        .func("geom.union(meshes: list<mesh>): mesh", "dasselbe mit einer Liste [m1, m2, ...]")
+        .func("geom.difference(m: mesh, ...cuts: mesh): mesh", "m ohne die Abzüge (ein Fenster aus einer Wand, ein Loch durch eine Platte)")
+        .func("geom.difference(meshes: list<mesh>): mesh", "dasselbe mit einer Liste [m, cut1, ...]")
+        .func("geom.intersection(...meshes: mesh): mesh", "was in allen liegt")
+        .func("geom.intersection(meshes: list<mesh>): mesh", "dasselbe mit einer Liste [m1, m2, ...]")
         .namespace("profile", "Profile: Listen von Punkten [x, y]")
         .func("profile.rect(w: float, h: float): list", "Rechteck um den Ursprung")
         .func("profile.circle(r: float, n: int = 32): list", "Vieleck mit n Ecken auf einem Kreis um den Ursprung")
@@ -67,48 +112,32 @@ pub fn api() -> Api {
         .func("profile.scale(p: list, sx: float, sy: float = sx): list", "skaliert um den Ursprung")
         .func("profile.rotate(p: list, deg: float): list", "gedreht um den Ursprung")
         .func("profile.area(p: list): float", "Fläche (positiv gegen den Uhrzeigersinn)")
-        .func("vec(x: float, y: float, z: float): vec", "ein Vektor oder Punkt (x, y, z); auch vec([x, y, z]); rechnet mit + - * /, liest v.x, v.y, v.z")
-        .func("vec.add(a: vec, b: vec): vec", "a + b; nimmt auch Listen [x, y, z] (mit Listen aus 2 Zahlen gibt es eine Liste)")
-        .func("vec.sub(a: vec, b: vec): vec", "a - b (wie vec.add)")
-        .func("vec.mul(a: vec, s: float): vec", "a * s")
-        .func("vec.dot(a: vec, b: vec): float", "Skalarprodukt")
-        .func("vec.cross(a: vec, b: vec): vec", "Kreuzprodukt (3D)")
-        .func("vec.len(a: vec): float", "Länge")
-        .func("vec.dist(a: vec, b: vec): float", "Abstand")
-        .func("vec.norm(a: vec): vec", "Einheitsvektor")
-        .func("vec.lerp(a: vec, b: vec, t: float): vec", "a + (b - a) * t")
+        .func("vec(x: float, y: float, z: float): vec", "ein Vektor oder Punkt (x, y, z); rechnet mit + - * /, liest v.x, v.y, v.z")
+        .func("vec(v: vec | list): vec", "ein Vektor aus einem vec oder einer Liste [x, y, z]")
+        .func("vec.add(a: vec | list, b: vec | list): vec", "a + b; ein vec oder eine Liste [x, y, z] je Seite")
+        .func("vec.add(a: list, b: list): list", "a + b mit Listen aus 2 Zahlen: eine Liste [x, y]")
+        .func("vec.sub(a: vec | list, b: vec | list): vec", "a - b (wie vec.add)")
+        .func("vec.sub(a: list, b: list): list", "a - b mit Listen aus 2 Zahlen: eine Liste")
+        .func("vec.mul(a: vec | list, s: float): vec", "a * s")
+        .func("vec.mul(a: list, s: float): list", "a * s mit einer Liste aus 2 Zahlen: eine Liste")
+        .func("vec.dot(a: vec | list, b: vec | list): float", "Skalarprodukt (auch mit Listen aus 2 Zahlen)")
+        .func("vec.cross(a: vec | list, b: vec | list): vec", "Kreuzprodukt (3D)")
+        .func("vec.len(a: vec | list): float", "Länge (auch einer Liste aus 2 Zahlen)")
+        .func("vec.dist(a: vec | list, b: vec | list): float", "Abstand (auch mit Listen aus 2 Zahlen)")
+        .func("vec.norm(a: vec | list): vec", "Einheitsvektor")
+        .func("vec.norm(a: list): list", "Einheitsvektor einer Liste aus 2 Zahlen: eine Liste")
+        .func("vec.lerp(a: vec | list, b: vec | list, t: float): vec", "a + (b - a) * t")
+        .func("vec.lerp(a: list, b: list, t: float): list", "a + (b - a) * t mit Listen aus 2 Zahlen: eine Liste")
         .namespace("model", "das Modell: Teile, Materialien und die Regeln, die der Bericht prüft")
-        .func("model.add(m: mesh, material = \"grau\", name: str = nil): int", "Teil des Modells; material: Name oder {color, roughness, metallic}; ohne name teil1, teil2, ...")
+        .func("model.add(m: mesh, material: str | map = \"grau\", name?: str): int", "Teil des Modells; material: Name oder {color, roughness, metallic}; ohne name teil1, teil2, ...")
         .func("model.material(name: str, props: map): str", "Material festlegen: props {color: \"#rrggbb\" oder [r, g, b], roughness = 0.8, metallic = 0} (Farben in sRGB, 0 bis 1)")
         .func("model.name(text: str): nil", "Name des Modells")
         .func("model.budget(triangles: int): nil", "höchstens so viele Dreiecke (Prüfung im Bericht, mit der Zeile der Regel)")
-        .func("model.expect_size(x: float, y: float, z: float, tolerance: float = 0.001): nil", "erwartete Maße der Box in Metern (Prüfung im Bericht, mit der Zeile der Regel); nil: diese Achse nicht prüfen; auch expect_size([x, y, z], tolerance) oder mit einem vec")
+        .func("model.expect_size(x?: float, y?: float, z?: float, tolerance: float = 0.001): nil", "erwartete Maße der Box in Metern (Prüfung im Bericht, mit der Zeile der Regel); eine Achse ohne Wert (nil) wird nicht geprüft")
+        .func("model.expect_size(size: vec | list, tolerance: float = 0.001): nil", "dasselbe mit einem vec oder einer Liste [x, y, z] (nil darin: diese Achse nicht prüfen)")
         .func("model.uv_scale(meters: float): nil", "Meter je UV-Einheit der Box-Projektion (ohne Aufruf 1)")
         .value("params: map", "die Parameter von --param NAME=WERT (Zahlen, true und false, sonst Text): params.get(\"b\", 0.8)")
-        .typ(
-            Type::new("mesh", "Ein Mesh: das Skript kann es nicht öffnen und nicht ändern, jede Methode gibt ein neues; == ist dasselbe Mesh; print zeigt mesh(12 Dreiecke).")
-                .prop("readonly tris: int", "die Zahl der Dreiecke")
-                .method("move(x: float, y: float, z: float): mesh", "verschoben; auch move(v) mit einem vec oder [x, y, z]")
-                .method("place(x: float, y: float, z: float): mesh", "so verschoben, dass die Mitte der Unterseite der Box bei (x, y, z) liegt; auch place(v)")
-                .method("center(): mesh", "so verschoben, dass die Mitte der Box im Ursprung liegt")
-                .method("rotate_x(deg: float): mesh", "um die X-Achse gedreht (rechtshändig; Vielfache von 90 exakt)")
-                .method("rotate_y(deg: float): mesh", "um die Y-Achse gedreht (rechtshändig; Vielfache von 90 exakt)")
-                .method("rotate_z(deg: float): mesh", "um die Z-Achse gedreht (rechtshändig; Vielfache von 90 exakt)")
-                .method("rotate(deg: float, ax: float, ay: float, az: float): mesh", "um die Achse (ax, ay, az) durch den Ursprung gedreht; auch rotate(deg, axis) mit einem vec oder [ax, ay, az]")
-                .method("scale(sx: float, sy: float, sz: float): mesh", "skaliert um den Ursprung; scale(s) in allen Achsen gleich, auch scale(v) mit einem vec oder [sx, sy, sz]")
-                .method("mirror(axis: str): mesh", "gespiegelt an der Ebene durch den Ursprung (\"x\": x -> -x; \"y\", \"z\"), Flächen bleiben außen")
-                .method("flip(): mesh", "Flächen umgedreht (innen nach außen)")
-                .method("weld(tolerance: float = 0): mesh", "Ecken an derselben Stelle zu einem Punkt verbunden (eine Hälfte und ihr Spiegelbild zu einer Fläche)")
-                .method("array(count: int, dx: float, dy: float, dz: float): mesh", "count Kopien, Kopie i um i * (dx, dy, dz) verschoben; auch array(count, v)")
-                .method("radial(count: int, step: float = 360 / count): mesh", "count Kopien um die Y-Achse, Kopie i um i * step Grad gedreht")
-                .method("flat(): mesh", "flache Normalen (harte Kanten)")
-                .method("smooth(deg: float = 30): mesh", "glatte Normalen über Kanten flacher als deg Grad")
-                .method("bevel(width: float, segments: int = 1, axis: str = nil): mesh", "Kanten und Ecken abgeschrägt (segments 1) oder gerundet (Flächen je Viertelkreis), width = Radius; axis \"x\", \"y\" oder \"z\": nur die Kanten entlang dieser Achse; nur konvexe Körper")
-                .method("bounds(): map", "{min, max, size, center} in Metern, jedes ein vec (nil bei einem leeren Mesh)")
-                .method("area(): float", "Oberfläche in m²")
-                .method("volume(): float", "Volumen in m³ (bei geschlossenen Meshes)")
-                .method("check(): map", "{ok, closed, outward, open_edges, flipped_edges, degenerate, triangles}"),
-        )
+        .typ(mesh)
         .typ(
             Type::new("vec", "Ein Vektor oder Punkt (x, y, z) in Metern, unveränderlich: + und - zwischen Vektoren, * und / mit einer Zahl, -v; == vergleicht die Zahlen genau. Statt v[0] heißt es v.x. Wo ein Punkt oder Vektor verlangt ist, geht ein vec wie eine Liste [x, y, z].")
                 .value()
@@ -116,18 +145,22 @@ pub fn api() -> Api {
                 .prop("readonly y: float", "die y-Komponente (nach oben)")
                 .prop("readonly z: float", "die z-Komponente (nach vorn)")
                 .method("length(): float", "die Länge")
-                .method("dot(other: vec): float", "das Skalarprodukt")
-                .method("cross(other: vec): vec", "das Kreuzprodukt")
+                .method("dot(other: vec | list): float", "das Skalarprodukt (other: ein vec oder [x, y, z])")
+                .method("cross(other: vec | list): vec", "das Kreuzprodukt")
                 .method("normalized(): vec", "der Einheitsvektor in derselben Richtung (nicht für den Nullvektor)")
-                .method("distance(other: vec): float", "der Abstand der beiden Punkte")
-                .method("lerp(other: vec, t: float): vec", "v + (other - v) * t")
+                .method("distance(other: vec | list): float", "der Abstand der beiden Punkte")
+                .method("lerp(other: vec | list, t: float): vec", "v + (other - v) * t")
                 .op("vec + vec: vec", "die Summe")
                 .op("vec - vec: vec", "die Differenz")
                 .op("vec * float: vec", "gestreckt")
                 .op("float * vec: vec", "gestreckt")
                 .op("vec / float: vec", "geteilt")
                 .op("-vec: vec", "umgekehrt"),
-        )
+        );
+    for n in gone {
+        api = api.removed(&format!("geom.{}", n), &format!("m.{}", n));
+    }
+    api
 }
 
 /// the built-in materials: name, sRGB colour, roughness, metallic
@@ -255,11 +288,13 @@ impl Host for ModelHost<'_> {
         self.timed(|h| {
             let r = h.dispatch(cx, name, args);
             if r.is_ok() {
-                let sig = match h.api.global(name).map(|g| &g.kind) {
-                    Some(GlobalKind::Func(s)) => Some(s),
-                    _ => None,
-                };
-                extra_arguments(cx, sig, name, args.len());
+                extra_arguments(cx, &h.api.sigs(name), name, args.len());
+            }
+            // a name S2 removed (geom.move(m, ..)): what to take instead, as the compiler's warning says
+            if matches!(r, Err(Fail::Unknown)) {
+                if let Some(gone) = h.api.find_removed(name) {
+                    return Err(cx.error(&gone.message(name)));
+                }
             }
             r
         })
@@ -307,8 +342,8 @@ impl Host for ModelHost<'_> {
                 _ => Err(Fail::Unknown),
             };
             if r.is_ok() {
-                let sig = h.api.get_type(obj.ty).and_then(|t| t.find_method(name)).map(|m| &m.sig);
-                extra_arguments(cx, sig, &format!("{}()", name), args.len());
+                let forms = h.api.get_type(obj.ty).map(|t| t.sigs(name)).unwrap_or_default();
+                extra_arguments(cx, &forms, &format!("{}()", name), args.len());
             }
             r
         })
@@ -407,18 +442,25 @@ pub fn place(at: &Position) -> String {
     if at.file.is_empty() { format!("Zeile {}", at.line) } else { format!("{}:{}", at.file, at.line) }
 }
 
-/// The most arguments a function or method of this signature reads (its parameters); None for one that takes any
-/// number (a rest parameter: merge and the Boolean operations).
-pub fn max_args(sig: &Sig) -> Option<usize> {
-    if sig.params.iter().any(|p| p.rest) { None } else { Some(sig.params.len()) }
+/// The longest of a function's or method's forms: the most arguments it reads are its parameters.  None for one
+/// that takes any number (a form with a rest parameter: merge and the Boolean operations) or has no forms.
+pub fn longest<'s>(forms: &[&'s Sig]) -> Option<&'s Sig> {
+    if forms.iter().any(|s| s.params.iter().any(|p| p.rest)) {
+        return None;
+    }
+    // (the first of the longest: m.move(x, y, z) before m.move(v))
+    forms.iter().copied().fold(None, |best: Option<&Sig>, s| match best {
+        Some(b) if b.params.len() >= s.params.len() => Some(b),
+        _ => Some(s),
+    })
 }
 
-/// A warning when a call that worked got more arguments than the function reads: the others were never looked at
-/// (`geom.cylinder(0.3, 1.2, 32, 0.1)` with a radius for the top meant for geom.cone).  `shown_as` is how messages
-/// name it ("geom.box", "move()").
-fn extra_arguments(cx: &mut Cx, sig: Option<&Sig>, shown_as: &str, given: usize) {
-    let Some(sig) = sig else { return };
-    let Some(max) = max_args(sig) else { return };
+/// A warning when a call that worked got more arguments than the function reads in any of its forms: the others
+/// were never looked at (`geom.cylinder(0.3, 1.2, 32, 0.1)` with a radius for the top meant for geom.cone).
+/// `shown_as` is how messages name it ("geom.box", "move()"); the parameters named are the longest form's.
+fn extra_arguments(cx: &mut Cx, forms: &[&Sig], shown_as: &str, given: usize) {
+    let Some(sig) = longest(forms) else { return };
+    let max = sig.params.len();
     if given <= max {
         return;
     }
@@ -711,7 +753,14 @@ impl ModelHost<'_> {
         } else if !call && t.find_method(name).is_some() {
             format!("{} ist eine Methode von {}, keine Eigenschaft – mit Klammern: {}(..)", name, ty, name)
         } else if call {
-            format!("{} hat keine Methode {} (es gibt: {})", ty, name, t.methods.iter().map(|m| m.name.as_str()).collect::<Vec<_>>().join(", "))
+            // (each name once: a method of several forms is declared once per form)
+            let mut names: Vec<&str> = Vec::new();
+            for m in &t.methods {
+                if !names.contains(&m.name.as_str()) {
+                    names.push(&m.name);
+                }
+            }
+            format!("{} hat keine Methode {} (es gibt: {})", ty, name, names.join(", "))
         } else {
             format!("{} hat keine Eigenschaft {} (es gibt: {})", ty, name, t.props.iter().map(|p| p.name.as_str()).collect::<Vec<_>>().join(", "))
         };

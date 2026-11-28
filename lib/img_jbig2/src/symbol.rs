@@ -154,6 +154,25 @@ fn need(v: Option<i32>) -> Result<i32, Error> {
     v.ok_or(Error::Corrupt)
 }
 
+/// the `size` bytes at byte `start` of Huffman-coded data (a refinement's arithmetic data, a
+/// collective bitmap's MMR data) and the byte after them; a negative size is Corrupt, data that
+/// ends early Truncated
+fn payload(d: &[u8], start: usize, size: i32) -> Result<(&[u8], usize), Error> {
+    let size = usize::try_from(size).map_err(|_| Error::Corrupt)?;
+    let end = start.checked_add(size).ok_or(Error::Corrupt)?;
+    Ok((d.get(start..end).ok_or(Error::Truncated)?, end))
+}
+
+/// a table selector's table: a standard one, the next custom one, or Corrupt for a value the
+/// standard reserves
+pub(crate) fn pick<'t>(sel: u16, std: &[u8], custom: &mut impl Iterator<Item = &'t &'t Table>) -> Result<Table, Error> {
+    match std.get(sel as usize) {
+        Some(&huff::RESERVED) => Err(Error::Corrupt),
+        Some(&k) if k != 0 => Ok(huff::standard(k)),
+        _ => custom.next().map(|t| (*t).clone()).ok_or(Error::Corrupt),
+    }
+}
+
 /// 6.4.5: the text region
 pub(crate) fn text_region(src: &mut Src, p: &Text, gr: &mut [Cx], work: &mut u64, limit: u64, max: u64) -> Result<Bmp, Error> {
     let mut out = Bmp::new(p.w, p.h, p.defpixel, max)?;
@@ -173,6 +192,8 @@ pub(crate) fn text_region(src: &mut Src, p: &Text, gr: &mut [Cx], work: &mut u64
         loop {
             if !first {
                 match int(src, Which::Ds)? {
+                    // the region has SBNUMINSTANCES (a strip of the last one must end there)
+                    Some(_) if n >= p.instances => return Err(Error::Corrupt),
                     Some(ds) => curs += ds as i64 + p.dsoffset as i64,
                     None => break,
                 }
@@ -219,7 +240,9 @@ pub(crate) fn text_region(src: &mut Src, p: &Text, gr: &mut [Cx], work: &mut u64
                 if w < 0 || h < 0 || w > 1 << 20 || h > 1 << 20 {
                     return Err(Error::Corrupt);
                 }
-                let g = Gr { w: w as usize, h: h as usize, template: p.rtemplate, reference: sym, dx: (rdw >> 1) + rdx, dy: (rdh >> 1) + rdy, tpgron: false, at: p.rat };
+                let dx = (rdw >> 1).checked_add(rdx).ok_or(Error::Corrupt)?;
+                let dy = (rdh >> 1).checked_add(rdy).ok_or(Error::Corrupt)?;
+                let g = Gr { w: w as usize, h: h as usize, template: p.rtemplate, reference: sym, dx, dy, tpgron: false, at: p.rat };
                 *work = work.saturating_add((w * h) as u64);
                 if *work > limit {
                     return Err(Error::Limit);
@@ -227,13 +250,12 @@ pub(crate) fn text_region(src: &mut Src, p: &Text, gr: &mut [Cx], work: &mut u64
                 refined = match src {
                     Src::Arith { mq, .. } => generic::refine(mq, gr, &g, max)?,
                     Src::Huff { b, t } => {
-                        let size = need(t.rsize.decode(b)?)? as usize;
+                        let size = need(t.rsize.decode(b)?)?;
                         b.align();
-                        let start = b.byte_pos();
-                        let data = b.d.get(start..start.saturating_add(size).min(b.d.len())).ok_or(Error::Truncated)?;
+                        let (data, end) = payload(b.d, b.byte_pos(), size)?;
                         let mut mq = Mq::new(data);
                         let r = generic::refine(&mut mq, gr, &g, max)?;
-                        b.pos = (start + size) * 8;
+                        b.pos = end * 8;
                         r
                     }
                 };
@@ -261,8 +283,7 @@ pub(crate) fn text_region(src: &mut Src, p: &Text, gr: &mut [Cx], work: &mut u64
             }
             n += 1;
             *work = work.saturating_add(16 + (wi * hi).max(0) as u64);
-            // a strip that never ends (hostile data): far more instances than the region has
-            if *work > limit || n as u64 > p.instances as u64 * 4 + 4096 {
+            if *work > limit {
                 return Err(Error::Limit);
             }
         }
@@ -294,11 +315,11 @@ pub(crate) fn dictionary(d: &[u8], input: &[Rc<Bmp>], custom: &[&Table], retaine
     let rtemplate = ((flags >> 12) & 1) as u8;
     let mut p = 2usize;
     let byte = |i: usize| -> Result<i8, Error> { d.get(i).map(|&b| b as i8).ok_or(Error::Truncated) };
-    let mut at = [(0i8, 0i8); 4];
+    let mut at = [(0i32, 0i32); 4];
     if !sdhuff {
         let n = if template == 0 { 4 } else { 1 };
         for a in at.iter_mut().take(n) {
-            *a = (byte(p)?, byte(p + 1)?);
+            *a = (byte(p)? as i32, byte(p + 1)? as i32);
             p += 2;
         }
     }
@@ -319,19 +340,16 @@ pub(crate) fn dictionary(d: &[u8], input: &[Rc<Bmp>], custom: &[&Table], retaine
     let data = &d[p..];
     // the Huffman tables (custom ones in order)
     let mut ci = custom.iter();
-    let mut pick = |sel: u16, std: &[u8]| -> Result<Table, Error> {
-        match std.get(sel as usize) {
-            Some(&k) if k != 0 => Ok(huff::standard(k)),
-            _ => ci.next().map(|t| (*t).clone()).ok_or(Error::Corrupt),
-        }
-    };
+    let r = huff::RESERVED;
     let huff = if sdhuff {
-        Some((pick(sel_dh, &[4, 5, 0, 0])?, pick(sel_dw, &[2, 3, 0, 0])?, pick(sel_bm, &[1, 0])?, pick(sel_agg, &[1, 0])?))
+        Some((pick(sel_dh, &[4, 5, r, 0], &mut ci)?, pick(sel_dw, &[2, 3, r, 0], &mut ci)?, pick(sel_bm, &[1, 0], &mut ci)?, pick(sel_agg, &[1, 0], &mut ci)?))
     } else {
         None
     };
+    // the contexts used again: those a referred dictionary retained (7.4.2.2 step 3)
     let mut stats = match retained {
         Some(s) if ctx_used => s.clone(),
+        None if ctx_used => return Err(Error::Corrupt),
         _ => Stats::new(),
     };
     let total = input.len() + num_new;
@@ -394,7 +412,7 @@ pub(crate) fn dictionary(d: &[u8], input: &[Rc<Bmp>], custom: &[&Table], retaine
                 return Err(Error::Corrupt);
             }
             let (w, h) = (symwidth as usize, hcheight as usize);
-            *work = work.saturating_add((w * h) as u64 + 16);
+            *work = work.saturating_add((w as u64) * (h as u64) + 16);
             if *work > limit {
                 return Err(Error::Limit);
             }
@@ -410,6 +428,10 @@ pub(crate) fn dictionary(d: &[u8], input: &[Rc<Bmp>], custom: &[&Table], retaine
                     Some(hh) => need(hh.3.decode(&mut bits)?)?,
                     None => need(decode_int(&mut mq, &mut iaai))?,
                 };
+                // REFAGGNINST: one refined symbol, or a text region of several
+                if ninst < 1 {
+                    return Err(Error::Corrupt);
+                }
                 let syms = &all;
                 if ninst > 1 {
                     let tp = Text {
@@ -451,19 +473,22 @@ pub(crate) fn dictionary(d: &[u8], input: &[Rc<Bmp>], custom: &[&Table], retaine
                     let g = Gr { w, h, template: rtemplate, reference, dx: rdx, dy: rdy, tpgron: false, at: rat };
                     match &huff {
                         Some(_) => {
-                            let size = need(huff::standard(1).decode(&mut bits)?)? as usize;
+                            let size = need(huff::standard(1).decode(&mut bits)?)?;
                             bits.align();
-                            let start = bits.byte_pos();
-                            let part = data.get(start..start.saturating_add(size).min(data.len())).ok_or(Error::Truncated)?;
+                            let (part, end) = payload(data, bits.byte_pos(), size)?;
                             let mut m2 = Mq::new(part);
                             let r = generic::refine(&mut m2, &mut stats.gr, &g, max)?;
-                            bits.pos = (start + size) * 8;
+                            bits.pos = end * 8;
                             r
                         }
                         None => generic::refine(&mut mq, &mut stats.gr, &g, max)?,
                     }
                 }
             };
+            // a bitmap decoded from the fill past its data (as at the top of the loops)
+            if huff.is_none() && mq.exhausted() {
+                return Err(Error::Truncated);
+            }
             let bmp = Rc::new(bmp);
             if refagg {
                 all.push(bmp.clone());
@@ -472,30 +497,33 @@ pub(crate) fn dictionary(d: &[u8], input: &[Rc<Bmp>], custom: &[&Table], retaine
         }
         // the collective bitmap of a Huffman-coded height class
         if let (Some(h), false) = (&huff, refagg) {
-            let size = need(h.2.decode(&mut bits)?)? as usize;
+            let size = need(h.2.decode(&mut bits)?)?;
             bits.align();
             let start = bits.byte_pos();
             let (tw, hh) = (totwidth as usize, hcheight as usize);
             let collective = if size == 0 {
+                // uncompressed: rows padded to bytes (none for a class of width 0, however tall)
                 let stride = tw.div_ceil(8);
                 let mut b = Bmp::new(tw, hh, 0, max)?;
-                for y in 0..hh {
-                    for x in 0..tw {
-                        let byte = *data.get(start + y * stride + x / 8).ok_or(Error::Truncated)?;
-                        b.d[y * tw + x] = (byte >> (7 - x % 8)) & 1;
+                if tw > 0 {
+                    let rows = data.get(start..start + stride * hh).ok_or(Error::Truncated)?;
+                    for y in 0..hh {
+                        for x in 0..tw {
+                            b.d[y * tw + x] = (rows[y * stride + x / 8] >> (7 - x % 8)) & 1;
+                        }
                     }
                 }
                 bits.pos = (start + stride * hh) * 8;
                 b
             } else {
-                let part = data.get(start..start.saturating_add(size).min(data.len())).ok_or(Error::Truncated)?;
+                let (part, end) = payload(data, start, size)?;
                 let (b, _) = mmr::decode(part, tw, hh, max)?;
-                bits.pos = (start + size) * 8;
+                bits.pos = end * 8;
                 b
             };
             let mut x = 0usize;
             for (k, &w) in widths.iter().enumerate() {
-                new[first + k] = Rc::new(collective.sub(x as i64, 0, w, hh)?);
+                new[first + k] = Rc::new(collective.sub(x as i64, 0, w, hh, max)?);
                 x += w;
             }
         }
@@ -524,6 +552,13 @@ pub(crate) fn dictionary(d: &[u8], input: &[Rc<Bmp>], custom: &[&Table], retaine
         }
         index += run as usize;
         flag = !flag;
+    }
+    if huff.is_none() && mq.exhausted() {
+        return Err(Error::Truncated);
+    }
+    // SDNUMEXSYMS: the flags export exactly that many
+    if exported.len() as u64 != num_ex as u64 {
+        return Err(Error::Corrupt);
     }
     Ok((exported, if ctx_retained { Some(stats) } else { None }))
 }

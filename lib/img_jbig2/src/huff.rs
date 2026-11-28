@@ -5,7 +5,8 @@
 // A table is a list of lines (prefix length, range length, range low, kind); the prefix codes are
 // assigned from the prefix lengths in table order (B.3), so a table is written down as its lengths
 // and ranges only.  A value is the line's low end plus RANGELEN bits read after the prefix (the
-// lower range line subtracts them; the out-of-band line has no value).
+// lower range line subtracts them; the out-of-band line has no value).  A value beyond the 32 bits
+// of JBIG2's integers is refused, not wrapped.
 
 use crate::Error;
 use alloc::vec;
@@ -23,7 +24,8 @@ pub(crate) enum Kind {
 pub(crate) struct Line {
     pub preflen: u8,
     pub rangelen: u8,
-    pub low: i32,
+    /// i64: a table segment's lower range line starts at HTLOW - 1
+    pub low: i64,
     pub kind: Kind,
 }
 
@@ -80,12 +82,13 @@ impl Table {
             let (c, start, n) = self.first[len];
             if n > 0 && code >= c && code - c < n as u32 {
                 let l = self.lines[self.order[start + (code - c) as usize]];
-                return Ok(match l.kind {
-                    Kind::Oob => None,
-                    Kind::Normal => Some(l.low.wrapping_add(b.bits(l.rangelen as u32)? as i32)),
-                    Kind::Upper => Some(l.low.wrapping_add(b.bits(32)? as i32)),
-                    Kind::Lower => Some(l.low.wrapping_sub(b.bits(32)? as i32)),
-                });
+                let v = match l.kind {
+                    Kind::Oob => return Ok(None),
+                    Kind::Normal => l.low + b.bits(l.rangelen as u32)? as i64,
+                    Kind::Upper => l.low + b.bits(32)? as i64,
+                    Kind::Lower => l.low - b.bits(32)? as i64,
+                };
+                return i32::try_from(v).map(Some).map_err(|_| Error::Corrupt);
             }
         }
         Err(Error::Corrupt)
@@ -127,13 +130,13 @@ impl<'a> Bits<'a> {
     }
 }
 
-const fn n(preflen: u8, rangelen: u8, low: i32) -> Line {
+const fn n(preflen: u8, rangelen: u8, low: i64) -> Line {
     Line { preflen, rangelen, low, kind: Kind::Normal }
 }
-const fn lo(preflen: u8, low: i32) -> Line {
+const fn lo(preflen: u8, low: i64) -> Line {
     Line { preflen, rangelen: 32, low, kind: Kind::Lower }
 }
-const fn up(preflen: u8, low: i32) -> Line {
+const fn up(preflen: u8, low: i64) -> Line {
     Line { preflen, rangelen: 32, low, kind: Kind::Upper }
 }
 const fn oob(preflen: u8) -> Line {
@@ -261,6 +264,10 @@ pub(crate) fn standard_lines(k: u8) -> Vec<Line> {
     v.to_vec()
 }
 
+/// in a list of standard tables per selector value: a value the standard reserves (7.4.2.1.1,
+/// 7.4.3.1.2; 0 there: the next custom table)
+pub(crate) const RESERVED: u8 = 0xFF;
+
 /// standard table B.k
 pub(crate) fn standard(k: u8) -> Table {
     Table::new(standard_lines(k)).unwrap_or(Table { lines: Vec::new(), first: vec![(0, 0, 0); 33], order: Vec::new() })
@@ -286,11 +293,11 @@ pub(crate) fn from_segment(d: &[u8]) -> Result<Table, Error> {
         if rangelen > 31 || lines.len() > 4096 {
             return Err(Error::Corrupt);
         }
-        lines.push(n(preflen, rangelen, cur as i32));
+        lines.push(n(preflen, rangelen, cur));
         cur += 1i64 << rangelen;
     }
-    lines.push(lo(b.bits(htps)? as u8, low.wrapping_sub(1)));
-    lines.push(up(b.bits(htps)? as u8, high));
+    lines.push(lo(b.bits(htps)? as u8, low as i64 - 1));
+    lines.push(up(b.bits(htps)? as u8, high as i64));
     if htoob {
         lines.push(oob(b.bits(htps)? as u8));
     }
@@ -321,5 +328,5 @@ pub(crate) fn symbol_id_table(b: &mut Bits, nsyms: usize) -> Result<Table, Error
         }
     }
     b.align();
-    Table::new(lens.iter().enumerate().map(|(i, &l)| n(l, 0, i as i32)).collect()).ok_or(Error::Corrupt)
+    Table::new(lens.iter().enumerate().map(|(i, &l)| n(l, 0, i as i64)).collect()).ok_or(Error::Corrupt)
 }

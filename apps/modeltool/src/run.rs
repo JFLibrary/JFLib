@@ -3,17 +3,19 @@
 // model, the script's expectations, the budget) and write the report.  Errors carry the file, line and
 // column, the source line with a caret and the calls, because an AI reads them and has to find the place;
 // the warnings carry the same, and a failed rule of the script (model.expect_size, model.budget) names the line
-// that states it.  The warnings are first those of JFScript's language services on the script and each module it
-// imported (ls::check with the host's description, host::api(): a member a mesh or a vec does not have, a name
-// of a namespace that is not there, a division of two ints), then the host's in the order they came (cx.warn:
-// the script went on).
+// that states it.  The script is compiled once with the host's description (script::compile_api with
+// host::api(), JFScript S3): the program, and the warnings of JFScript's language services from the same parse
+// (a member a mesh or a vec does not have, a name of a namespace that is not there, a removed name, a division
+// of two ints, a named argument a method of a mesh or a vec does not take).  The warnings are first the script's,
+// then in the order they came those of the run: each module's language-service warnings when it is imported (the
+// VM compiles it with the same description) and the host's (cx.warn: the script went on).
 
 use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use geom::{Fnv, Mesh, Report, Vec3};
-use script::{Api, Limits, Status, Value, Vm, Warning};
+use script::{Limits, Status, Value, Vm, Warning};
 
 use crate::host::{self, Model, ModelHost};
 use crate::json::J;
@@ -37,8 +39,8 @@ pub struct Run {
     pub file: String,
     pub model: Model,
     pub problems: Vec<Problem>,
-    /// the language services' warnings on the script and its modules, then the host's (cx.warn) in the order they
-    /// came; at most script::MAX_WARNINGS
+    /// the language services' warnings on the script, then in the order they came those on each module (at its
+    /// import) and the host's (cx.warn); at most script::MAX_WARNINGS
     pub warnings: Vec<Warning>,
     /// how many more there were (not kept)
     pub warnings_dropped: u64,
@@ -89,8 +91,9 @@ pub fn lf(s: &str) -> String {
 pub fn cache_key(src: &str, params: &[(String, String)], imports: &[(String, String)]) -> String {
     let mut text = String::new();
     // (2: the report has warnings and the rules' places since JFScript S1; 3: meshes and vectors are host objects
-    // since S2, and the language services' warnings are in the report; a report of before is built again)
-    text.push_str("modeltool-key-3\n");
+    // since S2, and the language services' warnings are in the report; 4: since S3 the warnings come from
+    // compile_api, a module's at its import, with removed names and S3's texts; a report of before is built again)
+    text.push_str("modeltool-key-4\n");
     text.push_str(crate::APP_VERSION);
     text.push('\n');
     text.push_str(rt::VERSION);
@@ -193,18 +196,6 @@ pub fn file_loader(dir: &str, path: &str) -> Result<String, String> {
     }
 }
 
-/// The warnings of JFScript's language services on a script or module (ls::check with the host's description):
-/// a member a mesh or a vec does not have, a name of a namespace that is not there (with the closest one), a
-/// division of two ints, a top-level let read before it ran.  Its errors are compile_with's and stop the run
-/// before.
-pub fn ls_warnings(api: &Api, file: &str, src: &str) -> Vec<Warning> {
-    script::ls::check(src, api)
-        .into_iter()
-        .filter(|d| !d.error)
-        .map(|d| Warning { file: String::from(file), line: d.line, col: d.col, msg: d.msg })
-        .collect()
-}
-
 /// Compile and run the script `src` (named `file` in messages) with its parameters; `loader` reads a module
 /// for import(path) (the path relative to the script).  A module outside the script's folder is refused
 /// before the loader sees it (import_allowed).
@@ -227,8 +218,10 @@ pub fn run_script(file: &str, src: &str, params: &[(String, String)], loader: &m
         meshes_peak: 0,
     };
     let api = host::api();
-    let prog = match script::compile_with(file, src, &api.names()) {
-        Ok(p) => p,
+    // the program and the language services' warnings of one parse; its errors stop the run before it starts (an
+    // unknown name, a named argument a function of the host does not take)
+    let (prog, mut warnings) = match script::compile_api(file, src, &api) {
+        Ok(c) => (c.program, c.warnings.into_iter().map(|d| Warning { file: d.file, line: d.line, col: d.col, msg: d.msg }).collect::<Vec<Warning>>()),
         Err(diags) => {
             for d in diags {
                 let f = if d.file.is_empty() { String::from(file) } else { d.file };
@@ -281,12 +274,8 @@ pub fn run_script(file: &str, src: &str, params: &[(String, String)], loader: &m
     run.model = core::mem::take(&mut host.model);
     (run.meshes, run.meshes_peak) = (host.made, host.peak);
     drop(host);
-    // the language services' warnings on the script and its modules, then the host's up to the end or the error,
+    // the script's warnings, then the run's up to the end or the error (each module's at its import, the host's),
     // at most script::MAX_WARNINGS together; the places of the rules; each with the file named as errors name it
-    let mut warnings = ls_warnings(&api, file, src);
-    for (path, s) in &run.imports {
-        warnings.extend(ls_warnings(&api, path, s));
-    }
     warnings.extend(vm.take_warnings());
     run.warnings_dropped = vm.warnings_dropped();
     if warnings.len() > script::MAX_WARNINGS {

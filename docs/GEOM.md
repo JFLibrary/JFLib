@@ -149,6 +149,17 @@ Eingebaute Materialien: grau, weiss, schwarz, holz, dunkelholz, stein, beton, zi
 gelb, glas (deckend). `import("datei.jfs")` lädt ein Modul relativ zum Skript ([`haus_teile.jfs`](../apps/modeltool/examples/haus_teile.jfs)),
 nur aus dem Ordner des Skripts und darunter.
 
+**Benannte Argumente** (seit JFScript S3): Jede Funktion und Methode nimmt ihre Argumente auch mit den Namen der
+Parameter, wie `--api` sie nennt, nach denen ohne Namen: `geom.box(w: 2, h: 1, d: 3)`, `geom.cylinder(h: 2.4, r:
+0.3)`, `geom.cone(1, 2, r_top: 0.5)` (`segments` bleibt 32), `m.bevel(0.1, segments: 3)`, `m.move(y: 1, x: 0, z:
+0)`, `model.add(m, name: "deckel")` (das Material bleibt `"grau"`), `model.expect_size(y: 2.6)` (nur die Höhe).
+Was ausgelassen ist, bekommt seinen Vorgabewert. Hat eine Funktion mehrere Formen, wählt der Name die Form:
+`m.move(v: [1, 0, 0])`, `vec(v: liste)`, `geom.union(meshes: teile)`. Ein Name, den die Funktion nicht hat, ist ein
+Fehler vor dem Lauf mit dem nächsten Namen (`geom.cone hat keinen Parameter segmens – meinst du segments?`), bei
+einer Methode eine Warnung vor dem Lauf und der Fehler beim Aufruf; ebenso ein Parameter, der schon ein Argument hat
+(`geom.box(1, w: 2, ..)`). Die Beispiele übergeben weiter nach der Stelle (ihre Eingaben sind die der
+[Prüfsumme](#prüfsummen)).
+
 **Boolesche Operationen** nehmen konvexe geschlossene Körper (Quader, Zylinder, Kegel, Kugeln, Prismen und Extrusionen
 konvexer Profile, auch gedreht und verschoben) oder Ergebnisse früherer Boolescher Operationen: ein solches Ergebnis
 behält seine konvexen Zellen, auch nach `move`, `place`, `center`, `rotate*`, `scale` und `mirror` (`smooth`, `flat`,
@@ -189,9 +200,12 @@ sind …` (in einem Modul dessen Pfad, so wie Fehler ihn nennen).
 ### Warnungen
 
 Was der Host annimmt, was aber sehr wahrscheinlich ein Versehen ist, meldet er als Warnung an der Stelle des Aufrufs
-(JFScripts `cx.warn`, seit S1); das Skript läuft weiter, der Exit-Code bleibt. Davor stehen seit S2 die Warnungen der
-Sprachdienste über das Skript und jedes Modul, das es lädt (`ls::check` mit der Beschreibung `host::api()`, ohne es
-laufen zu lassen, also auch für Zeilen, die nie laufen). Die Konsole zeigt sie vor dem Ergebnis wie Fehler, mit der
+(JFScripts `cx.warn`, seit S1); das Skript läuft weiter, der Exit-Code bleibt. Dazu kommen seit S2 die Warnungen der
+Sprachdienste über das Skript und jedes Modul, das es lädt (mit der Beschreibung `host::api()`, ohne es laufen zu
+lassen, also auch für Zeilen, die nie laufen): seit S3 aus demselben Durchgang, der das Skript übersetzt
+(`script::compile_api`), die des Skripts zuerst, die eines Moduls, wenn es geladen wird, zwischen denen des Hosts
+in der Reihenfolge, in der sie kamen (bis S2 standen die aller Module vor denen des Hosts). Die Konsole zeigt sie
+vor dem Ergebnis wie Fehler, mit der
 Zeile der Quelle (bei `--report` auf stderr), die ersten zehn ganz, dann wie viele noch folgen; `report.json` hat alle
 unter `warnings` (Datei, Zeile, Spalte, Text; zusammen höchstens 1000), der Beobachtungsmodus zeigt sie in einem
 eigenen Balken. Die Sprachdienste warnen bei:
@@ -201,6 +215,8 @@ eigenen Balken. Die Sprachdienste warnen bei:
 | eine Eigenschaft oder Methode, die ein Mesh oder ein `vec` nicht hat, mit dem nächsten Namen | `mesh hat keine Methode mov – meinst du move?`, `vec hat keine Eigenschaft q` |
 | eine Methode ohne Klammern gelesen oder eine Eigenschaft gerufen, eine nur lesbare gesetzt | `tris ist eine Eigenschaft von mesh, keine Methode – ohne Klammern: .tris`, `mesh.tris ist nur lesbar` |
 | ein Name in `geom`, `profile`, `vec` oder `model`, den es nicht gibt | `Unbekannter Name vec.ad – meinst du vec.add?` |
+| ein Name, den S2 entfernt hat (die Methoden eines Mesh als Funktion: `geom.move(m, ..)`), seit S3 | `geom.move wurde entfernt – nimm m.move` (der Aufruf wirft dasselbe) |
+| ein benanntes Argument, das eine Methode eines Mesh oder `vec` nicht nimmt, seit S3 | `mesh.bevel hat keinen Parameter widht – meinst du width?` |
 | eine Division zweier Ganzzahlen | `Ganzzahlige Division: 7 / 2 schneidet ab (7 / 2 ist 3) – …` |
 
 Der Typ eines Ausdrucks ist ihnen nur bekannt, wo die Beschreibung ihn sagt (`geom.box(..)` ist ein `mesh`, eine
@@ -221,9 +237,12 @@ tisch.jfs:12:7: Warnung: model.name: "Tisch 2" ersetzt den Namen "Tisch" aus tis
 ```
 
 Ein eingebautes Material neu festzulegen, das noch kein Teil benutzt, ist gewollt und keine Warnung; ebenso ein zweiter
-Aufruf mit demselben Wert. `compile_with` meldet die Warnungen der Sprachdienste nicht, darum ruft `modeltool`
-`ls::check` nach dem Übersetzen selbst: 0,1 bis 0,5 ms je Beispiel (das Haus mit seinem Modul am meisten), die
-Beschreibung zu bauen rund 0,05 ms je Lauf.
+Aufruf mit demselben Wert. Bis S2 meldete `compile_with` die Warnungen der Sprachdienste nicht, und `modeltool` rief
+`ls::check` nach dem Lauf selbst, das jede Datei ein zweites Mal las (0,1 bis 0,5 ms je Beispiel); seit S3 gibt
+`compile_api` Programm und Warnungen aus einem Durchgang, ein Modul übersetzt die VM beim Import ebenso. Die
+Beschreibung zu bauen kostet rund 0,05 ms je Lauf. `Api::check_calls` (eine Warnung vor dem Lauf, wenn die Zahl der
+Argumente zu keiner Form passt) ist aus: Die Warnung des Hosts über weitere Argumente kommt beim Aufruf, und beide
+zusammen gäben dieselbe Warnung zweimal.
 
 ### Der Beobachtungsmodus
 
@@ -532,10 +551,23 @@ Teile sind bei 384 px kaum zu sehen (`--size 1024` hilft). Die Reihenfolge der W
 - **Eine Beschreibung** (seit S2): `host::api()` ist ein `script::Api` mit allen Funktionen, dem Wert `params`, den
   Typen `mesh` und `vec` mit Eigenschaften, Methoden und Operatoren, die Signaturen in der Schreibweise von
   TypeScript (`geom.cone(r: float, h: float, segments: int = 32, r_top: float = 0): mesh`), die Texte deutsch.
-  Daraus kommen `--api`, die Namen für `compile_with`, die Warnungen der Sprachdienste, die höchste Zahl der Argumente
-  je Funktion (für die Warnung über weitere) und die Meldungen über fehlende Eigenschaften und Methoden. Eine Signatur
-  nennt die längste Form (`m.move(x, y, z)`), die kürzeren (`m.move(v)`) stehen in ihrem Text: Eine Signatur hat
-  keine Überladungen und `Api::validate` keine Vereinigungstypen.
+  Daraus kommen `--api`, das Übersetzen mit `compile_api` und die Warnungen der Sprachdienste, die benannten
+  Argumente, die höchste Zahl der Argumente je Funktion (für die Warnung über weitere) und die Meldungen über
+  fehlende Eigenschaften und Methoden. Bis S2 nannte eine Signatur die längste Form (`m.move(x, y, z)`) und die
+  kürzeren (`m.move(v)`) standen in ihrem Text. Seit S3 hat jede Form ihre Signatur (`m.move(x: float, y: float, z:
+  float)` und `m.move(v: vec | list)`; `m.scale` hat drei, `geom.merge`, `union`, `difference` und `intersection`
+  eine mit einer Liste `meshes: list<mesh>`, `vec.add` und seine Verwandten eine mit Listen aus 2 Zahlen, die eine
+  Liste gibt), was eine Wahl nimmt, ist eine Vereinigung (`material: str | map`, `other: vec | list`,
+  `bounds(): map | nil`), und was ausgelassen werden darf, ohne einen Vorgabewert zu haben, heißt `name?`
+  (`model.add(.., name?: str)`, `m.bevel(.., axis?: str)`, `model.expect_size(x?: float, ..)`). Die Warnung über
+  weitere Argumente zählt gegen die längste Form. Die Methoden eines Mesh gehen seit S2 nicht mehr als Funktionen
+  (`geom.move(m, ..)`); `Api::removed` nennt für jede, was statt ihrer zu nehmen ist (`m.move`), in der Warnung vor
+  dem Lauf und im Fehler beim Aufruf.
+- **Benannte Argumente** (seit S3): Die VM bindet sie nach den Formen der Beschreibung und gibt dem Host die Werte
+  in der Reihenfolge der Parameter, `nil` für ausgelassene davor ([Die Skript-API](#die-skript-api)); der Host ist
+  dafür nicht geändert. Ein Parameter ohne `?` und ohne Vorgabewert darf dabei nicht fehlen: `m.scale(sx: 2)` ist
+  der Fehler „mesh.scale: der Parameter sy fehlt“ (vor dem Lauf eine Warnung), statt beim Host als `m.scale(2)`
+  anzukommen, in allen Achsen 2. Die Namen der Parameter sind damit Teil der Schnittstelle (G9.3).
 - **Namen englisch, Texte deutsch** (Entscheidung G9.3 in JFScripts `docs/RICHTUNG.md`): Funktionen und ihre
   Parameter heißen englisch wie die Sprache und ihre Bibliothek (`m.bevel(width, segments, axis)`, `list.range(start,
   end, step)`); mit benannten Argumenten werden auch die Namen der Parameter Teil der Schnittstelle. Bis S1 hießen sie
@@ -544,15 +576,20 @@ Teile sind bei 384 px kaum zu sehen (`--size 1024` hilft). Die Reihenfolge der W
   (Variablen, `--param`) wählt sein Autor.
 - **Fehler auf Deutsch**, mit dem Namen der Funktion und des Parameters (`geom.box: die Höhe muss eine Zahl größer 0
   sein, nicht -2`, `geom.box: w muss eine Zahl sein, nicht str "x"`), wie JFScripts eigene. JFScript setzt Datei,
-  Zeile und Spalte des Aufrufs dazu; `modeltool` zeigt die Zeile mit einem Pfeil und die Aufrufe. `compile_with` mit
-  den Namen des Hosts macht einen Tippfehler (`boks`) schon vor dem Lauf zum Fehler, mit Vorschlag.
+  Zeile und Spalte des Aufrufs dazu; `modeltool` zeigt die Zeile mit einem Pfeil und die Aufrufe. `compile_api` mit
+  der Beschreibung des Hosts macht einen Tippfehler (`boks`) schon vor dem Lauf zum Fehler, mit Vorschlag, wenn ein
+  Name wirklich nahe ist (seit S3 strenger: `geom.move` schlägt nicht mehr `geom.cone` vor). Die Meldungen von
+  JFScript selbst könnten seit S3 auch englisch sein (`script::set_language`); `modeltool` hat keine Wahl der Sprache
+  und ruft es nicht, also bleibt alles deutsch.
 - **Grenzen**: 64 MiB Heap, 200 Mio. Schritte (eine Endlosschleife endet nach rund 2 s), Brennstoff der
   Host-Funktionen nach der Arbeit (je 64 Dreiecke einer).
 - **Cache-Schlüssel**: SHA-256 (die ersten 128 Bit) über die Version des Werkzeugs und von JFLib, das Skript, die
   sortierten Parameter und jedes importierte Modul mit Pfad und Inhalt, Zeilenenden als LF. Ein Lauf mit gleichem
   Schlüssel, gleichen Bildoptionen und vorhandenen Dateien baut nicht neu. Seit S1 beginnt der Text mit
   `modeltool-key-2` (der Bericht hat Warnungen und die Zeilen der Regeln), seit S2 mit `modeltool-key-3` (Meshes und
-  Vektoren sind Objekte, der Bericht hat die Warnungen der Sprachdienste): ein Bericht von vorher wird neu gebaut.
+  Vektoren sind Objekte, der Bericht hat die Warnungen der Sprachdienste), seit S3 mit `modeltool-key-4` (die
+  Warnungen aus `compile_api`, die eines Moduls bei seinem Import, entfernte Namen, die Texte von S3): ein Bericht
+  von vorher wird neu gebaut. In `examples/out` hat sich mit S3 nur der Schlüssel geändert.
 
 ### Die Bilder
 
@@ -574,7 +611,10 @@ Nutzers (E7); JFScript ist in Teil 2 unverändert. Die Richtung und die Stufen s
 `docs/RICHTUNG.md`; Stufe S1 (JFScript c970852, 2026-11-24) brachte 3, 5 und 7 und für 6 die Warnung der
 Sprachdienste, `modeltool` nutzt davon die Stelle des Aufrufs und die Warnungen. Stufe S2 (JFScript a21a0c3,
 2026-11-25) brachte 2 und 9 und damit 1 als Werttyp des Hosts; `modeltool` zeigt seitdem auch die Warnungen der
-Sprachdienste (6). Offen sind 4, 8 und 10 (S3). Der
+Sprachdienste (6). Stufe S3 (JFScript 415aca4, 2026-11-27) brachte 4, 8 und 10 und schloss die Lücken, die
+`modeltool` an S2 fand (Warnungen aus einem Durchgang, Formen, optionale Parameter, Vereinigungen, entfernte Namen);
+`modeltool` nutzt davon die Warnungen aus `compile_api`, die Formen und benannten Argumente in seiner Beschreibung
+und `Api::removed`. Offen ist nichts mehr aus dieser Liste. Der
 [Bewertungslauf](#der-bewertungslauf) ordnet die Wünsche so: **1. Vektoren mit Operatoren** (die Lage-Rechnungen waren der größte Aufwand: die Dachplatte, die Linie der
 Stufenkanten), **5. mehr Mathematik in Grad** (tan für das Dach), **4. benannte Argumente** (`bevel(width, segments,
 axis)`), neu **10. ein Bedingungsausdruck** (`a ? b : c` fehlt; die Meldung hilft, kostet aber eine Runde), dann
@@ -602,7 +642,8 @@ axis)`), neu **10. ein Bedingungsausdruck** (`a ? b : c` fehlt; die Meldung hilf
 4. **Benannte Argumente.** `geom.cylinder(0.3, 1.2, 32)` ist für eine KI fehleranfällig (was ist r, was h?).
    Gewünscht: `geom.cylinder(r: 0.3, h: 1.2)` als letzte Map übergeben, oder Standardwerte in der Signatur. Behelf:
    Positionsargumente mit Namen in den Fehlermeldungen und in `--api` (seit S1 englisch, so wie sie als benannte
-   Argumente heißen würden).
+   Argumente heißen würden). **Seit S3 da**: `geom.cylinder(r: 0.3, h: 1.2)` mit den Namen von `--api`, auch für
+   Methoden (`m.bevel(0.1, segments: 3)`); die VM bindet sie nach der Beschreibung ([Die Skript-API](#die-skript-api)).
 5. **Mehr Mathematik.** Es fehlen `tan`, `asin`, `acos`, `atan`, `atan2`, `hypot` und Winkel in Grad, die bei 90° exakt
    sind (`math.sin_deg`). `haus_teile.jfs` rechnet `tan` als `math.sin(a) / math.cos(a)` mit `a = neigung * math.pi / 180`.
    **Seit S1 da**: `math.tan`, `asin`, `acos`, `atan`, `atan2`, `hypot`, `sin_deg`, `cos_deg`, `tan_deg`. Die Beispiele
@@ -615,15 +656,19 @@ axis)`), neu **10. ein Bedingungsausdruck** (`a ? b : c` fehlt; die Meldung hilf
    `t = i / 12.0` von Hand. Gewünscht: `range(a, b, schritt)`, `linspace(a, b, n)`. **Seit S1 da**:
    `list.range(start, end, step)`, `list.linspace(start, end, n)`.
 8. **Zerlegen beim Zuweisen.** `let {rahmen, glas, bank} = teile.fenster(b, h)` und `let [x, y, z] = p` statt
-   `f.rahmen` und `p[0]`.
+   `f.rahmen` und `p[0]`. **Seit S3 da**, auch `let {x, y, z} = v` eines `vec` (seine Eigenschaften) und
+   `m.bounds()` (`let {size, center} = m.bounds()`).
 9. **Beschreibungen der Host-Funktionen für die Sprachdienste.** `script::ls` kennt `HostItem`; `modeltool` hat die
    Liste in `host::API`. Für den Beobachtungsmodus und die IDE (G7o) gehören beide zusammen. **Seit S2 da**:
    `script::Api` mit Typen und Signaturen; `host::api()` ersetzt `host::API` und dient `--api`, `compile_with` und
-   `ls::check`. Offen bleibt: `compile_with` gibt die Warnungen der Sprachdienste nicht mit zurück; `modeltool` ruft
-   dafür `ls::check`, das das Skript ein zweites Mal liest.
+   `ls::check`. Offen blieb: `compile_with` gibt die Warnungen der Sprachdienste nicht mit zurück; `modeltool` rief
+   dafür `ls::check`, das das Skript ein zweites Mal las. **Seit S3 geschlossen**: `compile_api` gibt beides aus
+   einem Durchgang, dazu Formen, `name?`, Vereinigungen und entfernte Namen in der Beschreibung.
 10. **Ein Bedingungsausdruck** (neu aus dem Bewertungslauf). `"drücker ${seite > 0 ? "vorn" : "hinten"}"` geht nicht;
     Behelf: eine Variable und `if` davor. Ebenso fehlt ein Ausdruck für eine Liste aus einer Schleife (`[for i in
     0..n: ...]`); Behelf: `push` in der Schleife, was bei `geom.union(teile)` und `geom.difference(liste)` oft vorkommt.
+    **Seit S3 da**: `seite > 0 ? "vorn" : "hinten"` und `[geom.box(1, 1, 1).move(i * 2, 0, 0) for i in 0..n]` wie in
+    Python. Die Beispiele schreiben weiter wie vorher, damit ihre Eingaben und die [Prüfsumme](#prüfsummen) bleiben.
 
 ## Tests
 
@@ -656,11 +701,11 @@ ihren Rasterdreiecken).
 | `csg` | 300 Paare achsparalleler Quader (ein Drittel auf einem Raster von 1/64 m bündig, berührend, eins im anderen): Vereinigung, Differenz, Schnitt geschlossen, außen, nichts entartet, ein oder zwei Teile, Euler, Volumen gegen die Überlappung auf 10⁻¹¹, Grenzen exakt; 120 Paare gedrehter Quader, Zylinder, Kegel und Stümpfe, Kugeln und Prismen: die Volumen-Gleichungen auf 10⁻⁹, je 40 gestreute Punkte auf der richtigen Seite; 80 Prismen mit 3 bis 48 Ecken durch Platten (Euler 0, Volumen); 30 Wände mit bis zu vier Öffnungen nacheinander (Euler 2 − 2k); 20 Körper gedreht und weiter geschnitten gegen dasselbe aus gedrehten Eingaben; A ∪ A, A − A, A ∩ A, zwei Hälften, eine Reihe gedrehter Kisten; was verweigert wird (nicht konvex, offen, zwei Teile, leer) | 6 090 Prüfungen, 0 falsch |
 | `bevel` | 120 Quader mit 1 bis 6 Segmenten: geschlossen, Euler 2, Volumen gegen die Minkowski-Summe auf 10⁻¹¹, Grenzen exakt, die flache Fläche flach und so groß wie erwartet, keine Naht am Übergang; 40 nur entlang Y (Querschnitt: Rechteck mit runden Ecken); 60 Zylinder, Stümpfe, gedrehte Quader; ein abgeschrägter Block mit Loch; was verweigert wird | 1 287 Prüfungen, 0 falsch |
 | `gltf` | die sechs Beispiele geschrieben und gelesen: Meshes, Materialien, Knoten, Szenen gleich, keine Notizen; ein Knoten mit Matrix und Kind, ein Material mit allen Faktoren, MASK und doppelseitig; was verweigert wird (Textur, Index außerhalb, NaN) | 42 Prüfungen, 0 falsch |
-| `script` | ein gutes Skript; zwölf kaputte: falsche Werte, falsche Typen, unbekannte Namen, Methoden, Materialien, sich schneidende Profile, nichts hinzugefügt, fehlende und kaputte Module, Endlosschleife, zu viele Dreiecke, falsche Achse: jede Meldung mit Datei, Zeile und Text; Pfeil unter der Spalte; Parameter, Module, Funden statt Fehlern, Abfragen; der Cache-Schlüssel (CRLF = LF); Boolesche Operationen und Abschrägen aus dem Skript (eine Wand mit Fenster: Euler 0, gedreht und weiter geschnitten) und ihre Meldungen; ein Befund mit Ort und Teil; Importe: zwölf Pfade für `import_allowed`, drei Skripte, die hinaus wollen, ein Skript im Unterordner; seit S1: Befunde und Regeln mit ihrer Zeile (auch aus einem Modul), sieben Warnungen mit Datei, Zeile, Spalte und Text, in der Konsole und im Bericht, eine Warnung vor einem Fehler, mehr als 1000 Warnungen; die Namen von `--api` englisch, `max_args` für jede Funktion; seit S2: die Beschreibung ganz (`Api::validate`), ein Mesh als Objekt (Typ, Text, `tris`, Gleichheit, fünf falsche Zugriffe mit ihren Meldungen und den Warnungen der Sprachdienste), ein `vec` (Konstruktor, Komponenten, Operatoren, `==`, Methoden, `vec.*` auf `vec`s und Listen, Punkte als `vec` in sieben Funktionen, elf Fehler mit ihren Meldungen), 40 401 Meshes mit höchstens 8191 zugleich (die Teile und ein gehaltenes Mesh bleiben heil), sechs Warnungen aus Sprachdiensten, Modul und Host in ihrer Reihenfolge; die Vervollständigung nach `m.`, `v.` und `vec.` und die Signatur von `vec(` mit der Beschreibung | 221 Prüfungen, 0 falsch |
+| `script` | ein gutes Skript; zwölf kaputte: falsche Werte, falsche Typen, unbekannte Namen, Methoden, Materialien, sich schneidende Profile, nichts hinzugefügt, fehlende und kaputte Module, Endlosschleife, zu viele Dreiecke, falsche Achse: jede Meldung mit Datei, Zeile und Text; Pfeil unter der Spalte; Parameter, Module, Funden statt Fehlern, Abfragen; der Cache-Schlüssel (CRLF = LF); Boolesche Operationen und Abschrägen aus dem Skript (eine Wand mit Fenster: Euler 0, gedreht und weiter geschnitten) und ihre Meldungen; ein Befund mit Ort und Teil; Importe: zwölf Pfade für `import_allowed`, drei Skripte, die hinaus wollen, ein Skript im Unterordner; seit S1: Befunde und Regeln mit ihrer Zeile (auch aus einem Modul), sieben Warnungen mit Datei, Zeile, Spalte und Text, in der Konsole und im Bericht, eine Warnung vor einem Fehler, mehr als 1000 Warnungen; die Namen von `--api` englisch, `max_args` für jede Funktion; seit S2: die Beschreibung ganz (`Api::validate`), ein Mesh als Objekt (Typ, Text, `tris`, Gleichheit, fünf falsche Zugriffe mit ihren Meldungen und den Warnungen der Sprachdienste), ein `vec` (Konstruktor, Komponenten, Operatoren, `==`, Methoden, `vec.*` auf `vec`s und Listen, Punkte als `vec` in sieben Funktionen, elf Fehler mit ihren Meldungen), 40 401 Meshes mit höchstens 8191 zugleich (die Teile und ein gehaltenes Mesh bleiben heil), sechs Warnungen aus Sprachdiensten, Modul und Host in ihrer Reihenfolge; die Vervollständigung nach `m.`, `v.` und `vec.` und die Signatur von `vec(` mit der Beschreibung; seit S3: Formen, Vereinigungen und `name?` in `--api` (65 Funktionen und Methoden mit 82 Formen, die längste Form je Name), die 20 entfernten Namen, benannte Argumente an Funktionen und Methoden (in jeder Reihenfolge, Ausgelassenes mit seinem Vorgabewert, die Form nach dem Namen, ohne Warnung), ein falscher Name mit Vorschlag und ein doppeltes Argument (bei einer Funktion vor dem Lauf, bei einer Methode als Warnung und beim Aufruf), `geom.move` mit dem, was statt seiner zu nehmen ist | 256 Prüfungen, 0 falsch |
 | `watch` | der Kern des Beobachtungsmodus mit echten Dateien in einem temporären Ordner: der erste Bau, unverändert, gespeichert, ein Fehler (das alte Modell bleibt), ein Modul geändert und gelöscht, ein Import aus dem Ordner darüber, ein Skript, das fehlt (im Browser: keine Dateien, keine Prüfung); eine Warnung mit Ort und Zeile | 18 Prüfungen, 0 falsch |
 | `examples` | die sechs Beispiele: laufen, bestehen alle Prüfungen, ihr Bericht gleich dem in `examples/out` (ohne Dateien, Ansichten, Zeiten) | 24 Prüfungen, 0 falsch |
 
-Zusammen 38 945 Prüfungen in rund 9 s (Entwicklungs-Build, Ryzen 5 3600; `bevel` und `csg` sind die längsten
+Zusammen 38 980 Prüfungen in rund 9 s (Entwicklungs-Build, Ryzen 5 3600; `bevel` und `csg` sind die längsten
 Gruppen). Dazu headless: `watch.uis` (die Kiste im Fenster, die vier Ansichten, ziehen und Rad in der
 freien Ansicht, Gitter aus, Neu bauen und F5) und `watch_fehler.uis` (ein Skript mit Fehler: der Balken, Ort und
 Meldung, die Zeile; kein Modell; die Warnung davor in ihrem Balken).
@@ -687,12 +732,16 @@ viele, auch mit Meshes als Objekten. Die Bits aller Meshes sind gleich: Ohne den
 und nach S2 `d9c23e8f809f620b` mit 109 751 Werten, und die Berichte in `examples/out` unterscheiden sich nur im
 Schlüssel. Bis S2 war die Zahl `0fae175a31a0f15e` (S1 und `modeltool` vor S2 auch gegen JFScript a21a0c3).
 
+**Mit S3 (JFScript 415aca4, 6e5f58b) ist die Zahl dieselbe**, `ff9e060c8233c600` mit 234 941 Werten, auch der Brennstoff:
+`compile_api` übersetzt Aufrufe nach der Stelle wie `compile_with`, der Brennstoff je Abschnitt zwischen zwei `await`
+ändert ohne `await` nichts, und die Beispiele sind unverändert (sie nutzen keine benannten Argumente).
+
 | Ziel | Build | Prüfsumme | `--check` |
 | --- | --- | --- | --- |
-| Windows x86-64 (Ryzen 5 3600), Rust 1.100 | Entwicklung | `ff9e060c8233c600` | 38 945 bestanden (S2) |
-| Linux x86-64 gegen glibc, in WSL Ubuntu 24.04 | Entwicklung | `ff9e060c8233c600` | 38 945 bestanden (S2) |
-| macOS ARM64 (Mac mini M2, macOS 27.2), Rust 1.98.1 | Entwicklung | `0fae175a31a0f15e` | 38 906 bestanden (S1; S2 noch nicht geprüft; die fünf Skripte mit Metal: Stand Teil 2) |
-| WebAssembly in Node 22 (V8): einfach, SIMD, Threads | Entwicklung | `ff9e060c8233c600` | 38 927 bestanden (S2; alle drei, ohne die 18 der Gruppe `watch`) |
+| Windows x86-64 (Ryzen 5 3600), Rust 1.100 | Entwicklung | `ff9e060c8233c600` | 38 980 bestanden (S3; mit S2 38 945) |
+| Linux x86-64 gegen glibc, in WSL Ubuntu 24.04 | Entwicklung | `ff9e060c8233c600` | 38 980 bestanden (S3; mit S2 38 945) |
+| macOS ARM64 (Mac mini M2, macOS 27.2), Rust 1.98.1 | Entwicklung | `ff9e060c8233c600` | 38 980 bestanden (S3; die fünf Skripte mit Metal: Stand Teil 2) |
+| WebAssembly in Node 22 (V8): einfach, SIMD, Threads | Entwicklung | `ff9e060c8233c600` | 38 962 bestanden (S3; alle drei, ohne die 18 der Gruppe `watch`; mit S2 38 927) |
 
 Zusammen 234 941 Werte. Mit JFScript S1 (c970852) und den Warnungen war die Zahl auf Windows, Linux und in Node
 dieselbe geblieben, auch die Zahl der Werte: Die Warnungen kosten keinen Brennstoff, und die Beispiele waren

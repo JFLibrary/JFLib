@@ -23,7 +23,9 @@
 //   auto_link(tx, shapes, rs, pairs, replace)   AS-04: a column against a shape field (text,
 //                                   name or a shape data field) -> the rows bound where they match
 //   refresh(tx, rs, columns, rows, now)   DA-05: new data for a recordset: rows matched by key
-//                                   (or by order), linked shapes updated, conflicts reported
+//                                   (or by order), linked shapes updated, conflicts reported;
+//                                   missing_key(doc, rs, columns): key columns the source lacks
+//                                   (refresh refuses those)
 //   user_edited(tx, sheet, name)    a user's change of a linked value: DataLinked = 0, so a
 //                                   refresh keeps it (unless the recordset overwrites all)
 //   resolve_*                       what the user decides about a conflict
@@ -887,15 +889,27 @@ pub struct Refreshed {
     pub written: Vec<Written>,
 }
 
+/// the key columns of recordset `rs` (their source names) that the source's `headers` lack:
+/// refresh refuses such data (ask the user to choose the key again)
+pub fn missing_key(doc: &Document, rs: u32, headers: &[String]) -> Vec<String> {
+    let Some(set) = doc.recordset(rs) else { return Vec::new() };
+    set.key.iter().filter(|k| !headers.iter().any(|h| h.trim() == k.column)).map(|k| k.column.clone()).collect()
+}
+
 /// DA-05: new data for recordset `rs` (the source's columns by name and its rows in source
 /// order).  Rows keep their IDs while their key matches (without key: their position); new
 /// rows get new IDs; columns keep their Name, label and type when the source still has them,
 /// new ones are added.  Every bound shape gets the new values -- a value the user changed
 /// (DataLinked = 0) only when the recordset overwrites all, else it stays and is reported.
 /// Shapes whose row is gone stay bound and are reported (and kept as RefreshConflict).
-/// `now` is the time to note ("2026-11-23T14:05:00").
+/// `now` is the time to note ("2026-11-23T14:05:00").  Invalid, with nothing changed, when the
+/// source lacks a key column (missing_key): matched by position instead, each bound shape got
+/// another row's data without a word
 pub fn refresh(tx: &mut Transaction, rs: u32, headers: &[String], rows: Vec<Vec<DataValue>>, now: &str) -> Result<Refreshed, EditError> {
     let old = tx.doc().recordset(rs).ok_or(EditError::Invalid)?.clone();
+    if !missing_key(tx.doc(), rs, headers).is_empty() {
+        return Err(EditError::Invalid);
+    }
     let mut new = old.clone();
     // columns: kept by source name, new ones appended (types guessed), gone ones dropped
     let mut columns: Vec<Column> = Vec::new();
@@ -911,7 +925,6 @@ pub fn refresh(tx: &mut Transaction, rs: u32, headers: &[String], rows: Vec<Vec<
         }
     }
     new.columns = columns;
-    new.key.retain(|k| new.columns.iter().any(|c| c.id == k.column));
     new.row_order = new.key.is_empty();
     let n = new.columns.len();
     // old rows by key

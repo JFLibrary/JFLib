@@ -26,7 +26,7 @@ use alloc::vec::Vec;
 use ui::i18n::{t, tf};
 
 use crate::payload::{PK_FILE, STY_MAX, kv_get, parent_dir, path_cap, pl_inflate};
-use crate::shell::{Reg, Scope, sh_assoc_remove, sh_assoc_set, sh_browser_request, sh_folder, sh_link, sh_pins, sh_reg_delete, sh_run};
+use crate::shell::{Reg, Scope, sh_assoc_remove, sh_assoc_set, sh_browser_request, sh_folder, sh_key_command, sh_link, sh_pins, sh_reg_delete, sh_run, sh_test_mode};
 use crate::{Inst, PATH_CAP, str_cap};
 
 /// install.ini's lists (files=, assoc=) have no limit: the asm's buffers of 4096 and 8192 bytes
@@ -88,6 +88,46 @@ pub(crate) fn exe_name(st: &Inst) -> String {
 
 const E_WRITE: &str = "„{}“ konnte nicht geschrieben werden.";
 
+/// (all users) what may lie in the folder already: nothing, or what an earlier installation of
+/// this app wrote there (install.ini names it).  Anything else may be a user's, put there to run
+/// with the program (a DLL beside it) once the folder is the computer's: refused.  A folder that is
+/// not there yet is fine
+fn in_dir_clean(st: &Inst) -> bool {
+    let Some(top) = plat::fs::read_dir(&st.dir) else { return true };
+    if top.is_empty() {
+        return true;
+    }
+    let Some(ini) = plat::read_file(&in_path(st, "install.ini")) else { return false };
+    if kv_get(&ini, "app", 64).as_deref() != Some(st.app.as_str()) {
+        return false;
+    }
+    let names = un_names(&kv_get(&ini, "files", NO_CAP).unwrap_or_default());
+    let folders = un_folders(&names);
+    let known = |rel: &str| {
+        [exe_name(st).as_str(), "uninstall.exe", "install.ini"].iter().any(|n| rel.eq_ignore_ascii_case(n))
+            || names.iter().chain(folders.iter()).any(|n| rel.eq_ignore_ascii_case(n))
+    };
+    // every entry, folders included, down to a depth no setup writes
+    let mut todo: Vec<(String, u32)> = alloc::vec![(String::new(), 0)];
+    while let Some((rel, depth)) = todo.pop() {
+        let dir = if rel.is_empty() { st.dir.clone() } else { in_path(st, &rel) };
+        let Some(list) = plat::fs::read_dir(&dir) else { return false };
+        for e in list {
+            let r = if rel.is_empty() { e.name.clone() } else { format!("{rel}\\{}", e.name) };
+            if !known(&r) {
+                return false;
+            }
+            if e.kind == plat::fs::FileKind::Dir {
+                if depth >= 32 {
+                    return false;
+                }
+                todo.push((r, depth + 1));
+            }
+        }
+    }
+    true
+}
+
 /// install into st.dir -> Ok / Err (st.err)  [inst_run]
 pub(crate) fn inst_run(st: &mut Inst) -> Result<(), ()> {
     let mut initxt = String::new();
@@ -95,10 +135,33 @@ pub(crate) fn inst_run(st: &mut Inst) -> Result<(), ()> {
     st.lnk_desk.clear();
     st.lnk_start.clear();
     st.dir = in_slash(&st.dir);
-    // folder
-    if !plat::mkdir(&st.dir) {
+    // folder: for all users a new one (or the app's own), the administrators' with a DACL of its
+    // own (test mode: the rights stay, the test runs without administrator rights)
+    let machine = st.scope == Scope::Machine;
+    if machine && !in_dir_clean(st) {
+        let d = st.dir.clone();
+        return in_fail(st, "Der Ordner „{}“ enthält schon andere Dateien. Wählen Sie für alle Benutzer einen neuen oder leeren Ordner.", &d);
+    }
+    let secure = machine && !sh_test_mode();
+    let made = if secure {
+        parent_dir(&st.dir).is_none_or(|p| plat::fs::read_dir(&p).is_some() || plat::mkdir(&p)) && plat::inst::secure_dir(&st.dir)
+    } else {
+        plat::mkdir(&st.dir)
+    };
+    if !made {
         let d = st.dir.clone();
         return in_fail(st, "Der Ordner „{}“ konnte nicht angelegt werden.", &d);
+    }
+    // the payload's folders the same way, the outermost first (an earlier installation's keep
+    // what they had otherwise: SetFileSecurityW does not pass the folder's rights down)
+    if secure {
+        let names: Vec<String> = st.ents.iter().filter(|e| e.kind == PK_FILE).map(|e| in_slash(&e.name)).collect();
+        for d in un_folders(&names).iter().rev() {
+            let p = in_path(st, d);
+            if !plat::inst::secure_dir(&p) {
+                return in_fail(st, "Der Ordner „{}“ konnte nicht angelegt werden.", &p);
+            }
+        }
     }
     // the program in the chosen style
     let ent = st.sty[sel_index(st)].ent;
@@ -147,7 +210,11 @@ pub(crate) fn inst_run(st: &mut Inst) -> Result<(), ()> {
         in_regentry(st);
     }
     // file types and URL schemes (PACKAGE filetypes= / schemes=), a web browser (browser=1)
-    let plan = crate::assoc::plan(&package(st), &st.exepath);
+    let scope = st.scope;
+    let plan = crate::assoc::plan(&package(st), &st.exepath, &|key: &str| sh_key_command(key, scope));
+    for k in &plan.kept {
+        st.log.line(&format!("kept: {k} belongs to another program"));
+    }
     sh_assoc_set(&plan.set, st.scope);
     in_ini(&mut initxt, "app", &st.app);
     in_ini(&mut initxt, "display", &st.disp);
@@ -291,6 +358,18 @@ fn un_folders(names: &[String]) -> Vec<String> {
     dirs
 }
 
+/// a shortcut install.ini's desktop= / start= names is one the setup made: a .lnk right in the
+/// scope's desktop (0) or start menu (1) folder.  The uninstaller deleted any path there, and for
+/// all users it runs with administrator rights while install.ini may lie in a folder users could
+/// change
+fn un_link_ok(path: &str, which: u32, scope: Scope) -> bool {
+    if path.is_empty() || !path.to_ascii_lowercase().ends_with(".lnk") || path.split(['\\', '/']).any(|p| p == "..") {
+        return false;
+    }
+    let (Some(dir), Some(parent)) = (sh_folder(which, scope), parent_dir(path)) else { return false };
+    in_slash(&parent).eq_ignore_ascii_case(&in_slash(&dir))
+}
+
 /// the hidden command that deletes uninstall.exe (self) and then its folder: a running exe
 /// cannot be deleted, so it tries once a second until the uninstaller has ended (at most five
 /// minutes; the window of the uninstaller stays open on its last page, and an uninstaller with
@@ -314,11 +393,10 @@ pub(crate) fn un_run(st: &mut Inst) {
     for d in un_folders(&names) {
         plat::delete(&in_path(st, &d));
     }
-    if !st.lnk_desk.is_empty() {
-        plat::delete(&st.lnk_desk);
-    }
-    if !st.lnk_start.is_empty() {
-        plat::delete(&st.lnk_start);
+    for (which, lnk) in [(0, st.lnk_desk.clone()), (1, st.lnk_start.clone())] {
+        if un_link_ok(&lnk, which, st.scope) {
+            plat::delete(&lnk);
+        }
     }
     if st.opt_reg != 0 {
         sh_reg_delete(&st.app, st.scope);

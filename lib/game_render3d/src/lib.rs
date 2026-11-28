@@ -67,6 +67,9 @@ pub struct SyncStats {
     pub moved: u32,
     /// poses looked at (changed since the last sync, or between two ticks)
     pub visited: u32,
+    /// entities render3d refused (a mesh or material it does not have, a transform that is not finite): left out,
+    /// the others go on; tried again by the next sync (a pose: when it changes again)
+    pub failed: u32,
 }
 
 /// the origin's step unless set (metres): f32 has a step of 0.06 mm at 1 km from the origin
@@ -106,6 +109,9 @@ pub struct Bridge {
     model_removals: u64,
     model_pose_seen: u64,
     models_version: u64,
+    /// entities whose MeshRef / ModelRef render3d refused at the last sync: tried again by the next
+    retry: Vec<Entity>,
+    model_retry: Vec<Entity>,
 }
 
 impl Default for Bridge {
@@ -156,6 +162,8 @@ impl Bridge {
             model_removals: 0,
             model_pose_seen: 0,
             models_version: 0,
+            retry: Vec::new(),
+            model_retry: Vec::new(),
         }
     }
 
@@ -197,10 +205,54 @@ impl Bridge {
         Ok(())
     }
 
+    // entity e's MeshRef into the scene: its instance added, or its mesh and material switched
+    fn put(&mut self, e: Entity, m: MeshRef, at: &impl Fn(Entity) -> game::Transform, scene: &mut Scene, st: &mut SyncStats) -> Result<()> {
+        let i = e.index() as usize;
+        if self.slots.len() <= i {
+            self.slots.resize(i + 1, None);
+        }
+        if let Some(s) = self.slots[i] {
+            if s.entity != e {
+                // (an older generation's instance the sweep did not see: it goes)
+                st.removed += 1;
+                self.drop_slot(i, scene)?;
+            }
+        }
+        match &mut self.slots[i] {
+            Some(s) => {
+                if s.mesh != m.mesh {
+                    scene.set_mesh(s.inst, m.mesh)?;
+                    count(&mut self.mesh_use, s.mesh.0, false);
+                    count(&mut self.mesh_use, m.mesh.0, true);
+                    s.mesh = m.mesh;
+                    st.switched += 1;
+                }
+                if s.material != m.material {
+                    scene.set_material(s.inst, m.material)?;
+                    count(&mut self.material_use, s.material.0, false);
+                    count(&mut self.material_use, m.material.0, true);
+                    s.material = m.material;
+                    st.switched += 1;
+                }
+            }
+            None => {
+                let t = transform(&at(e));
+                let inst = scene.add(Instance { mesh: m.mesh, material: m.material, transform: t })?;
+                self.slots[i] = Some(Slot { entity: e, inst, mesh: m.mesh, material: m.material, t });
+                self.live += 1;
+                count(&mut self.mesh_use, m.mesh.0, true);
+                count(&mut self.material_use, m.material.0, true);
+                st.added += 1;
+            }
+        }
+        Ok(())
+    }
+
     /// the world into the scene for a frame at `alpha` (FixedTick::alpha; Pose::interpolate) -> what it
-    /// did.  The scene is the one the bridge has filled so far (another one after reset).  An error of
-    /// render3d (a mesh or material it does not have, a removed one) ends the sync there; the next one goes
-    /// on from the same place
+    /// did.  The scene is the one the bridge has filled so far (another one after reset).  An entity render3d
+    /// refuses (a mesh or material it does not have, a removed one, a transform that is not finite) is left
+    /// out and counted (SyncStats::failed); the others go on, and the next sync tries it again (so far
+    /// nothing else fails: the Result stays for what would not be one entity's)
     pub fn sync(&mut self, world: &World, scene: &mut Scene, alpha: f64) -> Result<SyncStats> {
         let mut st = SyncStats::default();
         let meshes = world.column::<MeshRef>();
@@ -214,57 +266,37 @@ impl Bridge {
             for i in 0..self.slots.len() {
                 if let Some(s) = self.slots[i] {
                     if !meshes.is_some_and(|m| m.contains(s.entity)) {
-                        self.drop_slot(i, scene)?;
                         st.removed += 1;
+                        if self.drop_slot(i, scene).is_err() {
+                            st.failed += 1;
+                        }
                     }
                 }
             }
             self.mesh_removals = removals;
         }
 
-        // new and changed MeshRefs (a column whose version did not move has none: no scan)
+        // new and changed MeshRefs (a column whose version did not move has none: no scan); then the ones
+        // refused at the last sync, while they still have one.  (An error there ended the sync, and the next
+        // ran into the same entity again: nothing after it was added or moved any more)
+        let mut retry = core::mem::take(&mut self.retry);
         if let Some(meshes) = meshes.filter(|m| m.version() > self.mesh_seen) {
             for (e, m) in meshes.changed_since(self.mesh_seen) {
-                let i = e.index() as usize;
-                if self.slots.len() <= i {
-                    self.slots.resize(i + 1, None);
-                }
-                if let Some(s) = self.slots[i] {
-                    if s.entity != e {
-                        // (an older generation's instance the sweep did not see: it goes)
-                        self.drop_slot(i, scene)?;
-                        st.removed += 1;
-                    }
-                }
-                match &mut self.slots[i] {
-                    Some(s) => {
-                        if s.mesh != m.mesh {
-                            scene.set_mesh(s.inst, m.mesh)?;
-                            count(&mut self.mesh_use, s.mesh.0, false);
-                            count(&mut self.mesh_use, m.mesh.0, true);
-                            s.mesh = m.mesh;
-                            st.switched += 1;
-                        }
-                        if s.material != m.material {
-                            scene.set_material(s.inst, m.material)?;
-                            count(&mut self.material_use, s.material.0, false);
-                            count(&mut self.material_use, m.material.0, true);
-                            s.material = m.material;
-                            st.switched += 1;
-                        }
-                    }
-                    None => {
-                        let t = transform(&at(e));
-                        let inst = scene.add(Instance { mesh: m.mesh, material: m.material, transform: t })?;
-                        self.slots[i] = Some(Slot { entity: e, inst, mesh: m.mesh, material: m.material, t });
-                        self.live += 1;
-                        count(&mut self.mesh_use, m.mesh.0, true);
-                        count(&mut self.material_use, m.material.0, true);
-                        st.added += 1;
-                    }
+                retry.retain(|x| *x != e);
+                if self.put(e, *m, &at, scene, &mut st).is_err() {
+                    st.failed += 1;
+                    self.retry.push(e);
                 }
             }
             self.mesh_seen = meshes.version();
+        }
+        for e in retry {
+            if let Some(m) = meshes.and_then(|c| c.get(e)) {
+                if self.put(e, *m, &at, scene, &mut st).is_err() {
+                    st.failed += 1;
+                    self.retry.push(e);
+                }
+            }
         }
 
         // poses: changed since the last sync, or moved in the latest tick (between two states: every frame)
@@ -276,9 +308,12 @@ impl Bridge {
                     if s.entity == e {
                         let t = transform(&p.interpolate(alpha));
                         if t != s.t {
-                            scene.set_transform(s.inst, &t)?;
-                            s.t = t;
-                            st.moved += 1;
+                            if scene.set_transform(s.inst, &t).is_ok() {
+                                s.t = t;
+                                st.moved += 1;
+                            } else {
+                                st.failed += 1;
+                            }
                         }
                     }
                 }

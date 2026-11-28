@@ -14,6 +14,11 @@ First release on crates.io.
 
 - The bridge from lib/game to render3d (G7b part 1): `MeshRef` (a mesh and a material), `Bridge::sync` (new MeshRefs added, switched meshes and materials set, gone entities removed, changed poses written at the frame's alpha: a pose between two ticks every frame, a standing one once; `SyncStats`), `follow` (the scene's origin follows the camera in steps of 512 m), `retire_mesh`, `retire_material` and `collect` (`Renderer::remove_mesh` / `remove_material` once no instance of the bridge uses them), `reset` (a new scene after a lost device), `clear`; `camera` (a game `View` as `render3d::Camera`), `transform`. A crate of its own so that a game's server never links render3d (Cargo unifies features over one build). docs/GAMECORE.md
 
+### Fixed
+
+- Models and Textures: what the renderer refuses to remove (the bridge's instances still use it until sync_models runs after the update, a material of the app names a texture) comes off with the next update (waiting()); the ids were dropped and the meshes, materials and textures stayed on the GPU for good, with every model unloaded or reloaded while an entity showed it
+- Bridge::sync and sync_models: an entity render3d refuses (a removed mesh, a pose that is not finite) is left out and counted (SyncStats::failed), the others go on and the next sync tries it again; the error ended the sync and every later sync ran into the same entity, so nothing after it was added or moved any more. A model whose parts fail half way takes the instances it added off again
+
 [Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.1...HEAD
 - (G7b part 2) glTF models and images as lib/game assets: `Model` (lib/gltf) and `Image` (PNG, JPEG); `Models` and `Textures` put what became ready on a renderer and take off what was unloaded (`Renderer::remove_mesh`, `remove_material`, `remove_texture`); the component `ModelRef` and `Bridge::sync_models`: an entity gets an instance per part of its model once the model is up, at its pose, only changes written. docs/GAMECORE.md
 

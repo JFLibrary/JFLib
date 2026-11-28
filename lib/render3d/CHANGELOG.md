@@ -17,6 +17,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - Outlines and FXAA (G7f part 2): `Scene::set_outline` (`Outline { width, color, crease }`): lines on the edges of the depth buffer (silhouettes, creases), drawn over the opaque image before blended instances and particles; `Scene::set_antialias(Antialias::Fxaa)`: FXAA 3.11 (quality 12) from an image of the renderer's into the target. docs/RENDER3D.md sections Umrisse, Kantenglättung
 - The viewmodel (G7f part 2): `Scene::set_viewmodel` (`Viewmodel { fov_y, near, far }`) and `Scene::add_viewmodel`: instances in the camera's space drawn with their own lens in front of the world (the world's depth takes 0 to 0.5, the viewmodel's 0.5 to 1), lit by the scene's sun, shadows, lights and environment; lists apart from the world's, no shadows cast. docs/RENDER3D.md section Waffe vor der Kamera
 - Particles (G7f part 2): `Scene::set_particles`, `add_emitter` (`Emitter`: seed, additive or alpha, discs or streaks, life, speed, cone, size and colour over life, gravity, drag, the viewmodel's space), `emit`, `set_time`, `clear_particles`: born on the CPU from the emitter's seed (the same on every device), moved in closed form in a compute shader, sorted back to front on the GPU, one indirect draw; no read-back. docs/RENDER3D.md section Partikel
+- Renderer::has_material
 
 ### Changed
 

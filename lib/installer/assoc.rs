@@ -33,18 +33,48 @@ use plat::assoc::{package_entries, RV_TREE};
 pub(crate) struct Plan {
     pub(crate) set: Vec<(String, String, String)>,
     pub(crate) remove: String,
+    /// keys of the app's own that another program holds (a scheme such as mailto): left alone
+    pub(crate) kept: Vec<String>,
 }
 
-/// the registry entries of the package's types, schemes and browser for the program exe
-pub(crate) fn plan(pkg: &Package, exe: &str) -> Plan {
+/// whether a key's command (`have`) starts the same program as `want`: the same command, or the
+/// same program file name in its first quoted part (an earlier setup of the app in another folder)
+pub(crate) fn same_program(have: &str, want: &str) -> bool {
+    let prog = |c: &str| -> Option<String> {
+        let p = c.trim_start().strip_prefix('"')?.split('"').next()?;
+        Some(p.rsplit(['\\', '/']).next().unwrap_or(p).to_ascii_lowercase())
+    };
+    have.trim().eq_ignore_ascii_case(want.trim()) || prog(have).is_some_and(|h| prog(want) == Some(h))
+}
+
+/// the registry entries of the package's types, schemes and browser for the program exe.
+/// `holder(key)`: the command of a key that exists already (None: missing).  A key of the app's
+/// own that exists with another program's command is not written and not removed: a setup for
+/// all users with schemes=mailto overwrote the computer's mail handler, and its uninstaller
+/// removed the key, for every user
+pub(crate) fn plan(pkg: &Package, exe: &str, holder: &dyn Fn(&str) -> Option<String>) -> Plan {
+    let entries = package_entries(pkg, exe);
+    let mut kept: Vec<String> = Vec::new();
+    let mut looked: Vec<&str> = Vec::new();
+    for e in entries.iter().filter(|e| e.kind == RV_TREE) {
+        if looked.contains(&e.root.as_str()) {
+            continue;
+        }
+        looked.push(&e.root);
+        let key = format!("{}\\shell\\open\\command", e.root);
+        let mine = entries.iter().find(|x| x.key.eq_ignore_ascii_case(&key) && x.name.is_empty()).map_or("", |x| x.value.as_str());
+        if holder(&e.root).is_some_and(|c| !same_program(&c, mine)) {
+            kept.push(e.root.clone());
+        }
+    }
     let mut set = Vec::new();
     let mut remove: Vec<String> = Vec::new();
-    for e in package_entries(pkg, exe) {
+    for e in entries.iter().filter(|e| !(e.kind == RV_TREE && kept.contains(&e.root))) {
         let item = if e.kind == RV_TREE { format!("T:{}", e.root) } else { format!("V:{}|{}", e.key, e.name) };
         if !remove.contains(&item) {
             remove.push(item);
         }
-        set.push((e.key, e.name, e.value));
+        set.push((e.key.clone(), e.name.clone(), e.value.clone()));
     }
-    Plan { set, remove: remove.join(";") }
+    Plan { set, remove: remove.join(";"), kept }
 }

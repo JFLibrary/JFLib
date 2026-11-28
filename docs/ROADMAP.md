@@ -2742,9 +2742,11 @@ Crates, die einer JF-App folgen:
       beiden sie leer oder anders zeichnet, wie der andere bzw. das Referenzbild von SerenityOS
     - jede in einem PDF auch von pdf selbst gezeichnet
     - 8000 beschädigte Kopien ohne Absturz, keine langsamer als 0,5 s; dafür hat ein Datenstrom
-      ein Arbeitsbudget von viermal `max_pixels`, und Symbolwörterbücher und Textregionen enden,
-      wo ihre arithmetischen Daten aufgebraucht sind (vorher brauchte eine Kopie mit zu vielen
-      Symbolen bei den Standardoptionen 30 s)
+      ein Arbeitsbudget von viermal `max_pixels` plus 2^22 (die Pixel seiner Seiten und
+      Regionen; die Segmente werden einmal in ihrer Reihenfolge decodiert, jedes auf die Seite,
+      der es zugeordnet ist), und Symbolwörterbücher und
+      Textregionen enden, wo ihre arithmetischen Daten aufgebraucht sind (vorher brauchte eine
+      Kopie mit zu vielen Symbolen bei den Standardoptionen 30 s)
   - **Behoben** im CCITT-Decoder von pdf: Er suchte den Bezugspunkt einer Zeile vom Zeilenanfang
     an, was mit vielen Wechseln quadratisch wurde.
 

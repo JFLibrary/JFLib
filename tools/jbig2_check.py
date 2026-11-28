@@ -23,6 +23,8 @@ Suites
             decoded by img_jbig2::CODEC) equal our decode
   mutate    damaged copies of four files (codectest --jbig2-mutate): no crash, none slower
             than 2 s
+  layout    files made here (codectest --jbig2): two pages whose segments interleave, two pages
+            without an end of page, a global pattern dictionary after a damaged page
 
   python tools/jbig2_check.py [--exe build/linux/codectest] [--pdftest build/linux/pdftest] [--wine]
                                [--only SUITE] [--keep DIR]
@@ -82,7 +84,26 @@ bitmap-template1-customat bitmap-template1-tpgdon bitmap-template1 bitmap-templa
 bitmap-template2-tpgdon bitmap-template2 bitmap-template3-customat-tpgdon bitmap-template3-customat bitmap-template3-tpgdon
 bitmap-template3 bitmap-tpgdon bitmap-trailing-7fff-stripped-harder-refine bitmap-trailing-7fff-stripped-harder
 bitmap-trailing-7fff-stripped bitmap""".split()
-REFS = ["bitmap.bmp", "bitmap-xor.bmp", "bitmap-blemish.bmp", "bitmap-template0-all-ones.bmp", "annex-h-p.png"]
+# the reference image of a file, where Ghostscript or Poppler (or both) draw it otherwise: these files
+# are encodings of SerenityOS's bitmap.bmp (json/bitmap.bmp, the image its tests decode them to);
+# only a file's own reference image counts
+REF_OF = dict.fromkeys("""bitmap-composite-and-xnor-halftone bitmap-composite-and-xnor-refine
+bitmap-composite-or-xor-replace-refine bitmap-halftone-composite bitmap-halftone-refine
+bitmap-halftone-skip-dummy bitmap-halftone-skip-grid bitmap-halftone-skip-grid-template1
+bitmap-halftone-skip-grid-template2 bitmap-halftone-skip-grid-template3 bitmap-refine
+bitmap-refine-customat bitmap-refine-customat-tpgron bitmap-refine-lossless bitmap-refine-page-subrect
+bitmap-refine-refine bitmap-refine-template1 bitmap-refine-template1-tpgron bitmap-refine-tpgron
+bitmap-symbol-context-reuse bitmap-symbol-context-reuse-huffman-refagg
+bitmap-symbol-context-reuse-refagg bitmap-symbol-manyrefs bitmap-symbol-symhuff-texthuff
+bitmap-symbol-symhuff-texthuffB10B13 bitmap-symbol-symhuffB5B3-texthuffB7B9B12
+bitmap-symbol-symhuffcustom-texthuffcustom bitmap-symbol-symhuffrefine-textrefine
+bitmap-symbol-symhuffrefine-textrefine-export bitmap-symbol-symhuffrefineone
+bitmap-symbol-symhuffrefineseveral bitmap-symbol-texthuffrefine bitmap-symbol-texthuffrefineB15
+bitmap-symbol-texthuffrefinecustom bitmap-symbol-texthuffrefinecustomdims
+bitmap-symbol-texthuffrefinecustompos bitmap-symbol-texthuffrefinecustompos-global
+bitmap-symbol-texthuffrefinecustomposdims bitmap-symbol-texthuffrefinecustomsize
+bitmap-trailing-7fff-stripped-harder-refine""".split(), "bitmap.bmp")
+REFS = sorted(set(REF_OF.values()))
 
 FAILS = []
 DIGEST = hashlib.sha256()
@@ -225,8 +246,12 @@ class Exe:
 
 
 def differ(a, b):
-    """the pixels that differ between two (w, h, bits), or None when the sizes differ"""
+    """the pixels that differ between two (w, h, bits), or None when the sizes differ or the bits of
+    one are short"""
     if a is None or b is None or a[:2] != b[:2]:
+        return None
+    n = (a[0] + 7) // 8 * a[1]
+    if len(a[2]) != n or len(b[2]) != n:
         return None
     return sum(bin(x ^ y).count("1") for x, y in zip(a[2], b[2]))
 
@@ -274,7 +299,7 @@ def suite_serenity(exe, work):
             n_ok += 1
             continue
         # where a decoder disagrees: ours must equal the other one or SerenityOS's reference image
-        votes = [rn for rn, rv in refs.items() if differ(ours, rv) == 0]
+        votes = [REF_OF[name]] if name in REF_OF and differ(ours, refs.get(REF_OF[name])) == 0 else []
         agree = [n for n, dd in (("Ghostscript", dg), ("Poppler", dp)) if dd == 0] + votes
         if agree:
             n_ok += 1
@@ -366,6 +391,50 @@ def suite_mutate(exe, work):
             fail("mutate %s: a damaged copy took too long" % name)
 
 
+JB2_ID = bytes([0x97, 0x4A, 0x42, 0x32, 0x0D, 0x0A, 0x1A, 0x0A])
+
+
+def jb2_seg(num, ty, page, data, refs=()):
+    """a segment (T.88 7.2): its number, type, referred-to segments (numbers below 256), page
+    association (one byte) and data"""
+    return struct.pack(">IBB", num, ty, len(refs) << 5) + bytes(refs) + bytes([page]) + struct.pack(">I", len(data)) + data
+
+
+def suite_layout(exe, work):
+    """files made here, decoded as files: the segments of two pages interleaved (a region goes to
+    the page its association names), two pages without an end of page, and a global pattern
+    dictionary after a damaged page (the next page's halftone region still finds it)"""
+    info = struct.pack(">IIII", 8, 2, 0, 0) + b"\x00\x00\x00"
+    right = (8, 2, b"\x0f\x0f")  # the right half black
+    white = (8, 2, b"\x00\x00")
+    # an MMR generic region of 8 x 2 at (0, 0), OR: four white and four black in both rows
+    region = struct.pack(">IIII", 8, 2, 0, 0) + b"\x00\x01" + b"\x36\xf0"
+    # a pattern dictionary (MMR): two patterns of 4 x 2, white and black
+    patterns = b"\x01" + bytes([4, 2]) + struct.pack(">I", 1) + b"\x36\xf0"
+    # a halftone region (MMR) of 8 x 2: a grid of two cells 4 pixels apart, grey values 0 and 1
+    halftone = struct.pack(">IIII", 8, 2, 0, 0) + b"\x00" + b"\x01" + struct.pack(">IIiiHH", 2, 1, 0, 0, 4 * 256, 0) + b"\x23\xa0"
+    cases = {
+        "interleaved": ([jb2_seg(0, 48, 1, info), jb2_seg(1, 48, 2, info), jb2_seg(2, 39, 1, region), jb2_seg(3, 49, 1, b""), jb2_seg(4, 49, 2, b""), jb2_seg(5, 51, 0, b"")], [right, white]),
+        "no-end-of-page": ([jb2_seg(0, 48, 1, info), jb2_seg(1, 39, 1, region), jb2_seg(2, 48, 2, info)], [right, white]),
+        "global-after-damage": ([jb2_seg(0, 48, 1, info), jb2_seg(1, 38, 1, b"\x00" * 5), jb2_seg(2, 16, 0, patterns), jb2_seg(3, 49, 1, b""), jb2_seg(4, 48, 2, info), jb2_seg(5, 23, 2, halftone, [2]), jb2_seg(6, 49, 2, b"")], [white, right]),
+    }
+    for name, (segs, want) in cases.items():
+        path = Path(work) / ("layout-%s.jb2" % name)
+        path.write_bytes(JB2_ID + b"\x01" + struct.pack(">I", len(want)) + b"".join(segs))
+        for old in Path(work).glob("layout.pbm*"):
+            old.unlink()
+        out = Path(work) / "layout.pbm"
+        r = exe.run("--jbig2", path, "--to", out)
+        if r.returncode != 0:
+            fail("layout %s: %s" % (name, r.stderr.strip()))
+            continue
+        more = [Path(work) / ("layout.pbm-%d" % k) for k in range(2, 10)]
+        got = [read_pbm(out)] + [read_pbm(m) for m in more if m.exists()]
+        if got != want:
+            fail("layout %s: the pages %s, not %s" % (name, got, want))
+    print("layout: %d files made here" % len(cases))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--exe", default=str(ROOT / "build" / "linux" / "codectest"))
@@ -377,7 +446,7 @@ def main():
     exe = Exe(a.exe, a.wine)
     work = a.keep or tempfile.mkdtemp(prefix="jbig2_check_")
     os.makedirs(work, exist_ok=True)
-    suites = {"serenity": suite_serenity, "pdf": lambda e, w: suite_pdf(e, w, a.pdftest), "codec": suite_codec, "mutate": suite_mutate}
+    suites = {"serenity": suite_serenity, "pdf": lambda e, w: suite_pdf(e, w, a.pdftest), "codec": suite_codec, "mutate": suite_mutate, "layout": suite_layout}
     for name, f in suites.items():
         if a.only and a.only != name:
             continue

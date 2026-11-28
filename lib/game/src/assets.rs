@@ -135,8 +135,29 @@ type Job<T> = plat::task::Blocking<Result<T, String>>;
 enum Slot<T> {
     /// waiting for its decode: Background's job, or Frames' turn (None)
     Loading(Option<Job<T>>),
+    /// read again (reload): the value so far stays until the new one has come, as in Loading
+    Reloading(T, Option<Job<T>>),
     Ready(T),
     Failed(String),
+}
+
+/// a finished decode into the slot -> what changed: the new value, or for a reload that failed the old value again
+/// (no change: nothing to put up anew), else Failed
+fn finish<T>(slot: &mut Slot<T>, r: Result<T, String>, id: AssetId) -> Option<Change> {
+    match (r, core::mem::replace(slot, Slot::Failed(String::new()))) {
+        (Ok(v), _) => {
+            *slot = Slot::Ready(v);
+            Some(Change::Ready(id))
+        }
+        (Err(_), Slot::Reloading(old, _)) => {
+            *slot = Slot::Ready(old);
+            None
+        }
+        (Err(err), _) => {
+            *slot = Slot::Failed(err);
+            Some(Change::Failed(id))
+        }
+    }
 }
 
 struct Entry<T> {
@@ -312,13 +333,13 @@ impl<T: Asset> Assets<T> {
     /// the state of an entry by its id (None: gone)
     pub fn state_of(&self, id: AssetId) -> Option<State> {
         self.entry(id).map(|e| match e.slot {
-            Slot::Loading(_) => State::Loading,
+            Slot::Loading(_) | Slot::Reloading(..) => State::Loading,
             Slot::Ready(_) => State::Ready,
             Slot::Failed(_) => State::Failed,
         })
     }
 
-    /// the value once Ready
+    /// the value once Ready (while it is read again by reload: the one so far)
     pub fn get(&self, h: &Handle<T>) -> Option<&T> {
         self.get_id(h.id())
     }
@@ -326,7 +347,7 @@ impl<T: Asset> Assets<T> {
     /// the value of an entry by its id (None: not ready, failed or gone)
     pub fn get_id(&self, id: AssetId) -> Option<&T> {
         match self.entry(id) {
-            Some(Entry { slot: Slot::Ready(v), .. }) => Some(v),
+            Some(Entry { slot: Slot::Ready(v) | Slot::Reloading(v, _), .. }) => Some(v),
             _ => None,
         }
     }
@@ -368,7 +389,7 @@ impl<T: Asset> Assets<T> {
         let mut s = AssetStats { decoded: self.decoded, unloaded: self.unloaded, ..AssetStats::default() };
         for e in self.entries.iter().flatten() {
             match e.slot {
-                Slot::Loading(_) => s.loading += 1,
+                Slot::Loading(_) | Slot::Reloading(..) => s.loading += 1,
                 Slot::Ready(_) => s.ready += 1,
                 Slot::Failed(_) => s.failed += 1,
             }
@@ -382,24 +403,29 @@ impl<T: Asset> Assets<T> {
     }
 
     /// read and decode the asset again (a file that changed): Loading until then; its value stays until the new
-    /// one has come (a failed reload keeps the old value and reports Failed only when there was none)
+    /// one has come: get() gives it meanwhile (a failed reload keeps the old value, without a change, and reports
+    /// Failed only when there was none)
     pub fn reload(&mut self, h: &Handle<T>) {
         let i = h.id().index;
         let mode = self.mode;
         let Some(Some(e)) = self.entries.get_mut(i as usize) else { return };
-        if e.generation != h.id().generation || e.path.is_empty() || matches!(e.slot, Slot::Loading(_)) {
+        if e.generation != h.id().generation || e.path.is_empty() || matches!(e.slot, Slot::Loading(_) | Slot::Reloading(..)) {
             return;
         }
-        match mode {
+        let job = match mode {
             Loading::Background => {
                 let p = e.path.clone();
-                e.slot = Slot::Loading(Some(plat::task::spawn_blocking(move || read_decode::<T>(&p))));
+                Some(plat::task::spawn_blocking(move || read_decode::<T>(&p)))
             }
             Loading::Frames { .. } => {
-                e.slot = Slot::Loading(None);
                 self.queue.push_back(i);
+                None
             }
-        }
+        };
+        e.slot = match core::mem::replace(&mut e.slot, Slot::Loading(None)) {
+            Slot::Ready(v) => Slot::Reloading(v, job),
+            _ => Slot::Loading(job),
+        };
     }
 
     /// once a frame: decodes that finished (Frames: decoded now, within the budget) become Ready or Failed; assets
@@ -409,21 +435,11 @@ impl<T: Asset> Assets<T> {
         // ---- finished jobs
         for i in 0..self.entries.len() {
             let Some(e) = self.entries[i].as_mut() else { continue };
-            if let Slot::Loading(Some(job)) = &mut e.slot {
-                if let Some(r) = poll_job(job) {
-                    let id = AssetId { index: i as u32, generation: e.generation };
-                    self.decoded += 1;
-                    match r {
-                        Ok(v) => {
-                            e.slot = Slot::Ready(v);
-                            out.push(Change::Ready(id));
-                        }
-                        Err(err) => {
-                            e.slot = Slot::Failed(err);
-                            out.push(Change::Failed(id));
-                        }
-                    }
-                }
+            let (Slot::Loading(Some(job)) | Slot::Reloading(_, Some(job))) = &mut e.slot else { continue };
+            if let Some(r) = poll_job(job) {
+                let id = AssetId { index: i as u32, generation: e.generation };
+                self.decoded += 1;
+                out.extend(finish(&mut e.slot, r, id));
             }
         }
         // ---- Frames: decode here, the oldest first, until the budget is spent
@@ -436,7 +452,7 @@ impl<T: Asset> Assets<T> {
                     break;
                 }
                 let Some(e) = self.entries[i as usize].as_mut() else { continue };
-                if !matches!(e.slot, Slot::Loading(None)) {
+                if !matches!(e.slot, Slot::Loading(None) | Slot::Reloading(_, None)) {
                     continue;
                 }
                 // (nobody holds it any more: no decode, the unload below takes it)
@@ -446,16 +462,8 @@ impl<T: Asset> Assets<T> {
                 first = false;
                 let id = AssetId { index: i, generation: e.generation };
                 self.decoded += 1;
-                match read_decode::<T>(&e.path) {
-                    Ok(v) => {
-                        e.slot = Slot::Ready(v);
-                        out.push(Change::Ready(id));
-                    }
-                    Err(err) => {
-                        e.slot = Slot::Failed(err);
-                        out.push(Change::Failed(id));
-                    }
-                }
+                let r = read_decode::<T>(&e.path);
+                out.extend(finish(&mut e.slot, r, id));
             }
         }
         // ---- unloading: entries without a handle for more than `linger` updates

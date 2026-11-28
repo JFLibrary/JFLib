@@ -124,11 +124,18 @@ fn frames(c: &mut Ctx) {
     // reload: the file changed
     let r = s.load(&path("f7.bin"));
     let _ = s.update();
+    let before = s.get(&r).map(|b| b.0.clone());
     c.check(put("f7.bin", b"changed"), || String::from("mem:// f7.bin not written again"));
     s.reload(&r);
-    c.check(s.state(&r) == State::Loading, || String::from("reload: Loading"));
+    // (the value so far stays until the new one has come: it was gone at once)
+    c.check(s.state(&r) == State::Loading && before.is_some() && s.get(&r).map(|b| b.0.clone()) == before, || format!("reload: Loading, the old value meanwhile: {:?}", s.get(&r)));
     let ch = s.update();
     c.check(ch == vec![Change::Ready(r.id())] && s.get(&r).map(|b| &b.0[..]) == Some(&b"changed"[..]), || format!("reload: {ch:?}"));
+    // a reload that fails (the file went) keeps the value, Ready, without a change
+    plat::delete(&path("f7.bin"));
+    s.reload(&r);
+    let ch = s.update();
+    c.check(ch.is_empty() && s.state(&r) == State::Ready && s.get(&r).map(|b| &b.0[..]) == Some(&b"changed"[..]), || format!("a failed reload keeps the value: {ch:?} {:?} {:?}", s.state(&r), s.error(&r)));
     // stats
     let st = s.stats();
     c.check(st.loading == 0 && st.failed == 1 && st.ready as usize == s.len() - 1, || format!("stats {st:?}, {} entries", s.len()));
@@ -557,6 +564,79 @@ fn gpu_tests(c: &mut Ctx, dev: &Device) -> gpu::Result<()> {
     let ch = images.update();
     let _ = tex.update(&images, &ch, &mut r2)?;
     c.check(tex.texture(iid).is_none() && id.is_some_and(|t| r2.texture_info(t).is_none()), || String::from("the image unloaded: its texture gone"));
+    // an image unloaded while a material of the app still names its texture: the renderer refuses the removal then;
+    // once the material went, the next update takes the texture off (it stayed for good)
+    let im = images.load(&path("gpu_tex.png"));
+    let ch = images.update();
+    let _ = tex.update(&images, &ch, &mut r2)?;
+    let named = tex.texture(im.id());
+    let mat = match named {
+        Some(t) => Some(r2.add_material(&render3d::Material { base_color_texture: Some(render3d::TextureRef { texture: t, sampling: render3d::Sampling::LINEAR }), ..render3d::Material::color(1.0, 1.0, 1.0) })?),
+        None => None,
+    };
+    drop(im);
+    let ch = images.update();
+    let _ = tex.update(&images, &ch, &mut r2)?;
+    let refused = named.is_some_and(|t| r2.texture_info(t).is_some());
+    if let Some(m) = mat {
+        r2.remove_material(m)?;
+    }
+    let _ = tex.update(&images, &[], &mut r2)?;
+    c.check(mat.is_some() && refused && named.is_some_and(|t| r2.texture_info(t).is_none()), || format!("a texture a material still named comes off after the material: {named:?}, {mat:?}, refused {refused}"));
+    // the documented order (Assets::update, Models::update, then sync_models): the update that unloads a model finds
+    // the instances of its last entity still on the scene, which refuses the removal of its meshes and materials; the
+    // next update takes them off (they stayed on the renderer for good)
+    drop(w);
+    let mut w3 = World::new();
+    let e3 = w3.spawn_with((Pose::at(Vec3::new(0.0, 0.0, 0.0)), ModelRef { model: one.clone() }));
+    let mut b3 = Bridge::new();
+    let mut s3 = Scene::new(&r2)?;
+    let st = b3.sync_models(&w3, &mut s3, 1.0, &models)?;
+    let (meshes, mats) = models.made(one.id()).map(|m| (m.0.to_vec(), m.1.len() as u32)).unwrap_or_default();
+    let mc = r2.material_count();
+    w3.despawn(e3);
     drop(one);
+    let ch = assets.update();
+    let ms = models.update(&assets, &ch, &mut r2)?;
+    let st2 = b3.sync_models(&w3, &mut s3, 1.0, &models)?;
+    let ch2 = assets.update();
+    let _ = models.update(&assets, &ch2, &mut r2)?;
+    let gone = !meshes.is_empty() && meshes.iter().all(|m| r2.mesh_info(*m).is_none()) && r2.material_count() + mats == mc;
+    c.check(st.added == 1 && ms.removed == 1 && st2.removed == 1 && gone,
+            || format!("unloaded in the documented order: its meshes and materials off the renderer a frame later: {st:?} {ms:?} {st2:?}, {} of {} meshes left, materials {} of {mc}",
+                       meshes.iter().filter(|m| r2.mesh_info(**m).is_some()).count(), meshes.len(), r2.material_count()));
+    sync_refused(c, &mut r2)
+}
+
+/// an entity render3d refuses (a removed mesh, a pose that is not finite) ended Bridge::sync there, and the next sync
+/// ran into it again: the entities after it were never added or moved.  Now it is left out and tried again
+fn sync_refused(c: &mut Ctx, r: &mut Renderer) -> gpu::Result<()> {
+    use game_render3d::MeshRef;
+    use render3d::{Material, MeshData};
+    let p = cube_prim(None);
+    let data = MeshData { positions: &p.positions, normals: &p.normals, uvs: &p.uvs, indices: &p.indices };
+    let (mesh, gone) = (r.add_mesh(&data)?, r.add_mesh(&data)?);
+    r.remove_mesh(gone)?;
+    let material = r.add_material(&Material::color(0.5, 0.5, 0.5))?;
+    let mut w = World::new();
+    let a = w.spawn_with((Pose::at(Vec3::new(0.0, 0.0, 0.0)), MeshRef { mesh: gone, material }));
+    let b = w.spawn_with((Pose::at(Vec3::new(1.0, 0.0, 0.0)), MeshRef { mesh, material }));
+    let nan = Transform::new(Vec3::new(f64::NAN, 0.0, 0.0), Quat::IDENTITY);
+    let cc = w.spawn_with((Pose::new(nan), MeshRef { mesh, material }));
+    let mut bridge = Bridge::new();
+    let mut s = Scene::new(r)?;
+    let first = bridge.sync(&w, &mut s, 1.0);
+    let b_in = bridge.instance(b).is_some();
+    if let Some(mut p) = w.get_mut::<Pose>(b) {
+        p.teleport(Transform::new(Vec3::new(2.0, 0.0, 0.0), Quat::IDENTITY));
+    }
+    if let Some(mut p) = w.get_mut::<Pose>(cc) {
+        p.teleport(Transform::new(Vec3::new(3.0, 0.0, 0.0), Quat::IDENTITY));
+    }
+    let second = bridge.sync(&w, &mut s, 1.0);
+    c.check(b_in && first.as_ref().is_ok_and(|st| st.added == 1 && st.failed == 2) && bridge.instance(a).is_none(),
+            || format!("a refused entity is left out, the others are added: {first:?}, b {b_in}"));
+    c.check(second.as_ref().is_ok_and(|st| st.moved >= 1 && st.added == 1 && st.failed == 1) && bridge.instance(cc).is_some(),
+            || format!("the next sync moves the others and adds the one whose pose became finite: {second:?}"));
     Ok(())
 }

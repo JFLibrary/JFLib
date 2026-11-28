@@ -34,19 +34,20 @@ pub(crate) fn patterns(d: &[u8], work: &mut u64, limit: u64, max: u64) -> Result
     }
     let data = &d[7..];
     let w = (graymax + 1) * pw;
-    *work = work.saturating_add((w * ph) as u64);
+    *work = work.saturating_add((w as u64) * (ph as u64));
     if *work > limit {
         return Err(Error::Limit);
     }
     let collective = if mmr_on {
         mmr::decode(data, w, ph, max)?.0
     } else {
-        let at = [(-(pw as i32).min(127) as i8, 0), (-3, -1), (2, -2), (-2, -2)];
+        // 6.7.5: the first adaptive pixel one pattern to the left
+        let at = [(-(pw as i32), 0), (-3, -1), (2, -2), (-2, -2)];
         let mut mq = Mq::new(data);
         let mut cx = vec![Cx::default(); 1 << 16];
         generic::generic(&mut mq, &mut cx, &Gb { w, h: ph, template, tpgdon: false, at, skip: None }, max)?
     };
-    (0..=graymax).map(|g| collective.sub((g * pw) as i64, 0, pw, ph).map(Rc::new)).collect()
+    (0..=graymax).map(|g| collective.sub((g * pw) as i64, 0, pw, ph, max).map(Rc::new)).collect()
 }
 
 /// a halftone region (its data after the region segment information) of w x h with the patterns

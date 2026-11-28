@@ -87,7 +87,7 @@ impl Dec<'_> {
         v
     }
 
-    /// one run of a colour (makeup codes summed): None on a bad code
+    /// one run of a colour (makeup codes summed): None on a bad code or a run longer than the row
     fn run(&mut self, black: bool) -> Option<u32> {
         let mut total = 0u32;
         loop {
@@ -98,11 +98,12 @@ impl Dec<'_> {
             }
             self.pos += len as usize;
             total = total.saturating_add(run as u32);
+            // a terminating code too (a run of 63 in a row of 8 is damage, not a clamp)
+            if total > self.cols {
+                return None;
+            }
             if run < 64 {
                 return Some(total);
-            }
-            if total > 1 << 24 {
-                return None;
             }
         }
     }
@@ -131,6 +132,7 @@ impl Dec<'_> {
             }
             let b1 = refl.get(i).copied().unwrap_or(cols) as i64;
             let b2 = refl.get(i + 1).copied().unwrap_or(cols) as i64;
+            let before = a0;
             let p7 = self.peek(7);
             if p7 >> 6 == 1 {
                 self.pos += 1;
@@ -171,7 +173,8 @@ impl Dec<'_> {
                 return false;
             }
             a0 = a0.clamp(0, cols as i64);
-            if cur.last().is_some_and(|&l| (l as i64) > a0) {
+            // a0 never goes back (after a pass mode, b1 - 3 may lie left of it: damaged data)
+            if a0 < before || cur.last().is_some_and(|&l| (l as i64) > a0) {
                 return false;
             }
             cur.push(a0 as u32);
