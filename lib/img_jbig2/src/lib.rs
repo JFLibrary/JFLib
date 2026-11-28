@@ -25,10 +25,12 @@
 // REPLACE.  The file organisations sequential and random-access.
 //
 // Not here: colour (JBIG2 Amendment 3: colour palettes and coloured regions are ignored, the page
-// stays bilevel), extension segments.  The segments are decoded once, in their order (the global
-// ones where they stand); a damaged segment ends its page with what was decoded before it, and the
-// next page information segment starts the next page.  Limits (`Options::max_pixels`, symbol
-// counts, the work of a stream: its pages' and regions' pixels) refuse hostile files before they
+// stays bilevel), extension segments.  The segments are decoded once, in their order: the global
+// ones where they stand, a page's onto the page their association names (a file's pages may
+// interleave; PDF's embedded form has one page).  A damaged segment ends its page with what was
+// decoded before it and that page's further segments are left out; the global ones and the other
+// pages go on.  Limits (`Options::max_pixels`, symbol counts, the work of a stream: its pages' and
+// regions' pixels, at most four times `max_pixels` plus 2^22) refuse hostile files before they
 // cost memory or time, and symbol dictionaries and text regions stop where their arithmetic data
 // has run out (mq.rs).
 #![no_std]
@@ -44,7 +46,7 @@ mod mmr;
 mod mq;
 mod symbol;
 
-use alloc::collections::BTreeMap;
+use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::rc::Rc;
 use alloc::vec;
 use alloc::vec::Vec;
@@ -131,6 +133,8 @@ pub fn probe(d: &[u8]) -> bool {
 struct Seg<'a> {
     num: u32,
     ty: u8,
+    /// the page association (0: global)
+    page: u32,
     refs: Vec<u32>,
     data: &'a [u8],
     /// the header's data length was unknown (7.2.7): the data ends with its row count
@@ -164,12 +168,19 @@ fn header<'a>(d: &'a [u8], p: &mut usize) -> Result<(Seg<'a>, u32), Error> {
         refs.push(b.iter().fold(0u32, |v, &x| (v << 8) | x as u32));
         *p += size;
     }
-    // the page association (four bytes or one): not needed, the segments are decoded in their
-    // order and a page information segment starts each page
-    *p += if flags & 0x40 != 0 { 4 } else { 1 };
+    // the page association: four bytes or one
+    let page = if flags & 0x40 != 0 {
+        let v = be32(d, *p)?;
+        *p += 4;
+        v
+    } else {
+        let v = *d.get(*p).ok_or(Error::Truncated)? as u32;
+        *p += 1;
+        v
+    };
     let len = be32(d, *p)?;
     *p += 4;
-    Ok((Seg { num, ty: flags & 0x3F, refs, data: &[], unknown_len: false }, len))
+    Ok((Seg { num, ty: flags & 0x3F, page, refs, data: &[], unknown_len: false }, len))
 }
 
 /// the length of an immediate generic region's data of unknown length (7.2.7): up to its end
@@ -262,6 +273,8 @@ enum Res {
 }
 
 struct Page {
+    /// its place among the pages (the order of their page information segments)
+    slot: usize,
     bmp: Bmp,
     default: u8,
     /// the height grows with the stripes
@@ -274,8 +287,17 @@ struct Dec {
     work: u64,
     limit: u64,
     res: BTreeMap<u32, Res>,
-    page: Option<Page>,
-    done: Vec<Bitmap>,
+    /// the pages open, by their number
+    open: BTreeMap<u32, Page>,
+    /// the number of the page opened last
+    last: u32,
+    /// the pages in the order of their page information segments (None: still open)
+    done: Vec<Option<Bitmap>>,
+    /// a segment goes to the page its association names (files); else to the page opened last
+    /// (PDF's embedded form: one page)
+    by_page: bool,
+    /// the pages a damaged segment ended: their further segments are left out
+    damaged: BTreeSet<u32>,
     /// the pages wanted (PDF and the codec: the first)
     want: usize,
 }
@@ -289,8 +311,46 @@ fn region_info(d: &[u8]) -> Result<(usize, usize, i64, i64, u8), Error> {
 }
 
 impl Dec {
-    fn new(max: u64, want: usize) -> Dec {
-        Dec { max, work: 0, limit: max.saturating_mul(4).saturating_add(1 << 22), res: BTreeMap::new(), page: None, done: Vec::new(), want }
+    fn new(max: u64, want: usize, by_page: bool) -> Dec {
+        let limit = max.saturating_mul(4).saturating_add(1 << 22);
+        Dec { max, work: 0, limit, res: BTreeMap::new(), open: BTreeMap::new(), last: 0, done: Vec::new(), by_page, damaged: BTreeSet::new(), want }
+    }
+
+    /// the open page a segment draws on: the one its association names; for a global segment (or
+    /// any of the embedded form) the page opened last
+    fn target(&self, s: &Seg) -> Option<u32> {
+        if self.by_page && self.open.contains_key(&s.page) {
+            Some(s.page)
+        } else if (!self.by_page || s.page == 0) && self.open.contains_key(&self.last) {
+            Some(self.last)
+        } else {
+            None
+        }
+    }
+
+    /// page `pg` into the results
+    fn finish(&mut self, pg: u32) {
+        if let Some(p) = self.open.remove(&pg) {
+            self.done[p.slot] = Some(Bitmap::from(&p.bmp));
+        }
+    }
+
+    /// every open page into the results
+    fn finish_all(&mut self) {
+        for (_, p) in core::mem::take(&mut self.open) {
+            self.done[p.slot] = Some(Bitmap::from(&p.bmp));
+        }
+    }
+
+    /// the pages wanted are decoded
+    fn complete(&self) -> bool {
+        self.done.len() >= self.want && self.done[..self.want].iter().all(Option::is_some)
+    }
+
+    /// the decoded pages in their order
+    fn pages(mut self) -> Vec<Bitmap> {
+        self.finish_all();
+        self.done.into_iter().flatten().collect()
     }
 
     /// n pixels of work, refused beyond the stream's budget
@@ -299,26 +359,25 @@ impl Dec {
         if self.work > self.limit { Err(Error::Limit) } else { Ok(()) }
     }
 
-    /// a page of unknown height grown to h rows; the new rows cost their pixels
-    fn grow_page(&mut self, h: usize) -> Result<(), Error> {
-        let more = match &self.page {
+    /// page `pg`, of unknown height, grown to h rows; the new rows cost their pixels
+    fn grow_page(&mut self, pg: u32, h: usize) -> Result<(), Error> {
+        let more = match self.open.get(&pg) {
             Some(p) if p.unknown_height && h > p.bmp.h => (p.bmp.w as u64).saturating_mul((h - p.bmp.h) as u64),
             _ => return Ok(()),
         };
         self.spend(more)?;
         let max = self.max;
-        if let Some(p) = self.page.as_mut() {
+        if let Some(p) = self.open.get_mut(&pg) {
             p.bmp.grow(h, p.default, max)?;
         }
         Ok(())
     }
 
-    fn compose(&mut self, b: &Bmp, x: i64, y: i64, op: u8) -> Result<(), Error> {
-        if self.page.is_none() {
-            return Ok(());
-        }
-        self.grow_page((y + b.h as i64).max(0) as usize)?;
-        if let Some(page) = self.page.as_mut() {
+    /// a region of segment `s` onto its page
+    fn compose(&mut self, s: &Seg, b: &Bmp, x: i64, y: i64, op: u8) -> Result<(), Error> {
+        let Some(pg) = self.target(s) else { return Ok(()) };
+        self.grow_page(pg, (y + b.h as i64).max(0) as usize)?;
+        if let Some(page) = self.open.get_mut(&pg) {
             page.bmp.compose(b, x, y, op);
         }
         Ok(())
@@ -361,7 +420,7 @@ impl Dec {
                 if s.ty == 4 {
                     self.res.insert(s.num, Res::Region(b));
                 } else {
-                    self.compose(&b, x, y, op)?;
+                    self.compose(s, &b, x, y, op)?;
                 }
             }
             16 => {
@@ -381,7 +440,7 @@ impl Dec {
                 if s.ty == 20 {
                     self.res.insert(s.num, Res::Region(b));
                 } else {
-                    self.compose(&b, x, y, op)?;
+                    self.compose(s, &b, x, y, op)?;
                 }
             }
             36 | 38 | 39 => {
@@ -424,7 +483,7 @@ impl Dec {
                 if s.ty == 36 {
                     self.res.insert(s.num, Res::Region(b));
                 } else {
-                    self.compose(&b, x, y, op)?;
+                    self.compose(s, &b, x, y, op)?;
                 }
             }
             40 | 42 | 43 => {
@@ -449,7 +508,7 @@ impl Dec {
                 let reference: &Bmp = match s.refs.iter().find_map(|r| if let Some(Res::Region(b)) = self.res.get(r) { Some(b) } else { None }) {
                     Some(b) => b,
                     None => {
-                        let page = self.page.as_ref().ok_or(Error::Corrupt)?;
+                        let page = self.target(s).and_then(|pg| self.open.get(&pg)).ok_or(Error::Corrupt)?;
                         page_part = page.bmp.sub(x, y, w, h, max)?;
                         &page_part
                     }
@@ -461,11 +520,10 @@ impl Dec {
                 if s.ty == 40 {
                     self.res.insert(s.num, Res::Region(b));
                 } else {
-                    self.compose(&b, x, y, op)?;
+                    self.compose(s, &b, x, y, op)?;
                 }
             }
             48 => {
-                self.finish();
                 let w = be32(d, 0)? as usize;
                 let h = be32(d, 4)?;
                 let flags = *d.get(16).ok_or(Error::Truncated)?;
@@ -475,12 +533,20 @@ impl Dec {
                 // a page costs its pixels (64 pages of the largest size are no stream's work)
                 self.spend((w as u64).saturating_mul(rows as u64))?;
                 let bmp = Bmp::new(w, rows, default, self.max)?;
-                self.page = Some(Page { bmp, default, unknown_height: unknown });
+                self.open.insert(s.page, Page { slot: self.done.len(), bmp, default, unknown_height: unknown });
+                self.done.push(None);
+                self.last = s.page;
             }
-            49 => self.finish(),
+            49 => {
+                if let Some(pg) = self.target(s) {
+                    self.finish(pg);
+                }
+            }
             50 => {
                 let y = be32(d, 0)? as usize;
-                self.grow_page(y.saturating_add(1))?;
+                if let Some(pg) = self.target(s) {
+                    self.grow_page(pg, y.saturating_add(1))?;
+                }
             }
             53 => {
                 let t = huff::from_segment(d)?;
@@ -560,43 +626,49 @@ impl Dec {
         }
     }
 
-    /// the page so far into the results
-    fn finish(&mut self) {
-        if let Some(p) = self.page.take() {
-            self.done.push(Bitmap::from(&p.bmp));
-        }
-    }
-
-    /// the segments in their order, each once (the global ones where they stand, every page's);
-    /// a damaged segment ends its page with what was decoded before it, the segments up to the
-    /// next page information segment are left out; a stream whose work is spent ends there.  Err
-    /// when no page came before the damage.
+    /// the segments in their order, each once: the global ones where they stand, a page's onto
+    /// its page.  A damaged segment ends its page with what was decoded before it and that page's
+    /// further segments are left out (a global one that fails is left out alone; in the embedded
+    /// form any damage ends the page); a stream whose work is spent ends there.  Err when no page
+    /// came before the damage.
     fn run(&mut self, segs: &[Seg]) -> Result<(), Error> {
-        let mut skip = false;
         for s in segs {
             if s.ty == 51 {
                 break;
             }
+            // a page information segment ends the page of its number (the embedded form: the one
+            // open) and lets that page's segments count again
             if s.ty == 48 {
-                self.finish();
-                skip = false;
+                if self.by_page {
+                    self.finish(s.page);
+                    self.damaged.remove(&s.page);
+                } else {
+                    self.finish_all();
+                    self.damaged.clear();
+                }
             }
             // the pages wanted are done (after an end of page too): what follows can't change them
-            if self.done.len() >= self.want {
+            if self.complete() {
                 break;
             }
-            if skip {
+            let ended = if self.by_page { self.damaged.contains(&s.page) } else { !self.damaged.is_empty() };
+            if s.ty != 48 && s.page != 0 && ended {
                 continue;
             }
             if let Err(e) = self.segment(s) {
-                if self.page.is_none() && self.done.is_empty() {
+                if self.done.is_empty() {
                     return Err(e);
                 }
-                self.finish();
                 if e == Error::Limit {
+                    self.finish_all();
                     break;
                 }
-                skip = true;
+                if s.page != 0 || !self.by_page {
+                    if let Some(pg) = self.target(s) {
+                        self.finish(pg);
+                    }
+                    self.damaged.insert(s.page);
+                }
             }
         }
         Ok(())
@@ -605,7 +677,7 @@ impl Dec {
 
 /// PDF's JBIG2Decode: the embedded segments (and those of JBIG2Globals) -> the first page
 pub fn decode_embedded(data: &[u8], globals: Option<&[u8]>, opt: &Options) -> Result<Bitmap, Error> {
-    let mut dec = Dec::new(opt.max_pixels, 1);
+    let mut dec = Dec::new(opt.max_pixels, 1, false);
     if let Some(g) = globals {
         if let Ok(gs) = sequential(g) {
             dec.run(&gs)?;
@@ -613,13 +685,12 @@ pub fn decode_embedded(data: &[u8], globals: Option<&[u8]>, opt: &Options) -> Re
     }
     let segs = sequential(data)?;
     dec.run(&segs)?;
-    dec.finish();
-    dec.done.into_iter().next().ok_or(Error::NoPage)
+    dec.pages().into_iter().next().ok_or(Error::NoPage)
 }
 
 /// a JBIG2 file (sequential or random-access) -> its pages, in the order of their page information
-/// segments; one budget of work for the file (`Options::max_pixels`): the pages past it are left
-/// out
+/// segments; one budget of work for the file (four times `Options::max_pixels` plus 2^22): the
+/// pages past it are left out
 pub fn decode_file(data: &[u8], opt: &Options) -> Result<Vec<Bitmap>, Error> {
     file_pages(data, opt, usize::MAX).map(|(pages, _)| pages)
 }
@@ -634,13 +705,13 @@ fn file_pages(data: &[u8], opt: &Options, want: usize) -> Result<(Vec<Bitmap>, u
     let body = data.get(start..).ok_or(Error::Truncated)?;
     let segs = if flags & 1 != 0 { sequential(body)? } else { random_access(body)? };
     let count = segs.iter().filter(|s| s.ty == 48).count();
-    let mut dec = Dec::new(opt.max_pixels, want);
+    let mut dec = Dec::new(opt.max_pixels, want, true);
     dec.run(&segs)?;
-    dec.finish();
-    if dec.done.is_empty() {
+    let pages = dec.pages();
+    if pages.is_empty() {
         return Err(Error::NoPage);
     }
-    Ok((dec.done, count))
+    Ok((pages, count))
 }
 
 // ------------------------------------------------------------------ the codec of img_core
