@@ -732,7 +732,7 @@ viele, auch mit Meshes als Objekten. Die Bits aller Meshes sind gleich: Ohne den
 und nach S2 `d9c23e8f809f620b` mit 109 751 Werten, und die Berichte in `examples/out` unterscheiden sich nur im
 Schlüssel. Bis S2 war die Zahl `0fae175a31a0f15e` (S1 und `modeltool` vor S2 auch gegen JFScript a21a0c3).
 
-**Mit S3 (JFScript 415aca4) ist die Zahl dieselbe**, `ff9e060c8233c600` mit 234 941 Werten, auch der Brennstoff:
+**Mit S3 (JFScript 415aca4, 6e5f58b) ist die Zahl dieselbe**, `ff9e060c8233c600` mit 234 941 Werten, auch der Brennstoff:
 `compile_api` übersetzt Aufrufe nach der Stelle wie `compile_with`, der Brennstoff je Abschnitt zwischen zwei `await`
 ändert ohne `await` nichts, und die Beispiele sind unverändert (sie nutzen keine benannten Argumente).
 
@@ -740,7 +740,7 @@ Schlüssel. Bis S2 war die Zahl `0fae175a31a0f15e` (S1 und `modeltool` vor S2 au
 | --- | --- | --- | --- |
 | Windows x86-64 (Ryzen 5 3600), Rust 1.100 | Entwicklung | `ff9e060c8233c600` | 38 980 bestanden (S3; mit S2 38 945) |
 | Linux x86-64 gegen glibc, in WSL Ubuntu 24.04 | Entwicklung | `ff9e060c8233c600` | 38 980 bestanden (S3; mit S2 38 945) |
-| macOS ARM64 (Mac mini M2, macOS 27.2), Rust 1.98.1 | Entwicklung | `0fae175a31a0f15e` | 38 906 bestanden (S1; S2 noch nicht geprüft; die fünf Skripte mit Metal: Stand Teil 2) |
+| macOS ARM64 (Mac mini M2, macOS 27.2), Rust 1.98.1 | Entwicklung | `ff9e060c8233c600` | 38 980 bestanden (S3; die fünf Skripte mit Metal: Stand Teil 2) |
 | WebAssembly in Node 22 (V8): einfach, SIMD, Threads | Entwicklung | `ff9e060c8233c600` | 38 962 bestanden (S3; alle drei, ohne die 18 der Gruppe `watch`; mit S2 38 927) |
 
 Zusammen 234 941 Werte. Mit JFScript S1 (c970852) und den Warnungen war die Zahl auf Windows, Linux und in Node
