@@ -1,6 +1,6 @@
 # Android-Plan: Android so weit wie Windows, Linux und Apple
 
-Stand 2026-11-28, auf Basis von `main` 7cdabce4. AN0 bis AN4 sind umgesetzt (Emulator und A56; AN3 auf dem A56 seit dem Lauf von AN4), AN5 nicht; die Aufwände sind geschätzt. Der Plan wartete auf ARM1 bis ARM3 ([ARM64.md](ARM64.md)): die Kernel-Tabellen
+Stand 2026-11-28, auf Basis von `main` 7cdabce4. AN0 bis AN4 sind umgesetzt (Emulator und A56), AN5 nicht; die Aufwände sind geschätzt. Der Plan wartete auf ARM1 bis ARM3 ([ARM64.md](ARM64.md)): die Kernel-Tabellen
 und `plat` auf Linux ARM64 ohne libc.
 
 ## Ziel
@@ -486,7 +486,8 @@ und Linux); `build_rs.py test coretest` auf Windows und Linux; die Tests von `ca
 **Fertig, wenn:** die Dateisystem- und `watch`-Tests von `coretest` und `plattest` sowie die Tests von `datastore`
 und `cas` im Test-APK grün sind und `android_files.py` unverändert besteht.
 
-**Stand 2026-11-27:** umgesetzt und auf dem Emulator grün (beide Modi); das A56 war nicht dran (nur auf Zuruf).
+**Stand 2026-11-28:** umgesetzt, auf dem Emulator und dem A56 grün (beide Modi; das A56 am 2026-11-28 auf Zuruf
+des Nutzers, siehe unten).
 
 - `plat::fs` und `plat::watch` sind auf Android die Linux-Teile von [`fs.rs`](../lib/plat/fs.rs) und
   [`watch.rs`](../lib/plat/watch.rs) (nur `cfg`): die Syscalls über `rt::os`, `struct stat` aus `rt::kernel` (x86-64 und
@@ -504,7 +505,8 @@ und `cas` im Test-APK grün sind und `android_files.py` unverändert besteht.
 - **Kein `openat2`:** `Dir::open_dir` geht auf Android immer Schritt für Schritt (`openat` mit `O_NOFOLLOW` unter dem
   offenen Ordner); der Versuch mit `openat2` ist dort nicht einmal gebaut. `plattest --test kernel` läuft dafür jetzt
   auch auf Android (ohne `fork`, `clone` und `dup2`, die Helfer von `rt::os` nur unter Linux): 65 von 65 im
-  App-Prozess des x86-64-Emulators, wo `openat2` SIGSYS gäbe.
+  App-Prozess des x86-64-Emulators, wo `openat2` SIGSYS gäbe, und des A56 (arm64, dort mit der `struct stat` von
+  ARM64; `openat2` wäre dort erlaubt und bleibt ungenutzt).
 - **Links:** ein absolutes Ziel (`symlink`, `Dir::symlink`) liegt als echter Pfad im Link (der Kernel löst Links auf
   echten Pfaden auf), `read_link` liest es wieder als Namen; relative Ziele bleiben, wie sie sind.
 - **Hardlinks:** SELinux verweigert sie einer App (`avc: denied { link }` für `untrusted_app` auf `app_data_file`),
@@ -535,10 +537,19 @@ und `cas` im Test-APK grün sind und `android_files.py` unverändert besteht.
 | `plattest --test trash` | 4 von 4 | 4 von 4 |
 | `asynctest --script tasks.uis`, `copy.uis` | grün | grün |
 
+**Auf dem A56** (SM-A566B, arm64, Android 16, API 36; auf Zuruf des Nutzers am 2026-11-28, je eine Runde, danach
+das Test-APK deinstalliert und `/data/local/tmp/jfgui_plattest` gelöscht; die Apps des Nutzers blieben unberührt).
+`coretest` (darin `plat`, `datastore`, `cas`) und `plattest --test all` liefen dort schon mit AN4 grün (siehe dort).
+
+| Lauf (A56, arm64) | `adb shell` | App (`untrusted_app`, seccomp 2) |
+|---|---|---|
+| `plattest --test kernel` (`fs::Dir`, arm64-`struct stat`) | 65 von 65 | 65 von 65 |
+| `plattest --test vfs` | 132 von 132 | 132 von 132 |
+| `plattest --test content` | 97 von 97 | 97 von 97 |
+| `plattest --test trash` | 4 von 4 | 4 von 4 |
+
 Offen nach AN3:
 
-- Das A56 (ARM64: die andere `struct stat` im App-Prozess, `openat2` dort erlaubt, aber ungenutzt), nur auf Zuruf.
-  (Mit AN4 gelaufen: `coretest` und `plattest --test all` auf dem A56 grün, siehe dort.)
 - `plattest --test dirs` prüft auf Android die XDG-Ordner von Linux (25 Fehler, schon vor AN3; nicht in `all`).
   Android kennt nur `/documents` und `/data` als Ordner der Logs; der Test braucht einen eigenen Zweig.
 - Unix-Sockets von `net` (mit `fs::socket_id`): nach dem Mischen von AN2 und AN3 sind beide Teile da, die Sockets
