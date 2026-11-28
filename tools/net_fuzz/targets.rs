@@ -1,5 +1,5 @@
 // net_fuzz targets -- the parsers of untrusted bytes, their seeds and the code that feeds them
-// (compress, formats, netchan, netio, netpkt, plat).
+// (compress, formats, img_jp2, img_jbig2, netchan, netio, netpkt, plat).
 // Shared by tools/net_fuzz/fuzz.rs (the mutation fuzzer, tools/net_fuzz.py) and the libFuzzer
 // targets of tools/cov_fuzz.py, which include this file with #[path].
 //
@@ -871,6 +871,742 @@ fn cookie_seeds() -> Vec<Vec<u8>> {
     .collect()
 }
 
+// ------------------------------------------------------------------ images (img_jp2, img_jbig2)
+
+/// the pixel cap of img_jbig2: a page or region of at most DECODE_LIMIT pixels, a stream's work at
+/// most four times that plus 2^22 pixels (a byte each); its slowest inputs, regions that spend
+/// all of that, take some 50 ms here and 0.7 s under cov_fuzz's instrumentation
+const JBIG2_PIXELS: u64 = DECODE_LIMIT as u64;
+
+/// the pixel cap of img_jp2: an image of at most 2^20 pixels, four times that in samples (16 MB
+/// of i32).  A pixel costs about a hundred times as much under cov_fuzz's instrumentation as here
+/// (a 520-byte file of 33 x 65052 pixels in 8133 empty tiles: 30 ms here, 3 to 20 s there, past
+/// libFuzzer's 10 s), so DECODE_LIMIT pixels would time out on files of no fault
+const JP2_PIXELS: u64 = 1 << 20;
+
+/// a format's codec as img_all calls it: the probe, then the decode into an ARGB surface under the
+/// pixel cap `cap`; a decoded surface holds its rows and keeps to the cap
+fn img_codec(c: &img_core::Codec, d: &[u8], cap: u64) {
+    let (Some(probe), Some(decode)) = (c.probe, c.decode) else { return };
+    if !probe(d, &mut img_core::ImgMeta::default()) {
+        return;
+    }
+    let mut sf = img_core::Surface::default();
+    let dec = img_core::ImgDec { maxpx: cap, ..Default::default() };
+    if decode(d, &mut sf, &dec, &mut img_core::ImgMeta::default()) == 0 {
+        assert!(sf.w >= 0 && sf.h >= 0 && sf.stride >= sf.w.saturating_mul(4), "a surface of {} x {}, stride {}", sf.w, sf.h, sf.stride);
+        assert!(sf.px.len() >= sf.stride as usize * sf.h as usize, "a surface shorter than its rows");
+        assert!(sf.w as u64 * sf.h as u64 <= cap, "a surface of {} x {} past the cap", sf.w, sf.h);
+    }
+}
+
+// JPEG 2000 images of apps/pdftest/src/rdraw.rs (`python tools/jp2_check.py --fixtures`: Pillow
+// with OpenJPEG 2.5): 8 x 8 (the lossy one 16 x 16) RGB, grey and RGBA, a 4-bit codestream and
+// 2-bit grey under 8-bit opacity
+const J2K_RGB: &[u8] = &[0xFF, 0x4F, 0xFF, 0x51, 0x00, 0x2F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x07, 0x01, 0x01, 0x07, 0x01, 0x01, 0x07, 0x01, 0x01, 0xFF, 0x52, 0x00, 0x0C, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x04, 0x04, 0x00, 0x01, 0xFF, 0x5C, 0x00, 0x07, 0x40, 0x40, 0x48, 0x48, 0x50, 0xFF, 0x64, 0x00, 0x25, 0x00, 0x01, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x64, 0x20, 0x62, 0x79, 0x20, 0x4F, 0x70, 0x65, 0x6E, 0x4A, 0x50, 0x45, 0x47, 0x20, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6F, 0x6E, 0x20, 0x32, 0x2E, 0x35, 0x2E, 0x34, 0xFF, 0x90, 0x00, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x5D, 0x00, 0x01, 0xFF, 0x93, 0xCF, 0xB4, 0x3C, 0x10, 0xCC, 0x4E, 0x0C, 0x04, 0xEC, 0x3D, 0x61, 0xE6, 0x13, 0x9C, 0x5C, 0x52, 0x33, 0x0F, 0xCF, 0xB4, 0x38, 0x06, 0x31, 0x3A, 0xE1, 0xF6, 0xBC, 0x75, 0x91, 0x87, 0x01, 0xE9, 0x44, 0x92, 0x7F, 0xCF, 0xB4, 0x38, 0x13, 0x8C, 0x45, 0x30, 0x14, 0x4D, 0x30, 0x11, 0x36, 0x09, 0x0C, 0x00, 0x02, 0x9F, 0xA3, 0xED, 0x05, 0x00, 0x0C, 0x78, 0x3B, 0x2E, 0x9F, 0xA1, 0xF5, 0x02, 0x80, 0x0F, 0x27, 0x97, 0x3C, 0x5B, 0xA1, 0xF5, 0x02, 0x80, 0x0F, 0x27, 0xA7, 0x14, 0x7F, 0xFF, 0xD9];
+const JP2_RGB: &[u8] = &[0x00, 0x00, 0x00, 0x0C, 0x6A, 0x50, 0x20, 0x20, 0x0D, 0x0A, 0x87, 0x0A, 0x00, 0x00, 0x00, 0x14, 0x66, 0x74, 0x79, 0x70, 0x6A, 0x70, 0x32, 0x20, 0x00, 0x00, 0x00, 0x00, 0x6A, 0x70, 0x32, 0x20, 0x00, 0x00, 0x00, 0x2D, 0x6A, 0x70, 0x32, 0x68, 0x00, 0x00, 0x00, 0x16, 0x69, 0x68, 0x64, 0x72, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x08, 0x00, 0x03, 0x07, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0F, 0x63, 0x6F, 0x6C, 0x72, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0xD8, 0x6A, 0x70, 0x32, 0x63, 0xFF, 0x4F, 0xFF, 0x51, 0x00, 0x2F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x07, 0x01, 0x01, 0x07, 0x01, 0x01, 0x07, 0x01, 0x01, 0xFF, 0x52, 0x00, 0x0C, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x04, 0x04, 0x00, 0x01, 0xFF, 0x5C, 0x00, 0x07, 0x40, 0x40, 0x48, 0x48, 0x50, 0xFF, 0x64, 0x00, 0x25, 0x00, 0x01, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x64, 0x20, 0x62, 0x79, 0x20, 0x4F, 0x70, 0x65, 0x6E, 0x4A, 0x50, 0x45, 0x47, 0x20, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6F, 0x6E, 0x20, 0x32, 0x2E, 0x35, 0x2E, 0x34, 0xFF, 0x90, 0x00, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x5D, 0x00, 0x01, 0xFF, 0x93, 0xCF, 0xB4, 0x3C, 0x10, 0xCC, 0x4E, 0x0C, 0x04, 0xEC, 0x3D, 0x61, 0xE6, 0x13, 0x9C, 0x5C, 0x52, 0x33, 0x0F, 0xCF, 0xB4, 0x38, 0x06, 0x31, 0x3A, 0xE1, 0xF6, 0xBC, 0x75, 0x91, 0x87, 0x01, 0xE9, 0x44, 0x92, 0x7F, 0xCF, 0xB4, 0x38, 0x13, 0x8C, 0x45, 0x30, 0x14, 0x4D, 0x30, 0x11, 0x36, 0x09, 0x0C, 0x00, 0x02, 0x9F, 0xA3, 0xED, 0x05, 0x00, 0x0C, 0x78, 0x3B, 0x2E, 0x9F, 0xA1, 0xF5, 0x02, 0x80, 0x0F, 0x27, 0x97, 0x3C, 0x5B, 0xA1, 0xF5, 0x02, 0x80, 0x0F, 0x27, 0xA7, 0x14, 0x7F, 0xFF, 0xD9];
+const JP2_GRAY: &[u8] = &[0x00, 0x00, 0x00, 0x0C, 0x6A, 0x50, 0x20, 0x20, 0x0D, 0x0A, 0x87, 0x0A, 0x00, 0x00, 0x00, 0x14, 0x66, 0x74, 0x79, 0x70, 0x6A, 0x70, 0x32, 0x20, 0x00, 0x00, 0x00, 0x00, 0x6A, 0x70, 0x32, 0x20, 0x00, 0x00, 0x00, 0x2D, 0x6A, 0x70, 0x32, 0x68, 0x00, 0x00, 0x00, 0x16, 0x69, 0x68, 0x64, 0x72, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x08, 0x00, 0x01, 0x07, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0F, 0x63, 0x6F, 0x6C, 0x72, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x11, 0x00, 0x00, 0x00, 0x9B, 0x6A, 0x70, 0x32, 0x63, 0xFF, 0x4F, 0xFF, 0x51, 0x00, 0x29, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x07, 0x01, 0x01, 0xFF, 0x52, 0x00, 0x0C, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x04, 0x04, 0x00, 0x01, 0xFF, 0x5C, 0x00, 0x07, 0x40, 0x40, 0x48, 0x48, 0x50, 0xFF, 0x64, 0x00, 0x25, 0x00, 0x01, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x64, 0x20, 0x62, 0x79, 0x20, 0x4F, 0x70, 0x65, 0x6E, 0x4A, 0x50, 0x45, 0x47, 0x20, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6F, 0x6E, 0x20, 0x32, 0x2E, 0x35, 0x2E, 0x34, 0xFF, 0x90, 0x00, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x26, 0x00, 0x01, 0xFF, 0x93, 0xCF, 0xB4, 0x30, 0x11, 0x11, 0xFA, 0xAE, 0xD9, 0xCA, 0xF1, 0xBB, 0xB6, 0xA8, 0xE2, 0xC1, 0xA3, 0xED, 0x05, 0x00, 0x0C, 0x78, 0x3B, 0x2E, 0x9F, 0xFF, 0xD9];
+const JP2_RGBA: &[u8] = &[0x00, 0x00, 0x00, 0x0C, 0x6A, 0x50, 0x20, 0x20, 0x0D, 0x0A, 0x87, 0x0A, 0x00, 0x00, 0x00, 0x14, 0x66, 0x74, 0x79, 0x70, 0x6A, 0x70, 0x32, 0x20, 0x00, 0x00, 0x00, 0x00, 0x6A, 0x70, 0x32, 0x20, 0x00, 0x00, 0x00, 0x4F, 0x6A, 0x70, 0x32, 0x68, 0x00, 0x00, 0x00, 0x16, 0x69, 0x68, 0x64, 0x72, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x08, 0x00, 0x04, 0x07, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0F, 0x63, 0x6F, 0x6C, 0x72, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x22, 0x63, 0x64, 0x65, 0x66, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x02, 0x00, 0x00, 0x00, 0x03, 0x00, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF5, 0x6A, 0x70, 0x32, 0x63, 0xFF, 0x4F, 0xFF, 0x51, 0x00, 0x32, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x07, 0x01, 0x01, 0x07, 0x01, 0x01, 0x07, 0x01, 0x01, 0x07, 0x01, 0x01, 0xFF, 0x52, 0x00, 0x0C, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x04, 0x04, 0x00, 0x01, 0xFF, 0x5C, 0x00, 0x07, 0x40, 0x40, 0x48, 0x48, 0x50, 0xFF, 0x64, 0x00, 0x25, 0x00, 0x01, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x64, 0x20, 0x62, 0x79, 0x20, 0x4F, 0x70, 0x65, 0x6E, 0x4A, 0x50, 0x45, 0x47, 0x20, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6F, 0x6E, 0x20, 0x32, 0x2E, 0x35, 0x2E, 0x34, 0xFF, 0x90, 0x00, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x77, 0x00, 0x01, 0xFF, 0x93, 0xCF, 0xB4, 0x3C, 0x10, 0xCC, 0x4E, 0x0C, 0x04, 0xEC, 0x3D, 0x61, 0xE6, 0x13, 0x9C, 0x5C, 0x52, 0x33, 0x0F, 0xCF, 0xB4, 0x38, 0x06, 0x31, 0x3A, 0xE1, 0xF6, 0xBC, 0x75, 0x91, 0x87, 0x01, 0xE9, 0x44, 0x92, 0x7F, 0xCF, 0xB4, 0x38, 0x13, 0x8C, 0x45, 0x30, 0x14, 0x4D, 0x30, 0x11, 0x36, 0x09, 0x0C, 0x00, 0x02, 0x9F, 0xDF, 0x80, 0x88, 0x0E, 0xCA, 0x2E, 0x01, 0xF9, 0x74, 0xBC, 0x2C, 0xF8, 0x7C, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xA3, 0xED, 0x05, 0x00, 0x0C, 0x78, 0x3B, 0x2E, 0x9F, 0xA1, 0xF5, 0x02, 0x80, 0x0F, 0x27, 0x97, 0x3C, 0x5B, 0xA1, 0xF5, 0x02, 0x80, 0x0F, 0x27, 0xA7, 0x14, 0x7F, 0xA7, 0xE0, 0x06, 0x0F, 0x28, 0x5F, 0xFF, 0xD9];
+const JP2_LOSSY: &[u8] = &[0x00, 0x00, 0x00, 0x0C, 0x6A, 0x50, 0x20, 0x20, 0x0D, 0x0A, 0x87, 0x0A, 0x00, 0x00, 0x00, 0x14, 0x66, 0x74, 0x79, 0x70, 0x6A, 0x70, 0x32, 0x20, 0x00, 0x00, 0x00, 0x00, 0x6A, 0x70, 0x32, 0x20, 0x00, 0x00, 0x00, 0x2D, 0x6A, 0x70, 0x32, 0x68, 0x00, 0x00, 0x00, 0x16, 0x69, 0x68, 0x64, 0x72, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x10, 0x00, 0x03, 0x07, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0F, 0x63, 0x6F, 0x6C, 0x72, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0xAF, 0x6A, 0x70, 0x32, 0x63, 0xFF, 0x4F, 0xFF, 0x51, 0x00, 0x2F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x07, 0x01, 0x01, 0x07, 0x01, 0x01, 0x07, 0x01, 0x01, 0xFF, 0x52, 0x00, 0x0C, 0x00, 0x00, 0x00, 0x01, 0x00, 0x02, 0x04, 0x04, 0x00, 0x00, 0xFF, 0x5C, 0x00, 0x11, 0x42, 0x5F, 0x52, 0x50, 0x05, 0x50, 0x05, 0x50, 0x47, 0x57, 0xD3, 0x57, 0xD3, 0x57, 0x62, 0xFF, 0x64, 0x00, 0x25, 0x00, 0x01, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x64, 0x20, 0x62, 0x79, 0x20, 0x4F, 0x70, 0x65, 0x6E, 0x4A, 0x50, 0x45, 0x47, 0x20, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6F, 0x6E, 0x20, 0x32, 0x2E, 0x35, 0x2E, 0x34, 0xFF, 0x90, 0x00, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2A, 0x00, 0x01, 0xFF, 0x93, 0xC4, 0xA0, 0x10, 0xCC, 0x4E, 0x0A, 0xDF, 0xC7, 0x85, 0x00, 0xC8, 0xAA, 0x22, 0xB2, 0xC7, 0x46, 0x13, 0x8C, 0x45, 0x30, 0x28, 0x2C, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0xFF, 0xD9];
+const J2K_GRAY4: &[u8] = &[0xFF, 0x4F, 0xFF, 0x51, 0x00, 0x29, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x03, 0x01, 0x01, 0xFF, 0x52, 0x00, 0x0C, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x04, 0x04, 0x00, 0x01, 0xFF, 0x5C, 0x00, 0x07, 0x40, 0x40, 0x48, 0x48, 0x50, 0xFF, 0x64, 0x00, 0x25, 0x00, 0x01, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x64, 0x20, 0x62, 0x79, 0x20, 0x4F, 0x70, 0x65, 0x6E, 0x4A, 0x50, 0x45, 0x47, 0x20, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6F, 0x6E, 0x20, 0x32, 0x2E, 0x35, 0x2E, 0x34, 0xFF, 0x90, 0x00, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1B, 0x00, 0x01, 0xFF, 0x93, 0xC0, 0xF8, 0x44, 0x10, 0xDC, 0x38, 0x3D, 0xA0, 0x1D, 0x0C, 0x0C, 0x78, 0x3F, 0xFF, 0xD9];
+const JP2_GRAY2_ALPHA: &[u8] = &[0x00, 0x00, 0x00, 0x0C, 0x6A, 0x50, 0x20, 0x20, 0x0D, 0x0A, 0x87, 0x0A, 0x00, 0x00, 0x00, 0x14, 0x66, 0x74, 0x79, 0x70, 0x6A, 0x70, 0x32, 0x20, 0x00, 0x00, 0x00, 0x00, 0x6A, 0x70, 0x32, 0x20, 0x00, 0x00, 0x00, 0x43, 0x6A, 0x70, 0x32, 0x68, 0x00, 0x00, 0x00, 0x16, 0x69, 0x68, 0x64, 0x72, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x08, 0x00, 0x02, 0x07, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0F, 0x63, 0x6F, 0x6C, 0x72, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x11, 0x00, 0x00, 0x00, 0x16, 0x63, 0x64, 0x65, 0x66, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x94, 0x6A, 0x70, 0x32, 0x63, 0xFF, 0x4F, 0xFF, 0x51, 0x00, 0x2C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x01, 0x01, 0x01, 0x07, 0x01, 0x01, 0xFF, 0x52, 0x00, 0x0C, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x04, 0x04, 0x00, 0x01, 0xFF, 0x5C, 0x00, 0x07, 0x40, 0x40, 0x48, 0x48, 0x50, 0xFF, 0x64, 0x00, 0x25, 0x00, 0x01, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x64, 0x20, 0x62, 0x79, 0x20, 0x4F, 0x70, 0x65, 0x6E, 0x4A, 0x50, 0x45, 0x47, 0x20, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6F, 0x6E, 0x20, 0x32, 0x2E, 0x35, 0x2E, 0x34, 0xFF, 0x90, 0x00, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1C, 0x00, 0x01, 0xFF, 0x93, 0xC0, 0x23, 0x11, 0x50, 0x3F, 0xCF, 0xB4, 0x10, 0x14, 0x00, 0x51, 0x9F, 0x80, 0x80, 0xFF, 0xD9];
+
+/// a box of the JP2 file format (T.800 I.4)
+fn jp2_box(ty: &[u8; 4], body: &[u8]) -> Vec<u8> {
+    let mut v = ((body.len() + 8) as u32).to_be_bytes().to_vec();
+    v.extend_from_slice(ty);
+    v.extend_from_slice(body);
+    v
+}
+
+/// a JP2 file around codestream `cs`: the signature, the file type, the header (an image header
+/// of the codestream's SIZ, then the boxes `head`) and the codestream
+fn jp2_file(cs: &[u8], head: &[Vec<u8>]) -> Vec<u8> {
+    let be = |o: usize| u32::from_be_bytes([cs[o], cs[o + 1], cs[o + 2], cs[o + 3]]);
+    let mut ihdr = (be(12) - be(20)).to_be_bytes().to_vec();
+    ihdr.extend_from_slice(&(be(8) - be(16)).to_be_bytes());
+    ihdr.extend_from_slice(&cs[40..43]);
+    ihdr.extend_from_slice(&[7, 0, 0]);
+    let mut jp2h = jp2_box(b"ihdr", &ihdr);
+    for b in head {
+        jp2h.extend_from_slice(b);
+    }
+    let sig = [0, 0, 0, 12, b'j', b'P', b' ', b' ', 0x0D, 0x0A, 0x87, 0x0A];
+    [&sig[..], &jp2_box(b"ftyp", b"jp2 \0\0\0\0jp2 "), &jp2_box(b"jp2h", &jp2h), &jp2_box(b"jp2c", cs)].concat()
+}
+
+/// an enumerated colour space box (16 sRGB, 17 grey, 18 sYCC, 12 CMYK, 14 CIELab)
+fn jp2_colr(cs: u32) -> Vec<u8> {
+    let mut b = vec![1, 0, 0];
+    b.extend_from_slice(&cs.to_be_bytes());
+    if cs == 14 {
+        // CIELab's parameters (JPX): ranges, offsets, illuminant
+        b.extend_from_slice(&[0, 0, 0, 100, 0, 0, 0, 0, 0, 0, 0, 255, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 128, 0x00, 0x44, 0x35, 0x30]);
+    }
+    jp2_box(b"colr", &b)
+}
+
+/// JPEG 2000: the images of rdraw.rs, JP2 headers made here around them (a palette with its
+/// component mapping, an ICC profile, channel definitions in another order and with opacity,
+/// sYCC, CIELab, boxes of 64-bit and of open length), and the files tools/net_fuzz.py writes into
+/// the seed folder with Pillow (OpenJPEG) where it is there: tiles, precincts, code-block sizes,
+/// layers, the progressions, the 9/7 wavelet, 16 bits, PLT
+fn jp2_seeds(dir: &str) -> Vec<Vec<u8>> {
+    let mut out: Vec<Vec<u8>> = [J2K_RGB, JP2_RGB, JP2_GRAY, JP2_RGBA, JP2_LOSSY, J2K_GRAY4, JP2_GRAY2_ALPHA].iter().map(|s| s.to_vec()).collect();
+    // a palette of 16 entries (three 8-bit columns) that the 4-bit component goes through
+    let mut pclr = vec![0, 16, 3, 7, 7, 7];
+    for i in 0..16u8 {
+        pclr.extend_from_slice(&[i * 16, 255 - i * 16, i * 5]);
+    }
+    let cmap = [0u8, 0, 1, 0, 0, 0, 1, 1, 0, 0, 1, 2];
+    out.push(jp2_file(J2K_GRAY4, &[jp2_colr(16), jp2_box(b"pclr", &pclr), jp2_box(b"cmap", &cmap)]));
+    // an ICC profile (only carried along), the channels as blue, green, red
+    let mut icc = vec![2, 0, 0];
+    icc.extend_from_slice(&132u32.to_be_bytes());
+    icc.extend_from_slice(&[0u8; 32]);
+    icc.extend_from_slice(b"acsp");
+    icc.extend(std::iter::repeat_n(0u8, 92));
+    let bgr = [0u8, 3, 0, 0, 0, 0, 0, 3, 0, 1, 0, 0, 0, 2, 0, 2, 0, 0, 0, 1];
+    out.push(jp2_file(J2K_RGB, &[jp2_box(b"colr", &icc), jp2_box(b"cdef", &bgr)]));
+    // the third channel as opacity, premultiplied (type 2), of the whole image (association 0)
+    let alpha = [0u8, 3, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 2, 0, 2, 0, 2, 0, 0];
+    out.push(jp2_file(J2K_RGB, &[jp2_colr(16), jp2_box(b"cdef", &alpha)]));
+    for cs in [18, 14, 12, 17] {
+        out.push(jp2_file(J2K_RGB, &[jp2_colr(cs)]));
+    }
+    // the codestream box with a 64-bit length, and one of open length (0: to the end)
+    let plain = jp2_file(J2K_RGB, &[jp2_colr(16)]);
+    let at = plain.len() - J2K_RGB.len() - 8;
+    let mut xl = plain[..at].to_vec();
+    xl.extend_from_slice(&1u32.to_be_bytes());
+    xl.extend_from_slice(b"jp2c");
+    xl.extend_from_slice(&(J2K_RGB.len() as u64 + 16).to_be_bytes());
+    xl.extend_from_slice(J2K_RGB);
+    out.push(xl);
+    let mut open = plain.clone();
+    open[at..at + 4].copy_from_slice(&[0; 4]);
+    out.push(open);
+    // Pillow's files (tools/net_fuzz.py)
+    if let Ok(rd) = std::fs::read_dir(dir) {
+        let mut files: Vec<_> = rd.flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "jp2" || x == "j2k")).collect();
+        files.sort();
+        for p in files {
+            if let Ok(b) = std::fs::read(p) {
+                out.push(b);
+            }
+        }
+    }
+    out
+}
+
+/// a JBIG2 segment (T.88 7.2) as (header, data): its number (below 256), type (0x40 set: a
+/// four-byte page association), page association, the segments it refers to; `len` None: the
+/// data's length (Some(0xFFFFFFFF): unknown, 7.2.7)
+fn jb2_seg(num: u32, ty: u8, page: u32, refs: &[u8], data: Vec<u8>, len: Option<u32>) -> (Vec<u8>, Vec<u8>) {
+    let mut h = num.to_be_bytes().to_vec();
+    h.push(ty);
+    h.push((refs.len() as u8) << 5);
+    h.extend_from_slice(refs);
+    if ty & 0x40 != 0 {
+        h.extend_from_slice(&page.to_be_bytes());
+    } else {
+        h.push(page as u8);
+    }
+    h.extend_from_slice(&len.unwrap_or(data.len() as u32).to_be_bytes());
+    (h, data)
+}
+
+/// the input of the target for PDF's embedded form: the length of the JBIG2Globals (two bytes),
+/// the globals' segments, the page's
+fn jb2_pdf(globals: &[(Vec<u8>, Vec<u8>)], page: &[(Vec<u8>, Vec<u8>)]) -> Vec<u8> {
+    let g: Vec<u8> = globals.iter().flat_map(|(h, d)| h.iter().chain(d)).copied().collect();
+    let mut v = (g.len() as u16).to_be_bytes().to_vec();
+    v.extend_from_slice(&g);
+    v.extend(page.iter().flat_map(|(h, d)| h.iter().chain(d)));
+    v
+}
+
+/// a JBIG2 file (D.4): sequential (each header and its data) or random-access (the headers, then
+/// the data; an end of file segment ends the headers), with the number of pages
+fn jb2_file(segs: &[(Vec<u8>, Vec<u8>)], random: bool) -> Vec<u8> {
+    let mut v = vec![0x97, 0x4A, 0x42, 0x32, 0x0D, 0x0A, 0x1A, 0x0A, if random { 0 } else { 1 }];
+    let pages = segs.iter().filter(|(h, _)| h[4] & 0x3F == 48).count() as u32;
+    v.extend_from_slice(&pages.to_be_bytes());
+    if random {
+        v.extend(segs.iter().flat_map(|(h, _)| h.iter()));
+        v.extend(segs.iter().flat_map(|(_, d)| d.iter()));
+    } else {
+        v.extend(segs.iter().flat_map(|(h, d)| h.iter().chain(d)));
+    }
+    v
+}
+
+/// page information (7.4.8): w x h (0xFFFFFFFF: unknown), its flags and striping
+fn jb2_info(w: u32, h: u32, flags: u8, striping: u16) -> Vec<u8> {
+    let mut v = Vec::new();
+    for x in [w, h, 0, 0] {
+        v.extend_from_slice(&x.to_be_bytes());
+    }
+    v.push(flags);
+    v.extend_from_slice(&striping.to_be_bytes());
+    v
+}
+
+/// region segment information (7.4.1): w x h at (x, y), the combination operator; then `rest`
+fn jb2_region(w: u32, h: u32, x: i32, y: i32, op: u8, rest: &[&[u8]]) -> Vec<u8> {
+    let mut v = Vec::new();
+    for x in [w, h, x as u32, y as u32] {
+        v.extend_from_slice(&x.to_be_bytes());
+    }
+    v.push(op);
+    for r in rest {
+        v.extend_from_slice(r);
+    }
+    v
+}
+
+/// the nominal adaptive pixels of a generic region's template (6.2.5.3)
+fn jb2_at(template: u8) -> &'static [u8] {
+    match template {
+        0 => &[3, 0xFF, 0xFD, 0xFF, 2, 0xFE, 0xFE, 0xFE],
+        1 => &[3, 0xFF],
+        _ => &[2, 0xFF],
+    }
+}
+
+/// a code table segment (B.2) of lines of (prefix length, range length) from 0, a lower and an
+/// upper range line, 3-bit prefix and 4-bit range lengths
+fn jb2_table(lines: &[(u32, u32)], lower: u32, upper: u32) -> Vec<u8> {
+    let mut v = vec![0x34];
+    let high: u32 = lines.iter().map(|l| 1 << l.1).sum();
+    v.extend_from_slice(&0u32.to_be_bytes());
+    v.extend_from_slice(&high.to_be_bytes());
+    let mut bits: Vec<bool> = Vec::new();
+    let mut put = |x: u32, n: u32| bits.extend((0..n).rev().map(|i| x >> i & 1 == 1));
+    for &(p, r) in lines {
+        put(p, 3);
+        put(r, 4);
+    }
+    put(lower, 3);
+    put(upper, 3);
+    v.extend(bits.chunks(8).map(|c| c.iter().enumerate().fold(0u8, |b, (i, &x)| b | (x as u8) << (7 - i))));
+    v
+}
+
+// JBIG2 encoding for the seeds: symbol dictionaries, text regions and halftones whose arithmetic
+// (or Huffman) data decodes, where random bytes almost never do (one dictionary in 10^4)
+
+/// T.88 Table E.1: Qe, the next index after an MPS and after an LPS, whether an LPS swaps the MPS
+const MQ_QE: [(u32, u8, u8, bool); 47] = [
+    (0x5601, 1, 1, true), (0x3401, 2, 6, false), (0x1801, 3, 9, false), (0x0AC1, 4, 12, false), (0x0521, 5, 29, false),
+    (0x0221, 38, 33, false), (0x5601, 7, 6, true), (0x5401, 8, 14, false), (0x4801, 9, 14, false), (0x3801, 10, 14, false),
+    (0x3001, 11, 17, false), (0x2401, 12, 18, false), (0x1C01, 13, 20, false), (0x1601, 29, 21, false), (0x5601, 15, 14, true),
+    (0x5401, 16, 14, false), (0x5101, 17, 15, false), (0x4801, 18, 16, false), (0x3801, 19, 17, false), (0x3401, 20, 18, false),
+    (0x3001, 21, 19, false), (0x2801, 22, 19, false), (0x2401, 23, 20, false), (0x2201, 24, 21, false), (0x1C01, 25, 22, false),
+    (0x1801, 26, 23, false), (0x1601, 27, 24, false), (0x1401, 28, 25, false), (0x1201, 29, 26, false), (0x1101, 30, 27, false),
+    (0x0AC1, 31, 28, false), (0x09C1, 32, 29, false), (0x08A1, 33, 30, false), (0x0521, 34, 31, false), (0x0441, 35, 32, false),
+    (0x02A1, 36, 33, false), (0x0221, 37, 34, false), (0x0141, 38, 35, false), (0x0111, 39, 36, false), (0x0085, 40, 37, false),
+    (0x0049, 41, 38, false), (0x0025, 42, 39, false), (0x0015, 43, 40, false), (0x0009, 44, 41, false), (0x0005, 45, 42, false),
+    (0x0001, 45, 43, false), (0x5601, 46, 46, false),
+];
+
+/// a context of the coder: its index into MQ_QE and its more probable symbol
+type MqCx = (u8, u8);
+
+/// the MQ encoder (T.88 E.2); out[0] is the byte before the data
+struct MqEnc {
+    a: u32,
+    c: u32,
+    ct: u32,
+    out: Vec<u8>,
+}
+
+impl MqEnc {
+    fn new() -> MqEnc {
+        MqEnc { a: 0x8000, c: 0, ct: 12, out: vec![0] }
+    }
+
+    fn encode(&mut self, cx: &mut MqCx, d: u8) {
+        let (qe, nmps, nlps, switch) = MQ_QE[cx.0 as usize];
+        self.a -= qe;
+        if d == cx.1 {
+            if self.a & 0x8000 != 0 {
+                self.c += qe;
+                return;
+            }
+            if self.a < qe { self.a = qe } else { self.c += qe }
+            cx.0 = nmps;
+        } else {
+            if self.a < qe { self.c += qe } else { self.a = qe }
+            if switch {
+                cx.1 ^= 1;
+            }
+            cx.0 = nlps;
+        }
+        loop {
+            self.a <<= 1;
+            self.c <<= 1;
+            self.ct -= 1;
+            if self.ct == 0 {
+                self.byte_out();
+            }
+            if self.a & 0x8000 != 0 {
+                break;
+            }
+        }
+    }
+
+    fn byte_out(&mut self) {
+        let last = self.out.len() - 1;
+        if self.out[last] != 0xFF && self.c >= 0x800_0000 {
+            self.out[last] += 1;
+            self.c &= 0x7FF_FFFF;
+        }
+        if self.out[last] == 0xFF {
+            self.out.push((self.c >> 20) as u8);
+            self.c &= 0xF_FFFF;
+            self.ct = 7;
+        } else {
+            self.out.push((self.c >> 19) as u8);
+            self.c &= 0x7_FFFF;
+            self.ct = 8;
+        }
+    }
+
+    /// FLUSH (E.2.9) and the marker 0xFF 0xAC: the data
+    fn finish(mut self) -> Vec<u8> {
+        let t = self.c + self.a;
+        self.c |= 0xFFFF;
+        if self.c >= t {
+            self.c -= 0x8000;
+        }
+        self.c <<= self.ct;
+        self.byte_out();
+        self.c <<= self.ct;
+        self.byte_out();
+        if self.out.last() != Some(&0xFF) {
+            self.out.push(0xFF);
+        }
+        self.out.push(0xAC);
+        self.out.split_off(1)
+    }
+}
+
+/// A.2: an integer (None: OOB) in the 512 contexts of one procedure (IADH, IADW, ...)
+fn mq_int(e: &mut MqEnc, cx: &mut [MqCx], v: Option<i32>) {
+    let mut prev = 1usize;
+    let mut bit = |e: &mut MqEnc, d: u32| {
+        e.encode(&mut cx[prev], d as u8);
+        prev = if prev < 256 { (prev << 1) | d as usize } else { (((prev << 1) | d as usize) & 511) | 256 };
+    };
+    let (s, a) = v.map_or((1, 0), |v| ((v < 0) as u32, v.unsigned_abs()));
+    let ranges: [(u32, u32, u32, &[u32]); 6] = [(4, 2, 0, &[0]), (20, 4, 4, &[1, 0]), (84, 6, 20, &[1, 1, 0]), (340, 8, 84, &[1, 1, 1, 0]), (4436, 12, 340, &[1, 1, 1, 1, 0]), (u32::MAX, 32, 4436, &[1, 1, 1, 1, 1])];
+    let &(_, n, off, prefix) = ranges.iter().find(|r| a < r.0).unwrap();
+    bit(e, s);
+    for &p in prefix {
+        bit(e, p);
+    }
+    for i in (0..n).rev() {
+        bit(e, (a - off) >> i & 1);
+    }
+}
+
+/// A.3: a symbol id of `len` bits (IAID, 2^(len+1) contexts)
+fn mq_id(e: &mut MqEnc, cx: &mut [MqCx], id: u32, len: u32) {
+    let mut prev = 1usize;
+    for i in (0..len).rev() {
+        let d = id >> i & 1;
+        e.encode(&mut cx[prev], d as u8);
+        prev = (prev << 1) | d as usize;
+    }
+}
+
+/// 6.2.5.3: the context of pixel (x, y) of a w-wide bitmap under template `t` with the adaptive
+/// pixels `at` -- the numbering of img_jbig2's generic.rs (the standard's figures: bit 0 the pixel
+/// to the left, the rows above as windows, the adaptive pixels at their fixed bits)
+fn gb_context(b: &[u8], w: usize, x: usize, y: usize, t: u8, at: &[(i32, i32)]) -> usize {
+    let p = |dx: i64, dy: i64| -> usize {
+        let (xx, yy) = (x as i64 + dx, y as i64 + dy);
+        if xx < 0 || yy < 0 || xx >= w as i64 || dy > 0 || (dy == 0 && dx >= 0) { 0 } else { b[yy as usize * w + xx as usize] as usize }
+    };
+    let (up2, up1, own, bits): (Option<(i64, i64, u32)>, (i64, i64, u32), u32, &[u32]) = match t {
+        0 => (Some((-1, 1, 12)), (-2, 2, 5), 4, &[4, 10, 11, 15]),
+        1 => (Some((-1, 2, 9)), (-2, 2, 4), 3, &[3]),
+        2 => (Some((-1, 1, 7)), (-2, 1, 3), 2, &[2]),
+        _ => (None, (-3, 1, 5), 4, &[4]),
+    };
+    let mut c = 0usize;
+    for k in 0..own {
+        c |= p(-(k as i64) - 1, 0) << k;
+    }
+    for (dy, (lo, hi, s)) in [(-1, Some(up1)), (-2, up2)].into_iter().filter_map(|(dy, r)| r.map(|r| (dy, r))) {
+        for dx in lo..=hi {
+            c |= p(dx, dy) << (s + (hi - dx) as u32);
+        }
+    }
+    for (&(ax, ay), &bit) in at.iter().zip(bits) {
+        c |= p(ax as i64, ay as i64) << bit;
+    }
+    c
+}
+
+/// 6.2.5: a generic region (no TPGDON); the pixels `skip` marks are not coded (they are 0)
+fn mq_generic(e: &mut MqEnc, cx: &mut [MqCx], b: &[u8], w: usize, h: usize, t: u8, at: &[(i32, i32)], skip: Option<&[u8]>) {
+    for y in 0..h {
+        for x in 0..w {
+            if skip.is_some_and(|s| s[y * w + x] == 1) {
+                continue;
+            }
+            let c = gb_context(b, w, x, y, t, at);
+            e.encode(&mut cx[c], b[y * w + x]);
+        }
+    }
+}
+
+/// the nominal adaptive pixels of template 0
+const AT0: [(i32, i32); 4] = [(3, -1), (-3, -1), (2, -2), (-2, -2)];
+
+/// a symbol of w x h: a frame on the left and the bottom, a diagonal pattern inside (0 / 1)
+fn glyph(w: usize, h: usize, k: usize) -> Vec<u8> {
+    (0..w * h).map(|i| (i % w == 0 || i / w == h - 1 || (i % w * 3 + i / w * 5 + k) % 4 == 0) as u8).collect()
+}
+
+/// symbols in height classes: (height, the widths of its symbols); arithmetic coding takes a
+/// width smaller than the one before, B.2 (Huffman) only larger ones
+type Classes = [(usize, &'static [usize]); 2];
+const CLASSES_MQ: Classes = [(5, &[4, 6]), (8, &[3, 7, 5])];
+const CLASSES_HUFF: Classes = [(5, &[4, 6]), (8, &[3, 5, 7])];
+
+/// the sizes of the glyphs of `classes`, in their order
+fn class_sizes(classes: &Classes) -> Vec<(usize, usize)> {
+    classes.iter().flat_map(|&(h, ws)| ws.iter().map(move |&w| (w, h))).collect()
+}
+
+/// 6.5 (arithmetic, template 0, no refinement): a symbol dictionary of the glyphs of `classes`
+/// after `inputs` symbols of the dictionaries it refers to, the new ones exported; the generic
+/// contexts start from `gb` and end there (flags 0x100: contexts used, 0x200: retained)
+fn jb2_symbols_mq(classes: &Classes, flags: u16, inputs: usize, gb: &mut [MqCx]) -> Vec<u8> {
+    let n: usize = classes.iter().map(|c| c.1.len()).sum();
+    let mut d = flags.to_be_bytes().to_vec();
+    d.extend_from_slice(jb2_at(0));
+    d.extend_from_slice(&(n as u32).to_be_bytes());
+    d.extend_from_slice(&(n as u32).to_be_bytes());
+    let mut e = MqEnc::new();
+    let (mut iadh, mut iadw, mut iaex) = ([(0u8, 0u8); 512], [(0u8, 0u8); 512], [(0u8, 0u8); 512]);
+    let (mut height, mut k) = (0, 0);
+    for &(h, widths) in classes {
+        mq_int(&mut e, &mut iadh, Some(h as i32 - height));
+        height = h as i32;
+        let mut width = 0;
+        for &w in widths {
+            mq_int(&mut e, &mut iadw, Some(w as i32 - width));
+            width = w as i32;
+            mq_generic(&mut e, gb, &glyph(w, h, k), w, h, 0, &AT0, None);
+            k += 1;
+        }
+        mq_int(&mut e, &mut iadw, None);
+    }
+    // the export flags: a run of the input not exported, then the new symbols
+    mq_int(&mut e, &mut iaex, Some(inputs as i32));
+    mq_int(&mut e, &mut iaex, Some(n as i32));
+    d.extend_from_slice(&e.finish());
+    d
+}
+
+/// bits, most significant first (Huffman-coded data)
+struct BitW(Vec<u8>, usize);
+
+impl BitW {
+    fn put(&mut self, x: u32, n: u32) {
+        for i in (0..n).rev() {
+            if self.1 % 8 == 0 {
+                self.0.push(0);
+            }
+            if x >> i & 1 == 1 {
+                *self.0.last_mut().unwrap() |= 0x80 >> (self.1 % 8);
+            }
+            self.1 += 1;
+        }
+    }
+
+    /// on to the next byte
+    fn align(&mut self) {
+        self.1 = self.0.len() * 8;
+    }
+}
+
+/// a value of the standard Huffman tables B.1 (k 1), B.2 (k 2, None: OOB) and B.4 (k 4): (its
+/// lowest value, prefix, prefix length, range bits) per line, the last one the upper range
+fn huff_std(b: &mut BitW, k: u8, v: Option<u32>) {
+    let lines: &[(u32, u32, u32, u32)] = match k {
+        1 => &[(0, 0, 1, 4), (16, 2, 2, 8), (272, 6, 3, 16), (65808, 7, 3, 32)],
+        2 => &[(0, 0, 1, 0), (1, 2, 2, 0), (2, 6, 3, 0), (3, 14, 4, 3), (11, 30, 5, 6), (75, 62, 6, 32)],
+        _ => &[(1, 0, 1, 0), (2, 2, 2, 0), (3, 6, 3, 0), (4, 14, 4, 3), (12, 30, 5, 6), (76, 31, 5, 32)],
+    };
+    let Some(v) = v else { return b.put(63, 6) };
+    let &(low, code, len, bits) = lines.iter().rev().find(|l| v >= l.0).unwrap();
+    b.put(code, len);
+    b.put(v - low, bits);
+}
+
+/// 6.5 (Huffman: tables B.4, B.2 and B.1, collective bitmaps uncompressed): a symbol dictionary
+/// of the glyphs of `classes` (widths growing in each class), all exported
+fn jb2_symbols_huff(classes: &Classes) -> Vec<u8> {
+    let n: usize = classes.iter().map(|c| c.1.len()).sum();
+    let mut d = 1u16.to_be_bytes().to_vec();
+    d.extend_from_slice(&(n as u32).to_be_bytes());
+    d.extend_from_slice(&(n as u32).to_be_bytes());
+    let mut b = BitW(Vec::new(), 0);
+    let (mut height, mut k) = (0, 0);
+    for &(h, widths) in classes {
+        huff_std(&mut b, 4, Some((h - height) as u32));
+        height = h;
+        let mut width = 0;
+        for &w in widths {
+            huff_std(&mut b, 2, Some((w - width) as u32));
+            width = w;
+        }
+        huff_std(&mut b, 2, None);
+        // BMSIZE 0: the collective bitmap uncompressed from the next byte, its rows padded
+        huff_std(&mut b, 1, Some(0));
+        let glyphs: Vec<Vec<u8>> = widths.iter().enumerate().map(|(i, &w)| glyph(w, h, k + i)).collect();
+        k += widths.len();
+        for y in 0..h {
+            b.align();
+            for (g, &w) in glyphs.iter().zip(widths) {
+                for x in 0..w {
+                    b.put(g[y * w + x] as u32, 1);
+                }
+            }
+        }
+        b.align();
+    }
+    huff_std(&mut b, 1, Some(0));
+    huff_std(&mut b, 1, Some(n as u32));
+    d.extend_from_slice(&b.0);
+    d
+}
+
+/// 6.4 (arithmetic, top left, no transposition): a text region of w x h of the instances
+/// (symbol id, x, y) in strips of `strips` rows, with `syms` symbols of these sizes; `refine`: the
+/// refinement flag on, every instance unrefined (RI 0)
+fn jb2_text_mq(w: u32, h: u32, op: u8, strips: u32, refine: bool, sizes: &[(usize, usize)], inst: &[(u32, i32, i32)]) -> Vec<u8> {
+    let codelen = if sizes.len() <= 1 { 0 } else { 64 - (sizes.len() as u64 - 1).leading_zeros() };
+    let flags: u16 = (refine as u16) << 1 | (strips.trailing_zeros() as u16) << 2 | 1 << 4 | (refine as u16) << 15;
+    let mut d = jb2_region(w, h, 0, 0, op, &[&flags.to_be_bytes(), &(inst.len() as u32).to_be_bytes()]);
+    let mut e = MqEnc::new();
+    let new = || [(0u8, 0u8); 512];
+    let (mut iadt, mut iafs, mut iads, mut iait, mut iari) = (new(), new(), new(), new(), new());
+    let mut iaid = vec![(0u8, 0u8); 2 << codelen];
+    let strips = strips as i32;
+    let mut sorted = inst.to_vec();
+    sorted.sort_by_key(|&(_, x, y)| (y - y.rem_euclid(strips), x));
+    mq_int(&mut e, &mut iadt, Some(0));
+    let (mut stript, mut firsts) = (0i32, 0i32);
+    let mut i = 0;
+    while i < sorted.len() {
+        let base = sorted[i].2 - sorted[i].2.rem_euclid(strips);
+        mq_int(&mut e, &mut iadt, Some((base - stript) / strips));
+        stript = base;
+        mq_int(&mut e, &mut iafs, Some(sorted[i].1 - firsts));
+        firsts = sorted[i].1;
+        let mut curs = firsts;
+        let mut first = true;
+        while i < sorted.len() && sorted[i].2 - sorted[i].2.rem_euclid(strips) == base {
+            let (id, x, y) = sorted[i];
+            if !first {
+                mq_int(&mut e, &mut iads, Some(x - curs));
+            }
+            first = false;
+            if strips > 1 {
+                mq_int(&mut e, &mut iait, Some(y - base));
+            }
+            mq_id(&mut e, &mut iaid, id, codelen);
+            if refine {
+                mq_int(&mut e, &mut iari, Some(0));
+            }
+            curs = x + sizes[id as usize].0 as i32 - 1;
+            i += 1;
+        }
+        mq_int(&mut e, &mut iads, None);
+    }
+    d.extend_from_slice(&e.finish());
+    d
+}
+
+/// 6.7 (arithmetic, template 0): a pattern dictionary of four patterns of 4 x 4 (0, 4, 8, 12
+/// pixels black)
+fn jb2_patterns_mq() -> Vec<u8> {
+    let (pw, ph, n) = (4usize, 4usize, 4usize);
+    let mut d = vec![0, pw as u8, ph as u8];
+    d.extend_from_slice(&(n as u32 - 1).to_be_bytes());
+    let w = pw * n;
+    let coll: Vec<u8> = (0..w * ph).map(|i| ((i % w % pw) + (i / w) * pw < (i % w / pw) * 4) as u8).collect();
+    let mut e = MqEnc::new();
+    let mut cx = vec![(0u8, 0u8); 1 << 16];
+    mq_generic(&mut e, &mut cx, &coll, w, ph, 0, &[(-(pw as i32), 0), (-3, -1), (2, -2), (-2, -2)], None);
+    d.extend_from_slice(&e.finish());
+    d
+}
+
+/// 6.6 (arithmetic, template `t`): a halftone region of w x h over a grid of gw x gh cells 4
+/// pixels apart (four patterns: grey values (m + n) mod 4, two planes Gray-coded); `skip`: the
+/// cells outside the region left out
+fn jb2_halftone_mq(w: u32, h: u32, gw: usize, gh: usize, t: u8, skip: bool, op: u8) -> Vec<u8> {
+    let flags = t << 1 | (skip as u8) << 3 | op << 4;
+    let grid = [&(gw as u32).to_be_bytes()[..], &(gh as u32).to_be_bytes(), &0u32.to_be_bytes(), &0u32.to_be_bytes(), &(4u16 << 8).to_be_bytes(), &0u16.to_be_bytes()].concat();
+    let mut d = jb2_region(w, h, 0, 0, 0, &[&[flags], &grid]);
+    let skipped: Vec<u8> = (0..gw * gh).map(|i| (skip && ((i % gw) * 4 >= w as usize || (i / gw) * 4 >= h as usize)) as u8).collect();
+    let gray: Vec<usize> = (0..gw * gh).map(|i| if skipped[i] == 1 { 0 } else { (i % gw + i / gw) % 4 }).collect();
+    let at: &[(i32, i32)] = match t {
+        0 => &AT0,
+        1 => &[(3, -1)],
+        _ => &[(2, -1)],
+    };
+    let mut e = MqEnc::new();
+    let mut cx = vec![(0u8, 0u8); 1 << 16];
+    for j in 0..2 {
+        // plane j (the most significant first), Gray-coded: its bit XOR the bit above it
+        let plane: Vec<u8> = gray.iter().map(|&g| ((g >> (1 - j) & 1) ^ if j == 0 { 0 } else { g >> 1 & 1 }) as u8).collect();
+        mq_generic(&mut e, &mut cx, &plane, gw, gh, t, at, skip.then_some(&skipped[..]));
+    }
+    d.extend_from_slice(&e.finish());
+    d
+}
+
+/// JBIG2: PDF's embedded form (its input: the length of the globals, the globals, the page's
+/// segments) and files, sequential and random-access.  Every kind of segment: generic regions in
+/// MMR and arithmetic coding (each template, TPGDON, data of unknown length), refinement regions
+/// (both templates, TPGRON, on the page and on an intermediate region), symbol dictionaries and
+/// text regions (arithmetic and Huffman, refinement and aggregate coding, retained contexts,
+/// transposed, a custom code table), pattern dictionaries and halftone regions (skip, a grid at an
+/// angle), striped pages of unknown height, a default pixel and operator, a four-byte page
+/// association; the files of tools/jbig2_check.py's layout suite.  Symbol dictionaries, text
+/// regions, pattern dictionaries and halftones are encoded above so that they decode, except
+/// aggregate coding and text regions in Huffman coding; their data is random, as is that of the
+/// generic and refinement regions (which decode from any bytes)
+fn jbig2_seeds() -> Vec<Vec<u8>> {
+    let mut r = Rng(0x0B16_2000);
+    let mut rnd = |n: usize| -> Vec<u8> { (0..n).map(|_| r.next() as u8).collect() };
+    let mut out = Vec::new();
+    let page = |num: u32, pg: u32, w: u32, h: u32| jb2_seg(num, 48, pg, &[], jb2_info(w, h, 0, 0), None);
+    let eop = |num: u32, pg: u32| jb2_seg(num, 49, pg, &[], Vec::new(), None);
+    let ff_ac = |mut v: Vec<u8>| {
+        v.extend_from_slice(&[0xFF, 0xAC]);
+        v
+    };
+    // MMR: a page of 8 x 2, four white and four black in both rows (pdftest's)
+    let mmr = jb2_region(8, 2, 0, 0, 0, &[&[1], &[0x36, 0xF0]]);
+    out.push(jb2_pdf(&[], &[page(0, 1, 8, 2), jb2_seg(1, 39, 1, &[], mmr.clone(), None), eop(2, 1)]));
+    // arithmetic generic regions: each template, TPGDON on the odd ones; one of unknown length
+    for t in 0..4u8 {
+        let g = jb2_region(32, 16, 0, 0, 0, &[&[t << 1 | (t & 1) << 3], jb2_at(t), &ff_ac(rnd(48))]);
+        out.push(jb2_pdf(&[], &[page(0, 1, 32, 16), jb2_seg(1, 39, 1, &[], g, None), eop(2, 1)]));
+    }
+    let mut g = jb2_region(32, 16, 0, 0, 0, &[&[0], jb2_at(0), &ff_ac(rnd(40))]);
+    g.extend_from_slice(&16u32.to_be_bytes());
+    out.push(jb2_pdf(&[], &[page(0, 1, 32, 16), jb2_seg(1, 38, 1, &[], g, Some(0xFFFF_FFFF)), eop(2, 1)]));
+    // refinement on the page (template 0, its adaptive pixels) and on intermediate regions
+    // (template 1 with TPGRON, a refinement of a refinement)
+    let g1 = jb2_region(16, 16, 0, 0, 0, &[&[2], jb2_at(1), &ff_ac(rnd(24))]);
+    let r0 = jb2_region(16, 16, 0, 0, 2, &[&[0], &[0xFF, 0xFF, 0xFF, 0xFF], &ff_ac(rnd(32))]);
+    out.push(jb2_pdf(&[], &[page(0, 1, 16, 16), jb2_seg(1, 39, 1, &[], g1.clone(), None), jb2_seg(2, 43, 1, &[], r0, None), eop(3, 1)]));
+    let r1 = jb2_region(16, 16, 0, 0, 0, &[&[3], &ff_ac(rnd(32))]);
+    let r2 = jb2_region(16, 16, 4, 2, 0, &[&[1], &ff_ac(rnd(32))]);
+    out.push(jb2_file(&[page(0, 1, 24, 24), jb2_seg(1, 36, 1, &[], g1, None), jb2_seg(2, 40, 1, &[1], r1, None), jb2_seg(3, 42, 1, &[2], r2, None), eop(4, 1)], false));
+    // symbol dictionaries and text regions (encoded here): a global dictionary in arithmetic
+    // coding, a text region of its five glyphs, eight instances on six strips (top left)
+    let mq_sizes = class_sizes(&CLASSES_MQ);
+    let inst: &[(u32, i32, i32)] = &[(0, 1, 1), (1, 7, 1), (2, 15, 2), (3, 2, 10), (4, 8, 10), (0, 20, 11), (1, 30, 10), (2, 40, 12)];
+    let mut gb = vec![(0u8, 0u8); 1 << 16];
+    let dict = jb2_symbols_mq(&CLASSES_MQ, 0, 0, &mut gb);
+    let text = jb2_text_mq(48, 20, 0, 1, false, &mq_sizes, inst);
+    out.push(jb2_pdf(&[jb2_seg(0, 0, 0, &[], dict, None)], &[page(1, 1, 48, 20), jb2_seg(2, 6, 1, &[0], text, None), eop(3, 1)]));
+    // ... a dictionary that retains its contexts and one that goes on with them (after the first
+    // one's five symbols); a text region of both (ten symbols) in strips of two rows with the
+    // refinement flag on (no instance refined), XOR; an intermediate one under a refinement
+    let mut gb = vec![(0u8, 0u8); 1 << 16];
+    let kept = jb2_symbols_mq(&CLASSES_MQ, 0x200, 0, &mut gb);
+    let more = jb2_symbols_mq(&CLASSES_MQ, 0x100, 5, &mut gb);
+    let both: Vec<(usize, usize)> = mq_sizes.iter().chain(&mq_sizes).copied().collect();
+    let inst2: Vec<(u32, i32, i32)> = inst.iter().enumerate().map(|(i, &(id, x, y))| (id + 5 * (i as u32 % 2), x, y)).collect();
+    let text = jb2_text_mq(48, 20, 2, 2, true, &both, &inst2);
+    let inter = jb2_text_mq(48, 20, 0, 1, false, &both, &inst2);
+    let refined = jb2_region(48, 20, 0, 0, 0, &[&[1], &ff_ac(rnd(48))]);
+    out.push(jb2_file(&[
+        page(0, 1, 48, 20),
+        jb2_seg(1, 0, 1, &[], kept, None),
+        jb2_seg(2, 0, 1, &[1], more, None),
+        jb2_seg(3, 7, 1, &[1, 2], text, None),
+        jb2_seg(4, 4, 1, &[1, 2], inter, None),
+        jb2_seg(5, 42, 1, &[4], refined, None),
+        eop(6, 1),
+    ], false));
+    // random data where no encoder is here: refinement / aggregate coding with retained contexts
+    // and a dictionary that uses them, a text region with refinement (template 0), two strips,
+    // transposed, bottom right, XOR
+    let mut agg = (2u16 | 0x200).to_be_bytes().to_vec();
+    agg.extend_from_slice(jb2_at(0));
+    agg.extend_from_slice(&[0xFF, 0xFF, 0xFF, 0xFF, 0, 0, 0, 2, 0, 0, 0, 2]);
+    agg.extend_from_slice(&rnd(64));
+    let mut used = (2u16 | 0x100 | 0x200).to_be_bytes().to_vec();
+    used.extend_from_slice(jb2_at(0));
+    used.extend_from_slice(&[0xFF, 0xFF, 0xFF, 0xFF, 0, 0, 0, 4, 0, 0, 0, 2]);
+    used.extend_from_slice(&rnd(64));
+    let tflags: u16 = 2 | 1 << 2 | 3 << 4 | 0x40 | 2 << 7;
+    let text = jb2_region(40, 24, 0, 0, 0, &[&tflags.to_be_bytes(), &[0xFF, 0xFF, 0xFF, 0xFF], &5u32.to_be_bytes(), &rnd(64)]);
+    out.push(jb2_file(&[page(0, 1, 40, 24), jb2_seg(1, 0, 1, &[], agg, None), jb2_seg(2, 0, 1, &[1], used, None), jb2_seg(3, 7, 1, &[1, 2], text, None), eop(4, 1)], false));
+    // Huffman: a dictionary of the standard tables (encoded here) under an arithmetic text region
+    // in strips of four rows; text regions in Huffman coding (random data) of the standard tables
+    // and of a custom table for the first S coordinates
+    let hd = jb2_symbols_huff(&CLASSES_HUFF);
+    let text = jb2_text_mq(48, 20, 0, 4, false, &class_sizes(&CLASSES_HUFF), inst);
+    out.push(jb2_pdf(&[jb2_seg(0, 0, 0, &[], hd.clone(), None)], &[page(1, 1, 48, 20), jb2_seg(2, 6, 1, &[0], text, None), eop(3, 1)]));
+    let ht = jb2_region(32, 16, 0, 0, 0, &[&(1u16 | 1 << 4).to_be_bytes(), &0u16.to_be_bytes(), &3u32.to_be_bytes(), &rnd(40)]);
+    out.push(jb2_pdf(&[jb2_seg(0, 0, 0, &[], hd.clone(), None)], &[page(1, 1, 32, 16), jb2_seg(2, 6, 1, &[0], ht, None), eop(3, 1)]));
+    let table = jb2_table(&[(1, 4), (2, 5), (3, 4)], 4, 4);
+    let hc = jb2_region(32, 16, 0, 0, 0, &[&(1u16 | 1 << 4).to_be_bytes(), &3u16.to_be_bytes(), &3u32.to_be_bytes(), &rnd(40)]);
+    out.push(jb2_file(&[jb2_seg(0, 53, 0, &[], table, None), jb2_seg(1, 0, 0, &[], hd, None), page(2, 1, 32, 16), jb2_seg(3, 6, 1, &[1, 0], hc, None), eop(4, 1)], false));
+    // a pattern dictionary of four 4 x 4 patterns and halftone regions on it (encoded here): a
+    // grid of 10 x 6 with skip (its last column and row off the region), template 1 without, XOR;
+    // random data: template 1 on a grid at an angle, partly off the region, AND on a black region
+    let pats = jb2_patterns_mq();
+    out.push(jb2_pdf(&[jb2_seg(0, 16, 0, &[], pats.clone(), None)], &[page(1, 1, 36, 20), jb2_seg(2, 22, 1, &[0], jb2_halftone_mq(36, 20, 10, 6, 0, true, 0), None), eop(3, 1)]));
+    out.push(jb2_file(&[page(0, 1, 40, 24), jb2_seg(1, 16, 1, &[], pats.clone(), None), jb2_seg(2, 23, 1, &[1], jb2_halftone_mq(40, 24, 10, 6, 1, false, 2), None), eop(3, 1)], false));
+    let grid = |gw: u32, gh: u32, gx: i32, gy: i32, rx: u16, ry: u16| [&gw.to_be_bytes()[..], &gh.to_be_bytes(), &gx.to_be_bytes(), &gy.to_be_bytes(), &rx.to_be_bytes(), &ry.to_be_bytes()].concat();
+    let h2 = jb2_region(32, 32, 0, 0, 0, &[&[2 | 1 << 4 | 0x80], &grid(10, 10, -1024, 512, 0x2D4, 0x2D4), &ff_ac(rnd(64))]);
+    out.push(jb2_file(&[jb2_seg(0, 16, 1, &[], pats, None), page(1, 1, 32, 32), jb2_seg(2, 23, 1, &[0], h2, None), eop(3, 1), jb2_seg(4, 51, 0, &[], Vec::new(), None)], true));
+    // a striped page of unknown height (stripes of at most 8 rows): an MMR region, the end of the
+    // stripe, an arithmetic region (template 2) below it, the end of that stripe
+    let s1 = jb2_region(16, 8, 0, 0, 0, &[&[1], &rnd(12)]);
+    let s2 = jb2_region(16, 8, 0, 8, 0, &[&[4], jb2_at(2), &ff_ac(rnd(20))]);
+    out.push(jb2_file(&[
+        jb2_seg(0, 48, 1, &[], jb2_info(16, 0xFFFF_FFFF, 0, 0x8008), None),
+        jb2_seg(1, 39, 1, &[], s1, None),
+        jb2_seg(2, 50, 1, &[], 7u32.to_be_bytes().to_vec(), None),
+        jb2_seg(3, 38, 1, &[], s2, None),
+        jb2_seg(4, 50, 1, &[], 15u32.to_be_bytes().to_vec(), None),
+        eop(5, 1),
+        jb2_seg(6, 51, 0, &[], Vec::new(), None),
+    ], false));
+    // default pixel 1, the operator overridden (XNOR, template 3), a region partly off the page;
+    // a four-byte page association
+    let g3 = jb2_region(24, 12, -5, 10, 3, &[&[6], jb2_at(3), &ff_ac(rnd(32))]);
+    out.push(jb2_file(&[jb2_seg(0, 48 | 0x40, 7, &[], jb2_info(32, 16, 0x04 | 3 << 3 | 0x40, 0), None), jb2_seg(1, 39 | 0x40, 7, &[], g3, None), jb2_seg(2, 49 | 0x40, 7, &[], Vec::new(), None)], false));
+    // the same generic region of template 0 in a random-access file
+    let g0 = jb2_region(32, 16, 0, 0, 0, &[&[0], jb2_at(0), &ff_ac(rnd(48))]);
+    out.push(jb2_file(&[page(0, 1, 32, 16), jb2_seg(1, 39, 1, &[], g0, None), eop(2, 1), jb2_seg(3, 51, 0, &[], Vec::new(), None)], true));
+    // tools/jbig2_check.py's layout suite: two pages interleaved, two pages without an end of
+    // page, a global pattern dictionary after a damaged page (MMR)
+    let region = jb2_region(8, 2, 0, 0, 0, &[&[1], &[0x36, 0xF0]]);
+    let patterns = [&[1u8, 4, 2][..], &1u32.to_be_bytes(), &[0x36, 0xF0]].concat();
+    let halftone = jb2_region(8, 2, 0, 0, 0, &[&[1], &grid(2, 1, 0, 0, 4 << 8, 0), &[0x23, 0xA0]]);
+    out.push(jb2_file(&[page(0, 1, 8, 2), page(1, 2, 8, 2), jb2_seg(2, 39, 1, &[], region.clone(), None), eop(3, 1), eop(4, 2), jb2_seg(5, 51, 0, &[], Vec::new(), None)], false));
+    out.push(jb2_file(&[page(0, 1, 8, 2), jb2_seg(1, 39, 1, &[], region, None), page(2, 2, 8, 2)], false));
+    out.push(jb2_file(&[page(0, 1, 8, 2), jb2_seg(1, 38, 1, &[], vec![0; 5], None), jb2_seg(2, 16, 0, &[], patterns, None), eop(3, 1), page(4, 2, 8, 2), jb2_seg(5, 23, 2, &[2], halftone, None), eop(6, 2)], false));
+    out
+}
+
 pub fn targets(seed_dir: &str) -> Vec<(&'static str, Vec<Vec<u8>>, Fun)> {
     let (dq, dm) = dns_seed();
     let certs = pem_certs(seed_dir);
@@ -1187,6 +1923,41 @@ pub fn targets(seed_dir: &str) -> Vec<(&'static str, Vec<Vec<u8>>, Fun)> {
             let head = if kind & 1 == 1 { netchan::packet::DISCONNECT_HEADER } else { netchan::packet::DATA_HEADER };
             let seq = if wire.len() >= 7 { u16::from_le_bytes([wire[5], wire[6]]) } else { 0 };
             let _ = b.open(wire, head, seq);
+        })),
+        ("img_jp2", jp2_seeds(seed_dir), Box::new(|d: &[u8]| {
+            let _ = img_jp2::probe(d);
+            // img_all's way: the codec at full resolution, into ARGB
+            img_codec(&img_jp2::CODEC, d, JP2_PIXELS);
+            // a lower resolution, the components as they are coded: each holds its samples
+            let opt = img_jp2::Options { reduce: 1 + (d.len() % 3) as u8, max_pixels: JP2_PIXELS, convert_sycc: false };
+            if let Ok(img) = img_jp2::decode(d, &opt) {
+                for c in &img.components {
+                    assert_eq!(c.data.len() as u64, c.width as u64 * c.height as u64, "a component of {} x {}", c.width, c.height);
+                }
+            }
+        })),
+        ("img_jbig2", jbig2_seeds(), Box::new(|d: &[u8]| {
+            let opt = img_jbig2::Options { max_pixels: JBIG2_PIXELS };
+            let check = |b: &img_jbig2::Bitmap| {
+                assert_eq!(b.stride, (b.width as usize).div_ceil(8), "the stride of a page {} wide", b.width);
+                let px = b.width as u64 * b.height as u64;
+                assert!(px <= JBIG2_PIXELS, "a page of {} x {} past the cap", b.width, b.height);
+                assert_eq!(b.bits.len() as u64, if px == 0 { 0 } else { b.stride as u64 * b.height as u64 }, "the bits of a page of {} x {}", b.width, b.height);
+            };
+            if img_jbig2::probe(d) {
+                // a file: every page; img_all's codec: the first one, into ARGB
+                if let Ok(pages) = img_jbig2::decode_file(d, &opt) {
+                    pages.iter().for_each(check);
+                }
+                img_codec(&img_jbig2::CODEC, d, JBIG2_PIXELS);
+            } else if d.len() >= 2 {
+                // PDF's embedded form: the length of the JBIG2Globals (0: none), them, the page's segments
+                let g = (u16::from_be_bytes([d[0], d[1]]) as usize).min(d.len() - 2);
+                let (globals, page) = d[2..].split_at(g);
+                if let Ok(b) = img_jbig2::decode_embedded(page, (g > 0).then_some(globals), &opt) {
+                    check(&b);
+                }
+            }
         })),
         ("plat_clipboard", clipboard_seeds(), Box::new(|d: &[u8]| {
             let _ = plat::fuzz::clip_wide_text(d);

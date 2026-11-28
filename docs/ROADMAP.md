@@ -2522,8 +2522,8 @@ Sicherheit:
 - **P1** · *teilweise* (2026-11-27, Sicherheitsplan 2d) · Fuzzing der Datei-Parser. `tools/net_fuzz.py` und
   `tools/cov_fuzz.py` decken zstd, LZ4, X.509, DNS, HTTP, TLS, die IP-Reassembly und `netpkt` ab, dazu inzwischen
   DEFLATE, zlib, gzip und Brotli (`compress`: die einmaligen Decoder, die Stream-Decoder in Stücken gegen sie und die
-  Encoder in Rundreisen), `formats::json`, `formats::xml` (`Reader`, `Lenient`) und die Zeichensätze. Es fehlen
-  `archive` (ZIP, OPC), die
+  Encoder in Rundreisen), `formats::json`, `formats::xml` (`Reader`, `Lenient`) und die Zeichensätze, seit
+  2026-11-28 auch JPEG 2000 und JBIG2 (`img_jp2`, `img_jbig2`). Es fehlen `archive` (ZIP, OPC), die übrigen
   Bild-Decoder und die Schriften (bisher nur abgeschnittene und gekippte Kopien in den
   Python-Prüfungen, [`tools/imgtest_common.py`](../tools/imgtest_common.py),
   `tools/font_check.py --fuzz`), `doc_io` (RTF und HTML aus der Zwischenablage, die jedes andere

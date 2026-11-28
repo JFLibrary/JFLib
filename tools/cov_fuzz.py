@@ -4,7 +4,8 @@ The targets are tools/net_fuzz/targets.rs, the same as tools/net_fuzz.py's: zstd
 zlib, gzip, Brotli, JSON, XML, the charsets, X.509 (with netio's verify_chain and netpkt's
 check_chain), both DNS and HTTP parsers, netio's TLS server and clients, IPv4 / IPv6 reassembly,
 netpkt's dissector and application-layer parsers, netchan's packets, handshake cores and sealing,
-plat's decoders of other programs' data (clipboard, drops; on Linux D-Bus and Wayland).
+plat's decoders of other programs' data (clipboard, drops; on Linux D-Bus and Wayland), the JPEG 2000
+and JBIG2 decoders (img_jp2, img_jbig2).
 Writes a cargo-fuzz project into build/cov_fuzz (one fuzz target
 per name, each including targets.rs), starts every target's corpus from the seeds of net_fuzz
 (build/cov_fuzz/corpus/NAME, kept between runs so coverage adds up) and runs J targets at a time
@@ -32,7 +33,7 @@ NAMES = ["zstd", "lz4", "deflate", "zlib", "gzip", "brotli", "stream_deflate", "
          "stream_zstd", "stream_lz4", "roundtrip", "json", "xml", "charsets", "x509", "x509_netpkt", "ocsp", "csr", "dns",
          "dns_netpkt", "http_netio", "http_client", "url", "cookie", "http_netpkt", "tls_server", "tls_server_psk", "tls_client", "tls_webclient", "ipv4_reassembly",
          "ipv6_reassembly", "netpkt_decode", "netpkt_app", "netchan_packet", "netchan_server", "netchan_client",
-         "netchan_open", "plat_clipboard"] + (["plat_dbus", "plat_wayland"] if sys.platform.startswith("linux") else [])
+         "netchan_open", "plat_clipboard", "img_jp2", "img_jbig2"] + (["plat_dbus", "plat_wayland"] if sys.platform.startswith("linux") else [])
 
 
 def project():
@@ -53,7 +54,10 @@ def project():
         dep("netpkt", "jflib-netpkt"),
         dep("netio", "jflib-netio"),
         dep("formats", "jflib-formats"),
-        dep("netchan", "jflib-netchan"), "",
+        dep("netchan", "jflib-netchan"),
+        dep("img_core", "jflib-img-core"),
+        dep("img_jp2", "jflib-img-jp2"),
+        dep("img_jbig2", "jflib-img-jbig2"), "",
         bins,
     ]), encoding="utf-8")
     (OUT / "fuzz_targets").mkdir(parents=True, exist_ok=True)
