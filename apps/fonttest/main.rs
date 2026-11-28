@@ -36,6 +36,10 @@
 //   --find FAMILY WEIGHT ITALIC        fontdb find
 //   --conf FAMILY [LANG]               fontconf: the system's rules (files read), the
 //                                      candidates and the family FontDb::resolve finds
+//   --fallback LANG CP..               the system fallback (fallback.rs; LANG "-" none) for
+//                                      each code point (hex): "U+XXXX family", or "none"
+//                                      (exit 1 when one has none); before them the families
+//                                      of the system's fonts.xml (Android) in its order
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
@@ -184,7 +188,7 @@ fn fonttest() -> i32 {
     let t = Text::new(st.fonts(), st.font_names());
     let mut ft = Ft { t, db: FontDb::new(), a: plat::args(), ob: Vec::new(), key: String::new(), st_fail: 0 };
     let modes = ["--selftest", "--dump", "--outlines", "--outline", "--kern", "--render", "--cmpsgf", "--fuzz",
-                 "--bench", "--scan", "--find", "--conf", "--advances"];
+                 "--bench", "--scan", "--find", "--conf", "--fallback", "--advances"];
     for m in modes {
         let i = ft.arg_index(m);
         if i < 0 {
@@ -203,11 +207,12 @@ fn fonttest() -> i32 {
             "--bench" => ft.cmd_bench(i),
             "--scan" => ft.cmd_scan(i),
             "--conf" => ft.cmd_conf(i),
+            "--fallback" => ft.cmd_fallback(i),
             "--advances" => ft.cmd_advances(i),
             _ => ft.cmd_find(i),
         };
     }
-    plat::write_stderr(b"usage: fonttest --shot x.png (--dump F [FACE] | --outline F FACE CP | --outlines F FACE LIST OUT | --kern F FACE LIST OUT | --render F FACE SIZE TEXT OUT | --cmpsgf F FACE SGF | --fuzz F | --bench F FACE | --scan [OUT] | --find FAMILY W I | --conf FAMILY [LANG])\n");
+    plat::write_stderr(b"usage: fonttest --shot x.png (--dump F [FACE] | --outline F FACE CP | --outlines F FACE LIST OUT | --kern F FACE LIST OUT | --render F FACE SIZE TEXT OUT | --cmpsgf F FACE SGF | --fuzz F | --bench F FACE | --scan [OUT] | --find FAMILY W I | --conf FAMILY [LANG] | --fallback LANG CP..)\n");
     1
 }
 
@@ -754,6 +759,37 @@ impl Ft {
         }
     }
 
+    fn cmd_fallback(&mut self, ai: usize) -> i32 {
+        let lang = self.arg_at(ai + 1);
+        // the system's fallback families in order (Android: fonts.xml; elsewhere none)
+        let mut c = FontConf::system();
+        let mut db = FontDb::new();
+        db.scan(0);
+        let mut chain = String::new();
+        for sf in c.sys_families().to_vec() {
+            let fam = sf.faces.iter().find_map(|(file, k)| c.sys_family(&db, file, *k));
+            let fam = fam.as_deref();
+            chain.push_str(&format!("  {} {}: {}\n", sf.langs.join(","), sf.faces.first().map_or("", |f| f.0.as_str()), fam.unwrap_or("(not found)")));
+        }
+        out(&format!("# {} families in the system's order\n{chain}", c.sys_families().len()));
+        self.t.set_system_fallback(true);
+        if lang != "-" {
+            self.t.set_fallback_lang(&lang);
+        }
+        let mut missing = 0;
+        for a in self.a.iter().skip(ai + 2).take_while(|a| !a.starts_with("--")).cloned().collect::<Vec<_>>() {
+            let cp = u32::from_str_radix(a.trim_start_matches("U+"), 16).unwrap_or(0);
+            match self.t.fallback_for(cp) {
+                Some(f) => out(&format!("U+{cp:04X} {}\n", self.name(f, FN_FAMILY))),
+                None => {
+                    missing += 1;
+                    out(&format!("U+{cp:04X} none\n"));
+                }
+            }
+        }
+        (missing > 0) as i32
+    }
+
     fn cmd_find(&mut self, ai: usize) -> i32 {
         self.db.scan(0);
         let w = self.arg_num(ai + 2, 400);
@@ -836,6 +872,58 @@ impl Ft {
             found.push(db.resolve(&c, f, "de", 400, false).map(|r| r.2).unwrap_or_default());
         }
         self.st_check(found == ["DejaVu Sans Mono", "jfgui Mini", "jfgui Mini", "jfgui Mini"], &format!("selftest: fontdb resolve, no Latin {found:?}\n"));
+    }
+
+    // Android's fonts.xml (FontConf::familyset, docs/ANDROID.md AN4): named families, aliases,
+    // fallback families with languages, serif faces, emoji, ignore; the files found in the font
+    // folders (here jfgui_FONTDIRS) and their family names read from the files
+    fn st_fontsxml(&mut self) {
+        let dirs = plat::env("jfgui_FONTDIRS");
+        plat::setenv("jfgui_FONTDIRS", Some("apps/fonttest/tests/fixtures;lib/doc_view/assets"));
+        let xml = "<?xml version=\"1.0\" encoding=\"utf-8\"?><!-- first font is default --><familyset version=\"23\">\
+            <family name=\"sans-serif\"><font weight=\"400\" style=\"normal\">mini.ttf\n  <axis tag=\"wght\" stylevalue=\"400\" />\n</font>\
+            <font weight=\"700\" style=\"normal\">mini.ttf</font></family>\
+            <alias name=\"arial\" to=\"sans-serif\" /><alias name=\"sans-serif-thin\" to=\"sans-serif\" weight=\"100\" />\
+            <family name=\"monospace\"><font weight=\"400\" style=\"normal\">DejaVuSansMono.ttf</font></family>\
+            <family lang=\"und-Arab\" variant=\"elegant\"><font weight=\"400\" style=\"normal\" index=\"1\">mini.ttc</font></family>\
+            <family lang=\"ja\"><font weight=\"400\" style=\"normal\">mac.ttf</font>\
+            <font weight=\"400\" style=\"normal\" fallbackFor=\"serif\">mini.otf</font></family>\
+            <family lang=\"zh-Hans\"><font weight=\"400\" style=\"normal\">DejaVuSerif.ttf</font></family>\
+            <family lang=\"und-Zsye\" ignore=\"true\"><font weight=\"400\" style=\"normal\">gone.ttf</font></family>\
+            <family lang=\"und-Zsye\"><font weight=\"400\" style=\"normal\">cbdt.ttf</font></family>\
+            <family><font weight=\"400\" style=\"normal\">missing.ttf</font><font>../mac.ttf</font></family></familyset>";
+        let mut c = FontConf::new();
+        let n = c.parse(xml, "");
+        let files: Vec<Vec<(&str, u32)>> = c.sys_families().iter().map(|f| f.faces.iter().map(|(n, i)| (n.as_str(), *i)).collect()).collect();
+        let langs: Vec<String> = c.sys_families().iter().map(|f| f.langs.join(",")).collect();
+        self.st_check(n == 8 && files == [alloc::vec![("mini.ttf", 0)], alloc::vec![("mini.ttc", 1)], alloc::vec![("mac.ttf", 0)], alloc::vec![("DejaVuSerif.ttf", 0)],
+                                         alloc::vec![("cbdt.ttf", 0)], alloc::vec![("missing.ttf", 0)]]
+                      && langs == ["", "und-Arab", "ja", "zh-Hans", "und-Zsye", ""],
+                      &format!("selftest: fonts.xml families {n} {files:?} {langs:?}\n"));
+        let serif: Vec<&str> = c.sys_families().get(2).map_or(Vec::new(), |f| f.serif.iter().map(|x| x.0.as_str()).collect());
+        self.st_check(serif == ["mini.otf"], &format!("selftest: fonts.xml fallbackFor serif {serif:?}\n"));
+        let l = c.candidates("sans-serif", "");
+        self.st_check(l == ["jfgui Mini", "sans-serif"], &format!("selftest: fonts.xml named family {l:?}\n"));
+        let l = c.candidates("Arial", "de");
+        self.st_check(l.first().map(String::as_str) == Some("Arial") && l.iter().any(|f| f == "jfgui Mini"), &format!("selftest: fonts.xml alias {l:?}\n"));
+        let l = c.candidates("monospace", "");
+        self.st_check(l.first().map(String::as_str) == Some("DejaVu Sans Mono"), &format!("selftest: fonts.xml monospace {l:?}\n"));
+        let (ja, zh, ar) = (c.lang_families("ja-JP"), c.lang_families("zh-CN"), c.lang_families("ar"));
+        self.st_check(ja == ["jfgui Mac"] && zh == ["DejaVu Serif"] && ar.is_empty(), &format!("selftest: fonts.xml languages {ja:?} {zh:?} {ar:?}\n"));
+        let l = c.candidates("serif", "ja");
+        self.st_check(l.first().map(String::as_str) == Some("jfgui Mini CFF"), &format!("selftest: fonts.xml serif in ja {l:?}\n"));
+        let l = c.candidates("emoji", "");
+        self.st_check(l.first().map(String::as_str) == Some("CBDT Test"), &format!("selftest: fonts.xml emoji {l:?}\n"));
+        // the faces behind the file names (fallback.rs) and a family name from a file
+        let mut db = FontDb::new();
+        db.scan_dirs(&["apps/fonttest/tests/fixtures", "lib/doc_view/assets"], FDB_RESCAN);
+        let fam = |db: &FontDb, f: &str, k: u32| db.face_by_file(f, k).and_then(|i| db.face(i)).map(|x| (x.family.clone(), x.face));
+        let (a, b, none) = (fam(&db, "MINI.TTC", 1), fam(&db, "cbdt.ttf", 0), fam(&db, "mini.ttc", 2));
+        self.st_check(a == Some((String::from("jfgui Mini"), 1)) && b.as_ref().is_some_and(|x| x.0 == "CBDT Test") && none.is_none(),
+                      &format!("selftest: fontdb face_by_file {a:?} {b:?} {none:?}\n"));
+        let (f1, f2) = (text::fontdb::file_family("apps/fonttest/tests/fixtures/mini.otf", 0), text::fontdb::file_family("apps/fonttest/tests/fixtures/mini.ttf", 1));
+        self.st_check(f1.as_deref() == Some("jfgui Mini CFF") && f2.is_none(), &format!("selftest: fontdb file_family {f1:?} {f2:?}\n"));
+        plat::setenv("jfgui_FONTDIRS", dirs.as_deref());
     }
 
     // text s in font / size on white (A8: on 0) in colour c, drawn with a subpixel order into
@@ -1663,6 +1751,7 @@ impl Ft {
         plat::delete(&cp);
         // ---- fontconf: generic families, substitutes, languages (fixtures/fontconf)
         self.st_fontconf();
+        self.st_fontsxml();
         // ---- fallback: a character the UI font lacks comes from DejaVu Serif (lib/doc_view)
         self.st_fallback();
         // ---- macOS / iOS: the system's own fonts for CJK and other scripts (fallback.rs FAMILIES)

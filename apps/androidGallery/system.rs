@@ -2,7 +2,8 @@
 // contrast, animations, text size, accent; UIC_SETTINGS), a notification (ui.notify; a click
 // UIC_NOTE, one that went away UIC_NOTE_GONE), the screen kept on (plat::inhibit with
 // INHIBIT_IDLE), the share sheet (plat::share: a text, a link and a small file; the answer of
-// share_poll shown) and the lifecycle (UIC_ACTIVE, UIC_SUSPEND: 2 in the background, a hidden tab
+// share_poll shown), printing (plat::print: a test picture on A4, Android's print dialog with
+// "Save as PDF"; docs/ANDROID.md AN4) and the lifecycle (UIC_ACTIVE, UIC_SUSPEND: 2 in the background, a hidden tab
 // or Android's onStop, 0 back).  "Design des Systems" lets the theme follow the system (the
 // gallery itself stays light, AF_LIGHT).
 // With jfgui_SELFTEST=system (the start intent's extras on Android, debug builds;
@@ -19,6 +20,7 @@ const ID_SYSTHEME: u32 = 600;
 const ID_NOTIFY: u32 = 601;
 const ID_KEEPON: u32 = 602;
 const ID_SHARE: u32 = 603;
+const ID_PRINT: u32 = 604;
 /// the small file the share button hands over
 const SHARE_FILE: &str = "data://Galerie-Teilen.txt";
 
@@ -50,8 +52,39 @@ pub struct System {
     /// the share sheet: how often opened, the last answer (SHARE_*; SHARE_PENDING while open)
     shares: u32,
     share: i32,
+    /// printing: how often, the last answer of plat::print (0: the system's dialog has the job)
+    prints: u32,
+    print: i32,
     written: String,
 }
+
+/// the picture the button prints: four bands (red, green, blue, black) in a grey frame on white,
+/// easy to tell apart in the PDF ("Save as PDF")
+fn test_picture() -> alloc::vec::Vec<u8> {
+    let (w, h) = (PRINT_W as usize, PRINT_H as usize);
+    let mut px = alloc::vec![255u8; w * h * 4];
+    for y in 0..h {
+        for x in 0..w {
+            let frame = x < 8 || y < 8 || x >= w - 8 || y >= h - 8;
+            let bgr: [u8; 3] = if frame {
+                [128, 128, 128]
+            } else if y < 24 || y >= h - 24 || x < 24 || x >= w - 24 {
+                [255, 255, 255]
+            } else {
+                match (x - 24) * 4 / (w - 48) {
+                    0 => [0, 0, 220],
+                    1 => [0, 170, 0],
+                    2 => [220, 0, 0],
+                    _ => [0, 0, 0],
+                }
+            };
+            px[(y * w + x) * 4..][..4].copy_from_slice(&[bgr[0], bgr[1], bgr[2], 255]);
+        }
+    }
+    px
+}
+const PRINT_W: i32 = 480;
+const PRINT_H: i32 = 320;
 
 impl System {
     fn settings(&mut self, ui: &Ui) -> SysSettings {
@@ -106,6 +139,16 @@ impl System {
             };
             self.share = plat::share(&s);
         }
+        ui.next_size(0, 44);
+        if ui.button(ID_PRINT, t("Drucken")) & EV_ACT != 0 {
+            self.prints += 1;
+            let px = test_picture();
+            let src = plat::PrintSrc { px: &px, w: PRINT_W, h: PRINT_H, stride: PRINT_W * 4, fmt: plat::PRINT_XRGB };
+            let mut job = plat::PrintJob::new(Some(src), t("JFLib Galerie"));
+            job.flags = plat::PJF_CENTER;
+            job.margin = 1500; // 15 mm
+            self.print = plat::print(&mut job);
+        }
         if let Some(r) = plat::share_poll() {
             self.share = r;
         }
@@ -156,6 +199,13 @@ impl System {
             _ => "?",
         };
         ui.text(TS_BODY | TX_WRAP, &tf("Teilen: {}", &[shared]));
+        let printed = match self.print {
+            _ if self.prints == 0 => String::from(t("noch nicht")),
+            0 => String::from(t("an das System übergeben")),
+            plat::ERR_UNSUPPORTED => String::from(t("nicht möglich")),
+            e => format!("{} {e}", t("Fehler")),
+        };
+        ui.text(TS_BODY | TX_WRAP, &tf("Drucken: {}", &[&printed]));
         let on = plat::inhibited() & INHIBIT_IDLE != 0;
         let tail = if self.keep_failed { format!(" ({})", t("nicht möglich")) } else { String::new() };
         ui.text(TS_BODY | TX_WRAP, &tf("Bildschirm an: {}{}", &[yn(on), &tail]));
@@ -203,7 +253,7 @@ impl System {
         let text = format!(
             "selftest=system\ndark_system={}\ndark={}\ncontrast={}\ncolors={}\nmotion={}\nscale={}\naccent={}\nsettings={}\nbits={:#x}\n\
              themes={}\nactive={}\nsuspend={}\nbackground={}\nforeground={}\nnotes={}\nshown={}\nclicked={}\ngone={}\nkeep={}\n\
-             inhibited={}\nshares={}\nshare={}\n",
+             inhibited={}\nshares={}\nshare={}\nprints={}\nprint={}\n",
             s.dark.map_or("-", |d| if d { "1" } else { "0" }),
             f(ui.theme_dark()),
             f(ui.high_contrast()),
@@ -226,6 +276,8 @@ impl System {
             plat::inhibited(),
             self.shares,
             self.share,
+            self.prints,
+            self.print,
         );
         if text != self.written {
             plat::write_file(STATE, text.as_bytes());

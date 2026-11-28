@@ -22,9 +22,13 @@
 //   unit_text(&ServiceSpec) -> the systemd unit install writes (Linux)
 //   plist_text(&ServiceSpec) -> the launchd property list install writes (macOS: a daemon in
 //       /Library/LaunchDaemons, launchctl bootstrap / bootout / kickstart; iOS has no services)
+//   Android has no system services for an app (docs/ANDROID.md, decision 8): run_service runs
+//       run() directly, program_path is None, install / start / stop / uninstall answer an error
+//       text, state NotInstalled -- the module is there so apps build without a cfg of their own
 
 use alloc::format;
 use alloc::string::String;
+#[cfg(not(target_os = "android"))] // (the service managers' modules)
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicBool, Ordering};
 
@@ -102,6 +106,44 @@ pub use win::*;
 pub use linux::*;
 #[cfg(target_vendor = "apple")]
 pub use apple::*;
+#[cfg(target_os = "android")]
+pub use android::*;
+
+#[cfg(target_os = "android")]
+mod android {
+    use super::*;
+
+    const NONE: &str = "Android kennt keine Systemdienste";
+
+    pub fn run_service(_name: &str, run: fn() -> i32) -> i32 {
+        run()
+    }
+
+    /// (Android) no program to register: None
+    pub fn program_path(_s: &ServiceSpec) -> Option<String> {
+        None
+    }
+
+    pub fn install(_s: &ServiceSpec) -> Result<(), String> {
+        Err(String::from(NONE))
+    }
+
+    pub fn start(_name: &str) -> Result<(), String> {
+        Err(String::from(NONE))
+    }
+
+    pub fn stop(_name: &str) -> Result<(), String> {
+        Err(String::from(NONE))
+    }
+
+    pub fn uninstall(_name: &str) -> Result<(), String> {
+        Err(String::from(NONE))
+    }
+
+    pub fn state(_name: &str) -> ServiceState {
+        ServiceState::NotInstalled
+    }
+}
 
 #[cfg(windows)]
 mod win {

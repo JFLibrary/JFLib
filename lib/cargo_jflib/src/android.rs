@@ -27,6 +27,7 @@ const JAVA: &[(&str, &str)] = &[
     ("GalleryHost.java", include_str!("../android/GalleryHost.java")),
     ("GalleryInputConnection.java", include_str!("../android/GalleryInputConnection.java")),
     ("GalleryNotify.java", include_str!("../android/GalleryNotify.java")),
+    ("GalleryPrint.java", include_str!("../android/GalleryPrint.java")),
     ("GallerySecrets.java", include_str!("../android/GallerySecrets.java")),
     ("GallerySensors.java", include_str!("../android/GallerySensors.java")),
     ("GallerySystem.java", include_str!("../android/GallerySystem.java")),

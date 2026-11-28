@@ -3,9 +3,11 @@
 //   set_fallback_fonts(ids)        (shaping.rs) the app's own chain, tried first; shaping uses
 //                                  it as well
 //   set_system_fallback(on)        then system fonts: the families of FAMILIES (this OS's
-//                                  list: Windows, macOS / iOS, Linux and the rest; after
-//                                  the ';' separated families of
-//                                  jfgui_FALLBACK_FONTS), found with a FontDb of the font
+//                                  list: Windows, macOS / iOS, Linux and the rest, Android;
+//                                  after the ';' separated families of jfgui_FALLBACK_FONTS
+//                                  and, where the system has a fonts.xml (Android), its
+//                                  families in its order: FontConf::sys_families, their
+//                                  files found in the FontDb), found with a FontDb of the font
 //                                  folders (scanned on the first missing character; its cache
 //                                  is cache://fontdb.fdb, not with jfgui_FONTDIRS) and loaded
 //                                  when first needed
@@ -52,7 +54,19 @@ const FAMILIES: &[&str] = &[
     "Times New Roman", "Arial",
 ];
 
-#[cfg(not(any(windows, target_vendor = "apple")))]
+// Android: the fallback families of AOSP's fonts.xml (after the device's own file, which
+// FontConf::sys_families reads): Roboto, the scripts, CJK, emoji, symbols
+#[cfg(target_os = "android")]
+const FAMILIES: &[&str] = &[
+    "Roboto", "Noto Naskh Arabic", "Noto Sans Ethiopic", "Noto Sans Hebrew", "Noto Sans Thai", "Noto Sans Armenian",
+    "Noto Sans Georgian", "Noto Sans Devanagari", "Noto Sans Gujarati", "Noto Sans Gurmukhi", "Noto Sans Tamil",
+    "Noto Sans Malayalam", "Noto Sans Bengali", "Noto Sans Telugu", "Noto Sans Kannada", "Noto Sans Oriya",
+    "Noto Sans Sinhala", "Noto Sans Khmer", "Noto Sans Lao", "Noto Sans Myanmar", "Noto Sans Symbols",
+    "Noto Sans CJK SC", "Noto Sans CJK TC", "Noto Sans CJK JP", "Noto Sans CJK KR", "Noto Color Emoji",
+    "Noto Sans Symbols2", "Noto Sans Math",
+];
+
+#[cfg(not(any(windows, target_vendor = "apple", target_os = "android")))]
 const FAMILIES: &[&str] = &[
     "DejaVu Sans", "Noto Sans", "Liberation Sans", "Noto Sans CJK SC", "Noto Sans CJK JP", "Noto Sans CJK KR",
     "Noto Sans CJK TC", "Noto Color Emoji", "Noto Emoji", "Noto Sans Symbols", "Noto Sans Symbols2", "Noto Sans Math",
@@ -195,13 +209,23 @@ impl Text {
         self.fb.db = Some(db);
     }
 
-    // the installed families of jfgui_FALLBACK_FONTS, the language's and FAMILIES in order
+    // the installed families of jfgui_FALLBACK_FONTS, the language's, the system's fonts.xml
+    // (Android) and FAMILIES in order
     fn fallback_families(&mut self, db: &FontDb) {
         let mut fams: Vec<String> = plat::env("jfgui_FALLBACK_FONTS")
             .map(|v| v.split(';').map(str::trim).filter(|s| !s.is_empty()).map(String::from).collect())
             .unwrap_or_default();
+        // the system's rules: for the language, and Android's fonts.xml (or a test's jfgui_FONTCONF)
+        let mut conf = (!self.fb.lang.is_empty() || cfg!(target_os = "android") || plat::env("jfgui_FONTCONF").is_some())
+            .then(FontConf::system)
+            .unwrap_or_default();
         if !self.fb.lang.is_empty() {
-            fams.extend(FontConf::system().lang_families(&self.fb.lang));
+            fams.extend(conf.lang_families(&self.fb.lang));
+        }
+        // every family of fonts.xml in its order: the family of its first face there is
+        let sys = conf.sys_families().to_vec();
+        for sf in &sys {
+            fams.extend(sf.faces.iter().find_map(|(file, index)| conf.sys_family(db, file, *index)));
         }
         fams.extend(FAMILIES.iter().map(|s| String::from(*s)));
         let mut seen: Vec<String> = Vec::new();

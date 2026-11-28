@@ -317,13 +317,14 @@ fn found_editor(_file: &str, _line: u32) -> Option<(String, Vec<String>)> {
     None
 }
 
-// start the editor on its own (plat::process::launch; the browser, Android and iOS: not supported)
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+// start the editor on its own (plat::process::launch; Android and iOS refuse it, the browser has
+// no processes)
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 fn start(prog: &str, args: &[&str]) -> Result<(), u32> {
     plat::process::launch(prog, args)
 }
 
-#[cfg(not(any(windows, target_os = "linux", target_vendor = "apple")))]
+#[cfg(not(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android")))]
 fn start(_prog: &str, _args: &[&str]) -> Result<(), u32> {
     Err(50)
 }

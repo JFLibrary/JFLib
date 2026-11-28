@@ -115,6 +115,14 @@ mod android_thread;
 pub use android_thread::{Sem, Thread, cpu_count, jfgui_wake_fd, mem_total, sleep_ms, thread_spawn, thread_yield, wait_events, wake};
 #[cfg(target_os = "android")]
 pub(crate) use android_thread::{plat_tid, proc_file, thread_background};
+// Android: printing through the system's PrintManager (docs/ANDROID.md AN4)
+#[cfg(target_os = "android")]
+#[path = "android_print.rs"]
+mod android_print;
+#[cfg(target_os = "android")]
+pub use android_print::print;
+#[cfg(target_os = "android")]
+pub(crate) use android_print::{doc_abort, doc_begin, doc_end, doc_image};
 #[cfg(target_os = "android")]
 use android_thread::drain_wake;
 
@@ -171,6 +179,11 @@ pub const REQUEST_SECRET: u32 = 13;
 /// host completes with 2 (shared), -4 (closed without a target), anything else (failed)
 #[cfg(not(target_os = "ios"))]
 pub const REQUEST_SHARE: u32 = 34;
+/// (Android) a print job for the system's PrintManager (android_print.rs): the title (u32 length +
+/// UTF-8), u32 paper (PAPER_*), u32 flags (PJF_LANDSCAPE), u32 pages (0 unknown), then the PDF;
+/// detached: refused at once (-3) when there is no print service, completed later with 2 (the
+/// system took the job), -4 (cancelled in its dialog) or a failure
+pub const REQUEST_PRINT: u32 = 35;
 /// (browser) read a file of the user's own (/handles/..) again: the path (UTF-8); the host asks
 /// for the permission the handle needs (from the user's gesture), imports the file and
 /// completes with 2
@@ -356,7 +369,7 @@ pub(crate) fn request(kind: u32, bytes: &[u8], file: Option<(String, u64)>) -> O
             kind,
             status: RequestStatus::Pending,
             file,
-            detached: matches!(kind, REQUEST_URL | REQUEST_CLIP_WRITE | REQUEST_SECRET),
+            detached: matches!(kind, REQUEST_URL | REQUEST_CLIP_WRITE | REQUEST_SECRET | REQUEST_PRINT),
             result: None,
         });
         id
@@ -480,9 +493,11 @@ pub fn capabilities() -> Capabilities {
             | crate::CAP_CLIPBOARD_RICH
             | crate::CAP_WINDOWING
             | if cfg!(any(web_threads, target_os = "android")) { crate::CAP_THREADS } else { 0 }
-            // Android: internal storage and the ClipboardManager (images: GalleryFiles)
+            // Android: internal storage and the ClipboardManager (images: GalleryFiles), the
+            // system's fonts (/system/fonts, fonts.xml), printing through the PrintManager
             | if cfg!(target_os = "android") {
                 crate::CAP_PERSISTENT_STORAGE | crate::CAP_CLIPBOARD_TEXT | crate::CAP_CLIPBOARD_IMAGE | crate::CAP_SHARE
+                    | crate::CAP_SYSTEM_FONTS | crate::CAP_PRINT
             } else {
                 0
             }
@@ -788,26 +803,27 @@ pub fn file_dialog_poll() -> Option<(i32, u32, String)> {
 }
 // the request of the open picker
 static DIALOG: SpinLock<Option<u32>> = SpinLock::new(None);
-/// Native printing is disabled until a browser print adapter has been connected.
-#[cfg(not(target_os = "ios"))]
+/// Native printing is disabled until a browser print adapter has been connected (Android:
+/// android_print.rs).
+#[cfg(target_arch = "wasm32")]
 pub fn print(_job: &mut crate::PrintJob<'_>) -> i32 {
     crate::ERR_UNSUPPORTED
 }
-// (print.rs PrintDoc, E9) no print system here: the test variant (jfgui_PRINT_TO) writes the
-// PDF of the pages, else ERR_UNSUPPORTED
-#[cfg(not(target_os = "ios"))]
+// (print.rs PrintDoc, E9) no print system in the browser: the test variant (jfgui_PRINT_TO)
+// writes the PDF of the pages, else ERR_UNSUPPORTED
+#[cfg(target_arch = "wasm32")]
 pub(crate) fn doc_begin(d: &mut crate::PrintDoc) -> i32 {
     crate::doc_begin_pdf_only(d)
 }
-#[cfg(not(target_os = "ios"))]
+#[cfg(target_arch = "wasm32")]
 pub(crate) fn doc_image(_d: &mut crate::PrintDoc, _src: &crate::PrintSrc, _pl: &crate::Place) -> i32 {
     crate::ERR_UNSUPPORTED
 }
-#[cfg(not(target_os = "ios"))]
+#[cfg(target_arch = "wasm32")]
 pub(crate) fn doc_end(d: &mut crate::PrintDoc) -> i32 {
     crate::doc_end_pdf_file(d)
 }
-#[cfg(not(target_os = "ios"))]
+#[cfg(target_arch = "wasm32")]
 pub(crate) fn doc_abort(_d: &mut crate::PrintDoc) {}
 /// Operating-system folder launch is unavailable.
 #[cfg(not(target_os = "ios"))]

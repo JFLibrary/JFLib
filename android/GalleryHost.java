@@ -3,8 +3,8 @@
  * names, the ClipboardManager, the persisted grants, the secret store (GallerySecrets: the
  * Android Keystore); a ContentObserver per provider whose tree is listed reports changes
  * (nativeChanged); request(kind, id, bytes) starts the
- * system's picker (Storage Access Framework) or the share sheet (a chooser for ACTION_SEND) and
- * answers later through nativeResult.
+ * system's picker (Storage Access Framework), the share sheet (a chooser for ACTION_SEND) or the
+ * print dialog (GalleryPrint) and answers later through nativeResult.
  * Wire: little endian; strings and byte blocks as u32 length + bytes (android_host.rs). */
 package org.jflib.gallery;
 
@@ -98,6 +98,7 @@ final class GalleryHost {
         if (kind == GalleryAudio.CALL_SOUND) return app == null ? null : GalleryAudio.call(app, in);
         if (kind == GalleryActivity.CALL_GPU) return GalleryActivity.gpuCall(in);
         if (kind >= GallerySystem.CALL_FIRST && kind <= GallerySystem.CALL_LAST) return GallerySystem.call(kind, in);
+        if (kind == GalleryPrint.CALL_PRINT) return GalleryPrint.call(activity);
         Context context = activity;
         if (context == null) return null;
         try {
@@ -328,6 +329,7 @@ final class GalleryHost {
         if (a == null) return false;
         try {
             if (kind == REQUEST_SHARE) return share(a, id, new In(payload));
+            if (kind == GalleryPrint.REQUEST_PRINT) return GalleryPrint.request(a, id, payload);
             Intent intent;
             if (kind == REQUEST_FILE_DIALOG) intent = dialog(new In(payload));
             else if (kind == REQUEST_OPEN) intent = openIntent(extensions(new String(payload, StandardCharsets.UTF_8)));

@@ -214,6 +214,48 @@ fn read_var(path: &str, face: u32) -> Option<FdVar> {
     Some(FdVar { axes: v.axes, instances: v.instances })
 }
 
+/// the family name (name ID 1, as a scan groups the face) of face `face` of a font file, read
+/// from its name table only -> None for a file that is no font or has no such face (fontconf.rs:
+/// the families of Android's fonts.xml, which names files)
+pub fn file_family(path: &str, face: u32) -> Option<String> {
+    let f = plat::File::open(path, plat::FO_READ)?;
+    let mut h = [0u8; 12];
+    if read_at(&f, 0, &mut h) != 12 {
+        return None;
+    }
+    let dir = match be32(&h, 0) {
+        TAG_TTCF => {
+            if face >= be32(&h, 8).min(TTC_MAX) {
+                return None;
+            }
+            let mut o = [0u8; 4];
+            if read_at(&f, 12 + face as u64 * 4, &mut o) != 4 {
+                return None;
+            }
+            be32(&o, 0) as u64
+        }
+        TAG_V1 | TAG_TRUE | TAG_OTTO if face == 0 => 0,
+        _ => return None,
+    };
+    let mut d = [0u8; 12];
+    if read_at(&f, dir, &mut d) != 12 {
+        return None;
+    }
+    let nt = be16(&d, 4).min(NT_MAX);
+    let mut recs = alloc::vec![0u8; (nt * 16) as usize];
+    if read_at(&f, dir + 12, &mut recs) != (nt * 16) as i64 {
+        return None;
+    }
+    let name = (0..nt as usize).map(|i| &recs[i * 16..]).find(|r| be32(r, 0) == T_NAME).map(|r| (be32(r, 8), be32(r, 12)))?;
+    let mut nb = alloc::vec![0u8; name.1.min(NAME_MAX) as usize];
+    let got = read_at(&f, name.0 as u64, &mut nb);
+    if got <= 0 {
+        return None;
+    }
+    let fam = sfnt_name(Tb(&nb[..got as usize]), FN_FAMILY, NAME_CAP);
+    (!fam.is_empty()).then(|| String::from_utf8_lossy(&fam).into_owned())
+}
+
 /// FNV-1a 64 (hash_fnv64, seed 0 = the offset basis)
 pub fn fnv64(d: &[u8]) -> u64 {
     let mut h: u64 = 0xCBF2_9CE4_8422_2325;
@@ -378,6 +420,14 @@ impl FontDb {
 
     pub fn face(&self, i: usize) -> Option<&FdFace> {
         self.faces.get(i)
+    }
+
+    /// the face `index` of the font file named `file` (its name in a folder of the scan, as
+    /// Android's fonts.xml names it; ASCII case-insensitive) -> face index
+    pub fn face_by_file(&self, file: &str, index: u32) -> Option<usize> {
+        self.faces.iter().position(|f| {
+            f.face == index && f.path.rsplit(['/', '\\']).next().is_some_and(|n| ci_cmp(n.as_bytes(), file.as_bytes()) == 0)
+        })
     }
 
     // ------------------------------------------------------------------ scanning

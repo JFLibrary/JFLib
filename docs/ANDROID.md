@@ -1,6 +1,6 @@
 # Android-Plan: Android so weit wie Windows, Linux und Apple
 
-Stand 2026-11-27, auf Basis von `main` 7cdabce4. AN0, AN1 und AN2 sind umgesetzt (Emulator und A56), AN3 auf dem Emulator, der Rest nicht; die Aufwände sind geschätzt. Der Plan wartete auf ARM1 bis ARM3 ([ARM64.md](ARM64.md)): die Kernel-Tabellen
+Stand 2026-11-28, auf Basis von `main` 7cdabce4. AN0, AN1 und AN2 sind umgesetzt (Emulator und A56), AN3 und AN4 auf dem Emulator, AN5 nicht; die Aufwände sind geschätzt. Der Plan wartete auf ARM1 bis ARM3 ([ARM64.md](ARM64.md)): die Kernel-Tabellen
 und `plat` auf Linux ARM64 ohne libc.
 
 ## Ziel
@@ -33,7 +33,8 @@ Was auf Android fehlt (Code auf `main` 7cdabce4):
   ([ARM64.md](ARM64.md), ARM6). (Seit AN1 behoben.)
 - **Keine Module ohne Oberfläche.** `process`, `sync`, `net`, `fs`, `service`, `watch` und `certs` sind in
   [`lib/plat/lib.rs`](../lib/plat/lib.rs) nur für Windows, Linux und Apple da. `rand` hat Android seit b5134991
-  (`arc4random_buf`). (`sync` seit AN1, `fs` und `watch` seit AN3.)
+  (`arc4random_buf`). (`sync` seit AN1, `fs` und `watch` seit AN3, `process` und `service` seit AN4 als Module, die
+  „nicht unterstützt“ antworten.)
 - **Die Fassade lässt Crates weg.** [`lib/jflib/Cargo.toml`](../lib/jflib/Cargo.toml) nimmt `cas`, `datastore`,
   `netio` und `update` auf Android und im Browser nicht auf („plat has no fs and net there“). (`cas` und
   `datastore` seit AN3.)
@@ -42,7 +43,8 @@ Was auf Android fehlt (Code auf `main` 7cdabce4):
   `tools/android.py` prüft nur `location` gegen das Manifest (`manifest_gaps`). (Seit AN2 behoben; `netio` ist seit
   AN2 auch in der Fassade.)
 - **Kein Druck, keine Systemschriften.** `capabilities()` meldet auf Android weder `CAP_PRINT` noch
-  `CAP_SYSTEM_FONTS` noch `CAP_THREADS`; `policy::font_dirs()` kennt `/system/fonts` nicht.
+  `CAP_SYSTEM_FONTS` noch `CAP_THREADS`; `policy::font_dirs()` kennt `/system/fonts` nicht. (`CAP_THREADS` seit AN1,
+  der Rest seit AN4.)
 - **Kaum Tests ohne Oberfläche.** Nur `androidGallery`, `audiotest`, `gputest`, `portabletest`, `render2dtest` und
   `screentest` haben `android` in `TARGETS`; `coretest`, `plattest` und `asynctest` nicht. Es gibt keinen CI-Lauf
   auf Android, nur `cargo check` in `crates.yml`.
@@ -554,6 +556,90 @@ Offen nach AN3:
 Druckdialog von Android öffnet und „Als PDF speichern“ das richtige Dokument schreibt (von Hand) und `fontdb` die
 Schriften des Systems findet (Roboto, Noto CJK).
 
+**Stand 2026-11-28:** umgesetzt und auf dem Emulator grün (beide Modi, dazu der Druckdialog aus der `androidGallery`);
+das A56 war nicht dran (nur auf Zuruf), die Handprüfung dort steht aus.
+
+- **Drucken:** [`android_print.rs`](../lib/plat/android_print.rs) (neu, aus `web.rs` eingebunden) legt den Auftrag wie
+  überall als PDF an (`print_pdf`, Papier und Lage des Auftrags) und gibt ihn mit der neuen Anfrage `REQUEST_PRINT`
+  (35) an den Host. [`GalleryPrint.java`](../android/GalleryPrint.java) legt das PDF in den Cache (`jfgui-print/`) und
+  ruft `PrintManager.print` mit einem `PrintDocumentAdapter`, der es unverändert weiterreicht; Papier und Lage des
+  Auftrags sind die erste Wahl des Dialogs. Der Dialog des Systems (Drucker oder „Als PDF speichern“, Papier, Kopien,
+  Seiten, Vorschau) kommt erst, wenn `print` zurück ist: der UI-Thread darf nicht warten (ANR), 0 heißt also „der Dialog
+  hat den Auftrag“, nicht „gedruckt“. `PrintDoc` hat keinen Dialog vor den Seiten: `begin` fragt den Host, ob es einen
+  Druckdienst gibt (`CALL_PRINT`, 70), die Seiten gehen in ein PDF (`pdf_native`, auch `add_pdf`), `end` übergibt es.
+  Ein Programm ohne Java-Host (`adb shell`, das Test-APK) antwortet `ERR_UNSUPPORTED`, die Testvariante
+  `jfgui_PRINT_TO` schreibt das PDF wie überall in eine Datei. `capabilities()` meldet `CAP_PRINT` und
+  `CAP_SYSTEM_FONTS` (fest, wie `CAP_SHARE`).
+- **Die Antwort des Dialogs:** `REQUEST_PRINT` ist eine „detached“ Anfrage. Der Host lehnt sofort ab (-3, `print`
+  sieht `ERR_UNSUPPORTED`) oder meldet in `onFinish` 2 (das System hat den Auftrag), -4 (abgebrochen) oder einen
+  Fehler. Wer den Dialog mit Zurück schließt, hinterlässt einen Auftrag im Zustand CREATED (der Spooler vergisst ihn,
+  die App behält den Zustand von `print()`); „Als PDF speichern“ endet mit COMPLETED. CREATED und CANCELED zählen als
+  abgebrochen. Eine App liest die Antwort heute nicht (es gibt kein `print_poll` wie `share_poll`).
+- **Systemschriften:** `policy::font_dirs()` nennt auf Android `/system/fonts` und `/product/fonts` (echte Pfade, Regel
+  `SYSTEM` aus AN3); mit Manifest darf die App auch `/system/etc/fonts.xml` lesen. [`fontconf.rs`](../lib/text/fontconf.rs)
+  liest diese Datei wie eine fontconfig-Datei (erkannt an `<familyset>`, auch über `jfgui_FONTCONF`): eine benannte
+  Familie wird ein Alias, der die Familien ihrer Schriften vorzieht (sans-serif → Roboto, monospace → Droid Sans
+  Mono), ein `<alias>` nimmt sein Ziel an (arial → sans-serif; sein Gewicht geht verloren), eine Ersatzfamilie einer
+  Sprache (ja, ko, zh-Hans, zh-Hant; nicht ein Schriftsystem allein wie `und-Arab`) kommt in sans-serif nach vorn und
+  ihre `fallbackFor="serif"`-Schriften in serif, `und-Zsye` sind die Emoji. Die Familiennamen liest
+  `fontdb::file_family` aus den Dateien (Kopf und `name`-Tabelle, etwa 25 Dateien).
+- **Ersatzreihenfolge:** [`fallback.rs`](../lib/text/fallback.rs) probiert auf Android nach den Schriften der Sprache
+  alle Familien der Datei in ihrer Reihenfolge (`FontConf::sys_families`: Roboto, die Schriftsysteme, CJK, Emoji,
+  Symbole; `ignore="true"` nicht), danach die eingebaute Liste. Fehlt die Datei, springen eingebaute Android-Regeln
+  und eine Ersatzliste nach AOSP ein.
+- **Gleichnamige Dateien:** FontDb behält von Gesichtern mit gleichem Namen, Gewicht und Stil nur eines. Android
+  verlinkt `DroidSans.ttf` und `DroidSans-Bold.ttf` auf `Roboto-Regular.ttf`, im Scan steht Roboto deshalb unter
+  `DroidSans-Bold.ttf`; `FontConf::sys_family` liest den Namen dann aus der Datei selbst (`FontDb::face_by_file` findet
+  sonst ein Gesicht nach seinem Dateinamen).
+- **`process` und `service`** sind auf Android Module (Entscheidung 8; [`process_android.rs`](../lib/plat/process_android.rs),
+  ein Android-Teil in `service.rs`): jeder Start antwortet `process::ENOTSUP` (95), `run_elevated` und die
+  Dienstverwaltung einen Text, `elevated()` ist false, `find()` None, ein Dienst `NotInstalled`, `run_service` ruft
+  die Funktion direkt. Die Fassade brauchte dafür nichts mehr (beide sind Teile von `plat`, ihre einzige
+  Android-Ausnahme bleibt `update`); der Inspektor (`ui/inspect_src.rs`) nimmt jetzt auch auf Android
+  `process::launch`.
+- Tests: `fonttest` hat `android` in `TARGETS` und `--fallback LANG CP..` (die Familien von `fonts.xml` in ihrer
+  Reihenfolge, dann die Ersatzschrift je Zeichen); sein Selbsttest liest eine `fonts.xml` über die Testschriften (auf
+  jedem Ziel). `coretest`: die Gruppe `plat` prüft `process` und `service` auf Android. Die `androidGallery` druckt aus
+  ihrer Karte 06 ein Testbild (vier Farbbänder, A4, 15 mm Rand), `android_system.py` prüft den Dialog, Zurück und
+  „Als PDF speichern“ (auf einem Telefon nur mit `--save-pdf`, es schreibt in dessen Downloads und löscht danach).
+
+| Lauf (Emulator x86-64, API 35) | `adb shell` | App (`untrusted_app`, seccomp 2) |
+|---|---|---|
+| `fonttest --scan` | 213 Gesichter, 185 Familien in 7 ms, darunter Roboto, Noto Sans CJK und Noto Serif CJK (JP, KR, SC, TC, HK), Noto Color Emoji | dasselbe |
+| `fonttest --fallback -` | 150 Familien aus `fonts.xml`; U+4E2D Noto Sans CJK SC, U+0627 Noto Naskh Arabic, U+05D0 Noto Sans Hebrew, U+0E01 Noto Sans Thai, U+0915 Noto Sans Devanagari, U+1F600 Noto Color Emoji, U+2603 Noto Sans Symbols, A Roboto | dasselbe |
+| `fonttest --fallback ja 4E2D` | Noto Sans CJK JP | dasselbe |
+| `fonttest --conf` | sans-serif, Arial, system-ui → Roboto; serif → Noto Serif; monospace → Droid Sans Mono; emoji → Noto Color Emoji; für ja zuerst Noto Sans CJK JP, für zh-TW Noto Sans CJK TC | dasselbe |
+| `plattest --test print`, `printdoc` | 12 von 12, 16 von 16 (ohne Host `ERR_UNSUPPORTED`, die Testvariante schreibt das PDF) | dasselbe |
+| `coretest --only plat` | 106 von 106 | 106 von 106 |
+| `plattest --test all` | 219 bestanden, 0 Fehler | dasselbe |
+| `coretest` | 5554 von 5554 | 5551 von 5551 (AN2, Fund 1) |
+
+`android_system.py` (Galerie-APK, Emulator): 59 von 59. Der Druck darin: „Drucken“ gibt 0, der Dialog des Spoolers
+(`com.android.printspooler/.ui.PrintActivity`) ist vorn und zeigt ISO A4 und 1/1; Zurück schließt ihn, der Auftrag
+endet mit -4. Danach „Als PDF speichern“ über den Speicherdialog (DocumentsUI): der Auftrag endet mit 2, und
+`Download/JFLib Galerie.pdf` (4374 Bytes) enthält unser Bild (die Pixel gleich, unser Inhaltsstrom: 15 mm Rand, mittig).
+Der Spooler schreibt die Datei mit PDFium neu (CRLF, `/ID`, MediaBox 595 × 841), unser `/Producer` und `/Title`
+bleiben.
+`GalleryInstrumentation`, `GalleryA11yInstrumentation` und `android_files.py` bleiben grün (`android_files.py` im
+zweiten Lauf; der erste scheiterte an der Zeit, wie in den Fallen von AN3).
+
+Geprüft außerdem: `cargo check -p jflib` mit und ohne `std` ohne Warnung für Windows (x86-64, ARM64), Linux (x86-64,
+ARM64), wasm32, Android (x86-64, ARM64) und macOS (ARM64); `build_rs.py check` (Lint, Clippy für Windows und Linux);
+Clippy mit denselben Regeln über `plat` und `text` für `aarch64-linux-android` (für x86-64 bricht es wie in AN2, Fund
+5, vorher in `rt` ab); `gendoc --check`; `build_rs.py test coretest` auf Windows und Linux; `fonttest --selftest` auf
+Windows und Linux mit den neuen Prüfungen grün (der Vergleich mit `expected.txt` scheitert wie bekannt an CRLF im
+Worktree).
+
+Offen nach AN4:
+
+- Das A56 (ARM64, Android 16, One UI): die Handprüfung „Als PDF speichern“ und `fonttest`, nur auf Zuruf.
+- `NotoSansSymbols-Regular-Subsetted2.ttf` (`und-Zsym`) heißt wie `…-Subsetted.ttf` und fällt im Scan als Doppel weg;
+  seine 125 Symbole fehlen der Ersatzkette, bis FontDb gleichnamige Dateien verschiedenen Inhalts behält.
+- Die Familien des Herstellers (`/product/etc/fonts_customization.xml`) liest `fontconf` nicht, `/product/fonts` wird
+  nur durchsucht; Schriften, die das System nachlädt (`/data/fonts`), sieht die App nicht.
+- Die Antwort des Druckdialogs (gedruckt, abgebrochen) erreicht die App nicht (ein `print_poll` wäre der Weg).
+- `plattest --test policy` bleibt auf Android aus (Netz, Prozesse und echte Programme in einem Lauf).
+
 ### AN5: Apps, CI, Dokumentation (M)
 
 - `TARGETS`: welche Apps zusätzlich Android bekommen, entscheidet der Nutzer (Offene Fragen).
@@ -568,8 +654,8 @@ Schriften des Systems findet (Roboto, Noto CJK).
 
 | Was | Warum |
 |---|---|
-| Kindprozesse (`process`), Programme aus `BINS` | Android führt ab `targetSdk` 29 nichts aus beschreibbaren Ordnern aus (W^X), nur aus dem Ordner der nativen Bibliotheken des APK |
-| Systemdienste (`service`) | Das Gegenstück wäre ein Vordergrunddienst oder WorkManager, ein anderes Modell (Offene Fragen) |
+| Kindprozesse (`process`), Programme aus `BINS` | Android führt ab `targetSdk` 29 nichts aus beschreibbaren Ordnern aus (W^X), nur aus dem Ordner der nativen Bibliotheken des APK; das Modul ist da, jeder Start antwortet `process::ENOTSUP` (AN4) |
+| Systemdienste (`service`) | Das Gegenstück wäre ein Vordergrunddienst oder WorkManager, ein anderes Modell (Offene Fragen); das Modul ist da, `install` und die übrigen antworten einen Fehlertext (AN4) |
 | `update` | Android-Apps aktualisieren über ihren Store ([UPDATES.md](UPDATES.md)) |
 | Native Plugins | Code nur aus dem APK, wie heute |
 | Tray, Taskleiste, globale Hotkeys | gibt es auf Android nicht; `hotkey` antwortet schon `Unavailable` |
@@ -617,6 +703,11 @@ Fassade). AN4 braucht AN3 für die Schriften des Systems.
 - **Hardlinks** sind in der Shell verboten (ARM64.md) und im App-Prozess auch (AN3: SELinux, `link` auf
   `app_data_file`); `fs::hard_link` ist dort `false`.
 - **Kein `/etc/localtime`.** Die Zone kommt aus `persist.sys.timezone`.
+- **`fonts.xml` ist abgekündigt.** `/system/etc/fonts.xml` sagt selbst, Apps sollten sie nicht lesen; Android 15 hat
+  daneben `font_fallback.xml`, die schon `adb shell` nicht lesen darf. Die eingebauten Android-Regeln von `fontconf.rs`
+  und `fallback.rs` springen ein, wenn die Datei fehlt; der Weg des Systems wäre `ASystemFontIterator` (NDK, API 29).
+- **Der Druckdialog verdeckt die Activity.** Der Spooler und der Speicherdialog sind eigene Activities: die App
+  bekommt `onStop` / `onStart` (`UIC_SUSPEND`) wie beim Wechsel in eine andere App.
 - **Emulator und Gerät unterscheiden sich:** `x86_64` gegen ARM64 (`struct stat`, Syscall-Nummern), API 35 gegen
   Android 16. Jeder Meilenstein läuft auf beiden.
 - **big.LITTLE:** Das A56 hat schnelle und sparsame Kerne. Wie viele Pool-Threads sinnvoll sind, misst AN1, statt
@@ -631,7 +722,7 @@ Fassade). AN4 braucht AN3 für die Schriften des Systems.
 | Logik im App-Prozess | Test-APK auf Emulator und A56 | A56 nur auf Zuruf und unbedient |
 | Netz ins Internet | A56 im WLAN, Emulator | nur mit Zustimmung, nur öffentliche Prüfserver wie in `tls_web_check.py` |
 | Oberfläche | Skripte der `androidGallery`, `GalleryInstrumentation` | keine echte Eingabe, solange der Nutzer das Telefon bedient |
-| Drucken | A56 von Hand | „Als PDF speichern“, kein echter Drucker nötig |
+| Drucken | Emulator per Skript (`android_system.py`: Dialog, Zurück, „Als PDF speichern“), A56 von Hand | „Als PDF speichern“, kein echter Drucker nötig |
 | CI | Ubuntu-Runner mit KVM und Emulator (AN5) | kein echtes Gerät |
 
 Die Regel gegen Fenster-Fluten gilt auch hier: höchstens drei Runden pro Variante, keine echte Eingabe unter dem

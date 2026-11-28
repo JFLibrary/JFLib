@@ -201,8 +201,9 @@ void jfgui_host_request(uint32_t kind, uint32_t id, const uint8_t *bytes, size_t
         memcpy(&height, bytes + 8, sizeof(height));
         ime_visible = height > 0;
     }
-    /* the system's picker: 2 download (save a copy), 3 pick_file, 12 file_dialog */
-    if (id && (kind == 2 || kind == 3 || kind == 12 || kind == 34)) {
+    /* the system's picker: 2 download (save a copy), 3 pick_file, 12 file_dialog; 34 the share
+     * sheet, 35 the print dialog (GalleryPrint) */
+    if (id && (kind == 2 || kind == 3 || kind == 12 || kind == 34 || kind == 35)) {
         JNIEnv *env = host_env();
         jbyteArray payload = env ? host_bytes(env, bytes, length) : NULL;
         if (payload) {

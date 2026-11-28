@@ -73,7 +73,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: windows, input, files, threads, network, processes, desktop services
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [web_net.rs](#platweb_netrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [pid.rs](#platpidrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [apple_power_ios.rs](#platapple_power_iosrs) · [scan.rs](#platscanrs) · [share.rs](#platsharers) · [win_share.rs (Windows)](#platwin_sharers-windows) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_plock.rs (Windows)](#platwin_plockrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_pad.rs (Windows)](#platwin_padrs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_pad.rs (Linux)](#platlinux_padrs-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_share.rs (Apple)](#platapple_ios_sharers-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_ios_pad.rs (Apple)](#platapple_ios_padrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_pad.rs (Apple)](#platapple_mac_padrs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_scan.rs (Apple)](#platapple_mac_scanrs-apple) · [apple_mac_screen.rs (Apple)](#platapple_mac_screenrs-apple) · [apple_mac_share.rs (Apple)](#platapple_mac_sharers-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [android_thread.rs](#platandroid_threadrs) · [clipdrop.rs](#platclipdroprs) · [fuzz.rs](#platfuzzrs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [keycode.rs](#platkeycoders) · [plock.rs](#platplockrs) · [pad.rs](#platpadrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [process_android.rs](#platprocess_androidrs) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [web_net.rs](#platweb_netrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [pid.rs](#platpidrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [apple_power_ios.rs](#platapple_power_iosrs) · [scan.rs](#platscanrs) · [share.rs](#platsharers) · [win_share.rs (Windows)](#platwin_sharers-windows) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_plock.rs (Windows)](#platwin_plockrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_pad.rs (Windows)](#platwin_padrs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_pad.rs (Linux)](#platlinux_padrs-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_share.rs (Apple)](#platapple_ios_sharers-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_ios_pad.rs (Apple)](#platapple_ios_padrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_pad.rs (Apple)](#platapple_mac_padrs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_scan.rs (Apple)](#platapple_mac_scanrs-apple) · [apple_mac_screen.rs (Apple)](#platapple_mac_screenrs-apple) · [apple_mac_share.rs (Apple)](#platapple_mac_sharers-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [android_thread.rs](#platandroid_threadrs) · [android_print.rs](#platandroid_printrs) · [clipdrop.rs](#platclipdroprs) · [fuzz.rs](#platfuzzrs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [keycode.rs](#platkeycoders) · [plock.rs](#platplockrs) · [pad.rs](#platpadrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [formats](#formats) -- bounded JSON with exact numbers, typed JSON records, an XML subset, the text encodings of the web
@@ -14000,9 +14000,11 @@ fallback -- characters a font lacks, drawn with another font (font fallback)
   set_fallback_fonts(ids)        (shaping.rs) the app's own chain, tried first; shaping uses
                                  it as well
   set_system_fallback(on)        then system fonts: the families of FAMILIES (this OS's
-                                 list: Windows, macOS / iOS, Linux and the rest; after
-                                 the ';' separated families of
-                                 jfgui_FALLBACK_FONTS), found with a FontDb of the font
+                                 list: Windows, macOS / iOS, Linux and the rest, Android;
+                                 after the ';' separated families of jfgui_FALLBACK_FONTS
+                                 and, where the system has a fonts.xml (Android), its
+                                 families in its order: FontConf::sys_families, their
+                                 files found in the FontDb), found with a FontDb of the font
                                  folders (scanned on the first missing character; its cache
                                  is cache://fontdb.fdb, not with jfgui_FONTDIRS) and loaded
                                  when first needed
@@ -14208,10 +14210,15 @@ fontconf -- generic families, substitutes and choices per language: a light font
   FontConf::new()                  no rules
   FontConf::system()               the rules of this system: on Linux the <alias> and
                                    language rules of fontconfig's files (/etc/fonts/fonts.conf
-                                   and what it includes) -- or instead the file of
-                                   jfgui_FONTCONF (the same format, every OS; tests) --, then
+                                   and what it includes), on Android those of
+                                   /system/etc/fonts.xml (familyset) -- or instead the file of
+                                   jfgui_FONTCONF (either format, every OS; tests) --, then
                                    the built-in rules of this OS
-  conf.parse(text, dir) / conf.load(path) -> bool   add the rules of a fontconfig file
+  conf.parse(text, dir) / conf.load(path) -> bool   add the rules of a fontconfig file (or
+                                   of Android's fonts.xml: a <familyset>, see familyset)
+  conf.sys_families() -> &[SysFamily]   (fonts.xml) the default family and the fallback
+                                   families in the file's order, their fonts as (file, face)
+  conf.sys_family(db, file, face) -> Option<String>   the family name of one of those fonts
   conf.add_alias(family, prefer, accept, default)    add an alias
   conf.add_lang(lang, family, mode, families)        add a language rule (LR_*)
   conf.candidates(family, lang) -> Vec<String>       the families to try, best first
@@ -14256,6 +14263,15 @@ GENERICS: [&str; 10] = ["sans-serif", "serif", "monospace", "cursive", "fantasy"
 - **`fn is_generic(name: &str) -> bool`**
   a generic family name (GENERICS)
 
+- **`struct SysFamily`**
+  one family of Android's fonts.xml in its order (sys_families): its languages (the lang
+  attribute's tags as written, "und-Arab", "ja", "zh-Hant"; none for the default family) and its
+  faces as (file name, face index), for sans-serif text and for serif text (fallbackFor="serif"),
+  each once
+  - `langs: Vec<String>`
+  - `faces: Vec<(String, u32)>`
+  - `serif: Vec<(String, u32)>`
+
 - **`struct FontConf`**
   generic families, substitutes and language choices (see the module header)
 
@@ -14265,7 +14281,16 @@ GENERICS: [&str; 10] = ["sans-serif", "serif", "monospace", "cursive", "fantasy"
 - **`fn system() -> FontConf`**
   the rules of this system (see the module header)
 - **`fn files(&self) -> usize`**
-  fontconfig files read
+  fontconfig files read (Android's fonts.xml counts as one)
+- **`fn sys_families(&self) -> &[SysFamily]`**
+  (Android) the families of fonts.xml in its order: the default family (its first named
+  one, sans-serif), then every fallback family (without a name; not those with
+  ignore="true") -- fallback.rs tries them in this order.  Empty without such a file
+- **`fn sys_family(&mut self, db: &crate::fontdb::FontDb, file: &str, index: u32) -> Option<String>`**
+  (fonts.xml) the family name of face `index` of a font file it names: the scan's face of
+  that file (db), else the name read from the file itself -- the scan keeps one of several
+  files with the same names (Android links DroidSans.ttf to Roboto-Regular.ttf), so the file
+  may stand there under another name.  None: no such font in the font folders
 - **`fn load(&mut self, path: &str) -> bool`**
   add the rules of a fontconfig file (and of what it includes) -> it could be read
 - **`fn parse(&mut self, text: &str, dir: &str) -> usize`**
@@ -14365,6 +14390,11 @@ FDFF_NOLATIN: u16 = 256
 
 - **`struct FontDb`**
 
+- **`fn file_family(path: &str, face: u32) -> Option<String>`**
+  the family name (name ID 1, as a scan groups the face) of face `face` of a font file, read
+  from its name table only -> None for a file that is no font or has no such face (fontconf.rs:
+  the families of Android's fonts.xml, which names files)
+
 - **`fn fnv64(d: &[u8]) -> u64`**
   FNV-1a 64 (hash_fnv64, seed 0 = the offset basis)
 
@@ -14382,6 +14412,9 @@ FDFF_NOLATIN: u16 = 256
   the faces of family i (empty when out of range)
 - **`fn face_count(&self) -> usize`**
 - **`fn face(&self, i: usize) -> Option<&FdFace>`**
+- **`fn face_by_file(&self, file: &str, index: u32) -> Option<usize>`**
+  the face `index` of the font file named `file` (its name in a folder of the scan, as
+  Android's fonts.xml names it; ASCII case-insensitive) -> face index
 - **`fn scan(&mut self, flags: u32) -> usize`**
   fontdb_scan(flags) -> number of faces
 - **`fn scan_dirs(&mut self, dirs: &[&str], flags: u32) -> usize`**
@@ -28460,7 +28493,8 @@ Source: [`lib/plat/process.rs`](../lib/plat/process.rs)
 Native child processes for tools and application helpers; no assembly counterpart.
 run_elevated / elevated: a program with administrator or root rights (a service install).
 launch: a program on its own that outlives this one (the inspector's editor); find: the file
-a program name stands for.
+a program name stands for.  Android has none of it (process_android.rs): every start answers
+ENOTSUP (95), so apps build for every target without a cfg of their own.
 ```
 
 - **`struct Command<'a>`**
@@ -28596,6 +28630,43 @@ processes: there every start fails with the system's error.
   Poll exit status; signals map to 128 + signal.
 - **`fn terminate(&mut self)`**
   Terminate the owned process group and reap its leader.
+
+### `plat/process_android.rs`
+
+Source: [`lib/plat/process_android.rs`](../lib/plat/process_android.rs)
+
+```text
+Android has no child processes for an app (docs/ANDROID.md, "Bewusst nicht", decision 8): from
+targetSdk 29 on it executes nothing from writable folders (W^X), only from the APK's folder of
+native libraries.  The module is there all the same, so apps build for every target without a
+cfg of their own: every start answers ENOTSUP (95), run_elevated an error text, elevated()
+false, find() None.  A Child cannot exist (no start succeeds).
+```
+
+```rust
+/// the error number of every start on Android: ENOTSUP / EOPNOTSUPP ("not supported")
+ENOTSUP: u32 = 95
+```
+
+- **`struct Child`**
+  (never made on Android) a child process
+
+**`impl Child`**
+
+- **`fn read_stdout(&mut self, _bytes: &mut [u8]) -> Result<Option<usize>, u32>`**
+  read what the child wrote to stdout (never on Android)
+- **`fn read_stderr(&mut self, _bytes: &mut [u8]) -> Result<Option<usize>, u32>`**
+  read what the child wrote to stderr (never on Android)
+- **`fn write_stdin(&mut self, _bytes: &[u8]) -> Result<Option<usize>, u32>`**
+  write to the child's stdin (never on Android)
+- **`fn id(&self) -> u32`**
+  the child's process id (never on Android)
+- **`fn close_stdin(&mut self)`**
+  close the child's stdin (never on Android)
+- **`fn try_wait(&mut self) -> Result<Option<i32>, u32>`**
+  whether the child ended, its exit code (never on Android)
+- **`fn terminate(&mut self)`**
+  end the child and its tree (never on Android)
 
 ### `plat/sync.rs`
 
@@ -29322,6 +29393,9 @@ service -- programs that run as a system service
   unit_text(&ServiceSpec) -> the systemd unit install writes (Linux)
   plist_text(&ServiceSpec) -> the launchd property list install writes (macOS: a daemon in
       /Library/LaunchDaemons, launchctl bootstrap / bootout / kickstart; iOS has no services)
+  Android has no system services for an app (docs/ANDROID.md, decision 8): run_service runs
+      run() directly, program_path is None, install / start / stop / uninstall answer an error
+      text, state NotInstalled -- the module is there so apps build without a cfg of their own
 ```
 
 - **`fn stop_requested() -> bool`**
@@ -30070,8 +30144,9 @@ STORE: &str = "config://permission-decisions.txt"
 - **`fn font_dirs() -> Vec<String>`**
   the system font folders in the order fontdb scans them: jfgui_FONTDIRS (';' separated,
   on Linux also ':'), else the Windows / XDG folders (macOS and iOS: /System/Library/Fonts,
-  /Library/Fonts, ~/Library/Fonts); on Linux then fontconfig's own folders (fontconfig_dirs:
-  NixOS, TeX fonts, a &lt;dir> of the user) and in Flatpak the host's fonts
+  /Library/Fonts, ~/Library/Fonts; Android: /system/fonts, /product/fonts, real paths as
+  android_files.rs keeps the system's folders); on Linux then fontconfig's own folders
+  (fontconfig_dirs: NixOS, TeX fonts, a &lt;dir> of the user) and in Flatpak the host's fonts
 
 - **`fn net_connect_allowed(addr: &crate::net::SocketAddr) -> bool`**
   whether a TCP connection or a UDP datagram to addr is allowed: a net.connect rule with
@@ -37838,6 +37913,11 @@ REQUEST_SECRET: u32 = 13
 /// length + UTF-8 each), u32 count, per file its name and its bytes (u32 length + bytes each); the
 /// host completes with 2 (shared), -4 (closed without a target), anything else (failed)
 REQUEST_SHARE: u32 = 34
+/// (Android) a print job for the system's PrintManager (android_print.rs): the title (u32 length +
+/// UTF-8), u32 paper (PAPER_*), u32 flags (PJF_LANDSCAPE), u32 pages (0 unknown), then the PDF;
+/// detached: refused at once (-3) when there is no print service, completed later with 2 (the
+/// system took the job), -4 (cancelled in its dialog) or a failure
+REQUEST_PRINT: u32 = 35
 /// (browser) read a file of the user's own (/handles/..) again: the path (UTF-8); the host asks
 /// for the permission the handle needs (from the user's gesture), imports the file and
 /// completes with 2
@@ -38021,7 +38101,8 @@ REQUEST_UNSAVED: u32 = 22
   failed.
 
 - **`fn print(_job: &mut crate::PrintJob<'_>) -> i32`**
-  Native printing is disabled until a browser print adapter has been connected.
+  Native printing is disabled until a browser print adapter has been connected (Android:
+  android_print.rs).
 
 - **`fn open_folder(_path: &str) -> i32`**
   Operating-system folder launch is unavailable.
@@ -38997,6 +39078,40 @@ that leaves a thread ends the program with exit code 3, rt::abort_on_unwind).
 
 - **`fn mem_total() -> u64`**
   physical memory in bytes (MemTotal of /proc/meminfo), 0 unknown  [plat_mem_total]
+
+### `plat/android_print.rs`
+
+Source: [`lib/plat/android_print.rs`](../lib/plat/android_print.rs)
+
+```text
+android_print -- printing on Android: the job as our PDF (print.rs) to the system's PrintManager
+(android/GalleryPrint.java: a PrintDocumentAdapter that hands the PDF over; docs/ANDROID.md AN4)
+
+  print(job) -> 0 the system's print dialog has the job / ERR_UNSUPPORTED / ERR_DIMS / ERR_IO /
+       ERR_NOMEM.  The job laid out on its paper (job.paper, PJF_LANDSCAPE) as a one-page PDF
+       (print_pdf), handed to PrintManager.print.  The system's dialog -- a printer or "Save as
+       PDF", paper, copies, pages, with a preview of the PDF -- runs after print returns (the UI
+       thread must not wait for it: five seconds without an answer are an ANR), so 0 says the
+       dialog has the job, not that paper came out; job.copies = 1.  The job's paper and
+       orientation are the dialog's first choice; another paper scales the page (the print
+       spooler does that).
+  doc_begin / doc_image / doc_end / doc_abort   (print.rs PrintDoc, E9) no dialog before the
+       pages (the system's comes with the document, at end): page() is the job's paper, the pages
+       go into one PDF (pdf_native; add_pdf takes the app's own), end hands it over.
+  available() -> bool   the host has a print service and an activity (CALL_PRINT); a program
+       without the Java host (android/exe_main.c, the test APK) has none: ERR_UNSUPPORTED.
+  Test variant (never a dialog): jfgui_PRINT_TO=FILE writes the PDF into FILE, as on Linux
+       (jfgui_PRINT_SMASK=1: alpha as /SMask instead of white).
+
+REQUEST_PRINT (web.rs, detached): the title (u32 length + UTF-8), u32 paper (PAPER_*), u32
+flags (PJF_LANDSCAPE), u32 pages, then the PDF.  GalleryPrint takes it (the request stays
+pending) or refuses it at once (-3: no print service, no activity; the request is gone right
+after host_request, which print reads as ERR_UNSUPPORTED); later it completes with 2 (the
+system took the job), -4 (cancelled in the dialog) or a failure.
+```
+
+- **`fn print(job: &mut PrintJob<'_>) -> i32`**
+  print one image on one page (see the file header)  [plat_print]
 
 ### `plat/clipdrop.rs`
 

@@ -1,7 +1,8 @@
 // Native child processes for tools and application helpers; no assembly counterpart.
 // run_elevated / elevated: a program with administrator or root rights (a service install).
 // launch: a program on its own that outlives this one (the inspector's editor); find: the file
-// a program name stands for.
+// a program name stands for.  Android has none of it (process_android.rs): every start answers
+// ENOTSUP (95), so apps build for every target without a cfg of their own.
 use alloc::string::String;
 #[cfg(windows)]
 #[path = "process_win.rs"]
@@ -12,7 +13,13 @@ mod native;
 #[cfg(target_vendor = "apple")]
 #[path = "process_apple.rs"]
 mod native;
+// Android: no child processes (every start ENOTSUP, docs/ANDROID.md decision 8)
+#[cfg(target_os = "android")]
+#[path = "process_android.rs"]
+mod native;
 pub use native::Child;
+#[cfg(target_os = "android")]
+pub use native::ENOTSUP;
 
 /// Shell-free child invocation. Environment entries override inherited values.
 pub struct Command<'a> {

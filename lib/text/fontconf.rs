@@ -3,10 +3,15 @@
 //   FontConf::new()                  no rules
 //   FontConf::system()               the rules of this system: on Linux the <alias> and
 //                                    language rules of fontconfig's files (/etc/fonts/fonts.conf
-//                                    and what it includes) -- or instead the file of
-//                                    jfgui_FONTCONF (the same format, every OS; tests) --, then
+//                                    and what it includes), on Android those of
+//                                    /system/etc/fonts.xml (familyset) -- or instead the file of
+//                                    jfgui_FONTCONF (either format, every OS; tests) --, then
 //                                    the built-in rules of this OS
-//   conf.parse(text, dir) / conf.load(path) -> bool   add the rules of a fontconfig file
+//   conf.parse(text, dir) / conf.load(path) -> bool   add the rules of a fontconfig file (or
+//                                    of Android's fonts.xml: a <familyset>, see familyset)
+//   conf.sys_families() -> &[SysFamily]   (fonts.xml) the default family and the fallback
+//                                    families in the file's order, their fonts as (file, face)
+//   conf.sys_family(db, file, face) -> Option<String>   the family name of one of those fonts
 //   conf.add_alias(family, prefer, accept, default)    add an alias
 //   conf.add_lang(lang, family, mode, families)        add a language rule (LR_*)
 //   conf.candidates(family, lang) -> Vec<String>       the families to try, best first
@@ -79,12 +84,27 @@ impl Rule {
     }
 }
 
+/// one family of Android's fonts.xml in its order (sys_families): its languages (the lang
+/// attribute's tags as written, "und-Arab", "ja", "zh-Hant"; none for the default family) and its
+/// faces as (file name, face index), for sans-serif text and for serif text (fallbackFor="serif"),
+/// each once
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct SysFamily {
+    pub langs: Vec<String>,
+    pub faces: Vec<(String, u32)>,
+    pub serif: Vec<(String, u32)>,
+}
+
 /// generic families, substitutes and language choices (see the module header)
 #[derive(Clone, Debug, Default)]
 pub struct FontConf {
     files: Vec<Rule>,
     builtin: Vec<Rule>,
     nfiles: usize,
+    /// Android's fonts.xml: the default family, then the fallback families, in its order
+    sys: Vec<SysFamily>,
+    /// (file, face) -> family name, read once per FontConf (sys_names)
+    names: Vec<(String, u32, Option<String>)>,
 }
 
 impl FontConf {
@@ -102,15 +122,35 @@ impl FontConf {
             None => {
                 #[cfg(target_os = "linux")]
                 c.load("/etc/fonts/fonts.conf");
+                #[cfg(target_os = "android")]
+                c.load(ANDROID_FONTS_XML);
             }
         }
         c.builtin = builtin();
         c
     }
 
-    /// fontconfig files read
+    /// fontconfig files read (Android's fonts.xml counts as one)
     pub fn files(&self) -> usize {
         self.nfiles
+    }
+
+    /// (Android) the families of fonts.xml in its order: the default family (its first named
+    /// one, sans-serif), then every fallback family (without a name; not those with
+    /// ignore="true") -- fallback.rs tries them in this order.  Empty without such a file
+    pub fn sys_families(&self) -> &[SysFamily] {
+        &self.sys
+    }
+
+    /// (fonts.xml) the family name of face `index` of a font file it names: the scan's face of
+    /// that file (db), else the name read from the file itself -- the scan keeps one of several
+    /// files with the same names (Android links DroidSans.ttf to Roboto-Regular.ttf), so the file
+    /// may stand there under another name.  None: no such font in the font folders
+    pub fn sys_family(&mut self, db: &crate::fontdb::FontDb, file: &str, index: u32) -> Option<String> {
+        if let Some(f) = db.face_by_file(file, index).and_then(|i| db.face(i)) {
+            return Some(f.family.clone());
+        }
+        self.sys_names(&[(String::from(file), index)]).pop()
     }
 
     /// add the rules of a fontconfig file (and of what it includes) -> it could be read
@@ -134,9 +174,95 @@ impl FontConf {
         let root = parse_xml(&text);
         self.nfiles += 1;
         for e in &root.kids {
-            self.element(e, dir, seen);
+            if e.name == "familyset" {
+                self.familyset(e);
+            } else {
+                self.element(e, dir, seen);
+            }
         }
         true
+    }
+
+    // Android's fonts.xml (<familyset>): a named <family> -> an alias that prefers the families
+    // of its faces (sans-serif -> Roboto); <alias name to> -> an alias that accepts `to` (arial ->
+    // sans-serif; its weight is not kept); a family without a name is a fallback family (sys):
+    // for a language (not just a script, "und-Arab") its faces come first in sans-serif and its
+    // fallbackFor="serif" faces in serif (lang rules, LR_PREPEND), und-Zsye are the emoji.  The
+    // family names come from the font files (fontdb::file_family, found in the font folders)
+    fn familyset(&mut self, set: &Elem) {
+        let mut default = true;
+        for e in &set.kids {
+            match e.name.as_str() {
+                "family" if e.attr("ignore") != Some("true") => {
+                    let (mut faces, mut serif): (Vec<(String, u32)>, Vec<(String, u32)>) = (Vec::new(), Vec::new());
+                    for f in e.kids.iter().filter(|k| k.name == "font") {
+                        let file = f.text.trim();
+                        if file.is_empty() || file.contains(['/', '\\']) {
+                            continue;
+                        }
+                        let index = f.attr("index").and_then(|i| i.trim().parse::<u32>().ok()).unwrap_or(0);
+                        let list = if f.attr("fallbackFor").is_some_and(|x| x.trim() == "serif") { &mut serif } else { &mut faces };
+                        if !list.iter().any(|(n, i)| n == file && *i == index) {
+                            list.push((String::from(file), index));
+                        }
+                    }
+                    if let Some(name) = e.attr("name").map(str::trim).filter(|n| !n.is_empty()) {
+                        let fams = self.sys_names(&faces);
+                        if !fams.is_empty() {
+                            self.files.push(Rule::Alias { family: String::from(name), prefer: fams, accept: Vec::new(), default: Vec::new() });
+                        }
+                        if default {
+                            default = false;
+                            self.sys.push(SysFamily { langs: Vec::new(), faces, serif });
+                        }
+                        continue;
+                    }
+                    let langs: Vec<String> = e.attr("lang").unwrap_or("").split([',', ' ']).filter(|l| !l.is_empty()).map(String::from).collect();
+                    for key in langs.iter().filter_map(|l| sys_lang(l)) {
+                        for (generic, list) in [("sans-serif", &faces), ("serif", &serif)] {
+                            let fams = self.sys_names(list);
+                            if !fams.is_empty() {
+                                self.files.push(Rule::Lang { lang: Some(key.clone()), family: Some(String::from(generic)), mode: LR_PREPEND, families: fams });
+                            }
+                        }
+                    }
+                    if langs.iter().any(|l| l.eq_ignore_ascii_case("und-Zsye")) {
+                        let fams = self.sys_names(&faces);
+                        if !fams.is_empty() {
+                            self.files.push(Rule::Alias { family: String::from("emoji"), prefer: fams, accept: Vec::new(), default: Vec::new() });
+                        }
+                    }
+                    self.sys.push(SysFamily { langs, faces, serif });
+                }
+                "alias" => {
+                    let (Some(name), Some(to)) = (e.attr("name").map(str::trim), e.attr("to").map(str::trim)) else { continue };
+                    if !name.is_empty() && !to.is_empty() && !same(name, to) {
+                        self.files.push(Rule::Alias { family: String::from(name), prefer: Vec::new(), accept: alloc::vec![String::from(to)], default: Vec::new() });
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    // the family names of (file, face) pairs, each once, in order (those that cannot be read left out)
+    fn sys_names(&mut self, faces: &[(String, u32)]) -> Vec<String> {
+        let mut out: Vec<String> = Vec::new();
+        for (file, index) in faces {
+            let known = self.names.iter().find(|(f, i, _)| f == file && i == index).map(|x| x.2.clone());
+            let name = match known {
+                Some(n) => n,
+                None => {
+                    let n = sys_font(file).and_then(|p| crate::fontdb::file_family(&p, *index));
+                    self.names.push((file.clone(), *index, n.clone()));
+                    n
+                }
+            };
+            if let Some(n) = name.filter(|n| !out.iter().any(|o| same(o, n))) {
+                out.push(n);
+            }
+        }
+        out
     }
 
     /// add the rules of fontconfig text (includes relative to dir) -> rules found
@@ -145,7 +271,11 @@ impl FontConf {
         let root = parse_xml(text);
         let mut seen = Vec::new();
         for e in &root.kids {
-            self.element(e, dir, &mut seen);
+            if e.name == "familyset" {
+                self.familyset(e);
+            } else {
+                self.element(e, dir, &mut seen);
+            }
         }
         self.files.len() - n
     }
@@ -412,6 +542,40 @@ fn lang_norm(l: &str) -> String {
     l.trim().to_ascii_lowercase().replace('_', "-")
 }
 
+/// (Android) the font configuration of the system: its families, their fonts and the fallback
+/// order (read like a fontconfig file, see FontConf::familyset)
+#[cfg(target_os = "android")]
+const ANDROID_FONTS_XML: &str = "/system/etc/fonts.xml";
+
+// a language tag of fonts.xml -> the rules' language (lang_keys' forms): None for a script alone
+// ("und-Arab", "und-Zsye") and for Bopomofo; zh-Hans -> zh-cn, zh-Hant -> zh-tw; a language with
+// a script (ja-Jpan) -> the language
+fn sys_lang(tag: &str) -> Option<String> {
+    let l = lang_norm(tag);
+    if l.is_empty() || l == "und" || l.starts_with("und-") || l.starts_with("zh-bopo") {
+        return None;
+    }
+    if l.starts_with("zh-hans") {
+        return Some(String::from("zh-cn"));
+    }
+    if l.starts_with("zh-hant") {
+        return Some(String::from("zh-tw"));
+    }
+    Some(match l.split_once('-') {
+        Some((lang, script)) if script.len() == 4 && script.bytes().all(|b| b.is_ascii_alphabetic()) => String::from(lang),
+        _ => l,
+    })
+}
+
+// the path of a font file fonts.xml names (a bare file name): the first font folder that has it
+// (Android: /system/fonts, /product/fonts; tests: jfgui_FONTDIRS)
+fn sys_font(file: &str) -> Option<String> {
+    plat::policy::font_dirs()
+        .into_iter()
+        .map(|d| alloc::format!("{}/{}", d.trim_end_matches(['/', '\\']), file))
+        .find(|p| plat::file_exists(p) == 1)
+}
+
 // the rule languages a request matches: itself, its prefixes, the Chinese forms
 fn lang_keys(lang: &str) -> Vec<String> {
     let l = lang_norm(lang);
@@ -549,7 +713,7 @@ const LANGS: &[(&str, &str, &[&str])] = &[
     ("am", "sans-serif", &["Kefa III"]),
 ];
 
-#[cfg(not(any(windows, target_vendor = "apple")))]
+#[cfg(not(any(windows, target_vendor = "apple", target_os = "android")))]
 const GEN: &[(&str, &[&str])] = &[
     ("sans-serif", &["DejaVu Sans", "Noto Sans", "Liberation Sans", "Ubuntu", "Cantarell", "FreeSans"]),
     ("serif", &["DejaVu Serif", "Noto Serif", "Liberation Serif", "FreeSerif"]),
@@ -571,7 +735,7 @@ const GEN: &[(&str, &[&str])] = &[
     ("Consolas", &["DejaVu Sans Mono", "Liberation Mono"]),
 ];
 
-#[cfg(not(any(windows, target_vendor = "apple")))]
+#[cfg(not(any(windows, target_vendor = "apple", target_os = "android")))]
 const LANGS: &[(&str, &str, &[&str])] = &[
     ("ja", "sans-serif", &["Noto Sans CJK JP", "IPAGothic", "TakaoGothic", "VL Gothic"]),
     ("ja", "serif", &["Noto Serif CJK JP", "IPAMincho", "TakaoMincho"]),
@@ -595,6 +759,43 @@ const LANGS: &[(&str, &str, &[&str])] = &[
     ("ar", "sans-serif", &["Noto Sans Arabic", "Noto Naskh Arabic", "DejaVu Sans"]),
     ("fa", "sans-serif", &["Noto Sans Arabic", "Vazirmatn", "DejaVu Sans"]),
     ("am", "sans-serif", &["Noto Sans Ethiopic", "Abyssinica SIL"]),
+];
+
+// Android: the families of AOSP's fonts.xml, after the rules of the device's own file (which
+// an OEM may change; the file says it may move in a later release)
+#[cfg(target_os = "android")]
+const GEN: &[(&str, &[&str])] = &[
+    ("sans-serif", &["Roboto", "Noto Sans"]),
+    ("serif", &["Noto Serif"]),
+    ("monospace", &["Droid Sans Mono", "Cutive Mono"]),
+    ("cursive", &["Dancing Script"]),
+    ("fantasy", &["Noto Serif"]),
+    ("system-ui", &["Roboto"]),
+    ("emoji", &["Noto Color Emoji"]),
+    ("math", &["Noto Sans Math", "Noto Sans Symbols"]),
+    ("sans", &["sans-serif"]),
+    ("mono", &["monospace"]),
+    ("Arial", &["Roboto"]),
+    ("Helvetica", &["Roboto"]),
+    ("Segoe UI", &["Roboto"]),
+    ("Times New Roman", &["Noto Serif"]),
+    ("Times", &["Noto Serif"]),
+    ("Courier New", &["Cutive Mono", "Droid Sans Mono"]),
+    ("Courier", &["Cutive Mono", "Droid Sans Mono"]),
+    ("Consolas", &["Droid Sans Mono"]),
+];
+
+#[cfg(target_os = "android")]
+const LANGS: &[(&str, &str, &[&str])] = &[
+    ("ja", "sans-serif", &["Noto Sans CJK JP"]),
+    ("ja", "serif", &["Noto Serif CJK JP"]),
+    ("zh-cn", "sans-serif", &["Noto Sans CJK SC"]),
+    ("zh-cn", "serif", &["Noto Serif CJK SC"]),
+    ("zh-tw", "sans-serif", &["Noto Sans CJK TC"]),
+    ("zh-tw", "serif", &["Noto Serif CJK TC"]),
+    ("zh-hk", "sans-serif", &["Noto Sans CJK HK", "Noto Sans CJK TC"]),
+    ("ko", "sans-serif", &["Noto Sans CJK KR"]),
+    ("ko", "serif", &["Noto Serif CJK KR"]),
 ];
 
 fn builtin() -> Vec<Rule> {

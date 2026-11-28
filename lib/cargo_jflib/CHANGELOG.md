@@ -13,6 +13,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - Flatpak: the permission key `gamepad` becomes `--device=input` (every input device in `/dev/input`, keyboards too; Flatpak 1.15.6 and newer, an older one refuses to build it), with a note.
 - The setup manifest carries the styles' names and descriptions in other languages: styles/S/INFO's further lines name.<lang>= and desc.<lang>= become label_<style>.<lang>= and desc_<style>.<lang>= (cargo jflib package, tools/package.py)
 - `cargo jflib android`: the manifest it writes has `android.permission.INTERNET` when the app has no PERMISSIONS or names `net.connect` or `net.listen` there; an own `android/AndroidManifest.xml` without it is refused with those rules (without it Android refuses every socket)
+- The Android host prints (android/GalleryPrint.java, copied into the package as for the other host files)
 
 ### Changed
 

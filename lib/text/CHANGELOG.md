@@ -11,6 +11,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 ### Added
 
 - cff::Cff::outline_seac (the outline and the accent of an endchar with the arguments of seac, for a caller with the glyph names) and Cff::matrix (the FontMatrix in the outline's units); ttf::TtFont::cff (the CFF outlines of an OpenType font)
+- Android's fonts.xml: `FontConf::system()` reads `/system/etc/fonts.xml` (also through `jfgui_FONTCONF`, recognised by its `<familyset>`): a named family prefers the families of its fonts (sans-serif -> Roboto), an `<alias>` accepts its target, a fallback family of a language (ja, ko, zh-Hans, zh-Hant) comes first in sans-serif (its `fallbackFor="serif"` fonts in serif), und-Zsye are the emoji; `sys_families()` lists the default family and every fallback family in the file's order, `sys_family(db, file, index)` the family of one of its fonts. `fallback.rs` tries those families in that order (Android: after the language's fonts, before the built-in list); `FontDb::face_by_file` and `fontdb::file_family` find a face by its file name and read a file's family name; built-in Android rules and fallback families stand in where the file is missing
 
 ### Changed
 

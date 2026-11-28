@@ -2,7 +2,7 @@
 // UDP over IPv4 and IPv6, Unix sockets, timeouts, refused connections), fs (private files, metadata, listing,
 // links, times, free space), the local time zone; on Android sync and rand (AN1), net without Unix
 // sockets (AN2: and the app without android.permission.INTERNET, android_net), fs, watch and the
-// zone (AN3)
+// zone (AN3), service and process there but unsupported (AN4: android_none)
 
 use alloc::format;
 use alloc::string::String;
@@ -16,10 +16,12 @@ use plat::sync::{channel, Condvar, Mutex, RecvError, RwLock};
 use crate::T;
 
 pub fn run(t: &mut T) {
-    // Android (docs/ANDROID.md): threads and sync since AN1, files, watch and the zone since AN3;
-    // net waits for AN2, service for AN4
+    // Android (docs/ANDROID.md): threads and sync since AN1, net since AN2, files, watch and the
+    // zone since AN3, service and process as modules that answer "not supported" since AN4
     #[cfg(target_os = "android")]
     {
+        service(t);
+        android_none(t);
         sync(t);
         rand(t);
         if android_net(t) {
@@ -32,7 +34,6 @@ pub fn run(t: &mut T) {
         files(t);
         watch(t);
         zone(t);
-        t.later("service (AN4: Unsupported)");
     }
     #[cfg(not(target_os = "android"))]
     run_all(t);
@@ -596,8 +597,8 @@ fn remove_tree(path: &str) {
     plat::delete(&fs::long_path(path));
 }
 
-/// the systemd unit of a service: quoting of the command line, the fixed settings
-#[cfg(not(target_os = "android"))]
+/// the systemd unit of a service: quoting of the command line, the fixed settings (text only, so
+/// on Android as well)
 fn service(t: &mut T) {
     let args = [String::from("run"), String::from("--data"), String::from("/srv/backup data"), String::from("50%"), String::from("$HOME")];
     let spec = plat::service::ServiceSpec { name: "x", display: "X", description: "Ein Dienst", exe: "/opt/x/bin", args: &args };
@@ -609,6 +610,30 @@ fn service(t: &mut T) {
     let u = plat::service::unit_text(&spec);
     t.check("unit: control characters in the description are spaces", u.contains("Description=Ein ExecStartPre=/bin/evil  Dienst\n") && !u.contains('\r'));
     t.check("not a service: no stop request", !plat::service::stop_requested());
+}
+
+/// Android (docs/ANDROID.md AN4, decision 8): no child processes and no system services, but both
+/// modules are there and answer: every start ENOTSUP, run_elevated and the service manager an error
+/// text, elevated() false, find() None, a service NotInstalled, run_service runs its function
+#[cfg(target_os = "android")]
+fn android_none(t: &mut T) {
+    use plat::process::{Command, ENOTSUP};
+    let c = Command { program: "/system/bin/sh", args: &["-c", "true"], cwd: None, env: &[] };
+    t.check("process: spawn -> ENOTSUP", c.spawn().err() == Some(ENOTSUP));
+    t.check("process: launch -> ENOTSUP", plat::process::launch("/system/bin/sh", &[]) == Err(ENOTSUP));
+    t.check("process: exec -> ENOTSUP", plat::process::exec("/system/bin/sh", &[], &[]) == ENOTSUP);
+    t.check("process: run_elevated -> an error text", plat::process::run_elevated("/system/bin/sh", &[]).is_err_and(|e| !e.is_empty()));
+    t.check("process: not elevated, find nothing", !plat::process::elevated() && plat::process::find("sh").is_none());
+    let spec = plat::service::ServiceSpec { name: "x", display: "X", description: "Ein Dienst", exe: "/opt/x/bin", args: &[] };
+    t.check("service: install -> an error text", plat::service::install(&spec).is_err_and(|e| e.contains("Android")));
+    t.check("service: start / stop / uninstall -> errors",
+            plat::service::start("x").is_err() && plat::service::stop("x").is_err() && plat::service::uninstall("x").is_err());
+    t.check("service: state NotInstalled, no program path",
+            plat::service::state("x") == plat::service::ServiceState::NotInstalled && plat::service::program_path(&spec).is_none());
+    fn run() -> i32 {
+        7
+    }
+    t.check("service: run_service runs the function", plat::service::run_service("x", run) == 7);
 }
 
 /// Android (docs/ANDROID.md AN2) -> whether the app may use the network.  With

@@ -104,8 +104,9 @@ extern crate std;
 
 extern crate alloc;
 
-/// Owned native child processes with pipes and process-tree lifetime management.
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+/// Owned native child processes with pipes and process-tree lifetime management (Android: none,
+/// every start answers ENOTSUP).
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 pub mod process;
 /// Mutex, Condvar, RwLock and bounded channels for worker threads.
 #[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
@@ -116,8 +117,9 @@ pub mod net;
 /// Metadata, directory listings, links, times, free space, owner-only files, the local zone.
 #[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 pub mod fs;
-/// Running as a system service (Windows service control manager, systemd units).
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+/// Running as a system service (Windows service control manager, systemd units; Android: none,
+/// install and the others answer an error).
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 pub mod service;
 /// Changes below folders as they happen (continuous data protection).
 #[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]

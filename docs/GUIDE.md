@@ -1779,9 +1779,11 @@ let r = d.end();                                   // 0: on its way to the print
 
 * Windows: `PrintDlgExW` (with a page range of `1..=n` when `n > 0`) and GDI, one page after
   the other into the spooler; Linux: the portal's dialog, the pages as one PDF of several pages
-  (or the app's own PDF: `pdf_native()`) handed to the portal's `Print`. macOS, iOS, Android and
-  the browser have no jobs of several pages yet: `begin` answers `ERR_UNSUPPORTED` (outside the
-  test variant).
+  (or the app's own PDF: `pdf_native()`) handed to the portal's `Print`; Android: no dialog
+  before the pages, the PDF goes to the system's `PrintManager` at `end()`, whose dialog (a
+  printer or "Save as PDF", paper, copies, pages, a preview) comes after `end` returned (0: the
+  dialog has the job; `plat::print` the same with one page). macOS, iOS and the browser have no
+  jobs of several pages yet: `begin` answers `ERR_UNSUPPORTED` (outside the test variant).
 * Render each page for `page()` at the printer's resolution or a fixed one (300 dpi: `job.dpi_x
   = 300.0` with `PJS_DPI`, an image of `page.w / 72 * 300` pixels); `PJS_FIT` scales each image
   into the printable area. `d.abort()` drops the job, `end()` without a page is `ERR_DIMS`.
@@ -2077,8 +2079,10 @@ if (desc.render)(&args, &mut dst) == 0 {
   app's chain `ui.text.set_fallback_fonts(&[id, ...])`, then system fonts
   (`ui.text.set_system_fallback(on)`, on in window mode; off in headless runs so shots match
   on every machine). The system list (Segoe UI Symbol / Emoji, YaHei, ... on Windows; DejaVu,
-  Noto, WenQuanYi, ... on Linux) is found by scanning the font folders once (cached in
-  `cache://fontdb.fdb`). Environment: `jfgui_FONT_FALLBACK=0` turns system fonts off (`=1`
+  Noto, WenQuanYi, ... on Linux; on Android the families of `/system/etc/fonts.xml` in its
+  order, Roboto, the scripts' Noto fonts, Noto Sans CJK, Noto Color Emoji) is found by scanning
+  the font folders once (cached in `cache://fontdb.fdb`; Android: `/system/fonts`,
+  `/product/fonts`). Environment: `jfgui_FONT_FALLBACK=0` turns system fonts off (`=1`
   turns them on headless; a script turns them on from where it says
   `system env jfgui_FONT_FALLBACK 1`), `jfgui_FALLBACK_FONTS="Family;Family"` puts families
   first. A headless shot of text the app's fonts lack (CJK in a style with Latin fonts) shows

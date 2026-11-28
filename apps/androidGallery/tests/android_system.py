@@ -18,6 +18,12 @@ its state in data://system-state.txt, read with run-as) and works it as a user w
   WakeLock (`dumpsys power`), off again -> both gone;
 - the share sheet: the button "Teilen" (plat::share: a text, a link, a file) -> SHARE_PENDING and
   the system's chooser in front; Back closes it -> SHARE_CANCELLED, the gallery in front again;
+- printing (docs/ANDROID.md AN4): the button "Drucken" (plat::print: a test picture as a PDF) -> 0
+  and the system's print dialog (the print spooler's PrintActivity) in front with our page (A4,
+  1/1); Back closes it -> the job cancelled (logcat "print: ... -> -4"), the gallery in front;
+  then "Save as PDF" through the system's save dialog -> the job done ("-> 2") and
+  Download/JFLib Galerie.pdf holds the test picture (removed again; on a phone only with
+  --save-pdf, an emulator always);
 - the lifecycle: `input keyevent KEYCODE_HOME` -> UIC_ACTIVE 0, UIC_SUSPEND 2; started again from
   the launcher's intent -> UIC_SUSPEND 0, UIC_ACTIVE 1.
 Every setting it changes is restored at the end (also after a failure or Ctrl+C): night mode,
@@ -76,14 +82,60 @@ class Device:
     def sh(self, *args, check=False, timeout=120):
         return self.run("shell", *args, check=check, timeout=timeout)
 
+    def raw(self, *args, timeout=120):
+        """adb's output as bytes (b"" on a timeout)"""
+        try:
+            return subprocess.run(self.adb + list(args), capture_output=True, timeout=timeout).stdout
+        except subprocess.TimeoutExpired:
+            return b""
+
     def prop(self, name):
         return self.sh("getprop", name).strip()
+
+
+def test_picture():
+    """the gallery's print picture (system.rs test_picture) as R, G, B rows"""
+    w, h = 480, 320
+    out = bytearray()
+    for y in range(h):
+        for x in range(w):
+            if x < 8 or y < 8 or x >= w - 8 or y >= h - 8:
+                rgb = (128, 128, 128)
+            elif y < 24 or y >= h - 24 or x < 24 or x >= w - 24:
+                rgb = (255, 255, 255)
+            else:
+                rgb = ((220, 0, 0), (0, 170, 0), (0, 0, 220), (0, 0, 0))[(x - 24) * 4 // (w - 48)]
+            out += bytes(rgb)
+    return bytes(out)
+
+
+def saved_pdf_ok(pdf):
+    """the PDF "Save as PDF" wrote (the spooler rewrites it with PDFium): an A4 page and an image
+    of 480 x 320 whose Flate stream inflates to the test picture"""
+    import zlib
+    if not pdf.startswith(b"%PDF-"):
+        return False
+    box = re.search(rb"/MediaBox\s*\[\s*0\s+0\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s*\]", pdf)
+    if not box or abs(float(box.group(1)) - 595.3) > 1 or abs(float(box.group(2)) - 841.9) > 1:
+        return False
+    for m in re.finditer(rb"<<([^>]*?/Subtype\s*/Image[^>]*?)>>\s*stream\r?\n", pdf):
+        head = m.group(1)
+        w, h, n = (re.search(rb"/" + k + rb"\s+(\d+)", head) for k in (b"Width", b"Height", b"Length"))
+        if not (w and h and n) or (int(w.group(1)), int(h.group(1))) != (480, 320):
+            continue
+        try:
+            return zlib.decompress(pdf[m.end():m.end() + int(n.group(1))]) == test_picture()
+        except zlib.error:
+            return False
+    return False
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--serial", help="adb device (default: the only one)")
     ap.add_argument("--apk", help="install this APK first (default: build/android/androidGallery-<abi>-debug.apk if it exists)")
+    ap.add_argument("--save-pdf", action="store_true",
+                    help="on a phone too: print to \"Save as PDF\" into its Download folder (removed again)")
     a = ap.parse_args()
     d = Device(a.serial)
     sdk = int(d.prop("ro.build.version.sdk") or "0")
@@ -447,13 +499,95 @@ def main():
         ok(s is not None, "closed with Back: SHARE_CANCELLED (no target chosen)")
         ok(focused(), "the gallery is in front again")
 
+        # ------------------------------------------------------------ printing
+        print("printing:", flush=True)
+
+        def print_in_front():
+            w = d.sh("dumpsys", "window")
+            return any("mCurrentFocus" in line and ("printspooler" in line or "PrintActivity" in line) for line in w.splitlines())
+
+        def spooler(rid):
+            return lambda n: n.get("resource-id", "") == f"com.android.printspooler:id/{rid}"
+
+        def print_round(n):
+            """tap "Drucken" (the n-th time) -> the dialog in front with our page: A4, one page"""
+            awake()
+            d.sh("logcat", "-c")
+            ok(tap_label("Drucken"), f"tap \"Drucken\" ({n}.)")
+            s = wait(lambda s: num(s, "prints") == n, "print asked for")
+            ok(s is not None and s.get("print") == "0", f"plat::print: 0, the PDF to the system's PrintManager ({s and s.get('print')})")
+            end = time.time() + 20
+            while time.time() < end and not print_in_front():
+                time.sleep(0.3)
+            if not ok(print_in_front(), "the system's print dialog (the print spooler) is in front"):
+                return False
+            paper = find(spooler("paper_size_summary"), "the paper in the dialog", timeout=15)
+            page = find(spooler("page_number"), "the preview's page number", timeout=15)
+            ok(paper is not None and "A4" in paper.get("text", ""), f"the dialog suggests the job's paper ({paper is not None and paper.get('text')})")
+            ok(page is not None and page.get("text") == "1/1", f"the preview has our one page ({page is not None and page.get('text')})")
+            return True
+
+        def job_line():
+            end, line = time.time() + 10, ""
+            while time.time() < end and not line:
+                log = d.sh("logcat", "-d", "-s", "jfgui")
+                line = next((x for x in log.splitlines() if "print: " in x and " done, job " in x), "")
+                time.sleep(0.3)
+            return line.strip()
+
+        if print_round(1):
+            for _ in range(3):  # Back: a list that is open, then the dialog
+                if focused():
+                    break
+                d.sh("input", "keyevent", "KEYCODE_BACK")
+                time.sleep(1.5)
+            ok(focused(), "Back closes the dialog, the gallery is in front again")
+            line = job_line()
+            ok(line.endswith("-> -4"), f"the job ended cancelled ({line or 'no line'})")
+
+        # "Save as PDF" (the spooler's own printer) through the system's save dialog into
+        # Download/: an emulator always, a phone only with --save-pdf (it writes into its Downloads)
+        if a.save_pdf or d.prop("ro.kernel.qemu") == "1" or (a.serial or "").startswith("emulator-"):
+            saved_pdf = "/sdcard/Download/JFLib Galerie.pdf"
+            d.sh("rm", "-f", saved_pdf)
+            if print_round(2):
+                dest = find(spooler("title"), "the printer", timeout=10)
+                if dest is not None and dest.get("text") != "Save as PDF":
+                    spin = find(spooler("destination_spinner"), "the printer list")
+                    if spin is not None:
+                        tap(spin)
+                        pdf_item = find(label("Save as PDF"), '"Save as PDF"')
+                        if pdf_item is not None:
+                            tap(pdf_item)
+                button = find(spooler("print_button"), "the dialog's print button")
+                ok(button is not None, f"the dialog's button \"{button is not None and button.get('content-desc')}\"")
+                if button is not None:
+                    tap(button)
+                save = find(lambda n: (n.get("text") or "").lower() == "save" and n.get("clickable") == "true"
+                            and "documentsui" in n.get("resource-id", "") + n.get("package", ""), "the save dialog's button")
+                ok(save is not None, "the system's save dialog (DocumentsUI) is in front")
+                if save is not None:
+                    tap(save)
+                end = time.time() + 15
+                while time.time() < end and not focused():
+                    time.sleep(0.3)
+                ok(focused(), "saved: the gallery is in front again")
+                line = job_line()
+                ok(line.endswith("-> 2"), f"the job ended done ({line or 'no line'})")
+                pdf = d.raw("exec-out", "cat", saved_pdf)
+                ok(saved_pdf_ok(pdf), f"Download/JFLib Galerie.pdf: {len(pdf)} bytes, A4, our test picture (480 x 320) in it")
+                d.sh("rm", "-f", saved_pdf)
+
         # ------------------------------------------------------------ the lifecycle
         print("the lifecycle:", flush=True)
+        # (the print dialog and the save dialog covered the gallery: it was stopped and started before)
+        before = state()
+        bg, fg = num(before, "background"), num(before, "foreground")
         d.sh("input", "keyevent", "KEYCODE_HOME")
-        s = wait(lambda s: s["suspend"] == "2" and s["active"] == "0" and num(s, "background") == 1, "home")
+        s = wait(lambda s: s["suspend"] == "2" and s["active"] == "0" and num(s, "background") == bg + 1, "home")
         ok(s is not None, "KEYCODE_HOME: UIC_ACTIVE 0 (onPause), UIC_SUSPEND 2 (onStop)")
         launch([])
-        s = wait(lambda s: s["suspend"] == "0" and s["active"] == "1" and num(s, "foreground") == 1, "relaunched")
+        s = wait(lambda s: s["suspend"] == "0" and s["active"] == "1" and num(s, "foreground") == fg + 1, "relaunched")
         ok(s is not None, "started again: UIC_SUSPEND 0 (onStart), UIC_ACTIVE 1 (onResume)")
         ok(focused(), "the same activity is in front")
 

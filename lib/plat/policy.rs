@@ -1658,6 +1658,9 @@ fn parse(text: &str, src: &str, plugin: Option<&str>) -> Result<Policy, String> 
             for d in fontconfig_files() {
                 add_dir_rule(&mut p.fs, &d, FS_READ); // fontconfig's aliases and language rules (fontconf.rs)
             }
+            // Android: the families, their fonts and the fallback order of the system (fontconf.rs)
+            #[cfg(target_os = "android")]
+            add_dir_rule(&mut p.fs, ANDROID_FONTS_XML, FS_READ);
             if let Some(e) = exe_dir() {
                 add_dir_rule(&mut p.fs, &e, FS_READ);
             }
@@ -1914,10 +1917,16 @@ fn pattern(a: &str, plugin: Option<&str>) -> Result<Vec<Vec<String>>, String> {
     Ok(out)
 }
 
+/// (Android) the system's font configuration fonts.xml (fontconf.rs reads it like a fontconfig
+/// file): the app may always read it, like the font folders
+#[cfg(target_os = "android")]
+const ANDROID_FONTS_XML: &str = "/system/etc/fonts.xml";
+
 /// the system font folders in the order fontdb scans them: jfgui_FONTDIRS (';' separated,
 /// on Linux also ':'), else the Windows / XDG folders (macOS and iOS: /System/Library/Fonts,
-/// /Library/Fonts, ~/Library/Fonts); on Linux then fontconfig's own folders (fontconfig_dirs:
-/// NixOS, TeX fonts, a <dir> of the user) and in Flatpak the host's fonts
+/// /Library/Fonts, ~/Library/Fonts; Android: /system/fonts, /product/fonts, real paths as
+/// android_files.rs keeps the system's folders); on Linux then fontconfig's own folders
+/// (fontconfig_dirs: NixOS, TeX fonts, a <dir> of the user) and in Flatpak the host's fonts
 pub fn font_dirs() -> Vec<String> {
     let mut v = Vec::new();
     if let Some(e) = crate::env("jfgui_FONTDIRS").filter(|e| !e.is_empty()) {
@@ -1932,6 +1941,10 @@ pub fn font_dirs() -> Vec<String> {
         v.push(String::from("/System/Library/Fonts"));
         v.push(String::from("/Library/Fonts"));
         v.extend(env("HOME", "/Library/Fonts"));
+    } else if cfg!(target_os = "android") {
+        // AOSP's fonts, then the device maker's (fonts_customization.xml names them)
+        v.push(String::from("/system/fonts"));
+        v.push(String::from("/product/fonts"));
     } else {
         v.push(String::from("/usr/share/fonts"));
         v.push(String::from("/usr/local/share/fonts"));
