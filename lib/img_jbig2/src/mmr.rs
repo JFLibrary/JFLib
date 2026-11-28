@@ -98,11 +98,12 @@ impl Dec<'_> {
             }
             self.pos += len as usize;
             total = total.saturating_add(run as u32);
-            if run < 64 {
-                return Some(total);
-            }
+            // a terminating code too (a run of 63 in a row of 8 is damage, not a clamp)
             if total > self.cols {
                 return None;
+            }
+            if run < 64 {
+                return Some(total);
             }
         }
     }

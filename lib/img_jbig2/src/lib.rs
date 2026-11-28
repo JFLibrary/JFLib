@@ -442,19 +442,22 @@ impl Dec {
                 }
                 // the region's pixels, before a copy of the page as its reference costs them
                 self.spend((w as u64).saturating_mul(h as u64))?;
-                // the reference: the intermediate region it refers to, else the page under it
-                let referred = s.refs.iter().find_map(|r| if let Some(Res::Region(b)) = self.res.get(r) { Some(b.clone()) } else { None });
-                let reference = match referred {
+                let max = self.max;
+                // the reference: the intermediate region it refers to (borrowed, not copied), else
+                // a copy of the page under it
+                let page_part;
+                let reference: &Bmp = match s.refs.iter().find_map(|r| if let Some(Res::Region(b)) = self.res.get(r) { Some(b) } else { None }) {
                     Some(b) => b,
                     None => {
                         let page = self.page.as_ref().ok_or(Error::Corrupt)?;
-                        page.bmp.sub(x, y, w, h, self.max)?
+                        page_part = page.bmp.sub(x, y, w, h, max)?;
+                        &page_part
                     }
                 };
                 let mut mq = Mq::new(d.get(p..).unwrap_or(&[]));
                 let mut cx = vec![Cx::default(); 1 << 13];
-                let g = generic::Gr { w, h, template, reference: &reference, dx: 0, dy: 0, tpgron, at };
-                let b = generic::refine(&mut mq, &mut cx, &g, self.max)?;
+                let g = generic::Gr { w, h, template, reference, dx: 0, dy: 0, tpgron, at };
+                let b = generic::refine(&mut mq, &mut cx, &g, max)?;
                 if s.ty == 40 {
                     self.res.insert(s.num, Res::Region(b));
                 } else {
@@ -576,10 +579,11 @@ impl Dec {
             }
             if s.ty == 48 {
                 self.finish();
-                if self.done.len() >= self.want {
-                    break;
-                }
                 skip = false;
+            }
+            // the pages wanted are done (after an end of page too): what follows can't change them
+            if self.done.len() >= self.want {
+                break;
             }
             if skip {
                 continue;

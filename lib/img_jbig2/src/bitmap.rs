@@ -14,9 +14,10 @@ pub(crate) struct Bmp {
 /// the largest number of pixels of one bitmap (the page, a region, a collective bitmap)
 pub(crate) const MAX_PIXELS: u64 = 1 << 30;
 
-/// `d` grown to n bytes of `fill`; Limit when the allocator refuses them
+/// `d` grown to n bytes of `fill`; Limit when the allocator refuses them.  The growth is amortized
+/// (a page of unknown height grows by a stripe at a time and must not be copied at every one)
 fn fill_to(d: &mut Vec<u8>, n: usize, fill: u8) -> Result<(), Error> {
-    d.try_reserve_exact(n.saturating_sub(d.len())).map_err(|_| Error::Limit)?;
+    d.try_reserve(n.saturating_sub(d.len())).map_err(|_| Error::Limit)?;
     d.resize(n, fill);
     Ok(())
 }
