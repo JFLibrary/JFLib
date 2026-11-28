@@ -82,7 +82,26 @@ bitmap-template1-customat bitmap-template1-tpgdon bitmap-template1 bitmap-templa
 bitmap-template2-tpgdon bitmap-template2 bitmap-template3-customat-tpgdon bitmap-template3-customat bitmap-template3-tpgdon
 bitmap-template3 bitmap-tpgdon bitmap-trailing-7fff-stripped-harder-refine bitmap-trailing-7fff-stripped-harder
 bitmap-trailing-7fff-stripped bitmap""".split()
-REFS = ["bitmap.bmp", "bitmap-xor.bmp", "bitmap-blemish.bmp", "bitmap-template0-all-ones.bmp", "annex-h-p.png"]
+# the reference image of a file, where Ghostscript or Poppler (or both) draw it otherwise: these files
+# are encodings of SerenityOS's bitmap.bmp (json/bitmap.bmp, the image its tests decode them to);
+# only a file's own reference image counts
+REF_OF = dict.fromkeys("""bitmap-composite-and-xnor-halftone bitmap-composite-and-xnor-refine
+bitmap-composite-or-xor-replace-refine bitmap-halftone-composite bitmap-halftone-refine
+bitmap-halftone-skip-dummy bitmap-halftone-skip-grid bitmap-halftone-skip-grid-template1
+bitmap-halftone-skip-grid-template2 bitmap-halftone-skip-grid-template3 bitmap-refine
+bitmap-refine-customat bitmap-refine-customat-tpgron bitmap-refine-lossless bitmap-refine-page-subrect
+bitmap-refine-refine bitmap-refine-template1 bitmap-refine-template1-tpgron bitmap-refine-tpgron
+bitmap-symbol-context-reuse bitmap-symbol-context-reuse-huffman-refagg
+bitmap-symbol-context-reuse-refagg bitmap-symbol-manyrefs bitmap-symbol-symhuff-texthuff
+bitmap-symbol-symhuff-texthuffB10B13 bitmap-symbol-symhuffB5B3-texthuffB7B9B12
+bitmap-symbol-symhuffcustom-texthuffcustom bitmap-symbol-symhuffrefine-textrefine
+bitmap-symbol-symhuffrefine-textrefine-export bitmap-symbol-symhuffrefineone
+bitmap-symbol-symhuffrefineseveral bitmap-symbol-texthuffrefine bitmap-symbol-texthuffrefineB15
+bitmap-symbol-texthuffrefinecustom bitmap-symbol-texthuffrefinecustomdims
+bitmap-symbol-texthuffrefinecustompos bitmap-symbol-texthuffrefinecustompos-global
+bitmap-symbol-texthuffrefinecustomposdims bitmap-symbol-texthuffrefinecustomsize
+bitmap-trailing-7fff-stripped-harder-refine""".split(), "bitmap.bmp")
+REFS = sorted(set(REF_OF.values()))
 
 FAILS = []
 DIGEST = hashlib.sha256()
@@ -225,8 +244,12 @@ class Exe:
 
 
 def differ(a, b):
-    """the pixels that differ between two (w, h, bits), or None when the sizes differ"""
+    """the pixels that differ between two (w, h, bits), or None when the sizes differ or the bits of
+    one are short"""
     if a is None or b is None or a[:2] != b[:2]:
+        return None
+    n = (a[0] + 7) // 8 * a[1]
+    if len(a[2]) != n or len(b[2]) != n:
         return None
     return sum(bin(x ^ y).count("1") for x, y in zip(a[2], b[2]))
 
@@ -274,7 +297,7 @@ def suite_serenity(exe, work):
             n_ok += 1
             continue
         # where a decoder disagrees: ours must equal the other one or SerenityOS's reference image
-        votes = [rn for rn, rv in refs.items() if differ(ours, rv) == 0]
+        votes = [REF_OF[name]] if name in REF_OF and differ(ours, refs.get(REF_OF[name])) == 0 else []
         agree = [n for n, dd in (("Ghostscript", dg), ("Poppler", dp)) if dd == 0] + votes
         if agree:
             n_ok += 1

@@ -100,7 +100,10 @@ fn mutate(p: &str, count: u64, seed: u64, slow_out: Option<String>) -> i32 {
     let opt = img_jbig2::Options { max_pixels: 1 << 24 };
     for _ in 0..count {
         let mut m = d.clone();
-        match rng.below(5) {
+        // an empty file goes to the decoder as it is (nothing to index)
+        let kind = if m.is_empty() { usize::MAX } else { rng.below(5) };
+        match kind {
+            usize::MAX => {}
             0 | 1 => {
                 for _ in 0..1 + rng.below(8) {
                     let i = rng.below(m.len());
