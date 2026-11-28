@@ -18,8 +18,9 @@ pub(crate) struct Gb<'a> {
     pub h: usize,
     pub template: u8,
     pub tpgdon: bool,
-    /// the adaptive pixels (template 0: four, else one)
-    pub at: [(i8, i8); 4],
+    /// the adaptive pixels (template 0: four, else one); a header gives -128 to 127, a pattern
+    /// dictionary -HDPW (down to -255)
+    pub at: [(i32, i32); 4],
     pub skip: Option<&'a Bmp>,
 }
 
