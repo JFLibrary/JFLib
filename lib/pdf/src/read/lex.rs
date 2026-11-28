@@ -340,7 +340,7 @@ impl<'a> Lexer<'a> {
 
     /// the entries of a dictionary after its <<
     fn dict_body(&mut self, refs: bool, depth: u32) -> Result<Dict, ()> {
-        let mut d = Dict::new();
+        let mut d = alloc::collections::BTreeMap::new();
         loop {
             let save = self.pos;
             match self.next() {
@@ -359,7 +359,7 @@ impl<'a> Lexer<'a> {
                         Tok::Kw(k) if !matches!(k, b"true" | b"false" | b"null") => {
                             self.pos = save;
                             if matches!(k, b"endobj" | b"stream" | b"endstream" | b"obj") {
-                                d.0.insert(Name(key), Object::Null);
+                                d.insert(Name(key), Object::Null);
                                 break;
                             }
                             self.next();
@@ -368,12 +368,12 @@ impl<'a> Lexer<'a> {
                         }
                         t => self.value(t, refs, depth + 1)?,
                     };
-                    d.0.insert(Name(key), v);
+                    d.insert(Name(key), v);
                 }
                 _ => self.spend()?,
             }
         }
-        Ok(d)
+        Ok(Dict::from_map(d))
     }
 
     /// a token skipped costs as much as an object read
@@ -466,10 +466,11 @@ impl Ends {
 
 /// the indirect object at `off`: "num generation obj ... endobj", a stream with its data range.  A
 /// stream's /Length that is a reference is asked of `len_of`; a length that does not end at
-/// "endstream" is replaced by the next "endstream" (`ends`), as every reader does.
-pub(crate) fn indirect(b: &[u8], off: usize, len_of: &mut dyn FnMut(Ref) -> Option<i64>, ends: &dyn Fn(usize) -> Option<usize>) -> Option<(Ref, Object)> {
+/// "endstream" is replaced by the next "endstream" (`ends`), as every reader does.  The object
+/// (a stream's dictionary) is read up to `limit` (a repaired file: the next object's header).
+pub(crate) fn indirect(b: &[u8], off: usize, limit: usize, len_of: &mut dyn FnMut(Ref) -> Option<i64>, ends: &dyn Fn(usize) -> Option<usize>) -> Option<(Ref, Object)> {
     let (r, pos) = obj_header(b, off)?;
-    let mut lx = Lexer::new(b, pos);
+    let mut lx = Lexer::new(&b[..limit.clamp(pos, b.len())], pos);
     let save = lx.pos;
     let obj = match lx.next() {
         Tok::Kw(b"endobj") => return Some((r, Object::Null)),

@@ -565,6 +565,8 @@ pub(super) struct Type3 {
     pub matrix: M,
     pub procs: Vec<Option<Stream>>,
     pub res: Option<Dict>,
+    /// `res` resolved, once (each glyph resolved them again)
+    pub run_res: core::cell::OnceCell<Rc<super::Res>>,
 }
 
 pub(super) struct GFont {
@@ -594,7 +596,9 @@ fn strip_subset(name: &[u8]) -> String {
 }
 
 impl GFont {
-    pub fn load(doc: &Document, d: &Dict, subst: &mut dyn FnMut(&FontQuery) -> Option<Rc<Prog>>) -> GFont {
+    /// `embedded` opens an embedded program (FontFile*) of a kind, `subst` finds a substitute;
+    /// both share what they opened between fonts
+    pub fn load(doc: &Document, d: &Dict, embedded: &mut dyn FnMut(&Stream, u8) -> Option<Rc<Prog>>, subst: &mut dyn FnMut(&FontQuery) -> Option<Rc<Prog>>) -> GFont {
         let base = Rc::new(Font::load(doc, d));
         let sub = d.name("Subtype").unwrap_or(b"Type1").to_vec();
         let composite = sub == b"Type0";
@@ -628,12 +632,11 @@ impl GFont {
         // the embedded program
         let prog = [("FontFile", 1u8), ("FontFile2", 2), ("FontFile3", 3)].iter().find_map(|&(k, kind)| {
             let Object::Stream(s) = doc.key(&fd, k) else { return None };
-            let data = doc.decode(&s).ok()?;
             let kind = match (k, s.dict.name("Subtype")) {
                 ("FontFile3", Some(b"OpenType")) => 2,
                 _ => kind,
             };
-            Prog::open(data, 0, kind).map(Rc::new)
+            embedded(&s, kind)
         });
         let flags = doc.key(&fd, "Flags").as_int().unwrap_or(0);
         let symbolic = flags & 4 != 0;
@@ -873,7 +876,7 @@ impl GFont {
             })
             .collect();
         let res = d.get("Resources").map(|r| doc.dict(r));
-        Type3 { matrix, procs, res }
+        Type3 { matrix, procs, res, run_res: core::cell::OnceCell::new() }
     }
 
     /// the advance of a code when the reader's does not hold (a substitute's own)

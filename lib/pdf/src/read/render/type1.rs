@@ -21,7 +21,10 @@ const BUDGET: i32 = 100_000;
 pub(super) struct Type1 {
     data: Vec<u8>,
     len_iv: i32,
+    /// the subroutines: ranges in `data` while parsing, then in `subr_data`, decrypted once (a
+    /// glyph may call a long one thousands of times; each call copied and decrypted it)
     subrs: Vec<(usize, usize)>,
+    subr_data: Vec<u8>,
     glyphs: BTreeMap<Vec<u8>, (usize, usize)>,
     pub matrix: [f64; 6],
     /// the built-in encoding (None: StandardEncoding)
@@ -97,7 +100,7 @@ impl Type1 {
         };
         let data = decrypt(&enc, 55665);
         let data = data.get(4..)?.to_vec();
-        let mut t = Type1 { data, len_iv: 4, subrs: Vec::new(), glyphs: BTreeMap::new(), matrix: [0.001, 0.0, 0.0, 0.001, 0.0, 0.0], encoding: None };
+        let mut t = Type1 { data, len_iv: 4, subrs: Vec::new(), subr_data: Vec::new(), glyphs: BTreeMap::new(), matrix: [0.001, 0.0, 0.0, 0.001, 0.0, 0.0], encoding: None };
         t.clear_text(clear);
         t.private();
         (!t.glyphs.is_empty()).then_some(t)
@@ -216,6 +219,14 @@ impl Type1 {
             }
         }
         self.data = d;
+        let mut dec = Vec::new();
+        for i in 0..self.subrs.len() {
+            let cs = self.charstring(self.subrs[i]);
+            let s = dec.len();
+            dec.extend_from_slice(&cs);
+            self.subrs[i] = (s, dec.len());
+        }
+        self.subr_data = dec;
     }
 
     pub fn has(&self, name: &[u8]) -> bool {
@@ -379,9 +390,10 @@ impl St<'_, '_> {
                 }
                 10 => {
                     let i = self.stack.pop()? as i64;
-                    let r = *self.t.subrs.get(usize::try_from(i).ok()?)?;
-                    let sub = self.t.charstring(r);
-                    if self.run(&sub, depth + 1)? {
+                    let t = self.t;
+                    let r = *t.subrs.get(usize::try_from(i).ok()?)?;
+                    let sub = t.subr_data.get(r.0..r.1)?;
+                    if self.run(sub, depth + 1)? {
                         return Some(true);
                     }
                 }

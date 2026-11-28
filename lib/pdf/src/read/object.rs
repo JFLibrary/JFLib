@@ -5,6 +5,7 @@
 
 use alloc::collections::BTreeMap;
 use alloc::string::String;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::borrow::Borrow;
 
@@ -69,13 +70,22 @@ impl PartialEq<&str> for Name {
     }
 }
 
-/// a dictionary; a key given twice keeps its last value
+/// a dictionary; a key given twice keeps its last value.  Copies share their entries until one
+/// of them changes (inherited resources, the pages of a tree and the caches of drawing copy
+/// dictionaries freely; a hostile file must not turn that into memory without end)
 #[derive(Clone, Debug, PartialEq, Default)]
-pub struct Dict(pub(crate) BTreeMap<Name, Object>);
+pub struct Dict(pub(crate) Arc<BTreeMap<Name, Object>>);
 
 impl Dict {
     pub fn new() -> Dict {
-        Dict(BTreeMap::new())
+        Dict(Arc::new(BTreeMap::new()))
+    }
+    pub(crate) fn from_map(m: BTreeMap<Name, Object>) -> Dict {
+        Dict(Arc::new(m))
+    }
+    /// the entries to change (copied first when another Dict shares them)
+    pub(crate) fn map_mut(&mut self) -> &mut BTreeMap<Name, Object> {
+        Arc::make_mut(&mut self.0)
     }
     /// the value of a key (without the slash: "Type")
     pub fn get(&self, key: &str) -> Option<&Object> {
@@ -88,7 +98,7 @@ impl Dict {
         self.0.contains_key(key.as_bytes())
     }
     pub fn insert(&mut self, key: &str, value: Object) {
-        self.0.insert(Name(key.as_bytes().to_vec()), value);
+        self.map_mut().insert(Name(key.as_bytes().to_vec()), value);
     }
     pub fn len(&self) -> usize {
         self.0.len()
@@ -235,15 +245,23 @@ pub fn text_string(b: &[u8]) -> String {
     if b.len() >= 2 && (b[0] == 0xFE && b[1] == 0xFF || b[0] == 0xFF && b[1] == 0xFE) {
         let be = b[0] == 0xFE;
         let units = b[2..].chunks_exact(2).map(|c| if be { u16::from_be_bytes([c[0], c[1]]) } else { u16::from_le_bytes([c[0], c[1]]) });
-        let mut s: String = char::decode_utf16(units).map(|r| r.unwrap_or('\u{FFFD}')).collect();
-        // a language escape (ESC code ESC) inside UTF-16 is dropped
-        while let Some(i) = s.find('\u{1B}') {
-            match s[i + 1..].find('\u{1B}') {
-                Some(j) => s.replace_range(i..i + 1 + j + 1, ""),
-                None => break,
+        let s: String = char::decode_utf16(units).map(|r| r.unwrap_or('\u{FFFD}')).collect();
+        // a language escape (ESC code ESC) inside UTF-16 is dropped; an ESC without a second one
+        // stays with what follows.  One pass: a find and replace for each escape took quadratic
+        // time for a string of escapes
+        let Some(last) = s.rfind('\u{1B}') else { return s };
+        let mut out = String::with_capacity(s.len());
+        let mut skip = false;
+        for (i, ch) in s.char_indices() {
+            if ch == '\u{1B}' && (skip || i < last) {
+                skip = !skip;
+                continue;
+            }
+            if !skip {
+                out.push(ch);
             }
         }
-        return s;
+        return out;
     }
     if b.len() >= 3 && b[..3] == [0xEF, 0xBB, 0xBF] {
         return String::from_utf8_lossy(&b[3..]).into_owned();
