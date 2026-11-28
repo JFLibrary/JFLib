@@ -2,7 +2,6 @@
 // image 0; composing one onto another with the five combination operators (7.4.1.5)
 
 use crate::Error;
-use alloc::vec;
 use alloc::vec::Vec;
 
 #[derive(Clone, Debug, Default)]
@@ -15,13 +14,23 @@ pub(crate) struct Bmp {
 /// the largest number of pixels of one bitmap (the page, a region, a collective bitmap)
 pub(crate) const MAX_PIXELS: u64 = 1 << 30;
 
+/// `d` grown to n bytes of `fill`; Limit when the allocator refuses them.  The growth is amortized
+/// (a page of unknown height grows by a stripe at a time and must not be copied at every one)
+fn fill_to(d: &mut Vec<u8>, n: usize, fill: u8) -> Result<(), Error> {
+    d.try_reserve(n.saturating_sub(d.len())).map_err(|_| Error::Limit)?;
+    d.resize(n, fill);
+    Ok(())
+}
+
 impl Bmp {
     pub fn new(w: usize, h: usize, fill: u8, max: u64) -> Result<Bmp, Error> {
         let n = (w as u64).checked_mul(h as u64).ok_or(Error::Limit)?;
         if n > max.min(MAX_PIXELS) {
             return Err(Error::Limit);
         }
-        Ok(Bmp { w, h, d: vec![fill; n as usize] })
+        let mut d = Vec::new();
+        fill_to(&mut d, n as usize, fill)?;
+        Ok(Bmp { w, h, d })
     }
 
     #[inline(always)]
@@ -56,9 +65,9 @@ impl Bmp {
         }
     }
 
-    /// the part w x h at (x, y) (outside: 0)
-    pub fn sub(&self, x: i64, y: i64, w: usize, h: usize) -> Result<Bmp, Error> {
-        let mut b = Bmp::new(w, h, 0, MAX_PIXELS)?;
+    /// the part w x h at (x, y) (outside: 0), at most `max` pixels
+    pub fn sub(&self, x: i64, y: i64, w: usize, h: usize, max: u64) -> Result<Bmp, Error> {
+        let mut b = Bmp::new(w, h, 0, max)?;
         if w == 0 || h == 0 {
             return Ok(b);
         }
@@ -75,10 +84,11 @@ impl Bmp {
         if h <= self.h {
             return Ok(());
         }
-        if (self.w as u64).saturating_mul(h as u64) > max.min(MAX_PIXELS) {
+        let n = (self.w as u64).saturating_mul(h as u64);
+        if n > max.min(MAX_PIXELS) {
             return Err(Error::Limit);
         }
-        self.d.resize(self.w * h, fill);
+        fill_to(&mut self.d, n as usize, fill)?;
         self.h = h;
         Ok(())
     }

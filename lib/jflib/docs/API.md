@@ -77897,10 +77897,14 @@ each intermediate, immediate or lossless; the combination operators OR, AND, XOR
 REPLACE.  The file organisations sequential and random-access.
 
 Not here: colour (JBIG2 Amendment 3: colour palettes and coloured regions are ignored, the page
-stays bilevel), extension segments.  A damaged segment ends the page with what was decoded
-before it; limits (`Options::max_pixels`, symbol counts, the work of a stream) refuse hostile
-files before they cost memory or time, and symbol dictionaries and text regions stop where their
-arithmetic data has run out (mq.rs).
+stays bilevel), extension segments.  The segments are decoded once, in their order: the global
+ones where they stand, a page's onto the page their association names (a file's pages may
+interleave; PDF's embedded form has one page).  A damaged segment ends its page with what was
+decoded before it and that page's further segments are left out; the global ones and the other
+pages go on.  Limits (`Options::max_pixels`, symbol counts, the work of a stream: its pages' and
+regions' pixels, at most four times `max_pixels` plus 2^22) refuse hostile files before they
+cost memory or time, and symbol dictionaries and text regions stop where their arithmetic data
+has run out (mq.rs).
 ```
 
 ### `img_jbig2` crate root
@@ -77911,7 +77915,7 @@ arithmetic data has run out (mq.rs).
   - `Truncated` -- the data ends early
   - `Corrupt` -- a segment that breaks the standard
   - `Unsupported` -- valid, but not decoded here
-  - `Limit` -- larger than the limits allow
+  - `Limit` -- larger than the limits allow (or than the memory the allocator gives)
   - `NoPage` -- no page in the data
 
 - **`struct Options`**
@@ -77937,7 +77941,9 @@ arithmetic data has run out (mq.rs).
   PDF's JBIG2Decode: the embedded segments (and those of JBIG2Globals) -> the first page
 
 - **`fn decode_file(data: &[u8], opt: &Options) -> Result<Vec<Bitmap>, Error>`**
-  a JBIG2 file (sequential or random-access) -> its pages
+  a JBIG2 file (sequential or random-access) -> its pages, in the order of their page information
+  segments; one budget of work for the file (four times `Options::max_pixels` plus 2^22): the
+  pages past it are left out
 
 - **`static CODEC: Codec`**
   jbig2_codec: the first page of a JBIG2 file as 8-bit ARGB (black on white)

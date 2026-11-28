@@ -31,10 +31,14 @@ is written from the standard, not ported from another decoder.
   - the default pixel, and the combination operators OR, AND, XOR, XNOR and REPLACE
 - **Files:** sequential and random-access organisation, every page.
 
-A damaged segment ends the page with what was decoded before it. Limits on the pixels and on the
-work of a stream refuse hostile data before it costs memory or time, and a symbol dictionary or
-text region whose arithmetic data has run out stops there (a bitmap's last rows may come from the
-fill: encoders may leave out the bytes at the end that equal it).
+The segments are decoded once, in their order: the global ones where they stand, a page's onto
+the page its association names (a file's pages may interleave). A damaged segment ends its page
+with what was decoded before it; the global segments and the other pages go on. Limits on the
+pixels and on the work of a stream (the pixels of its pages and regions, at most four times
+`max_pixels` plus 2^22) refuse hostile data before it costs memory or time; `decode_file` leaves
+out the pages past them. A
+symbol dictionary or text region whose arithmetic data has run out stops there (a bitmap's last
+rows may come from the fill: encoders may leave out the bytes at the end that equal it).
 
 Not decoded: colour (JBIG2 Amendment 3's palettes and coloured regions are ignored; the page stays
 bilevel) and extension segments.
