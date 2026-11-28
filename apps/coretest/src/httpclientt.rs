@@ -468,6 +468,14 @@ fn https_redirects(t: &mut T) {
     let at = |p: &str| u(&format!("https://localhost:{}{}", srv.local_addr().port, p));
     t.check("https redirects: from https to http refused", matches!(c.get(&at("/down"), &Headers::new()), Err(HttpError::Redirect(ref s)) if s.contains("https to http")));
     t.check("https redirects: within https", matches!(c.get(&at("/up"), &Headers::new()), Ok(ref r) if r.body_bytes() == b"fine"));
+    let asked = Arc::new(AtomicU32::new(0));
+    let a2 = asked.clone();
+    let stay = c.clone().with_redirect_check(Arc::new(move |_: &Url, _: &Url| {
+        a2.fetch_add(1, SeqCst);
+        false
+    }));
+    t.check("https redirects: the check is asked first, also before a refused downgrade (false: the 302)",
+        matches!(stay.get(&at("/down"), &Headers::new()), Ok(ref r) if r.status == 302) && asked.load(SeqCst) == 1);
     srv.stop();
     plain.stop();
 }
@@ -682,10 +690,201 @@ fn deadline(t: &mut T) {
     let r = c.get(&srv.url("/stall"), &Headers::new());
     let ms = (plat::time_us() - t0) / 1000;
     t.check(&format!("deadline: a body that stops ends at the deadline, not the read timeout ({ms} ms)"), matches!(r, Err(HttpError::Net(ref e)) if e.kind == NetErrorKind::TimedOut) && ms < 2000);
+    deadline_tls(t);
+    deadline_handshake(t, srv.port);
+    deadline_write(t);
+    tls_read_in_pieces(t);
     let t0 = plat::time_us();
     let r = Client::new().get(&srv.url("/interim"), &Headers::new());
     let ms = (plat::time_us() - t0) / 1000;
     t.check(&format!("deadline: interim answers without end stop after 16 ({ms} ms)"), r.err() == Some(HttpError::Bad) && ms < 4000);
+}
+
+/// a server's stream that, once `slow`, writes four bytes every 100 ms (a TLS record in pieces)
+struct Drip {
+    tcp: TcpStream,
+    slow: Arc<AtomicBool>,
+}
+
+impl netio::Stream for Drip {
+    fn read(&self, b: &mut [u8]) -> plat::net::NetResult<usize> {
+        self.tcp.read(b)
+    }
+    fn write_all(&self, b: &[u8]) -> plat::net::NetResult<()> {
+        if !self.slow.load(SeqCst) {
+            return self.tcp.write_all(b);
+        }
+        for piece in b.chunks(4) {
+            self.tcp.write_all(piece)?;
+            plat::sleep_ms(100);
+        }
+        Ok(())
+    }
+    fn set_timeouts(&self, r: Option<u32>, w: Option<u32>) {
+        self.tcp.set_read_timeout(r);
+        self.tcp.set_write_timeout(w);
+    }
+    fn wait_readable(&self, ms: u32) -> bool {
+        self.tcp.wait_readable(ms).unwrap_or(true)
+    }
+}
+
+// over TLS: the head at once, then after 700 ms a body record that takes seconds to arrive; the
+// read that waits on it ends at the deadline (1 s), not a timeout later
+fn deadline_tls(t: &mut T) {
+    let p = crate::tlst::pki(53);
+    let scfg = netio::tls::ServerConfig::new(p.server.clone());
+    let Ok(l) = TcpListener::bind(&SocketAddr::new(IpAddr::LOCALHOST_V4, 0)) else { return t.check("deadline tls: server", false) };
+    let Ok(port) = l.local_addr().map(|a| a.port) else { return t.check("deadline tls: server", false) };
+    let th = plat::thread_spawn(0, Box::new(move || {
+        let Ok(Some((tcp, _))) = l.accept_timeout(5000) else { return };
+        tcp.set_read_timeout(Some(5000));
+        tcp.set_write_timeout(Some(5000));
+        let slow = Arc::new(AtomicBool::new(false));
+        let Ok(s) = netio::tls::accept(Box::new(Drip { tcp, slow: slow.clone() }), scfg) else { return };
+        if Reader::new(&s).head().is_err() {
+            return;
+        }
+        let _ = netio::Stream::write_all(&s, b"HTTP/1.1 200 OK\r\nContent-Length: 200\r\n\r\n");
+        plat::sleep_ms(700);
+        slow.store(true, SeqCst);
+        let _ = netio::Stream::write_all(&s, &[b'x'; 200]);
+    }));
+    if th.is_none() {
+        return t.check("deadline tls: server", false);
+    }
+    let ca = p.ca.clone();
+    let mut c = Client::new().with_connector(Arc::new(move |url: &Url, tcp: TcpStream| {
+        let cfg = netio::tls::ClientConfig::new(netio::tls::Trust::Anchors(vec![ca.clone()]), &url.host);
+        netio::tls::connect(Box::new(tcp), cfg).map(|s| Box::new(s) as Box<dyn netio::Stream>).map_err(|e| HttpError::Tls(format!("{}", e)))
+    }));
+    c.timeout_ms = 10_000;
+    c.deadline_ms = 1000;
+    let t0 = plat::time_us();
+    let r = c.get(&u(&format!("https://127.0.0.1:{}/", port)), &Headers::new());
+    let ms = (plat::time_us() - t0) / 1000;
+    t.check(&format!("deadline: a TLS record in pieces ends at the deadline ({ms} ms)"), matches!(r, Err(HttpError::Net(ref e)) if e.kind == NetErrorKind::TimedOut) && ms < 1400);
+}
+
+// a connector that fails after `ms`: past the deadline (300 ms) that is TimedOut, in time the
+// connector's own error
+fn deadline_handshake(t: &mut T, port: u16) {
+    let fails_after = |ms: u32| {
+        let mut c = Client::new().with_connector(Arc::new(move |_: &Url, _: TcpStream| -> Result<Box<dyn netio::Stream>, HttpError> {
+            plat::sleep_ms(ms);
+            Err(HttpError::Tls(String::from("refused")))
+        }));
+        c.timeout_ms = 10_000;
+        c.deadline_ms = 300;
+        c.get(&u(&format!("https://127.0.0.1:{}/", port)), &Headers::new())
+    };
+    let r = fails_after(600);
+    t.check("deadline: a handshake that fails past the deadline is TimedOut", matches!(r, Err(HttpError::Net(ref e)) if e.kind == NetErrorKind::TimedOut));
+    let r = fails_after(0);
+    t.check("deadline: one that fails in time keeps its error", matches!(r, Err(HttpError::Tls(ref m)) if m == "refused"));
+}
+
+// a server that takes the connection and reads nothing: a body larger than the sockets' buffers
+// is not written by the deadline, and the request is TimedOut (not Reset)
+fn deadline_write(t: &mut T) {
+    let Ok(l) = TcpListener::bind(&SocketAddr::new(IpAddr::LOCALHOST_V4, 0)) else { return t.check("deadline write: server", false) };
+    let Ok(port) = l.local_addr().map(|a| a.port) else { return t.check("deadline write: server", false) };
+    let th = plat::thread_spawn(0, Box::new(move || {
+        let Ok(Some((tcp, _))) = l.accept_timeout(5000) else { return };
+        plat::sleep_ms(3000);
+        drop(tcp);
+    }));
+    if th.is_none() {
+        return t.check("deadline write: server", false);
+    }
+    let mut c = Client::new();
+    c.timeout_ms = 10_000;
+    c.deadline_ms = 500;
+    let body = vec![b'x'; 64 << 20];
+    let t0 = plat::time_us();
+    let r = c.request("POST", &u(&format!("http://127.0.0.1:{}/", port)), &Headers::new(), &body);
+    let ms = (plat::time_us() - t0) / 1000;
+    t.check(&format!("deadline: a write that runs out of time is TimedOut ({ms} ms)"), matches!(r, Err(HttpError::Net(ref e)) if e.kind == NetErrorKind::TimedOut) && ms < 2000);
+}
+
+/// a client's stream whose wait_readable does not wait (the trait's own): only its read
+/// timeout bounds a read
+struct NoWait(TcpStream);
+
+impl netio::Stream for NoWait {
+    fn read(&self, b: &mut [u8]) -> plat::net::NetResult<usize> {
+        self.0.read(b)
+    }
+    fn write_all(&self, b: &[u8]) -> plat::net::NetResult<()> {
+        self.0.write_all(b)
+    }
+    fn set_timeouts(&self, r: Option<u32>, w: Option<u32>) {
+        self.0.set_read_timeout(r);
+        self.0.set_write_timeout(w);
+    }
+}
+
+/// a server's stream that, once `split`, writes the first 10 bytes of its next write, then the
+/// rest 900 ms later
+struct Split {
+    tcp: TcpStream,
+    split: Arc<AtomicBool>,
+}
+
+impl netio::Stream for Split {
+    fn read(&self, b: &mut [u8]) -> plat::net::NetResult<usize> {
+        self.tcp.read(b)
+    }
+    fn write_all(&self, b: &[u8]) -> plat::net::NetResult<()> {
+        if !self.split.swap(false, SeqCst) {
+            return self.tcp.write_all(b);
+        }
+        let (a, rest) = b.split_at(b.len().min(10));
+        self.tcp.write_all(a)?;
+        plat::sleep_ms(900);
+        self.tcp.write_all(rest)
+    }
+    fn set_timeouts(&self, r: Option<u32>, w: Option<u32>) {
+        self.tcp.set_read_timeout(r);
+        self.tcp.set_write_timeout(w);
+    }
+    fn wait_readable(&self, ms: u32) -> bool {
+        self.tcp.wait_readable(ms).unwrap_or(true)
+    }
+}
+
+// TLS over a stream that does not wait: a record's first bytes after 700 ms, the rest 900 ms
+// later; a read with a timeout of 1 s ends at it, not with the record at 1.6 s
+fn tls_read_in_pieces(t: &mut T) {
+    let p = crate::tlst::pki(53);
+    let scfg = netio::tls::ServerConfig::new(p.server.clone());
+    let Ok(l) = TcpListener::bind(&SocketAddr::new(IpAddr::LOCALHOST_V4, 0)) else { return t.check("tls in pieces: server", false) };
+    let Ok(port) = l.local_addr().map(|a| a.port) else { return t.check("tls in pieces: server", false) };
+    let th = plat::thread_spawn(0, Box::new(move || {
+        let Ok(Some((tcp, _))) = l.accept_timeout(5000) else { return };
+        tcp.set_read_timeout(Some(5000));
+        tcp.set_write_timeout(Some(5000));
+        let split = Arc::new(AtomicBool::new(false));
+        let Ok(s) = netio::tls::accept(Box::new(Split { tcp, split: split.clone() }), scfg) else { return };
+        plat::sleep_ms(700);
+        split.store(true, SeqCst);
+        let _ = netio::Stream::write_all(&s, &[b'x'; 200]);
+        plat::sleep_ms(500);
+    }));
+    if th.is_none() {
+        return t.check("tls in pieces: server", false);
+    }
+    let Ok(tcp) = TcpStream::connect(&SocketAddr::new(IpAddr::LOCALHOST_V4, port), 3000) else { return t.check("tls in pieces: connect", false) };
+    tcp.set_read_timeout(Some(5000));
+    tcp.set_write_timeout(Some(5000));
+    let cfg = netio::tls::ClientConfig::new(netio::tls::Trust::Anchors(vec![p.ca.clone()]), "127.0.0.1");
+    let Ok(s) = netio::tls::connect(Box::new(NoWait(tcp)), cfg) else { return t.check("tls in pieces: handshake", false) };
+    netio::Stream::set_timeouts(&s, Some(1000), Some(5000));
+    let mut buf = [0u8; 256];
+    let t0 = plat::time_us();
+    let r = netio::Stream::read(&s, &mut buf);
+    let ms = (plat::time_us() - t0) / 1000;
+    t.check(&format!("tls: a record in pieces over a stream that does not wait ends at the read timeout ({ms} ms)"), matches!(r, Err(ref e) if e.kind == NetErrorKind::TimedOut) && ms < 1400);
 }
 
 // ------------------------------------------------------------------ proxies at work
