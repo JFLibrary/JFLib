@@ -1,4 +1,4 @@
-# External test suites -- Wycheproof, ACVP, x509-limbo, tlsfuzzer, TLS-Anvil, Pebble, Brotli's test data, SerenityOS's images
+# External test suites -- Wycheproof, ACVP, x509-limbo, tlsfuzzer, TLS-Anvil, Pebble, Brotli's test data, http-state, SerenityOS's images
 
 Four adversarial suites that found bugs in OpenSSL, Go, Java, BouncyCastle, GnuTLS, NSS and
 others, and NIST's conformance vectors (ACVP, which FIPS validations are tested with), run
@@ -19,6 +19,7 @@ python tools/tlsanvil_check.py        # TLS-Anvil @ c1762f4 (Temurin 21, Maven 3
 python tools/tlsanvil_check.py --server   # ... netio's TLS 1.3 server (RSA certificate)
 python tools/pebble_check.py          # Pebble v2.10.1 (Let's Encrypt's ACME test server; 7 MB): netio::acme
 python tools/brotli_check.py --vectors   # google/brotli @ 717514a67b3f: tests/testdata without bb.binast, 3.4 MB
+python tools/cookie_check.py          # abarth/http-state @ 155e45c6168e: 222 cookie tests (28 KB) through netio's client
 python tools/jp2_check.py             # SerenityOS @ 835d22663feb: its JPEG 2000 test images (49 files, 1.4 MB): lib/img_jp2
 python tools/jbig2_check.py           # SerenityOS @ 835d22663feb: its JBIG2 test files (111 + 5 images, 2.4 MB): lib/img_jbig2
 ```
@@ -40,6 +41,7 @@ tlsfuzzer and TLS-Anvil talk to `coretest` over TCP (sections below).
 | TLS-Anvil (server) | 289 tests | 123 | 0 | 166 | 9 min |
 | Pebble (ACME) | 29 checks | 29 | 0 | 0 | 40 s |
 | Brotli's test data (2026-11-27) | 45 streams, 23 originals | 68 | 0 | 0 | 26 s |
+| http-state cookies (2026-11-28) | 222 | 217 | 0 (5 known) | 0 | 9 s |
 
 Not one primitive in `lib/crypto` failed. The 15 Wycheproof failures of the first run were all
 in netio's DER decoding of ECDSA signatures and are fixed (below). The limbo failures that changed what netio accepts (17 in
@@ -442,6 +444,36 @@ at a pinned commit (`tools/suite_fetch.py`). It leaves out `bb.binast`, an encod
 
 All pass. The streams are also seeds of the fuzz targets `brotli` and `stream_brotli`:
 `tools/net_fuzz.py` copies them into its seed folder once they have been fetched.
+
+## http-state's cookie tests
+
+`python tools/cookie_check.py` takes the parser tests of abarth/http-state, the suite Adam Barth
+wrote with RFC 6265 and the browsers took up (`tests/data/parser`, 222 cases of 2011 to 2017,
+fetched at a pinned commit with `tools/suite_fetch.py`). Each case runs the way http-state's own
+server has it: a fresh netio `Client` with a cookie jar (`netpkt::cookie` with the public suffix
+list) asks for `http://home.example.org:8888/cookie-parser?NAME`, gets a 302 with the case's
+Set-Cookie lines, follows it to `/cookie-parser-result?NAME` (or the case's own Location, other
+paths and names included), and the Cookie header that arrives there must be the case's. The
+server in the tool is that test server run as the client's HTTP proxy (requests in absolute
+form), so the suite's host names need no `/etc/hosts`; each case goes through `coretest
+--http-get URL --proxy .. --redirects 5 --cookies`. So one run tests the jar, the redirects and
+the proxy of the client together.
+
+217 cases pass. The first run had 11 differences, of which:
+
+- **2 were a bug, fixed**: `Domain=home.example.org.` (and `..`), a Domain with a dot at the
+  end, was taken for the host; RFC 6265 5.2.3 takes off a leading dot only, so such a Domain
+  matches no host and the cookie goes (domain0014, domain0015).
+- **4 were the tool's**: Python's `http.server` reads header lines as Latin-1, the client had sent
+  the UTF-8 of the charset cases correctly.
+- **5 are known** (`KNOWN` in the tool, each with its reason): three cookies expire in 2019, a
+  date that has passed since the suite was written (0002, comma0006, comma0007); two cases the
+  suite has disabled itself, because browsers part there: `%6F` in a request path is not
+  decoded for path matching (disabled-path0029, RFC 6265 5.1.4 compares the paths as written),
+  and a NUL in a header line makes netio refuse the whole answer (disabled-chromium0022; RFC 9110
+  5.5 allows rejecting such a field).
+
+A known case that comes out right is reported as well, so the list stays true.
 
 ## Pebble
 

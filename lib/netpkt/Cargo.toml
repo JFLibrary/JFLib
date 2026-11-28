@@ -4,7 +4,8 @@ description = "Network packets byte for byte: addresses, checksums, header codec
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-license.workspace = true
+# psl_data.rs is the Public Suffix List (MPL-2.0, licenses/PSL-LICENSE.txt)
+license = "(MIT OR Apache-2.0) AND MPL-2.0"
 repository.workspace = true
 homepage.workspace = true
 

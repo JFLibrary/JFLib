@@ -93,6 +93,8 @@
 //   cookie    SetCookie::parse, parse_date, domain_match, path_match, default_path, site_of; Jar:
 //             store, header, matching, script_text, purge, drop_session; SameSite as far as a small
 //             browser needs it; the time comes from the caller          (RFC 6265, 6265bis)
+//   psl       the Public Suffix List: public_suffix, registrable_domain, is_public_suffix (the
+//             list as a table, psl_data.rs, MPL-2.0; tools/psl_gen.py makes it)  (publicsuffix.org)
 //   x509      certificates: the crate jflib-x509 (netio's as well), CertSpec as its builder's
 //             earlier name, check_chain: what is wrong with a chain as fault bits for dialogs
 //             signed_by, check_chain with F_* faults; no clock; uses crate crypto  (RFC 5280, 8410)
@@ -149,6 +151,7 @@ pub mod snmpv3;
 pub mod eap;
 pub mod imap;
 pub mod cookie;
+pub mod psl;
 pub mod x509;
 pub mod tls;
 

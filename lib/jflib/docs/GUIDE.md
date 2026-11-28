@@ -2802,7 +2802,13 @@ crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)
   the stream's read timeout too.
 * `netio::Client` / `client::Session` -- requests with timeouts and size limits, kept-alive
   sessions; `with_connector(netio::trust::connector(..))` for https to a server with its own CA
-  (a CA file, a pinned fingerprint, or trust on first use).
+  (a CA file, a pinned fingerprint, or trust on first use). Bodies in gzip and br are asked for
+  and decoded by default (`decode`; also zstd and deflate, `max_body` after decoding); the rest
+  is switched on: `with_redirects(n)` (never from https to http; credentials stay with their
+  origin; `fetch` gives the last URL), `with_cookies(jar)` (`netpkt::cookie::Jar`, the public
+  suffix list deciding which Domain a site may set), `with_pool(Pool::new())` (keep-alive),
+  `with_proxy(netio::proxy::Proxy::from_env()?)` (HTTP proxies and CONNECT tunnels, NO_PROXY),
+  `deadline_ms` for a whole request.
 * `netio::tls` -- TLS 1.3 servers and clients (ChaCha20-Poly1305, AES-GCM; X25519MLKEM768,
   X25519, P-256, P-384; Ed25519, ECDSA and RSA certificates and keys, mutual authentication),
   certificates by SNI (`ServerConfig::identities`, `select`), ALPN (`ClientConfig::alpn`,

@@ -23,6 +23,10 @@ plat.workspace = true
 crypto.workspace = true
 x509.workspace = true
 formats.workspace = true
+# the stream decoders of Content-Encoding
+compress.workspace = true
+# the cookie jar (with the public suffix list)
+netpkt.workspace = true
 
 # docs.rs: Windows, Linux and Android (plat has no network in the browser), not docs.rs's five defaults
 [package.metadata.docs.rs]

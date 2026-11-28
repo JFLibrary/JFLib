@@ -39,6 +39,7 @@ mod dnsmsgt;
 mod dnst;
 mod dt;
 mod httpt;
+mod httpclientt;
 mod charsett;
 mod jmapt;
 mod xmlt;
@@ -176,6 +177,7 @@ fn run() -> i32 {
         ("plat", Some(platx::run)),
         ("datastore", Some(store::run)),
         ("http", Some(httpt::run)),
+        ("httpclient", Some(httpclientt::run)),
         ("cas", Some(cast::run)),
         ("tls", Some(tlst::run)),
         ("tlsweb", Some(tlsweb::run)),
@@ -258,6 +260,9 @@ fn server_modes(args: &[String]) -> Option<i32> {
     }
     if args.iter().any(|a| a == "--ocsp-tool") {
         return Some(ocspt::tool(args));
+    }
+    if let Some(u) = plat::arg_value("--http-get") {
+        return Some(httpclientt::get_mode(&u));
     }
     if let Some(u) = plat::arg_value("--tls-web") {
         return Some(tlst::web(&u, plat::arg_value("--ca").as_deref()));

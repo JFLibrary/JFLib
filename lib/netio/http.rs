@@ -313,8 +313,8 @@ impl<'a> Reader<'a> {
         self.got = 0;
     }
 
-    /// reads fail with TimedOut once plat::time_us() is past this (a limit for a whole head,
-    /// where the stream's timeout counts each read)
+    /// reads fail with TimedOut once plat::time_us() is past this, and a read waits for bytes
+    /// only until then (a limit for a whole head, where the stream's timeout counts each read)
     pub fn set_deadline(&mut self, deadline_us: Option<u64>) {
         self.deadline_us = deadline_us;
     }
@@ -337,8 +337,12 @@ impl<'a> Reader<'a> {
             self.buf.clear();
             self.pos = 0;
         }
-        if self.deadline_us.is_some_and(|d| plat::time_us() > d) {
-            return Err(NetError::new(NetErrorKind::TimedOut, 0));
+        if let Some(d) = self.deadline_us {
+            // a read starts only with bytes there before the deadline (not a stream timeout later)
+            let left = d.saturating_sub(plat::time_us()) / 1000;
+            if left == 0 || !self.s.wait_readable(left.min(u32::MAX as u64) as u32) {
+                return Err(NetError::new(NetErrorKind::TimedOut, 0));
+            }
         }
         if let Some((t0, grace, r)) = self.rate {
             if plat::time_us() > t0 + grace + self.got.saturating_mul(1_000_000) / r {
@@ -448,8 +452,11 @@ impl<'a> Reader<'a> {
     /// the body like body(), but each piece goes to `sink` as it arrives (downloads of any
     /// size); `sink` returning false stops reading with Err(Bad) -> the number of body bytes
     pub fn body_to(&mut self, h: &Headers, max: u64, until_close: bool, sink: &mut dyn FnMut(&[u8]) -> bool) -> Result<u64, ReadError> {
-        if let Some(te) = h.get("transfer-encoding") {
-            if !te.trim().eq_ignore_ascii_case("chunked") {
+        if h.get("transfer-encoding").is_some() {
+            // chunked and only chunked, over all Transfer-Encoding lines: another coding (or
+            // chunked twice) would leave the length to whoever reads it differently
+            let mut codings = h.0.iter().filter(|(k, _)| k.eq_ignore_ascii_case("transfer-encoding")).flat_map(|(_, v)| v.split(',')).map(str::trim).filter(|c| !c.is_empty());
+            if !codings.next().is_some_and(|c| c.eq_ignore_ascii_case("chunked")) || codings.next().is_some() {
                 return Err(ReadError::Bad);
             }
             let mut total: u64 = 0;
@@ -521,9 +528,11 @@ fn head_bytes(start: &str, h: &Headers) -> Vec<u8> {
     let mut s = String::with_capacity(256);
     s.push_str(start);
     s.push_str("\r\n");
+    let token = |b: u8| b.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&b);
     for (k, v) in &h.0 {
-        // no header injection: values with CR / LF are dropped
-        if v.contains(['\r', '\n']) || k.contains(['\r', '\n', ':']) {
+        // no header injection: a name that is not a token, a value with a control character
+        // (CR, LF, NUL; a tab is fine) is dropped
+        if k.is_empty() || !k.bytes().all(token) || v.bytes().any(|b| (b < b' ' && b != b'\t') || b == 0x7f) {
             continue;
         }
         s.push_str(k);
