@@ -20,6 +20,7 @@ python tools/tlsanvil_check.py --server   # ... netio's TLS 1.3 server (RSA cert
 python tools/pebble_check.py          # Pebble v2.10.1 (Let's Encrypt's ACME test server; 7 MB): netio::acme
 python tools/brotli_check.py --vectors   # google/brotli @ 717514a67b3f: tests/testdata without bb.binast, 3.4 MB
 python tools/jp2_check.py             # SerenityOS @ 835d22663feb: its JPEG 2000 test images (49 files, 1.4 MB): lib/img_jp2
+python tools/jbig2_check.py           # SerenityOS @ 835d22663feb: its JBIG2 test files (111 + 5 images, 2.4 MB): lib/img_jbig2
 ```
 
 Wycheproof, ACVP and limbo turn each case into a `coretest --vectors` line (the operations are
@@ -502,3 +503,41 @@ How each file is checked:
 
 The same tool also checks 284 decodes of files OpenJPEG writes here, img_all's codec, 6000 damaged
 copies and the speed of a large page. Those need no download.
+
+## SerenityOS's JBIG2 files
+
+SerenityOS keeps the JBIG2 files its own decoder is tested with in
+`Tests/LibGfx/test-inputs/jbig2` (BSD-2-Clause). `tools/jbig2_check.py` fetches all 111, five of the
+reference images in `json/` and the licence once, at commit 835d22663feb, into
+`build/vectors/serenity-835d22663feb/`. They cover:
+
+- **Generic regions:** every template, adaptive pixels and TPGDON, MMR.
+- **Refinement:** both templates, with TPGRON.
+- **Symbol dictionaries and text regions:**
+  - arithmetic and Huffman coding: standard tables, custom ones, 262 144 symbols
+  - refinement and aggregate coding, retained contexts
+  - every reference corner, transposed or not
+- **Halftones:** with skip, at angles, with 10 bits per pixel.
+- **Pages:** stripes and pages of unknown height, every combination operator.
+- **Files:** the random-access organisation, and the example of Annex H.
+
+Each file is checked against jbig2dec (through Ghostscript) and Poppler (`pdfimages`), with its
+first page embedded in a PDF the way PDF embeds JBIG2. JBIG2 is lossless, so ours must equal
+theirs bit for bit.
+
+The two do not always agree:
+
+- **Ghostscript** draws a blank page for 26 files (refinement regions, refined Huffman text
+  regions, retained contexts) and decodes 4 others differently.
+- **Poppler** draws a blank page for 8 files (halftones with skip, two Huffman tables) and decodes
+  12 others differently.
+
+In each of those cases ours equals the other decoder or SerenityOS's reference image. Ghostscript
+and Poppler never agree against ours.
+
+| Files | Pass | Fail |
+| --- | ---: | ---: |
+| 111 | 111 | 0 |
+
+The same PDFs drawn by lib/pdf equal the decode. Four files go through img_all, and 8000 damaged
+copies decode without a crash.

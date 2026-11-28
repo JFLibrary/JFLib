@@ -163,6 +163,9 @@ impl Dec<'_> {
         let mut a0: i64 = -1;
         let mut black = false;
         let mut guard = 0u32;
+        // the first change on the reference line right of a0: a0 only grows, so the search goes on
+        // from where it stood (a row costs its changes, not their square)
+        let mut k = 0usize;
         while a0 < cols as i64 {
             guard += 1;
             if guard > 4 * cols + 64 {
@@ -170,8 +173,11 @@ impl Dec<'_> {
             }
             // b1: the first change on the reference line right of a0 that starts the other
             // colour (even indices start black runs), b2 the one after it
-            let mut i = 0usize;
-            while i < refl.len() && ((refl[i] as i64) <= a0 || (i % 2 == 1) != black) {
+            while k < refl.len() && (refl[k] as i64) <= a0 {
+                k += 1;
+            }
+            let mut i = k;
+            while i < refl.len() && (i % 2 == 1) != black {
                 i += 1;
             }
             let b1 = refl.get(i).copied().unwrap_or(cols) as i64;

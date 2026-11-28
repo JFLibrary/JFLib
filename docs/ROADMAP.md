@@ -2653,7 +2653,7 @@ Grundbausteine am falschen Ort oder mehrfach:
 
 Crates, die einer JF-App folgen:
 
-- **P2** · *teilweise* (2026-11-23, U15 und U16; 2026-11-26, U19) · `pdf`: Lesen ist da ([`pdf/src/read/`](../lib/pdf/src/read/mod.rs),
+- **P2** · *teilweise* (2026-11-23, U15 und U16; 2026-11-26, U19; 2026-11-27, U20) · `pdf`: Lesen ist da ([`pdf/src/read/`](../lib/pdf/src/read/mod.rs),
   `pdf::read::Document`). PDF 1.0 bis 2.0 mit klassischen Tabellen, Querverweis- und Objektströmen,
   inkrementellen Updates und hybriden Dateien; beschädigte, abgeschnittene und Dateien ohne Tabelle
   werden aus ihren Objekten neu aufgebaut. Verschlüsselung mit dem Standard-Handler (RC4 40 bis
@@ -2687,7 +2687,8 @@ Crates, die einer JF-App folgen:
   eingebettete Schriften aus einer `FontSource` (vorgegeben: die Schriften des Systems, für die 14
   Standardschriften die metrisch gleichen Familien), alle Render-Modi, Glyphen auf Viertelpixeln
   und je Dokument gecacht. Bilder aller Bittiefen und Farbräume mit Decode, Masken aller Arten,
-  JPEG, CCITT Gruppe 3 und 4 (ein eigener Decoder) und JPEG 2000 (U19, siehe unten), verkleinert
+  JPEG, CCITT Gruppe 3 und 4 (ein eigener Decoder), JPEG 2000 (U19) und JBIG2 (U20, beide siehe
+  unten), verkleinert
   gemittelt; Shadings aller
   sieben Typen, Kachelmuster farbig und ungefärbt; Alpha, die 16 Mischmodi, weiche Masken,
   Transparenzgruppen; Anmerkungen über ihre Erscheinungsbilder; Optional Content. Die Arbeit
@@ -2722,7 +2723,32 @@ Crates, die einer JF-App folgen:
     - 6000 beschädigte Kopien ohne Absturz
     - eine Seite von 2500 × 3500 in 0,50 s (OpenJPEG 0,37 s)
 
-  Offen: JBIG2-Bilder (U20), Knockout- und nicht
+
+  JBIG2 (U20): Die neue Crate [`img_jbig2`](../lib/img_jbig2/src/lib.rs) ist ein eigener Decoder
+  nach ITU-T T.88.
+  - **Was sie liest:** die eingebettete Form von PDF mit `JBIG2Globals` und JBIG2-Dateien
+    (sequenziell und mit wahlfreiem Zugriff, alle Seiten).
+  - **Umfang:**
+    - generische Regionen: MMR und die Vorlagen 0 bis 3 mit AT-Pixeln und TPGDON
+    - Verfeinerung mit TPGRON
+    - Symbolwörterbücher und Textregionen, arithmetisch und Huffman (die Standardtabellen und
+      eigene), mit Verfeinerung, Aggregat und behaltenen Kontexten
+    - Muster und Halbtöne
+    - Streifen und Seiten unbekannter Höhe, alle Kombinationsoperatoren
+  - **In img_all:** als `IMGF_JBIG2`.
+  - **In pdf:** zeichnet `JBIG2Decode`, auch als Maske.
+  - **Geprüft** mit `tools/jbig2_check.py` gegen die 111 Testdateien von SerenityOS:
+    - jede bitgenau wie jbig2dec (über Ghostscript) und Poppler (`pdfimages`), oder, wo einer der
+      beiden sie leer oder anders zeichnet, wie der andere bzw. das Referenzbild von SerenityOS
+    - jede in einem PDF auch von pdf selbst gezeichnet
+    - 8000 beschädigte Kopien ohne Absturz, keine langsamer als 0,5 s; dafür hat ein Datenstrom
+      ein Arbeitsbudget von viermal `max_pixels`, und Symbolwörterbücher und Textregionen enden,
+      wo ihre arithmetischen Daten aufgebraucht sind (vorher brauchte eine Kopie mit zu vielen
+      Symbolen bei den Standardoptionen 30 s)
+  - **Behoben** im CCITT-Decoder von pdf: Er suchte den Bezugspunkt einer Zeile vom Zeilenanfang
+    an, was mit vielen Wechseln quadratisch wurde.
+
+  Offen: Knockout- und nicht
   isolierte Gruppen (wie isolierte gezeichnet), Überdrucken, ICC-Profile (wie ihre Gerätefarben),
   Formulare ausfüllen und schreiben, Verschlüsselung, PDF/A und Signaturen beim Schreiben,
   Signaturen prüfen, die vordefinierten CMaps Ostasiens außer Identity und den Unicode-CMaps.

@@ -96,7 +96,8 @@ Pages agree with Poppler's `pdftoppm` (tools/pdf_render_check.py), and drawing t
 long. JPEG 2000 images (`JPXDecode`) are decoded by
 [`jflib-img-jp2`](https://crates.io/crates/jflib-img-jp2): their own size and bit depth, the colour
 space of the JP2 header when the dictionary names none (an ICC profile there counts by its
-channels only), `SMaskInData`. Not drawn: JBIG2 images,
+channels only), `SMaskInData`. JBIG2 images (`JBIG2Decode`, with their `JBIG2Globals`) are decoded
+by [`jflib-img-jbig2`](https://crates.io/crates/jflib-img-jbig2). Not drawn:
 knockout groups and groups that are not isolated (drawn as isolated ones), overprint. The work of a page is bounded: a hostile page gives
 `Error::Limit`, never a hang.
 

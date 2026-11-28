@@ -27,6 +27,8 @@
 //                                  tests/jxlref.uis); exit code 1 on a failure
 //   --jp2 IN --to OUT, --jp2-mutate IN, --jp2-bench IN
 //                                  lib/img_jp2 for tools/jp2_check.py (ops_jp2.rs)
+//   --jbig2 IN --to OUT, --jbig2-embedded IN [--globals G] --to OUT, --jbig2-mutate IN
+//                                  lib/img_jbig2 for tools/jbig2_check.py (ops_jbig2.rs)
 //   --sheet [--only NAME]          lib/sheet_io's XLSX and CSV readers against crafted
 //                                  workbooks and texts (sheet_checks.rs; tests/sheet.uis); exit
 //                                  code 1 on a failure
@@ -74,6 +76,7 @@ mod ops_jxr;
 mod ops_pdn;
 mod ops_gif;
 mod ops_icc;
+mod ops_jbig2;
 mod ops_jp2;
 mod ops_jpeg;
 mod ops_meta;
@@ -216,6 +219,9 @@ fn codectest() -> i32 {
         return code;
     }
     if let Some(code) = ops_jp2::run_mode(&mut ct) {
+        return code;
+    }
+    if let Some(code) = ops_jbig2::run_mode(&mut ct) {
         return code;
     }
     plat::write_stderr(
