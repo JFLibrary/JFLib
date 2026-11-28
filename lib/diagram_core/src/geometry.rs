@@ -1299,9 +1299,10 @@ mod tests {
         for d in [1e12, f64::INFINITY, f64::NAN, 0.0, 10.0] {
             assert!(Nurbs::from_row(&[1.0, d, 0.0, 0.0], [0.0, 0.0], [1.0, 1.0], None, None, None, None, 1.0, 1.0).is_none(), "{d}");
             let mut path = Path::default();
-            let mut b = Builder::new(&mut path);
+            let mut tags = Vec::new();
+            let mut b = Builder::new(&mut path, &mut tags);
             b.move_to([0.0, 0.0]);
-            Spline { degree: d, points: alloc::vec![[0.0, 0.0], [1.0, 1.0]], knots: alloc::vec![0.0], last: 1.0 }.finish(&mut b);
+            Spline { tag: 0, degree: d, points: alloc::vec![[0.0, 0.0], [1.0, 1.0]], knots: alloc::vec![0.0], last: 1.0 }.finish(&mut b);
             b.finish();
             assert!(!path.subs.is_empty(), "{d}");
         }
