@@ -1211,8 +1211,8 @@ pub static MARKDOWN: Grammar = Grammar {
 
 // the lexical rules of JFScript's script/lex.rs: keywords, true / false / nil, one-line strings
 // with escapes and ${..} (code inside, nested strings too), numbers with _, 0x, 0b, a
-// fraction and an exponent, // and /* */ comments (not nested)
-const JFS_KEYWORDS: &[&str] = &["let", "fn", "if", "else", "while", "for", "in", "break", "continue", "return", "try", "catch", "throw"];
+// fraction and an exponent, // and /* */ comments (not nested); await is a keyword since S3
+const JFS_KEYWORDS: &[&str] = &["let", "fn", "if", "else", "while", "for", "in", "break", "continue", "return", "try", "catch", "throw", "await"];
 
 static JFS_RULES: [Rule; 7] = [
     Rule::LineComment("//"),
