@@ -42,10 +42,11 @@
 // deadline_ms: each address connected to gets connect_ms or the time left, whichever is less;
 // every read waits for bytes only until the deadline (a TLS record that arrives in pieces too);
 // a request is written in pieces of 16 KiB, each with the time left as its timeout -- a server
-// that takes a piece byte by byte can still keep that piece's write going past the deadline.
-// Outside the deadline: the name lookup (the resolver's own timeouts) and the TLS handshake (the
-// connector's: each of its reads and writes waits at most the time left when it begins, and a
-// handshake that ends past the deadline is TimedOut).
+// that takes a piece byte by byte can still keep that piece's write going past the deadline; a
+// write that runs out of time is TimedOut. Outside the deadline: the name lookup (the resolver's
+// own timeouts) and the TLS handshake (the connector's: the socket's timeouts are set once, to
+// the time left when it begins, and each of its reads and writes may take that long; a handshake
+// that ends past the deadline, done or failed, is TimedOut).
 
 use alloc::boxed::Box;
 use alloc::format;
@@ -253,9 +254,37 @@ struct Bounded<'a> {
     s: &'a dyn Stream,
     ms: u32,
     deadline: Option<u64>,
+    // a write ran out of time (the deadline or a write's own timeout): write_request only says
+    // false, which is then TimedOut rather than Reset
+    late: core::sync::atomic::AtomicBool,
 }
 
-impl Bounded<'_> {
+impl<'a> Bounded<'a> {
+    fn new(s: &'a dyn Stream, ms: u32, deadline: Option<u64>) -> Self {
+        Bounded { s, ms, deadline, late: core::sync::atomic::AtomicBool::new(false) }
+    }
+
+    // the error for a request write_request did not write, and whether a retry may help (not
+    // when time ran out: the server is there but does not read)
+    fn write_failed(&self) -> (HttpError, bool) {
+        if self.late.load(core::sync::atomic::Ordering::Relaxed) {
+            (HttpError::Net(timed_out()), false)
+        } else {
+            (reset(), true)
+        }
+    }
+
+    fn pieces(&self, buf: &[u8]) -> plat::net::NetResult<()> {
+        if self.deadline.is_none() {
+            return self.s.write_all(buf);
+        }
+        for piece in buf.chunks(WRITE_PIECE) {
+            self.limit()?;
+            self.s.write_all(piece)?;
+        }
+        Ok(())
+    }
+
     fn limit(&self) -> plat::net::NetResult<()> {
         if self.deadline.is_some() {
             let ms = left(self.ms, self.deadline).ok_or_else(timed_out)?;
@@ -271,14 +300,11 @@ impl Stream for Bounded<'_> {
         self.s.read(buf)
     }
     fn write_all(&self, buf: &[u8]) -> plat::net::NetResult<()> {
-        if self.deadline.is_none() {
-            return self.s.write_all(buf);
+        let r = self.pieces(buf);
+        if matches!(r, Err(e) if e.kind == NetErrorKind::TimedOut) {
+            self.late.store(true, core::sync::atomic::Ordering::Relaxed);
         }
-        for piece in buf.chunks(WRITE_PIECE) {
-            self.limit()?;
-            self.s.write_all(piece)?;
-        }
-        Ok(())
+        r
     }
     fn set_timeouts(&self, read_ms: Option<u32>, write_ms: Option<u32>) {
         self.s.set_timeouts(read_ms, write_ms);
@@ -624,9 +650,9 @@ impl Client {
         if let Some(a) = ep.authorization() {
             h.set("Proxy-Authorization", a);
         }
-        let s = Bounded { s: tcp, ms: self.timeout_ms, deadline };
+        let s = Bounded::new(tcp, self.timeout_ms, deadline);
         if !http::write_request(&s, "CONNECT", &url.authority(), &h, &[]) {
-            return Err(reset());
+            return Err(s.write_failed().0);
         }
         let mut rd = Reader::new(&s);
         rd.set_deadline(deadline);
@@ -655,14 +681,15 @@ impl Client {
         Ok((self.tls_within(url, tcp, deadline)?, None))
     }
 
-    // The TLS layer over tcp within the deadline.  The handshake is the connector's: each of its
-    // reads and writes waits at most the time left when it begins (the socket's timeouts), and
-    // a handshake that ends past the deadline is TimedOut
+    // The TLS layer over tcp within the deadline.  The handshake is the connector's: the
+    // socket's timeouts are set once, to the time left when the handshake begins, so each of its
+    // reads and writes may take that long; a handshake that ends past the deadline, done or
+    // failed, is TimedOut
     fn tls_within(&self, url: &Url, tcp: TcpStream, deadline: Option<u64>) -> Result<Box<dyn Stream>, HttpError> {
         self.bound(&tcp, deadline)?;
-        let s = self.tls(url, tcp)?;
+        let r = self.tls(url, tcp);
         within(self.timeout_ms, deadline)?;
-        Ok(s)
+        r
     }
 
     // What tells kept connections apart: the origin, the proxy with its credentials (a hash:
@@ -708,7 +735,7 @@ impl Client {
     /// whether the connection may carry another request, or the error and whether the
     /// connection ended before any answer (a kept one the server had closed: worth a retry)
     fn on_stream(&self, s: &dyn Stream, req: &Hop, via: Option<&Endpoint>, keep: bool, deadline: Option<u64>, read: ReadFn) -> Result<(Response, bool), (HttpError, bool)> {
-        let b = Bounded { s, ms: self.timeout_ms, deadline };
+        let b = Bounded::new(s, self.timeout_ms, deadline);
         let s: &dyn Stream = &b;
         let mut h = req.headers.clone();
         if h.get("host").is_none() {
@@ -739,7 +766,7 @@ impl Client {
             }
         };
         if !http::write_request(s, req.method, &target, &h, req.body) {
-            return Err((reset(), true));
+            return Err(b.write_failed());
         }
         let mut rd = Reader::new(s);
         rd.set_deadline(deadline);

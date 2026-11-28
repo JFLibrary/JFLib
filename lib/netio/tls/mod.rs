@@ -281,11 +281,41 @@ pub struct TlsStream {
     /// the read timeout of set_timeouts (u32::MAX: none): records that carry no data (empty
     /// ones, KeyUpdates) end a read with TimedOut after it, as silence would
     read_ms: core::sync::atomic::AtomicU32,
+    /// the write timeout of set_timeouts (u32::MAX: none), kept when a read shortens inner's
+    /// read timeout
+    write_ms: core::sync::atomic::AtomicU32,
+    /// the read timeout inner has now (u32::MAX: none)
+    inner_read_ms: core::sync::atomic::AtomicU32,
 }
 
 impl TlsStream {
     fn new(inner: Box<dyn Stream>, conn: Conn) -> TlsStream {
-        TlsStream { inner, conn: Mutex::new(conn), wlock: Mutex::new(()), last_error: Mutex::new(None), read_ms: core::sync::atomic::AtomicU32::new(u32::MAX) }
+        let none = || core::sync::atomic::AtomicU32::new(u32::MAX);
+        TlsStream { inner, conn: Mutex::new(conn), wlock: Mutex::new(()), last_error: Mutex::new(None), read_ms: none(), write_ms: none(), inner_read_ms: none() }
+    }
+
+    /// Before the next read of inner in a read with a timeout (read_ms, begun at t0): past it,
+    /// TimedOut; otherwise the time it has left, as long as the wait for bytes and as inner's read
+    /// timeout (for a stream whose wait_readable does not wait).  Records without data, or a
+    /// record that comes in pieces, then do not keep a read going past its timeout
+    fn before_inner_read(&self, t0: u64, read_ms: u32) -> NetResult<()> {
+        use core::sync::atomic::Ordering::Relaxed;
+        if read_ms == u32::MAX {
+            return Ok(());
+        }
+        let spent = plat::time_us().saturating_sub(t0) / 1000;
+        if spent >= read_ms as u64 {
+            return Err(NetError::new(NetErrorKind::TimedOut, 0));
+        }
+        let rest = (read_ms as u64 - spent) as u32;
+        if self.inner_read_ms.swap(rest, Relaxed) != rest {
+            let w = self.write_ms.load(Relaxed);
+            self.inner.set_timeouts(Some(rest), (w != u32::MAX).then_some(w));
+        }
+        if !self.inner.wait_readable(rest) {
+            return Err(NetError::new(NetErrorKind::TimedOut, 0));
+        }
+        Ok(())
     }
 
     /// (tests) send an application data record without data
@@ -398,9 +428,7 @@ impl TlsStream {
                 }
             }
             // records without data (empty ones) do not keep it going past the timeout, as read
-            if read_ms != u32::MAX && plat::time_us().saturating_sub(t0) >= read_ms as u64 * 1000 {
-                return Err(NetError::new(NetErrorKind::TimedOut, 0));
-            }
+            self.before_inner_read(t0, read_ms)?;
             let n = self.inner.read(&mut raw)?;
             if n == 0 {
                 return Ok(0);
@@ -459,12 +487,7 @@ impl Stream for TlsStream {
             }
             // records without data, or a record that comes in pieces, do not keep a read going
             // past the timeout: the next bytes are waited for only as long as it has left
-            if read_ms != u32::MAX {
-                let spent = plat::time_us().saturating_sub(t0) / 1000;
-                if spent >= read_ms as u64 || !self.inner.wait_readable((read_ms as u64 - spent) as u32) {
-                    return Err(NetError::new(NetErrorKind::TimedOut, 0));
-                }
-            }
+            self.before_inner_read(t0, read_ms)?;
             let n = self.inner.read(&mut raw)?;
             if n == 0 {
                 return Ok(0);
@@ -484,7 +507,10 @@ impl Stream for TlsStream {
     }
 
     fn set_timeouts(&self, read_ms: Option<u32>, write_ms: Option<u32>) {
-        self.read_ms.store(read_ms.unwrap_or(u32::MAX), core::sync::atomic::Ordering::Relaxed);
+        use core::sync::atomic::Ordering::Relaxed;
+        self.read_ms.store(read_ms.unwrap_or(u32::MAX), Relaxed);
+        self.write_ms.store(write_ms.unwrap_or(u32::MAX), Relaxed);
+        self.inner_read_ms.store(read_ms.unwrap_or(u32::MAX), Relaxed);
         self.inner.set_timeouts(read_ms, write_ms);
     }
 

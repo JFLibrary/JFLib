@@ -46411,10 +46411,11 @@ that was read to its end with no byte beyond it, and when neither side said clos
 deadline_ms: each address connected to gets connect_ms or the time left, whichever is less;
 every read waits for bytes only until the deadline (a TLS record that arrives in pieces too);
 a request is written in pieces of 16 KiB, each with the time left as its timeout -- a server
-that takes a piece byte by byte can still keep that piece's write going past the deadline.
-Outside the deadline: the name lookup (the resolver's own timeouts) and the TLS handshake (the
-connector's: each of its reads and writes waits at most the time left when it begins, and a
-handshake that ends past the deadline is TimedOut).
+that takes a piece byte by byte can still keep that piece's write going past the deadline; a
+write that runs out of time is TimedOut. Outside the deadline: the name lookup (the resolver's
+own timeouts) and the TLS handshake (the connector's: the socket's timeouts are set once, to
+the time left when it begins, and each of its reads and writes may take that long; a handshake
+that ends past the deadline, done or failed, is TimedOut).
 ```
 
 - **`enum HttpError`**
