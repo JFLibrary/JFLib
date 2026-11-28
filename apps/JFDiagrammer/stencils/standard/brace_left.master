@@ -31,6 +31,7 @@ TxtPinX = Width
 TxtPinY = Height*0.5
 TxtLocPinX = 0
 TxtLocPinY = TxtHeight*0.5
+ShapeSplit = 1
 
 [User]
 # die Höhe der Bögen und das Verhältnis ihrer Halbachsen

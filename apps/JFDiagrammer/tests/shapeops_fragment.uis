@@ -1,0 +1,23 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD21 (SP-08): In Einzelmengen zerlegen -- two overlapping rectangles become three
+# shapes (the two rests and the overlap), all selected; the inputs are gone; one undo step
+cmd 4404
+drag 500,330 640,420
+drag 580,380 720,470
+cmd 4400
+key ctrl+a
+click button:"Gruppieren"
+click menuitem:"In Einzelmengen zerlegen"
+expect listitem:"Sheet.6" selected
+expect listitem:"Sheet.7" selected
+expect listitem:"Sheet.8" selected
+expect listitem:"Sheet.4" missing
+expect listitem:"Sheet.5" missing
+# the overlap alone
+key esc
+click 610,400
+expect listitem:"Sheet.8" rect 576 374 75 50
+expect button:"Breite: 30 mm  Höhe: 20 mm  Winkel: 0°" exists
+key ctrl+z
+expect listitem:"Sheet.6" missing
+expect listitem:"Sheet.4" exists

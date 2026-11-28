@@ -761,57 +761,76 @@ pub fn gegenprobe(dir: &str) -> i32 {
         }
         None => ok = false,
     }
-    // every master, a page per stencil (420 x 600 mm), in rows by their own size
+    // every master, a page per stencil (420 x 600 mm), in rows by their own size; and the same in
+    // the design Kontrast (no shape lines: the lines of QuickStyleType 3 must stay), for Visio to
+    // draw with the file's theme
     let Some(docs) = all_built() else { return 1 };
-    let Some((mut doc, first)) = sheet_doc(420.0, 600.0) else { return 1 };
-    {
-        let mut tx = doc.transaction("Alle Shapes");
-        let mut page = first;
-        for (k, src) in docs.iter().enumerate() {
-            let title = String::from(StencilTexts::of(src).name(0));
-            if k == 0 {
-                let _ = tx.rename_page(page, &title, FOLDERS[k]);
-            } else {
-                match tx.add_page_like(first, &title, FOLDERS[k], false, None) {
-                    Ok(p) => page = p,
-                    Err(_) => {
-                        ok = false;
-                        continue;
-                    }
-                }
+    for (design, name) in [(None, "JD26-Alle-Shapes"), (Some(catalog::CONTRAST), "JD26-Alle-Shapes-Kontrast")] {
+        let Some((mut doc, good)) = all_shapes_doc(&docs, design) else { return 1 };
+        ok &= good;
+        ok &= save(&doc, &format!("{dir}/{name}.vsdx"));
+        // each page in the masters' own size, to look at
+        let pages: Vec<PageRef> = doc.pages().collect();
+        for (k, &p) in pages.iter().enumerate() {
+            if let Some(f) = FOLDERS.get(k) {
+                ok &= render_page_at(&mut doc, p, &format!("{dir}/{name}-{f}.png"), 110.0);
             }
-            let (mut x, mut y, mut row_h) = (10.0 * MM, 590.0 * MM, 0.0f64);
-            let mut placed: Vec<SheetRef> = Vec::new();
-            for m in src.masters() {
-                let (w, h) = master_size(src, m);
-                if x + w > 410.0 * MM && x > 10.0 * MM {
-                    x = 10.0 * MM;
-                    y -= row_h + 12.0 * MM;
-                    row_h = 0.0;
-                }
-                let local = instance::import_master(&mut tx, src, m);
-                let s = local.and_then(|l| instance::place(&mut tx, page, l, x + w * 0.5, y - h * 0.5, 0));
-                match s {
-                    Ok(s) => {
-                        placed.push(SheetRef::Shape(s));
-                        placed.extend(children(tx.doc(), s).into_iter().map(SheetRef::Shape));
-                    }
-                    Err(_) => ok = false,
-                }
-                x += w + 10.0 * MM;
-                row_h = row_h.max(h);
-            }
-            let _ = Engine::new().recalc(&mut tx, &placed);
-        }
-        let _ = tx.commit();
-    }
-    ok &= save(&doc, &format!("{dir}/JD26-Alle-Shapes.vsdx"));
-    // each page in the masters' own size, to look at
-    let pages: Vec<PageRef> = doc.pages().collect();
-    for (k, p) in pages.into_iter().enumerate() {
-        if let Some(f) = FOLDERS.get(k) {
-            ok &= render_page_at(&mut doc, p, &format!("{dir}/JD26-Alle-Shapes-{f}.png"), 110.0);
         }
     }
     if ok { 0 } else { 1 }
 }
+// every master of the stencils, a page per stencil (420 x 600 mm), in rows by their own size; a
+// design applied to the empty drawing first (the placed shapes take it, recalculated page by page:
+// applying it to the full drawing recalculates every sheet at once)
+fn all_shapes_doc(docs: &[Document], design: Option<u32>) -> Option<(Document, bool)> {
+    let mut ok = true;
+    let (mut doc, first) = sheet_doc(420.0, 600.0)?;
+    if let Some(id) = design {
+        let d = catalog::all().into_iter().find(|d| d.id == id)?;
+        let mut tx = doc.transaction("design");
+        let mut eng = Engine::new();
+        design_apply::apply(&mut tx, &mut eng, d.id, &d.theme_xml(), Scope::All, 0).ok()?;
+        let _ = tx.commit();
+    }
+    let mut tx = doc.transaction("Alle Shapes");
+    let mut page = first;
+    for (k, src) in docs.iter().enumerate() {
+        let title = String::from(StencilTexts::of(src).name(0));
+        if k == 0 {
+            let _ = tx.rename_page(page, &title, FOLDERS[k]);
+        } else {
+            match tx.add_page_like(first, &title, FOLDERS[k], false, None) {
+                Ok(p) => page = p,
+                Err(_) => {
+                    ok = false;
+                    continue;
+                }
+            }
+        }
+        let (mut x, mut y, mut row_h) = (10.0 * MM, 590.0 * MM, 0.0f64);
+        let mut placed: Vec<SheetRef> = Vec::new();
+        for m in src.masters() {
+            let (w, h) = master_size(src, m);
+            if x + w > 410.0 * MM && x > 10.0 * MM {
+                x = 10.0 * MM;
+                y -= row_h + 12.0 * MM;
+                row_h = 0.0;
+            }
+            let local = instance::import_master(&mut tx, src, m);
+            let s = local.and_then(|l| instance::place(&mut tx, page, l, x + w * 0.5, y - h * 0.5, 0));
+            match s {
+                Ok(s) => {
+                    placed.push(SheetRef::Shape(s));
+                    placed.extend(children(tx.doc(), s).into_iter().map(SheetRef::Shape));
+                }
+                Err(_) => ok = false,
+            }
+            x += w + 10.0 * MM;
+            row_h = row_h.max(h);
+        }
+        let _ = Engine::new().recalc(&mut tx, &placed);
+    }
+    let _ = tx.commit();
+    Some((doc, ok))
+}
+

@@ -1,0 +1,67 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD21 (ST-02): Kategorien -- a container that requires the category "Server"
+# (Container-Tools › Format › Mitgliedschaft › Kategorien) refuses a rectangle dragged into it;
+# once the rectangle has the category (Ansicht › Add-Ons › Kategorien, the shape's own), it joins
+# on the next move and moves with the container.  The dialog writes Visio's cells with ';'
+# between the categories, one undo step.  Ids: 0x7EBC_0000 (2126249984) + 2 required, + 3
+# excluded, + 4 the shape's own
+theme light
+cmd 4404
+drag 500,330 640,420
+cmd 4400
+click 570,375
+cmd 5409
+expect listitem:"Container" rect 488 291 176 146
+click tab:"Format"
+click button:"Kategorien"
+expect dialog:"Kategorien" exists
+expect #2126249987 text "DoNotContain"
+click #2126249986
+type "Server, Router;server"
+shot build/JFDiagrammer-structures-categories.png
+click button:"OK"
+expect dialog:"Kategorien" missing
+# the container shows them as Visio writes them
+click button:"Kategorien"
+expect #2126249986 text "Server;Router"
+expect text:"Auf dieser Seite: DoNotContain; Router; Server" exists
+click button:"Abbrechen"
+# a rectangle without categories, dragged wholly inside: not a member
+cmd 4404
+drag 800,500 840,530
+cmd 4400
+drag 820,515 600,410
+expect listitem:"Sheet.6" rect 576 399 50 25
+# the container by its heading: its member comes along, the rectangle stays
+click 1100,700
+drag 520,300 520,500
+expect listitem:"Container" rect 488 487 176 146
+expect listitem:"Sheet.4" rect 500 520 151 100
+expect listitem:"Sheet.6" rect 576 399 50 25
+key ctrl+z
+expect listitem:"Container" rect 488 291 176 146
+# the rectangle gets the category "Server"
+click 600,410
+click tab:"Ansicht"
+click button:"Kategorien"
+expect #2126249986 missing
+expect #2126249988 text ""
+click #2126249988
+type "Server"
+click button:"OK"
+# moved a little it joins; now it comes along (wait: no double click with the click before)
+wait 600
+drag 600,410 620,410
+click 1100,700
+drag 520,300 520,500
+expect listitem:"Container" rect 488 487 176 146
+expect listitem:"Sheet.6" rect 601 595 50 25
+# undo, step by step
+key ctrl+z
+key ctrl+z
+key ctrl+z
+wait 600
+click 600,410
+click button:"Kategorien"
+expect #2126249988 text ""
+click button:"Abbrechen"

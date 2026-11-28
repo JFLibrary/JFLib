@@ -1,7 +1,8 @@
 """A program without a UI on an Android device or emulator: per `adb shell` and in an app's process.
 
     python tools/android_console.py APP [--serial SERIAL] [--mode shell|app|both] [--file PATH ...] [--dir NAME ...]
-                                    [--env NAME=VALUE ...] [--expect REGEX ...] [--allow-install] [-- ARGS ...]
+                                    [--env NAME=VALUE ...] [--expect REGEX ...] [--allow-install] [--no-internet]
+                                    [-- ARGS ...]
 
 docs/ANDROID.md, AN0.  `python build_rs.py app APP --target android --android-abi ABI` makes
 build/android/APP-<abi> (the executable) and build/android/APP-<abi>-console.apk (its test APK,
@@ -17,6 +18,11 @@ tools/android.py build_console_apk); the device's ABI picks them.
          seccomp filter counts as failed.  Installing goes beyond /data/local/tmp: on a device that is
          no emulator only with --allow-install.
   both   (default) shell, then app.
+
+--no-internet (AN2): the app mode with APP-<abi>-console-nonet.apk, a test APK without
+android.permission.INTERNET (jfgui_ANDROID_NO_INTERNET=1 python build_rs.py app APP --target android
+makes it); the shell has the network anyway.  The test APK otherwise has INTERNET as `cargo jflib android`
+gives it: without PERMISSIONS, or with net.connect / net.listen there.
 
 ARGS go to the program (`-- --only crypto`); --file: a file the program reads by its name, at the root
 of the app's files (/NAME of android_files.rs: files/fs/NAME; asynctest's --script copy.uis); --dir: an
@@ -160,6 +166,8 @@ def main():
     ap.add_argument("--apk", help="the test APK (default: build/android/APP-<the device's ABI>-console.apk)")
     ap.add_argument("--allow-install", action="store_true", help="--mode app on a device that is no emulator")
     ap.add_argument("--quiet", action="store_true", help="only the summary lines and failures")
+    ap.add_argument("--no-internet", action="store_true",
+                    help="the app mode with the test APK without INTERNET (APP-<abi>-console-nonet.apk)")
     ap.add_argument("args", nargs="*")
     a = ap.parse_args()
     dev = Device(a.serial)
@@ -178,6 +186,8 @@ def main():
         if not f.is_file():
             raise SystemExit(f"FAIL: no file {f}")
     modes = ["shell", "app"] if a.mode == "both" else [a.mode]
+    if a.no_internet:
+        modes = ["app"]                            # (adb shell's user is in the group inet anyway)
     problems, ran = [], 0
     for mode in modes:
         if mode == "shell":
@@ -187,9 +197,11 @@ def main():
                 continue
             text, code, took = run_shell(dev, a.app, exe, files, a.dir, a.env, a.args)
         else:
-            apk = Path(a.apk) if a.apk else ROOT / "build" / "android" / f"{a.app}-{abi}-console.apk"
+            nonet = "-nonet" if a.no_internet else ""
+            apk = Path(a.apk) if a.apk else ROOT / "build" / "android" / f"{a.app}-{abi}-console{nonet}.apk"
             if not apk.is_file():
-                print(f"SKIP app: no {apk} (python build_rs.py app {a.app} --target android --android-abi {abi})")
+                env = "jfgui_ANDROID_NO_INTERNET=1 " if a.no_internet else ""
+                print(f"SKIP app: no {apk} ({env}python build_rs.py app {a.app} --target android --android-abi {abi})")
                 continue
             if not emulator and not a.allow_install:
                 print("SKIP app: installing the test APK on a device that is no emulator needs --allow-install")

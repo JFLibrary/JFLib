@@ -1,0 +1,126 @@
+#!args apps/JFDiagrammer/tests/jd19-geraete.vsdx --no-system-fonts --export-dir build --data-dir apps/JFDiagrammer/tests
+# JFDiagrammer, JD19: Überprüfen › Shape-Berichte (RU-06, DA-09, AS-05, DA-13) -- jd19-geraete.vsdx
+# (diagramiotest --write-report-fixture) has Server A, Server B, Router, Switch on Page-1 and
+# Firewall on Seite-2, each with the shape data Name, Standort, Kosten, Auslastung.  The dialog
+# Berichte lists the predefined Inventar (the network reports only without „Nur
+# zeichnungsspezifische Berichte anzeigen“: no shape has an IP address); the wizard makes a report
+# (criterion Auslastung existiert, four columns, grouped by Standort with the sum of Kosten and the
+# grand total, sorted by Auslastung descending, the columns reordered), keeps it in the drawing;
+# Ausführen puts it on the page as a table shape; a changed value and the table's menu „Bericht
+# aktualisieren“ build it anew in one undo step; other shapes' menus have no such row.
+wait 100
+click tab:"Überprüfen"
+expect button:"Neuer Kommentar" disabled
+click button:"Shape-Berichte"
+expect dialog:"Berichte" exists
+expect text:"Inventar" exists
+expect text:"Netzwerkgeräte" missing
+expect button:"Entfernen" disabled
+click checkbox:"Nur zeichnungsspezifische Berichte anzeigen"
+expect text:"Netzwerkgeräte" exists
+expect text:"Rackgeräte" exists
+click checkbox:"Nur zeichnungsspezifische Berichte anzeigen"
+expect text:"Netzwerkgeräte" missing
+shot build/JFDiagrammer-reports.png
+# ---- the wizard: shapes and a criterion
+click button:"Neu..."
+expect dialog:"Assistent für Berichtsdefinitionen" exists
+expect radio:"Shapes auf allen Seiten" checked
+expect text:"Keine Kriterien" exists
+click button:"Erweitert..."
+expect dialog:"Erweitert" exists
+click #2115108865
+click "Auslastung"
+click #2115108866
+click "existiert"
+expect #2115108867 disabled
+click button:"Hinzufügen"
+expect listitem:"Auslastung existiert" exists
+click button:"OK"
+expect dialog:"Assistent für Berichtsdefinitionen" exists
+expect text:"Kriterien: 1" exists
+click button:"Weiter >"
+# the columns: none chosen is refused
+click button:"Weiter >"
+expect text:"Wählen Sie mindestens eine Eigenschaft." exists
+click checkbox:"Name"
+click checkbox:"Standort"
+click checkbox:"Kosten"
+click checkbox:"Auslastung"
+click button:"Weiter >"
+# title, subtotals, sorting
+click #2114977840
+key ctrl+a
+type "JD19-Test"
+click button:"Teilergebnisse..."
+expect dialog:"Teilergebnisse" exists
+click #2115108865
+click "Standort"
+click listitem:"Kosten"
+click checkbox:"Summe"
+expect checkbox:"Summe" checked
+click checkbox:"Gesamtergebnis anzeigen"
+click button:"OK"
+click button:"Sortieren..."
+expect dialog:"Sortieren" exists
+click listitem:"Name"
+click button:"Nach oben"
+click button:"Nach oben"
+click listitem:"Standort"
+click button:"Nach oben"
+click button:"Nach oben"
+click #2115108896
+click "Auslastung"
+click #2115108897
+click "Absteigend"
+click button:"OK"
+expect text:"Gruppiert nach: Standort" exists
+expect text:"Sortiert nach: Auslastung ↓" exists
+expect text:"Dezimalstellen: 2" exists
+click button:"Weiter >"
+# name and place
+expect #2114977856 text "JD19-Test"
+click #2114977856
+key ctrl+a
+type "JD19 Bericht"
+expect radio:"In dieser Zeichnung speichern" checked
+click button:"Fertig stellen"
+expect dialog:"Berichte" exists
+expect text:"„JD19 Bericht“ ist in der Zeichnung gespeichert." exists
+expect text:"JD19 Bericht" exists
+expect button:"Entfernen" enabled
+# ---- Ausführen: the table shape on the page, selected
+click button:"Ausführen..."
+expect dialog:"Bericht ausführen" exists
+expect radio:"Tabellen-Shape" checked
+expect radio:"Kopie der Berichtsdefinition" checked
+click button:"OK"
+expect dialog:"Berichte" missing
+expect listitem:"JD19-Test" selected
+a11y expect announced "Der Bericht „JD19 Bericht“ steht als Tabelle auf der Seite (Zeilen: 10)."
+shot build/JFDiagrammer-report-table.png
+# ---- a value changes: Router's costs
+click listitem:"Router"
+cmd 5139
+expect #20792 text "300"
+click #20792
+key ctrl+a
+type "450"
+key enter
+expect #20792 text "450"
+# the menu of another shape has no Bericht aktualisieren; the table's has
+rclick listitem:"Server A"
+expect menuitem:"Bericht aktualisieren" missing
+key esc
+rclick listitem:"JD19-Test"
+expect menuitem:"Bericht aktualisieren" exists
+click menuitem:"Bericht aktualisieren"
+a11y expect announced "Bericht „JD19 Bericht“ aktualisiert"
+expect listitem:"JD19-Test" selected
+shot build/JFDiagrammer-report-refreshed.png
+# one undo step takes the refresh back, one more the value
+key ctrl+z
+expect listitem:"JD19-Test" exists
+key ctrl+z
+click listitem:"Router"
+expect #20792 text "300"

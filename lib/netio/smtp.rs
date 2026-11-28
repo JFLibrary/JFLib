@@ -134,7 +134,7 @@ impl Conv {
     }
 }
 
-fn b64(s: &[u8]) -> String {
+pub(crate) fn b64(s: &[u8]) -> String {
     crypto::b64::encode(s)
 }
 

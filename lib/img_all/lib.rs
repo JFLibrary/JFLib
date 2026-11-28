@@ -3,7 +3,8 @@
 //   use_core_codecs()   PNG, JPEG, BMP, GIF (the assembly registers them statically: call it
 //                       once at start-up, before worker threads decode)
 //   use_all_codecs()    every codec of the library, the core formats included
-//                       (img_use_all_codecs); JPEG 2000 into its slot IMGF_JP2
+//                       (img_use_all_codecs); JPEG 2000 and JBIG2 into their slots
+//                       IMGF_JP2 and IMGF_JBIG2
 //
 // Each codec crate exports `pub static CODEC: img_core::Codec`; the codec agents add one
 // registration line for their crate below.
@@ -40,4 +41,5 @@ pub fn use_all_codecs() {
     register(IMGF_PDN, Some(&img_pdn::CODEC)); // r9-pdn
     register(IMGF_PSD, Some(&psd::CODEC));
     register_slot(IMGF_JP2, "JPEG 2000", "jp2;j2k;j2c;jpx;jpf=JPEG 2000", "image/jp2", IFC_ALPHA | IFC_LOSSY | IFC_LOSSLESS | IFC_ICC, Some(&img_jp2::CODEC));
+    register_slot(IMGF_JBIG2, "JBIG2", "jb2;jbig2=JBIG2", "image/x-jbig2", IFC_LOSSLESS, Some(&img_jbig2::CODEC));
 }

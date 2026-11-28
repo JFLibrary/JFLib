@@ -34,7 +34,8 @@
 // (RowOrder = 1) its position does; RefreshOverwriteAll = 0 updates only the Value cells whose
 // row has DataLinked = 1.  Row IDs start at 1 in the order of the source (Visio's DataAsXML).
 // Visio's codes stay as they are in the model: Type and DataType 0 text, 1 fixed list,
-// 2 number, 3 Boolean, 4 variable list, 5 date, 6 duration, 7 currency.
+// 2 number, 3 Boolean, 4 variable list, 5 date, 6 duration, 7 currency.  New columns get Visio's
+// row names ("_VisDM_" and the source name's letters and digits, ROW_PREFIX).
 
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -122,8 +123,9 @@ pub struct Column {
     pub label: String,
     /// OrigLabel
     pub orig_label: Option<String>,
-    /// LangID
-    pub lang: Option<u32>,
+    /// LangID as written: Visio writes a culture name ("de-DE"), not the number [MS-VSDX]'s
+    /// schema names
+    pub lang: Option<String>,
     /// Calendar
     pub calendar: Option<u16>,
     /// DataType (kind::*)
@@ -381,12 +383,17 @@ impl Recordset {
     }
 }
 
-// a source name as a shape data row name: letters, digits and '_' (Visio's rule for row names;
-// "Prop.IP-Adresse" would not be a name), not starting with a digit, never empty
+/// the prefix of the shape data rows Visio makes for a linked column ("Prop._VisDM_Ports")
+pub const ROW_PREFIX: &str = "_VisDM_";
+
+// a source name as a shape data row name the way Visio 16 names them (Visio check 2026-11-27):
+// "_VisDM_" and the name's letters and digits ("IP-Adresse" -> "_VisDM_IPAdresse"); so a column
+// linked here and the same column linked in Visio meet in one row
 fn row_name(s: &str) -> String {
-    let mut out: String = s.trim().chars().map(|c| if c.is_alphanumeric() || c == '_' { c } else { '_' }).collect();
-    if out.is_empty() || out.starts_with(|c: char| c.is_ascii_digit()) {
-        out.insert(0, '_');
+    let mut out = String::from(ROW_PREFIX);
+    out.extend(s.trim().chars().filter(|c| c.is_alphanumeric()));
+    if out.len() == ROW_PREFIX.len() {
+        out.push('F');
     }
     out
 }
@@ -963,6 +970,11 @@ pub fn refresh(tx: &mut Transaction, rs: u32, headers: &[String], rows: Vec<Vec<
     new.rows = Arc::new(out_rows);
     new.update_key_values();
     new.time_refreshed = Some(String::from(now));
+    // Visio's checksum follows the columns (it stays when Visio refreshes the same columns):
+    // other columns, and Visio computes it anew
+    if new.columns.iter().map(|c| &c.id).ne(old.columns.iter().map(|c| &c.id)) {
+        new.checksum = None;
+    }
     new.conflicts.clear();
     // bound shapes
     let doc = tx.doc();

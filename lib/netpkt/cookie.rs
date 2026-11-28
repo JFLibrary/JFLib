@@ -7,8 +7,8 @@
 //   parse_date(text)               the tolerant date of an Expires attribute (5.1.1)
 //   domain_match(host, domain)     5.1.3; path_match(request, cookie) 5.1.4; default_path(path) 5.1.4
 //   canonical_host(host)           lower case, without the dot at the end (5.1.2, no IDNA here)
-//   site_of(host)                  what "same site" compares: an address itself, else the last two
-//                                  labels of the name (no public suffix list)
+//   site_of(host)                  what "same site" compares: an address itself, else the name's
+//                                  registrable domain by the public suffix list (netpkt::psl)
 //   Origin                         who stores: host, path, secure (https), http (false: a script)
 //   Asks                           who reads: host, path, secure, http, the site that asks (None:
 //                                  the user), a top-level navigation, a safe method
@@ -24,9 +24,10 @@
 // From RFC 6265bis, as far as a small browser needs it: SameSite (Strict is sent only within the
 // site, Lax and no attribute also on a top-level navigation with a safe method, None always but
 // only with Secure), a page without https cannot set Secure nor overwrite a Secure cookie, name and
-// value together hold at most MAX_COOKIE bytes.  Without a public suffix list a Domain without a dot
-// counts as a public suffix (5.3 step 5): the same name as the host makes a host-only cookie, any
-// other is refused.  A jar holds at most MAX_PER_DOMAIN cookies of a domain and MAX_COOKIES in all;
+// value together hold at most MAX_COOKIE bytes.  A Domain that is a public suffix (netpkt::psl, the
+// Public Suffix List: "com", "co.uk", "github.io") makes a host-only cookie when it is the host's
+// own name and is refused otherwise (6265bis 5.6 step 9), so a site cannot set cookies for the
+// sites beside it.  A jar holds at most MAX_PER_DOMAIN cookies of a domain and MAX_COOKIES in all;
 // beyond that the oldest go.
 
 use alloc::format;
@@ -266,16 +267,15 @@ pub fn default_path(path: &str) -> String {
     }
 }
 
-/// what "same site" compares: an address itself, else the last two labels of the name
+/// what "same site" compares: an address itself, else the name's registrable domain (the public
+/// suffix and one label: "example.co.uk"); a public suffix itself is its own site
 pub fn site_of(host: &str) -> String {
     let h = canonical_host(host);
     if IpAddr::parse(&h).is_some() {
         return h;
     }
-    let mut it = h.rmatch_indices('.');
-    let _ = it.next();
-    match it.next() {
-        Some((i, _)) => String::from(&h[i + 1..]),
+    match crate::psl::registrable_domain(&h) {
+        Some(d) => String::from(d),
         None => h,
     }
 }
@@ -392,8 +392,10 @@ impl Jar {
             Some(n) => Some(now.saturating_add(n)),
             None => c.expires,
         };
-        let (domain, host_only) = match c.domain.as_deref().map(canonical_host) {
-            Some(d) if !d.contains('.') => {
+        // the Domain attribute as written (5.2.3 takes off a leading dot only): one with a dot at
+        // the end matches no host and the cookie goes (as browsers do; http-state domain0014)
+        let (domain, host_only) = match c.domain.as_deref().map(str::to_ascii_lowercase) {
+            Some(d) if !d.contains('.') || crate::psl::is_public_suffix(&d) => {
                 // a public suffix: only as the host's own name
                 if d != host {
                     return Err(Refused::Domain);

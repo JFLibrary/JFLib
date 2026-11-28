@@ -47,6 +47,12 @@ TxtHeight.us = 0.2 in
 TxtLocPinX = TxtWidth*0.5
 TxtLocPinY = TxtHeight*0.5
 TextBkgnd = 0
+# die Verbinder-Liste des Designs auch in Visio (QuickStyleType 3), Linie 2 (1 pt,
+# Variantenfarbe) ausdrücklich: Visio nimmt die Schnellformatzellen aus der
+# Füll-Formatvorlage und kennt dk2 (Linie 1) nicht
+QuickStyleType = 3
+QuickStyleLineMatrix = 2
+QuickStyleLineColor = 100
 
 [Geometry]
 NoFill = TRUE

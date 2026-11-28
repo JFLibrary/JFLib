@@ -1,0 +1,53 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD21: Automatisch löschen (CN-09) -- a shape between two others (one connector
+# in, one out) deleted: the connector going out goes with it, the one coming in now joins the
+# two others (the flow heals); the shape at the end of the flow deleted: its connector goes;
+# one undo step each; Optionen › Erweitert › Verbinder mit Shapes löschen off: the connectors
+# stay where they were, their ends let go
+click button:"Weitere Shapes"
+click "Allgemein"
+click "Standard-Shapes"
+drag button:"Rechteck" 560,240
+wait 600
+drag button:"Raute" 560,400
+wait 600
+drag button:"Ellipse" 560,560
+click 560,240
+click 560,400 shift
+click 560,560 shift
+cmd 5421
+expect listitem:"Sheet.7" rect 557 265 6 97
+expect listitem:"Sheet.8" rect 557 438 6 97
+# the middle one: healed
+click 560,400
+key delete
+expect listitem:"Raute" missing
+expect listitem:"Sheet.8" missing
+expect listitem:"Sheet.7" rect 557 265 6 270
+shot build/JFDiagrammer-autoconn-heal.png
+key ctrl+z
+expect listitem:"Raute" exists
+expect listitem:"Sheet.7" rect 557 265 6 97
+expect listitem:"Sheet.8" rect 557 438 6 97
+# the last one: its connector goes along
+wait 600
+click 560,560
+key delete
+expect listitem:"Ellipse" missing
+expect listitem:"Sheet.8" missing
+expect listitem:"Sheet.7" rect 557 265 6 97
+key ctrl+z
+expect listitem:"Sheet.8" exists
+# Verbinder mit Shapes löschen off: both connectors stay
+click tab:"Datei"
+click button:"Optionen"
+click button:"Erweitert"
+click switch:"Verbinder mit Shapes löschen"
+expect switch:"Verbinder mit Shapes löschen" unchecked
+key esc
+wait 600
+click 560,400
+key delete
+expect listitem:"Raute" missing
+expect listitem:"Sheet.7" rect 557 265 6 97
+expect listitem:"Sheet.8" rect 557 438 6 97

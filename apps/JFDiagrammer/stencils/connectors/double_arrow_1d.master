@@ -31,6 +31,9 @@ EndY.us = 0.1875 in
 Height = 10 mm
 Height.us = 0.375 in
 GlueType = 2
+# Visio zeichnet ein 1D-Shape mit QuickStyleType 0 aus der Verbinder-Liste des Designs (graue
+# Fläche, dunkle Linie); 2: aus der Shape-Liste wie in JFDiagrammer
+QuickStyleType = 2
 
 [User]
 # die Länge der Spitze und der halbe Schaft

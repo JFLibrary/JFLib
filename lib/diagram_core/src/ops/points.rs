@@ -4,6 +4,8 @@
 //   set_control(tx, eng, shape, row, at)         a control point dragged to a page point
 //   vertices(doc, shape) -> Vec<Vertex>          the points of the Geometry rows on the page
 //   set_vertex / insert_vertex / delete_vertex   move one, add one after a row, take one out
+//   move_vertices / delete_vertices              (JD21, SP-05) several of one shape together
+//                                                (Visio: chosen with Shift)
 //
 // A control point is a row of the Controls section: X and Y in local coordinates, XDyn/YDyn
 // the point its rubber band starts from, XCon/YCon how it behaves ([MS-VSDX] Controls; the
@@ -22,7 +24,10 @@
 // absolute rows keep the proportional form of their formulas (Visio's "Width*0.5").  Adding and
 // taking out a vertex inserts or removes a row in the middle of the section
 // (Transaction::insert_row / remove_row: the rows after it are renumbered, formulas follow, an
-// instance's inherited section becomes its own).  LockVtxEdit refuses (Invalid).
+// instance's inherited section becomes its own).  LockVtxEdit refuses (Invalid).  (JD21, SP-05)
+// After each of them the box follows the geometry (shapeops::fit_frame: Width, Height, Pin and
+// the rows into the box of the geometry, the shape stays on the page; not with LockCalcWH), as
+// Visio does after a vertex edit.
 
 use alloc::format;
 use alloc::string::String;
@@ -194,12 +199,12 @@ pub struct Vertex {
 
 // a Geometry row as the vertex functions see it
 #[derive(Copy, Clone, Debug)]
-struct VRow {
-    ix: u32,
+pub(super) struct VRow {
+    pub(super) ix: u32,
     // its point in local coordinates
-    p: [f64; 2],
+    pub(super) p: [f64; 2],
     rel: bool,
-    start: bool,
+    pub(super) start: bool,
     // the last row of a closed sub-path (repeats the start)
     closing: bool,
     // the IX of its sub-path's start
@@ -215,7 +220,7 @@ fn has_point(kind: &str) -> bool {
 }
 
 // the rows of a Geometry section with points, sub-paths and closing rows
-fn vrows(doc: &Document, sheet: SheetRef, sk: SecKey, w: f64, h: f64) -> Vec<VRow> {
+pub(super) fn vrows(doc: &Document, sheet: SheetRef, sk: SecKey, w: f64, h: f64) -> Vec<VRow> {
     let rows = doc.rows(sheet, sk);
     let mut out: Vec<VRow> = Vec::new();
     for r in &rows {
@@ -247,7 +252,7 @@ fn vrows(doc: &Document, sheet: SheetRef, sk: SecKey, w: f64, h: f64) -> Vec<VRo
     out
 }
 
-fn geo_key(section: u32) -> SecKey {
+pub(super) fn geo_key(section: u32) -> SecKey {
     SecKey { name: names::GEOMETRY, index: section }
 }
 
@@ -293,7 +298,7 @@ fn follows(doc: &Document, sheet: SheetRef, sk: SecKey, ix: u32) -> bool {
     })
 }
 
-fn vertex_ctx(tx: &Transaction, eng: &mut Engine, shape: ShapeRef, section: u32) -> Result<(Xform, f64, f64, Vec<VRow>), EditError> {
+pub(super) fn vertex_ctx(tx: &Transaction, eng: &mut Engine, shape: ShapeRef, section: u32) -> Result<(Xform, f64, f64, Vec<VRow>), EditError> {
     let doc = tx.doc();
     doc.shape(shape).ok_or(EditError::NoShape)?;
     if locked(eng, doc, shape, "LockVtxEdit") {
@@ -331,7 +336,10 @@ pub fn set_vertex(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, secti
     };
     let mut wr = Writer::new();
     wr.put_all(tx, eng, sheet, sets)?;
-    wr.finish(tx, eng)
+    wr.finish(tx, eng)?;
+    // (JD21, SP-05) the box follows the geometry
+    crate::shapeops::fit_frame(tx, eng, shape)?;
+    Ok(())
 }
 
 /// add a vertex at the page point `at` after row `after` (on the segment to the next row):
@@ -354,6 +362,7 @@ pub fn insert_vertex(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, se
         tx.set_constant(sheet, &a, Value::Num(v), None)?;
     }
     eng.recalc(tx, &[sheet])?;
+    crate::shapeops::fit_frame(tx, eng, shape)?;
     Ok(ix)
 }
 
@@ -384,5 +393,59 @@ pub fn delete_vertex(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, se
     }
     tx.remove_row(sheet, sk, RowKey::Index(row))?;
     eng.recalc(tx, &[sheet])?;
+    crate::shapeops::fit_frame(tx, eng, shape)?;
+    Ok(())
+}
+
+/// (JD21, SP-05) move several vertices of a shape (section, row) together by `d` (page): each
+/// as set_vertex moves it (the start of a closed sub-path takes its closing row along), the box
+/// follows once at the end; vertices that are not there are left out
+pub fn move_vertices(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, list: &[(u32, u32)], d: [f64; 2]) -> Result<(), EditError> {
+    let sheet = SheetRef::Shape(shape);
+    let mut sections: Vec<u32> = list.iter().map(|v| v.0).collect();
+    sections.sort_unstable();
+    sections.dedup();
+    let mut wr = Writer::new();
+    for sec in sections {
+        let (inv, w, h, rows) = vertex_ctx(tx, eng, shape, sec)?;
+        let sk = geo_key(sec);
+        let xf = tx.doc().page_xform(shape);
+        let sets = {
+            let doc = tx.doc();
+            let mut sets = Vec::new();
+            for &(_, r) in list.iter().filter(|v| v.0 == sec) {
+                let Some(v) = rows.iter().find(|v| v.ix == r && !v.closing) else { continue };
+                let at = xf.apply(v.p);
+                let q = inv.apply([at[0] + d[0], at[1] + d[1]]);
+                sets.extend(point_sets(doc, sheet, sk, v.ix, v.rel, q, w, h));
+                if v.start {
+                    if let Some(c) = rows.iter().find(|c| c.closing && c.sub == v.ix) {
+                        if !follows(doc, sheet, sk, c.ix) {
+                            sets.extend(point_sets(doc, sheet, sk, c.ix, c.rel, q, w, h));
+                        }
+                    }
+                }
+            }
+            sets
+        };
+        wr.put_all(tx, eng, sheet, sets)?;
+    }
+    wr.finish(tx, eng)?;
+    crate::shapeops::fit_frame(tx, eng, shape)?;
+    Ok(())
+}
+
+/// (JD21, SP-05) take several vertices of a shape out, the last rows first so the others keep
+/// their numbers; a vertex its sub-path cannot spare (two left) stays
+pub fn delete_vertices(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, list: &[(u32, u32)]) -> Result<(), EditError> {
+    let mut l = list.to_vec();
+    l.sort_unstable_by(|a, b| b.cmp(a));
+    l.dedup();
+    for (sec, row) in l {
+        match delete_vertex(tx, eng, shape, sec, row) {
+            Ok(()) | Err(EditError::Invalid) | Err(EditError::NoRow) => {}
+            Err(e) => return Err(e),
+        }
+    }
     Ok(())
 }

@@ -443,26 +443,15 @@ oben	top	arriba	in alto	en haut
 unten	bottom	abajo	in basso	en bas
 kein Versatz	no offset	sin desplazamiento	nessuno spostamento	aucun décalage
 Flussdiagramm (von oben nach unten)	Flowchart (Top to Bottom)	Diagrama de flujo (de arriba abajo)	Diagramma di flusso (dall'alto in basso)	Diagramme de flux (de haut en bas)
-Organigramm (von links nach rechts)	Organization Chart (Left to Right)	Organigrama (de izquierda a derecha)	Organigramma (da sinistra a destra)	Organigramme (de gauche à droite)
-Organigramm (von oben nach unten)	Organization Chart (Top to Bottom)	Organigrama (de arriba abajo)	Organigramma (dall'alto in basso)	Organigramme (de haut en bas)
-Baum (von links nach rechts)	Tree (Left to Right)	Árbol (de izquierda a derecha)	Albero (da sinistra a destra)	Arborescence (de gauche à droite)
-Baum (von oben nach unten)	Tree (Top to Bottom)	Árbol (de arriba abajo)	Albero (dall'alto in basso)	Arborescence (de haut en bas)
 Flussdiagramm (von links nach rechts)	Flowchart (Left to Right)	Diagrama de flujo (de izquierda a derecha)	Diagramma di flusso (da sinistra a destra)	Diagramme de flux (de gauche à droite)
 Netzwerk	Network	Red	Rete	Réseau
-Organigramm (von unten nach oben)	Organization Chart (Bottom to Top)	Organigrama (de abajo arriba)	Organigramma (dal basso in alto)	Organigramme (de bas en haut)
-Baum (von unten nach oben)	Tree (Bottom to Top)	Árbol (de abajo arriba)	Albero (dal basso in alto)	Arborescence (de bas en haut)
 Flussdiagramm (von rechts nach links)	Flowchart (Right to Left)	Diagrama de flujo (de derecha a izquierda)	Diagramma di flusso (da destra a sinistra)	Diagramme de flux (de droite à gauche)
 Flussdiagramm (von unten nach oben)	Flowchart (Bottom to Top)	Diagrama de flujo (de abajo arriba)	Diagramma di flusso (dal basso in alto)	Diagramme de flux (de bas en haut)
-Organigramm (von rechts nach links)	Organization Chart (Right to Left)	Organigrama (de derecha a izquierda)	Organigramma (da destra a sinistra)	Organigramme (de droite à gauche)
-Baum (von rechts nach links)	Tree (Right to Left)	Árbol (de derecha a izquierda)	Albero (da destra a sinistra)	Arborescence (de droite à gauche)
 Mittig zu Mittig	Center to Center	De centro a centro	Da centro a centro	Centre à centre
 Horizontale Linien	Horizontal Lines	Líneas horizontales	Linee orizzontali	Lignes horizontales
 Vertikale Linien	Vertical Lines	Líneas verticales	Linee verticali	Lignes verticales
-Zuletzt gezeichnete Linien	Last Drawn Lines	Últimas líneas dibujadas	Ultime linee disegnate	Dernières lignes tracées
-Zuletzt gezeichnete Linien (umgekehrt)	Last Drawn Lines (Reversed)	Últimas líneas dibujadas (orden inverso)	Ultime linee disegnate (ordine inverso)	Dernières lignes tracées (ordre inverse)
 Lücke	Gap	Hueco	Spazio	Espace
 Quadrat	Square	Cuadrado	Quadrato	Carré
-Mehrseitig	Multi-sided	Poligonal	Poligonale	Polygonal
 Routing-Stil	Routing style	Estilo de enrutamiento	Stile di routing	Style de routage
 Linienübergänge	Line jumps	Saltos de línea	Salti di linea	Sauts de ligne
 Stil der Linienübergänge	Line jump style	Estilo de salto de línea	Stile salto di linea	Style de saut de ligne
@@ -1168,3 +1157,481 @@ Shapes ohne X und Y werden in Stufen von oben nach unten angeordnet, Links werde
 {} Shapes und {} Verbinder erstellt	{} shapes and {} connectors created	{} formas y {} conectores creados	{} forme e {} connettori creati	{} formes et {} connecteurs créés
 Die Zeichnung lässt sich nicht erstellen.	The drawing cannot be created.	No se puede crear el dibujo.	Impossibile creare il disegno.	Impossible de créer le dessin.
 Shape-Daten in Zeile {}: {}	Shape data in line {}: {}	Datos de forma en la línea {}: {}	Dati forma nella riga {}: {}	Données de forme à la ligne {} : {}
+Seitenlayout neu anordnen	Re-Layout Page	Reorganizar la página	Riorganizza la pagina	Réorganiser la page
+Hierarchie (von oben nach unten)	Hierarchy (Top to Bottom)	Jerarquía (de arriba abajo)	Gerarchia (dall'alto in basso)	Hiérarchie (de haut en bas)
+Hierarchie (von unten nach oben)	Hierarchy (Bottom to Top)	Jerarquía (de abajo arriba)	Gerarchia (dal basso in alto)	Hiérarchie (de bas en haut)
+Hierarchie (von links nach rechts)	Hierarchy (Left to Right)	Jerarquía (de izquierda a derecha)	Gerarchia (da sinistra a destra)	Hiérarchie (de gauche à droite)
+Hierarchie (von rechts nach links)	Hierarchy (Right to Left)	Jerarquía (de derecha a izquierda)	Gerarchia (da destra a sinistra)	Hiérarchie (de droite à gauche)
+Kompakte Struktur (nach unten, dann rechts)	Compact Tree (Down then Right)	Árbol compacto (abajo y luego derecha)	Albero compatto (in basso, poi a destra)	Arborescence compacte (bas puis droite)
+Kompakte Struktur (nach rechts, dann unten)	Compact Tree (Right then Down)	Árbol compacto (derecha y luego abajo)	Albero compatto (a destra, poi in basso)	Arborescence compacte (droite puis bas)
+Kompakte Struktur (nach unten, dann links)	Compact Tree (Down then Left)	Árbol compacto (abajo y luego izquierda)	Albero compatto (in basso, poi a sinistra)	Arborescence compacte (bas puis gauche)
+Kompakte Struktur (nach links, dann unten)	Compact Tree (Left then Down)	Árbol compacto (izquierda y luego abajo)	Albero compatto (a sinistra, poi in basso)	Arborescence compacte (gauche puis bas)
+Weitere Layoutoptionen...	More Layout Options...	Más opciones de disposición...	Altre opzioni di layout...	Autres options de disposition...
+Automatische Ausrichtung und Abstände	Auto Align & Space	Alineación y espaciado automáticos	Allineamento e spaziatura automatici	Alignement et espacement automatiques
+Abstandsoptionen...	Spacing Options...	Opciones de espaciado...	Opzioni di spaziatura...	Options d'espacement...
+Weitere Verteilungsoptionen...	More Distribute Options...	Más opciones de distribución...	Altre opzioni di distribuzione...	Autres options de distribution...
+Von Seitenumbrüchen verschieben	Move Off Page Breaks	Alejar de los saltos de página	Sposta dalle interruzioni di pagina	Éloigner des sauts de page
+Seitenumbrüche vermeiden	Avoid Page Breaks	Evitar saltos de página	Evita interruzioni di pagina	Éviter les sauts de page
+Diagramm um 90° nach links drehen	Rotate Diagram Left 90°	Girar diagrama 90° a la izquierda	Ruota diagramma a sinistra di 90°	Faire pivoter le diagramme à gauche de 90°
+Diagramm um 90° nach rechts drehen	Rotate Diagram Right 90°	Girar diagrama 90° a la derecha	Ruota diagramma a destra di 90°	Faire pivoter le diagramme à droite de 90°
+Diagramm vertikal spiegeln	Flip Diagram Vertical	Voltear diagrama verticalmente	Capovolgi diagramma verticalmente	Retourner le diagramme verticalement
+Diagramm horizontal spiegeln	Flip Diagram Horizontal	Voltear diagrama horizontalmente	Capovolgi diagramma orizzontalmente	Retourner le diagramme horizontalement
+Diagramm drehen	Rotate Diagram	Girar diagrama	Ruota diagramma	Faire pivoter le diagramme
+Layout konfigurieren	Configure Layout	Configurar disposición	Configura layout	Configurer la disposition
+Stil|Layout	Style	Estilo	Stile	Style
+Ausrichtung|Layout	Alignment	Alineación	Allineamento	Alignement
+Links|Ausrichtung	Left	Izquierda	Sinistra	Gauche
+Zentriert|Ausrichtung	Center	Centro	Centro	Centre
+Rechts|Ausrichtung	Right	Derecha	Destra	Droite
+Oben|Ausrichtung	Top	Arriba	In alto	Haut
+Mitte|Ausrichtung	Middle	Medio	Al centro	Milieu
+Unten|Ausrichtung	Bottom	Abajo	In basso	Bas
+Nach unten, dann rechts	Down then right	Abajo y luego derecha	In basso, poi a destra	Bas puis droite
+Nach rechts, dann unten	Right then down	Derecha y luego abajo	A destra, poi in basso	Droite puis bas
+Nach rechts, dann oben	Right then up	Derecha y luego arriba	A destra, poi in alto	Droite puis haut
+Nach oben, dann rechts	Up then right	Arriba y luego derecha	In alto, poi a destra	Haut puis droite
+Nach oben, dann links	Up then left	Arriba y luego izquierda	In alto, poi a sinistra	Haut puis gauche
+Nach links, dann oben	Left then up	Izquierda y luego arriba	A sinistra, poi in alto	Gauche puis haut
+Nach links, dann unten	Left then down	Izquierda y luego abajo	A sinistra, poi in basso	Gauche puis bas
+Nach unten, dann links	Down then left	Abajo y luego izquierda	In basso, poi a sinistra	Bas puis gauche
+Darstellung	Appearance	Apariencia	Aspetto	Apparence
+Routing-Stil auf Verbinder anwenden	Apply routing style to connectors	Aplicar estilo de enrutamiento a los conectores	Applica stile di routing ai connettori	Appliquer le style de routage aux connecteurs
+Einstellungen anwenden auf	Apply settings to	Aplicar configuración a	Applica impostazioni a	Appliquer les paramètres à
+Seite vergrößern, damit die Zeichnung passt	Enlarge page to fit drawing	Ampliar la página para ajustar el dibujo	Ingrandisci la pagina per adattarla al disegno	Agrandir la page pour l'ajuster au dessin
+Abstandsoptionen	Spacing Options	Opciones de espaciado	Opzioni di spaziatura	Options d'espacement
+Standardabstand der Seite verwenden	Use the page's default spacing	Usar el espaciado predeterminado de la página	Usa la spaziatura predefinita della pagina	Utiliser l'espacement par défaut de la page
+Diesen Abstand verwenden	Use this spacing	Usar este espaciado	Usa questa spaziatura	Utiliser cet espacement
+Horizontal (0,1 mm)	Horizontal (0.1 mm)	Horizontal (0,1 mm)	Orizzontale (0,1 mm)	Horizontal (0,1 mm)
+Vertikal (0,1 mm)	Vertical (0.1 mm)	Vertical (0,1 mm)	Verticale (0,1 mm)	Vertical (0,1 mm)
+Shapes verteilen	Distribute Shapes	Distribuir formas	Distribuisci forme	Distribuer les formes
+Gleicher Abstand	Equal spacing	Espaciado uniforme	Spaziatura uniforme	Espacement égal
+Linke Kanten	Left edges	Bordes izquierdos	Bordi sinistri	Bords gauches
+Mitten	Centers	Centros	Centri	Centres
+Rechte Kanten	Right edges	Bordes derechos	Bordi destri	Bords droits
+Unterkanten	Bottom edges	Bordes inferiores	Bordi inferiori	Bords inférieurs
+Oberkanten	Top edges	Bordes superiores	Bordi superiori	Bords supérieurs
+Abstand (0,1 mm)	Spacing (0.1 mm)	Espaciado (0,1 mm)	Spaziatura (0,1 mm)	Espacement (0,1 mm)
+Verbinder-Verhalten	Connector Behavior	Comportamiento del conector	Comportamento connettore	Comportement du connecteur
+Seitenvorgabe	Page default	Valor predeterminado de la página	Impostazione della pagina	Valeur de la page
+{} Seiten|Linienübergang	{} sides	{} lados	{} lati	{} côtés
+Linienübergänge hinzufügen	Add line jumps	Agregar saltos de línea	Aggiungi salti di linea	Ajouter des sauts de ligne
+Nie	Never	Nunca	Mai	Jamais
+Immer	Always	Siempre	Sempre	Toujours
+Der andere Verbinder springt	Other connector jumps	Salta el otro conector	Salta l'altro connettore	L'autre connecteur saute
+Kein Verbinder springt	Neither connector jumps	No salta ningún conector	Non salta nessun connettore	Aucun connecteur ne saute
+Waagerechte Richtung	Horizontal direction	Dirección horizontal	Direzione orizzontale	Direction horizontale
+Senkrechte Richtung	Vertical direction	Dirección vertical	Direzione verticale	Direction verticale
+Nach oben|Linienübergang	Up	Arriba	Su	Vers le haut
+Nach unten|Linienübergang	Down	Abajo	Giù	Vers le bas
+Nach links|Linienübergang	Left	Izquierda	Sinistra	Vers la gauche
+Nach rechts|Linienübergang	Right	Derecha	Destra	Vers la droite
+Zuletzt verlegte Linie	Last routed line	Última línea enrutada	Ultima linea instradata	Dernière ligne routée
+Zuletzt angezeigte Linie	Last displayed line	Última línea mostrada	Ultima linea visualizzata	Dernière ligne affichée
+Zuerst angezeigte Linie	First displayed line	Primera línea mostrada	Prima linea visualizzata	Première ligne affichée
+Größe der Linienübergänge (waagerecht, senkrecht)	Line jump size (horizontal, vertical)	Tamaño de los saltos de línea (horizontal, vertical)	Dimensioni dei salti di linea (orizzontale, verticale)	Taille des sauts de ligne (horizontale, verticale)
+Richtung der Linienübergänge (waagerecht, senkrecht)	Line jump direction (horizontal, vertical)	Dirección de los saltos de línea (horizontal, vertical)	Direzione dei salti di linea (orizzontale, verticale)	Direction des sauts de ligne (horizontale, verticale)
+Vorgänge	Operations	Operaciones	Operazioni	Opérations
+Gesamtmenge	Union	Unión	Unione	Union
+Kombinieren	Combine	Combinar	Combina	Combiner
+In Einzelmengen zerlegen	Fragment	Fragmentar	Frammenta	Fragmenter
+Schnittmenge bilden	Intersect	Intersecar	Interseca	Intersection
+Subtrahieren	Subtract	Restar	Sottrai	Soustraire
+Ausrichtungsfeld aktualisieren	Update Alignment Box	Actualizar cuadro de alineación	Aggiorna casella di allineamento	Mettre à jour la zone d'alignement
+Einen Verbinder zeichnen	Draw one connector	Dibujar un conector	Disegna un connettore	Tracer un connecteur
+Schnell-Shape	Top shape	Forma principal	Forma principale	Forme principale
+Shapes ablegen	Drop shapes	Colocar formas	Rilascia forme	Déposer des formes
+{} Shapes abgelegt	{} shapes dropped	{} formas colocadas	{} forme rilasciate	{} formes déposées
+Maßlinien	Dimensions	Cotas	Quote	Cotes
+Shapes nummerieren	Number Shapes	Numerar formas	Numera forme	Numéroter les formes
+Beim Ablegen weiterzählen	Continue numbering on drop	Seguir numerando al colocar	Continua a numerare al rilascio	Continuer la numérotation au dépôt
+Shapes vervielfältigen	Array Shapes	Repetir formas en matriz	Ripeti forme in matrice	Répéter les formes en matrice
+Maßlinie horizontal	Horizontal dimension	Cota horizontal	Quota orizzontale	Cote horizontale
+Maßlinie vertikal	Vertical dimension	Cota vertical	Quota verticale	Cote verticale
+Maßlinie ausgerichtet	Aligned dimension	Cota alineada	Quota allineata	Cote alignée
+Kategorien	Categories	Categorías	Categorie	Catégories
+Leiste|Container	Bar	Barra	Barra	Barre
+Doppelrahmen|Container	Double frame	Marco doble	Doppia cornice	Double cadre
+Schiefer|Container	Slate	Pizarra	Ardesia	Ardoise
+Reiter|Container	Tab	Pestaña	Scheda	Onglet
+Kopflinie|Container	Heading rule	Línea de título	Linea del titolo	Filet de titre
+Klammer|Container	Brackets	Corchetes	Parentesi quadre	Crochets
+Signal|Container	Signal	Señal	Segnale	Signal
+Kopf unten|Container	Heading below	Encabezado abajo	Intestazione in basso	En-tête en bas
+Kopfband rechts	Heading band at right	Banda de encabezado a la derecha	Banda intestazione a destra	Bandeau d'en-tête à droite
+Kopfband unten	Heading band at bottom	Banda de encabezado abajo	Banda intestazione in basso	Bandeau d'en-tête en bas
+Titel unten	Title at bottom	Título abajo	Titolo in basso	Titre en bas
+Alle Containerformatvorlagen	All container styles	Todos los estilos de contenedor	Tutti gli stili contenitore	Tous les styles de conteneur
+Nach rechts unten	Right and down	Hacia la derecha y abajo	Verso destra e in basso	Vers la droite et le bas
+Nach links unten	Left and down	Hacia la izquierda y abajo	Verso sinistra e in basso	Vers la gauche et le bas
+Nach rechts oben	Right and up	Hacia la derecha y arriba	Verso destra e in alto	Vers la droite et le haut
+Nach links oben	Left and up	Hacia la izquierda y arriba	Verso sinistra e in alto	Vers la gauche et le haut
+Zwischen den Zeilen ({})	Between rows ({})	Entre filas ({})	Tra le righe ({})	Entre les lignes ({})
+Zwischen den Spalten ({})	Between columns ({})	Entre columnas ({})	Tra le colonne ({})	Entre les colonnes ({})
+Zwischen den Shapes	Between the shapes	Entre las formas	Tra le forme	Entre les formes
+Von Mitte zu Mitte	Center to center	De centro a centro	Da centro a centro	De centre à centre
+Kopien: {}	Copies: {}	Copias: {}	Copie: {}	Copies : {}
+Erforderliche Kategorien	Required categories	Categorías requeridas	Categorie richieste	Catégories requises
+Ausgeschlossene Kategorien	Excluded categories	Categorías excluidas	Categorie escluse	Catégories exclues
+Ein Shape wird Mitglied, wenn es eine der erforderlichen Kategorien hat (ohne Angabe: jede) und keine der ausgeschlossenen. Die Regel gilt ab dem nächsten Verschieben oder Ablegen.	A shape becomes a member when it has one of the required categories (none given: any) and none of the excluded ones. The rule applies from the next move or drop.	Una forma pasa a ser miembro si tiene una de las categorías requeridas (si no se indica ninguna, cualquiera) y ninguna de las excluidas. La regla se aplica a partir del siguiente movimiento o colocación.	Una forma diventa membro se ha una delle categorie richieste (se non ne è indicata nessuna, qualsiasi) e nessuna di quelle escluse. La regola vale dal prossimo spostamento o rilascio.	Une forme devient membre si elle a l'une des catégories requises (aucune indiquée : n'importe laquelle) et aucune des catégories exclues. La règle s'applique au prochain déplacement ou dépôt.
+Kategorien des Shapes	Categories of the shape	Categorías de la forma	Categorie della forma	Catégories de la forme
+Die Shapes haben verschiedene Kategorien; leer lassen behält sie.	The shapes have different categories; leave empty to keep them.	Las formas tienen categorías distintas; déjelo vacío para conservarlas.	Le forme hanno categorie diverse; lasciare vuoto per mantenerle.	Les formes ont des catégories différentes ; laissez vide pour les conserver.
+Mehrere Kategorien durch Semikolon trennen.	Separate several categories with a semicolon.	Separe varias categorías con punto y coma.	Separare più categorie con un punto e virgola.	Séparez plusieurs catégories par un point-virgule.
+Auf dieser Seite: {}	On this page: {}	En esta página: {}	In questa pagina: {}	Sur cette page : {}
+Auswahlreihenfolge	Selection order	Orden de selección	Ordine di selezione	Ordre de sélection
+Von links nach rechts, dann von oben nach unten	Left to right, then top to bottom	De izquierda a derecha, luego de arriba abajo	Da sinistra a destra, poi dall'alto in basso	De gauche à droite, puis de haut en bas
+Von oben nach unten, dann von links nach rechts	Top to bottom, then left to right	De arriba abajo, luego de izquierda a derecha	Dall'alto in basso, poi da sinistra a destra	De haut en bas, puis de gauche à droite
+Entlang der Verbinder	Along the connectors	A lo largo de los conectores	Lungo i connettori	Le long des connecteurs
+Alle Shapes der Seite	All shapes on the page	Todas las formas de la página	Tutte le forme della pagina	Toutes les formes de la page
+Reihenfolge	Order	Orden	Ordine	Ordre
+Für die ganze Seite gilt die Reihenfolge von links nach rechts.	For the whole page the order is left to right.	Para toda la página, el orden es de izquierda a derecha.	Per l'intera pagina l'ordine è da sinistra a destra.	Pour toute la page, l'ordre est de gauche à droite.
+Nummern	Numbers	Números	Numeri	Numéros
+Startnummer	Start number	Número inicial	Numero iniziale	Numéro de départ
+Schrittweite	Interval	Intervalo	Intervallo	Intervalle
+Präfix	Prefix	Prefijo	Prefisso	Préfixe
+Nummer im Text	Number in the text	Número en el texto	Numero nel testo	Numéro dans le texte
+Vor dem Text	Before the text	Antes del texto	Prima del testo	Avant le texte
+Nach dem Text	After the text	Después del texto	Dopo il testo	Après le texte
+Text ersetzen	Replace the text	Reemplazar el texto	Sostituisci il testo	Remplacer le texte
+Beispiel: {}	Example: {}	Ejemplo: {}	Esempio: {}	Exemple : {}
+Add-Ons	Add-Ons	Complementos	Componenti aggiuntivi	Compléments
+Maßlinie	Dimension	Cota	Quota	Cote
+Shape ändern	Change Shape	Cambiar forma	Cambia forma	Modifier la forme
+Zu Gruppe hinzufügen	Add to Group	Agregar al grupo	Aggiungi al gruppo	Ajouter au groupe
+Aus Gruppe entfernen	Remove from Group	Quitar del grupo	Rimuovi dal gruppo	Supprimer du groupe
+Gruppe öffnen	Open Group	Abrir grupo	Apri gruppo	Ouvrir le groupe
+Gruppe schließen	Close Group	Cerrar grupo	Chiudi gruppo	Fermer le groupe
+Verhalten...	Behavior...	Comportamiento...	Comportamento...	Comportement...
+Gruppe „{}“ geöffnet	Group “{}” opened	Grupo «{}» abierto	Gruppo «{}» aperto	Groupe « {} » ouvert
+Gruppe „{}“ geöffnet: Shapes hineinziehen oder bearbeiten	Group “{}” is open: drag shapes into it or edit them	Grupo «{}» abierto: arrastre formas a él o edítelas	Gruppo «{}» aperto: trascinare forme al suo interno o modificarle	Groupe « {} » ouvert : faites-y glisser des formes ou modifiez-les
+Durch diese Aktion wird die Verknüpfung des Objekts mit dem Master getrennt. Dadurch kann sich das Objekt anders verhalten.	This action will sever the object's link to its master shape. This can cause the object to behave differently.	Esta acción romperá el vínculo del objeto con su forma maestra. Esto puede hacer que el objeto se comporte de forma diferente.	Questa azione interromperà il collegamento dell'oggetto con la forma master. L'oggetto potrebbe comportarsi in modo diverso.	Cette action rompra le lien de l'objet avec sa forme maître. L'objet risque de se comporter différemment.
+{} Formeln der Elemente beziehen sich auf die Gruppe; sie behalten nur ihre Werte.	{} formulas of the members refer to the group; they keep only their values.	{} fórmulas de los miembros hacen referencia al grupo; solo conservarán sus valores.	{} formule dei membri fanno riferimento al gruppo; manterranno solo i loro valori.	{} formules des membres font référence au groupe ; elles ne gardent que leurs valeurs.
+Möchten Sie den Vorgang fortsetzen?	Do you want to continue?	¿Desea continuar?	Continuare?	Voulez-vous continuer ?
+Nur Gruppe	Group only	Solo grupo	Solo gruppo	Groupe uniquement
+Gruppe zuerst	Group first	Grupo primero	Prima il gruppo	Groupe d'abord
+Elemente zuerst	Members first	Miembros primero	Prima i membri	Membres d'abord
+Ausblenden	Hide	Ocultar	Nascondi	Masquer
+Hinter Elementshapes	Behind member shapes	Detrás de las formas miembro	Dietro le forme membro	Derrière les formes membres
+Vor Elementshapes	In front of member shapes	Delante de las formas miembro	Davanti alle forme membro	Devant les formes membres
+Gruppenverhalten	Group behavior	Comportamiento del grupo	Comportamento del gruppo	Comportement du groupe
+Gruppendaten	Group data	Datos del grupo	Dati del gruppo	Données du groupe
+An Elementshapes ausrichten	Snap to member shapes	Ajustar a formas miembro	Blocca sulle forme membro	Aligner sur les formes membres
+Gruppentext bearbeiten	Edit text of group	Editar texto del grupo	Modifica testo del gruppo	Modifier le texte du groupe
+Abgelegte Shapes übernehmen	Accept dropped shapes	Aceptar formas colocadas	Accetta forme rilasciate	Accepter les formes déposées
+Elemente nicht mit der Maus verschieben	Members cannot be dragged with the mouse	No arrastrar los miembros con el ratón	Non trascinare i membri con il mouse	Ne pas déplacer les membres à la souris
+Doppelklick öffnet die Gruppe	Double-click opens the group	Doble clic abre el grupo	Il doppio clic apre il gruppo	Un double-clic ouvre le groupe
+Verschiedenes	Miscellaneous	Varios	Varie	Divers
+Shape bei Ablage zu Gruppen hinzufügen	Add shape to groups on drop	Agregar forma a grupos al colocarla	Aggiungi forma ai gruppi al rilascio	Ajouter la forme aux groupes lors de la dépose
+Kein ersetzbares Shape ausgewählt	No shape selected that can be replaced	No hay ninguna forma seleccionada que se pueda reemplazar	Nessuna forma sostituibile selezionata	Aucune forme remplaçable sélectionnée
+Schnell-Shapes: {}	Top shapes: {}	Formas principales: {}	Forme principali: {}	Formes principales : {}
+Keine passenden Schnell-Shapes	No matching top shapes	No hay formas principales adecuadas	Forme principali: nessuna adatta	Formes principales : aucune adaptée
+Schablonen	Stencils	Colecciones de formas	Raccolte di forme	Bibliothèques de formes
+Shape geändert in „{}“	Shape changed to “{}”	Forma cambiada a «{}»	Forma cambiata in «{}»	Forme remplacée par « {} »
+Das Shape lässt sich nicht ändern.	The shape cannot be changed.	No se puede cambiar la forma.	Impossibile cambiare la forma.	Impossible de modifier la forme.
+„{}“ kann die ausgewählten Shapes nicht ersetzen.	“{}” cannot replace the selected shapes.	«{}» no puede reemplazar las formas seleccionadas.	«{}» non può sostituire le forme selezionate.	« {} » ne peut pas remplacer les formes sélectionnées.
+Segment verschieben	Move Segment	Mover el segmento	Sposta il segmento	Déplacer le segment
+Organigramm|Routing	Organization Chart	Organigrama	Organigramma	Organigramme hiérarchique
+Baum|Routing	Tree	Árbol	Albero	Arborescence
+Einfach|Routing	Simple	Simple	Semplice	Simple
+Einfach waagerecht-senkrecht	Simple Horizontal-Vertical	Simple horizontal-vertical	Semplice orizzontale-verticale	Simple horizontal-vertical
+Einfach senkrecht-waagerecht	Simple Vertical-Horizontal	Simple vertical-horizontal	Semplice verticale-orizzontale	Simple vertical-horizontal
+Richtung des Routings	Routing direction	Dirección del enrutamiento	Direzione del routing	Direction du routage
+Weg	Path	Ruta	Percorso	Chemin
+Neu verlegen	Reroute	Volver a enrutar	Reinstrada	Réacheminer
+Frei	Freely	Libremente	Liberamente	Librement
+Nach Bedarf	As needed	Según sea necesario	Se necessario	Si nécessaire
+Bei Überkreuzung	On crossover	Al cruzarse	In caso di incrocio	En cas de croisement
+Verbinder dürfen das Shape waagerecht durchqueren	Connectors may route through the shape horizontally	Los conectores pueden atravesar la forma horizontalmente	I connettori possono attraversare la forma orizzontalmente	Les connecteurs peuvent traverser la forme horizontalement
+Verbinder dürfen das Shape senkrecht durchqueren	Connectors may route through the shape vertically	Los conectores pueden atravesar la forma verticalmente	I connettori possono attraversare la forma verticalmente	Les connecteurs peuvent traverser la forme verticalement
+Andere Shapes dürfen beim Layout darauf platziert werden	Allow other shapes to be placed on top in a layout	Permitir colocar otras formas encima al distribuir	Consenti di posizionare altre forme sopra nel layout	Autoriser le placement d'autres formes dessus lors de la disposition
+Linien trennen und überlappen	Separate and overlap lines	Separar y superponer líneas	Separa e sovrapponi linee	Séparer et superposer les lignes
+Unverbundene	Unrelated	No relacionadas	Non correlate	Non liées
+Wie der Stil	Style default	Según el estilo	Come lo stile	Selon le style
+Benachbarte	Close lines	Cercanas	Vicine	Proches
+Verbundene	Related	Relacionadas	Correlate	Liées
+Verbindungspunkt|Tool	Connection Point	Punto de conexión	Punto di connessione	Point de connexion
+Nach innen	Inward	Hacia dentro	Verso l'interno	Vers l'intérieur
+Nach außen	Outward	Hacia fuera	Verso l'esterno	Vers l'extérieur
+Nach innen und außen	Inward & Outward	Hacia dentro y hacia fuera	Verso l'interno e l'esterno	Vers l'intérieur et l'extérieur
+Verbindungspunkt verschieben	Move Connection Point	Mover el punto de conexión	Sposta il punto di connessione	Déplacer le point de connexion
+Verbindungspunkt hinzufügen	Add Connection Point	Agregar punto de conexión	Aggiungi punto di connessione	Ajouter un point de connexion
+Verbindungspunkt löschen	Delete Connection Point	Eliminar el punto de conexión	Elimina il punto di connessione	Supprimer le point de connexion
+Art des Verbindungspunkts	Connection Point Type	Tipo de punto de conexión	Tipo di punto di connessione	Type de point de connexion
+Scheitelpunkte verschieben	Move Vertices	Mover los vértices	Sposta i vertici	Déplacer les sommets
+Scheitelpunkte löschen	Delete Vertices	Eliminar vértices	Elimina vertici	Supprimer les sommets
+Bogen ändern	Change Arc	Cambiar el arco	Modifica l'arco	Modifier l'arc
+Kleben an	Glue to	Pegar a	Incolla a	Coller à
+Shape-Ziehpunkte	Shape handles	Controladores de forma	Maniglie della forma	Poignées de forme
+Shape-Scheitelpunkte	Shape vertices	Vértices de forma	Vertici della forma	Sommets de forme
+Horizontal|Legende	Horizontal	Horizontal	Orizzontale	Horizontale
+Vertikal|Legende	Vertical	Vertical	Verticale	Verticale
+Neue Datengrafik erstellen ...	Create new data graphic ...	Crear gráfico de datos nuevo ...	Crea nuova grafica dati ...	Créer un graphique de données ...
+Datengrafik bearbeiten ...	Edit data graphic ...	Editar gráfico de datos ...	Modifica grafica dati ...	Modifier le graphique de données ...
+Umbenennen|Datengrafik	Rename	Cambiar nombre	Rinomina	Renommer
+Duplizieren|Datengrafik	Duplicate	Duplicar	Duplica	Dupliquer
+Löschen|Datengrafik	Delete	Eliminar	Elimina	Supprimer
+Shapes mit dieser Grafik auswählen	Select shapes with this graphic	Seleccionar formas con este gráfico	Seleziona forme con questa grafica	Sélectionner les formes avec ce graphique
+Keine Datengrafik	No data graphic	Sin gráfico de datos	Nessuna grafica dati	Aucun graphique de données
+Weit links|Position	Far left	Muy a la izquierda	Molto a sinistra	Tout à gauche
+Linker Rand|Position	Left edge	Borde izquierdo	Bordo sinistro	Bord gauche
+Links|Position	Left	Izquierda	Sinistra	Gauche
+Zentriert|Position	Center	Centro	Centro	Centre
+Rechts|Position	Right	Derecha	Destra	Droite
+Rechter Rand|Position	Right edge	Borde derecho	Bordo destro	Bord droit
+Weit rechts|Position	Far right	Muy a la derecha	Molto a destra	Tout à droite
+Unterhalb|Position	Below	Debajo	Sotto	En dessous
+Unterer Rand|Position	Bottom edge	Borde inferior	Bordo inferiore	Bord inférieur
+Unten|Position	Bottom	Abajo	In basso	Bas
+Mittig|Position	Middle	En medio	Al centro	Milieu
+Oben|Position	Top	Arriba	In alto	Haut
+Oberer Rand|Position	Top edge	Borde superior	Bordo superiore	Bord supérieur
+Oberhalb|Position	Above	Encima	Sopra	Au-dessus
+Daten – {}	Data – {}	Datos – {}	Dati – {}	Données – {}
+Datengrafik	Data graphic	Gráfico de datos	Grafica dati	Graphique de données
+Die Datengrafik lässt sich nicht ändern: {}	The data graphic cannot be changed: {}	No se puede cambiar el gráfico de datos: {}	Impossibile modificare la grafica dati: {}	Impossible de modifier le graphique de données : {}
+Hellgrün	Light green	Verde claro	Verde chiaro	Vert clair
+Hellblau	Light blue	Azul claro	Azzurro	Bleu clair
+Orange	Orange	Naranja	Arancione	Orange
+Lila	Purple	Morado	Viola	Violet
+Grau	Gray	Gris	Grigio	Gris
+Dunkelgelb	Dark yellow	Amarillo oscuro	Giallo scuro	Jaune foncé
+Türkis	Turquoise	Turquesa	Turchese	Turquoise
+Text|Datengrafik	Text	Texto	Testo	Texte
+Datenleiste	Data bar	Barra de datos	Barra dei dati	Barre de données
+Symbolsatz	Icon set	Conjunto de iconos	Set di icone	Jeu d'icônes
+Farbe nach Wert	Color by value	Color por valor	Colore per valore	Couleur par valeur
+Position der Datengrafik	Position of the data graphic	Posición del gráfico de datos	Posizione della grafica dati	Position du graphique de données
+zwischen	between	entre	tra	entre
+enthält	contains	contiene	contiene	contient
+enthält nicht	does not contain	no contiene	non contiene	ne contient pas
+Legende	Legend	Leyenda	Legenda	Légende
+Symbol {}	Icon {}	Icono {}	Icona {}	Icône {}
+Wert als Text	Value as text	Valor como texto	Valore come testo	Valeur sous forme de texte
+Datengrafik anwenden	Apply data graphic	Aplicar gráfico de datos	Applica grafica dati	Appliquer le graphique de données
+Datengrafik duplizieren	Duplicate data graphic	Duplicar gráfico de datos	Duplica grafica dati	Dupliquer le graphique de données
+Datengrafik löschen	Delete data graphic	Eliminar gráfico de datos	Elimina grafica dati	Supprimer le graphique de données
+Zahl mit zwei Dezimalstellen	Number with two decimal places	Número con dos decimales	Numero con due decimali	Nombre à deux décimales
+Zahl mit Tausendertrennzeichen	Number with thousands separator	Número con separador de miles	Numero con separatore delle migliaia	Nombre avec séparateur de milliers
+Prozent	Percent	Porcentaje	Percentuale	Pourcentage
+{{dd.MM.yyyy}}	{{dd.MM.yyyy}}	{{dd.MM.yyyy}}	{{dd.MM.yyyy}}	{{dd.MM.yyyy}}
+Links vom Wert	Left of value	A la izquierda del valor	A sinistra del valore	À gauche de la valeur
+Nicht angezeigt	Not shown	No se muestra	Non visualizzata	Non affichée
+Rechts vom Wert	Right of value	A la derecha del valor	A destra del valore	À droite de la valeur
+Unter dem Wert	Below value	Debajo del valor	Sotto il valore	Sous la valeur
+Über dem Wert	Above value	Encima del valor	Sopra il valore	Au-dessus de la valeur
+Kein Rahmen	No border	Sin borde	Nessun bordo	Aucune bordure
+Linie unten	Bottom line	Línea inferior	Linea in basso	Ligne en bas
+Umriss	Outline	Contorno	Contorno	Contour
+Gefüllt	Filled	Relleno	Riempito	Rempli
+Keine Füllung|Datengrafik	No fill	Sin relleno	Nessun riempimento	Aucun remplissage
+[nicht verwendet]	[not used]	[no se usa]	[non utilizzato]	[non utilisé]
+ist gleich	equals	es igual a	è uguale a	est égal à
+ist größer als	is greater than	es mayor que	è maggiore di	est supérieur à
+ist größer als oder gleich	is greater than or equal to	es mayor o igual que	è maggiore o uguale a	est supérieur ou égal à
+ist kleiner als	is less than	es menor que	è minore di	est inférieur à
+ist kleiner als oder gleich	is less than or equal to	es menor o igual que	è minore o uguale a	est inférieur ou égal à
+ist ungleich	does not equal	no es igual a	è diverso da	est différent de
+liegt zwischen	is between	está entre	è compreso tra	est compris entre
+Dunkelblau	Dark blue	Azul oscuro	Blu scuro	Bleu foncé
+Dunkelrot	Dark red	Rojo oscuro	Rosso scuro	Rouge foncé
+Datengrafik bearbeiten	Edit data graphic	Editar gráfico de datos	Modifica grafica dati	Modifier le graphique de données
+Neue Datengrafik	New data graphic	Gráfico de datos nuevo	Nuova grafica dati	Nouveau graphique de données
+Elemente	Items	Elementos	Elementi	Éléments
+Element bearbeiten ...	Edit item ...	Editar elemento ...	Modifica elemento ...	Modifier l'élément ...
+Löschen|Element	Delete	Eliminar	Elimina	Supprimer
+Neues Element ...	New item ...	Elemento nuevo ...	Nuovo elemento ...	Nouvel élément ...
+Standardposition	Default position	Posición predeterminada	Posizione predefinita	Position par défaut
+Horizontal|Position	Horizontal	Horizontal	Orizzontale	Horizontale
+Vertikal|Position	Vertical	Vertical	Verticale	Verticale
+Anzeigeoptionen	Display options	Opciones de presentación	Opzioni di visualizzazione	Options d'affichage
+Shape-Text ausblenden	Hide shape text	Ocultar el texto de la forma	Nascondi il testo della forma	Masquer le texte de la forme
+Rahmen um Elemente an der Standardposition	Border around items at the default position	Borde alrededor de los elementos en la posición predeterminada	Bordo intorno agli elementi nella posizione predefinita	Bordure autour des éléments à la position par défaut
+Übernehmen	Apply	Aplicar	Applica	Appliquer
+Element bearbeiten	Edit item	Editar elemento	Modifica elemento	Modifier l'élément
+Neues Element	New item	Elemento nuevo	Nuovo elemento	Nouvel élément
+Weitere Felder	More fields	Más campos	Altri campi	Autres champs
+Datenfeld	Data field	Campo de datos	Campo dati	Champ de données
+Ausdruck	Expression	Expresión	Espressione	Expression
+Feldnamen in geschweiften Klammern, verbunden mit + - * /	Field names in braces, joined by + - * /	Nombres de campo entre llaves, unidos con + - * /	Nomi dei campi tra parentesi graffe, uniti da + - * /	Noms de champ entre accolades, reliés par + - * /
+Anzeigen als	Displayed as	Mostrar como	Visualizza come	Afficher en tant que
+Position	Position	Posición	Posizione	Position
+Standardposition verwenden	Use default position	Usar la posición predeterminada	Usa la posizione predefinita	Utiliser la position par défaut
+Details	Details	Detalles	Dettagli	Détails
+Eigenes: {}	Custom: {}	Personalizado: {}	Personalizzato: {}	Personnalisé : {}
+[Default]: die Bezeichnung des Datenfelds	[Default]: the name of the data field	[Default]: el nombre del campo de datos	[Default]: il nome del campo dati	[Default] : le nom du champ de données
+Position der Bezeichnung	Label position	Posición de la etiqueta	Posizione dell'etichetta	Position de l'étiquette
+Wertformat	Value format	Formato del valor	Formato del valore	Format de la valeur
+Wert anzeigen	Show value	Mostrar valor	Mostra valore	Afficher la valeur
+Rahmen|Text	Border	Borde	Bordo	Bordure
+Füllung|Text	Fill	Relleno	Riempimento	Remplissage
+Minimalwert	Minimum value	Valor mínimo	Valore minimo	Valeur minimale
+Maximalwert	Maximum value	Valor máximo	Valore massimo	Valeur maximale
+Regeln für die Symbole	Rules for the icons	Reglas para los iconos	Regole per le icone	Règles des icônes
+Der Stil hat keine Symbole.	The style has no icons.	El estilo no tiene iconos.	Lo stile non ha icone.	Le style n'a pas d'icônes.
+Werte des Felds: {}	Values of the field: {}	Valores del campo: {}	Valori del campo: {}	Valeurs du champ : {}
+Jeder Bereich eine Farbe	Each color represents a range of values	Cada color representa un intervalo de valores	Ogni colore rappresenta un intervallo di valori	Chaque couleur représente une plage de valeurs
+Jeder Wert eine Farbe	Each color represents a unique value	Cada color representa un valor único	Ogni colore rappresenta un valore univoco	Chaque couleur représente une valeur unique
+Färbemethode	Coloring method	Método de coloración	Metodo di colorazione	Méthode de coloration
+Eigene: {}	Custom: {}	Personalizado: {}	Personalizzato: {}	Personnalisée : {}
+Löschen|Farbe	Delete	Eliminar	Elimina	Supprimer
+Farbe hinzufügen	Add color	Agregar color	Aggiungi colore	Ajouter une couleur
+Werte der Shapes einsetzen	Insert the shapes' values	Insertar los valores de las formas	Inserisci i valori delle forme	Insérer les valeurs des formes
+Das Element braucht ein Datenfeld.	The item needs a data field.	El elemento necesita un campo de datos.	L'elemento richiede un campo dati.	L'élément a besoin d'un champ de données.
+Datengrafik umbenennen	Rename data graphic	Cambiar nombre del gráfico de datos	Rinomina grafica dati	Renommer le graphique de données
+Es gibt schon eine Datengrafik „{}“.	There is already a data graphic “{}”.	Ya existe un gráfico de datos «{}».	Esiste già una grafica dati «{}».	Il existe déjà un graphique de données « {} ».
+Keine|Datengrafik	None	Ninguno	Nessuna	Aucun
+Wählen Sie ein Feld im Bereich Datengrafikfelder.	Choose a field in the Data Graphic Fields pane.	Elija un campo en el panel Campos de gráfico de datos.	Scegli un campo nel riquadro Campi grafica dati.	Choisissez un champ dans le volet Champs de graphique de données.
+Alle Datengrafiken	All data graphics	Todos los gráficos de datos	Tutte le grafiche dati	Tous les graphiques de données
+Weitere Datengrafiken ...	More data graphics ...	Más gráficos de datos ...	Altre grafiche dati ...	Autres graphiques de données ...
+In dieser Zeichnung	In this drawing	En este dibujo	In questo disegno	Dans ce dessin
+Die Zeichnung hat noch keine Datengrafik.	The drawing has no data graphic yet.	El dibujo aún no tiene ningún gráfico de datos.	Il disegno non ha ancora una grafica dati.	Le dessin n'a pas encore de graphique de données.
+Keine Datenfelder	No data fields	Sin campos de datos	Nessun campo dati	Aucun champ de données
+Verknüpfen Sie Shapes mit Daten, um ihre Felder hier zu sehen.	Link shapes to data to see their fields here.	Vincule formas a datos para ver aquí sus campos.	Collega le forme ai dati per vederne qui i campi.	Liez des formes à des données pour voir leurs champs ici.
+Datengrafik: {}	Data graphic: {}	Gráfico de datos: {}	Grafica dati: {}	Graphique de données : {}
+Ein Haken zeigt das Feld als Datengrafik. Die Galerie, Position und Konfigurieren ändern das gewählte Feld.	A check mark shows the field as a data graphic. The gallery, Position and Configure change the chosen field.	Una marca muestra el campo como gráfico de datos. La galería, Posición y Configurar cambian el campo elegido.	Un segno di spunta mostra il campo come grafica dati. La raccolta, Posizione e Configura modificano il campo scelto.	Une coche affiche le champ comme graphique de données. La galerie, Position et Configurer modifient le champ choisi.
+„{}“ als Datengrafik zeigen	Show “{}” as a data graphic	Mostrar «{}» como gráfico de datos	Mostra «{}» come grafica dati	Afficher « {} » comme graphique de données
+Datengrafikfeld entfernen	Remove data graphic field	Quitar campo de gráfico de datos	Rimuovi campo grafica dati	Supprimer le champ de graphique de données
+Datengrafikfeld hinzufügen	Add data graphic field	Agregar campo de gráfico de datos	Aggiungi campo grafica dati	Ajouter un champ de graphique de données
+<Anzeigetext>	<Displayed text>	<Texto mostrado>	<Testo visualizzato>	<Texte affiché>
+<Breite>	<Width>	<Ancho>	<Larghezza>	<Largeur>
+<Höhe>	<Height>	<Alto>	<Altezza>	<Hauteur>
+<Master-Name>	<Master shape name>	<Nombre de forma maestra>	<Nome forma master>	<Nom de forme maître>
+<PinX>	<PinX>	<PinX>	<PinX>	<PinX>
+<PinY>	<PinY>	<PinY>	<PinY>	<PinY>
+<Shape-ID>	<Shape ID>	<Id. de forma>	<ID forma>	<ID de forme>
+<Shape-Name>	<Shape name>	<Nombre de forma>	<Nome forma>	<Nom de forme>
+Absteigend	Descending	Descendente	Decrescente	Décroissant
+Alle Eigenschaften anzeigen	Show all properties	Mostrar todas las propiedades	Mostra tutte le proprietà	Afficher toutes les propriétés
+Alle löschen	Delete all	Eliminar todo	Elimina tutto	Tout supprimer
+Anzahl der Shapes auf allen Seiten, nach Master-Shape gruppiert.	Number of shapes on all pages, grouped by master shape.	Número de formas en todas las páginas, agrupadas por forma maestra.	Numero di forme su tutte le pagine, raggruppate per forma master.	Nombre de formes sur toutes les pages, groupées par forme maître.
+Arbeitsspeicher	Memory	Memoria	Memoria	Mémoire
+Assistent für Berichtsdefinitionen	Report Definition Wizard	Asistente para definiciones de informe	Procedura guidata definizione report	Assistant Définition de rapport
+Aufsteigend	Ascending	Ascendente	Crescente	Croissant
+Ausführen...	Run...	Ejecutar...	Esegui...	Exécuter...
+Bedingung	Condition	Condición	Condizione	Condition
+Bericht	Report	Informe	Report	Rapport
+Bericht aktualisieren	Update Report	Actualizar informe	Aggiorna report	Mettre à jour le rapport
+Bericht ausführen	Run Report	Ejecutar informe	Esegui report	Exécuter le rapport
+Bericht entfernen	Remove Report	Quitar informe	Rimuovi report	Supprimer le rapport
+Bericht ändern	Modify Report	Modificar informe	Modifica report	Modifier le rapport
+Bericht „{}“	Report “{}”	Informe «{}»	Report «{}»	Rapport « {} »
+Bericht „{}“ aktualisiert	Report “{}” updated	Informe «{}» actualizado	Report «{}» aggiornato	Rapport « {} » mis à jour
+Berichte	Reports	Informes	Report	Rapports
+Berichtsformat	Report format	Formato del informe	Formato del report	Format du rapport
+Berichtstitel	Report title	Título del informe	Titolo del report	Titre du rapport
+Betriebssystem	Operating system	Sistema operativo	Sistema operativo	Système d'exploitation
+CSV-Datei (.csv)	CSV file (.csv)	Archivo CSV (.csv)	File CSV (.csv)	Fichier CSV (.csv)
+Computer	Computers	Equipos	Computer	Ordinateurs
+Computer und Server mit Betriebssystem, Prozessor, Arbeitsspeicher und Festplatte.	Computers and servers with operating system, processor, memory and hard disk.	Equipos y servidores con sistema operativo, procesador, memoria y disco duro.	Computer e server con sistema operativo, processore, memoria e disco rigido.	Ordinateurs et serveurs avec système d'exploitation, processeur, mémoire et disque dur.
+Dateiformat	File format	Formato de archivo	Formato file	Format de fichier
+Daten exportieren	Export Data	Exportar datos	Esporta dati	Exporter les données
+Den mitgelieferten Bericht „{}“ gibt es nicht.	The built-in report “{}” does not exist.	El informe incluido «{}» no existe.	Il report incluso «{}» non esiste.	Le rapport fourni « {} » n'existe pas.
+Der Bericht braucht einen Namen.	The report needs a name.	El informe necesita un nombre.	Il report deve avere un nome.	Le rapport doit avoir un nom.
+Der Bericht ließ sich nicht auf die Seite stellen: {}	The report could not be put on the page: {}	No se pudo colocar el informe en la página: {}	Impossibile inserire il report nella pagina: {}	Impossible de placer le rapport sur la page : {}
+Der Bericht ließ sich nicht speichern: {}	The report could not be saved: {}	No se pudo guardar el informe: {}	Impossibile salvare il report: {}	Impossible d'enregistrer le rapport : {}
+Der Bericht „{}“ steht als Tabelle auf der Seite (Zeilen: {}).	The report “{}” is on the page as a table (rows: {}).	El informe «{}» está en la página como tabla (filas: {}).	Il report «{}» è nella pagina come tabella (righe: {}).	Le rapport « {} » est sur la page sous forme de tableau (lignes : {}).
+Dezimalstellen	Decimal places	Posiciones decimales	Posizioni decimali	Décimales
+Dezimalstellen: {}	Decimal places: {}	Posiciones decimales: {}	Posizioni decimali: {}	Décimales : {}
+Die Kopie der Berichtsdefinition ist beschädigt ({}).	The copy of the report definition is damaged ({}).	La copia de la definición del informe está dañada ({}).	La copia della definizione del report è danneggiata ({}).	La copie de la définition du rapport est endommagée ({}).
+Die Shape-Daten der Shapes als Excel-Arbeitsmappe oder CSV-Datei speichern (Inventar)	Save the shapes' shape data as an Excel workbook or a CSV file (inventory)	Guardar los datos de forma de las formas como libro de Excel o archivo CSV (inventario)	Salva i dati forma delle forme come cartella di lavoro di Excel o file CSV (inventario)	Enregistrer les données de forme des formes dans un classeur Excel ou un fichier CSV (inventaire)
+Die Tabelle kommt auf die Seite und die Ebene „Bericht“; ihr Kontextmenü aktualisiert sie.	The table goes on the page, on the layer “Report”; its shortcut menu updates it.	La tabla se coloca en la página, en la capa «Informe»; su menú contextual la actualiza.	La tabella va nella pagina, sul livello «Report»; il suo menu di scelta rapida la aggiorna.	Le tableau est placé sur la page, sur le calque « Rapport » ; son menu contextuel le met à jour.
+Die Zeichnung hat keine Berichtsdefinition „{}“ mehr.	The drawing no longer has a report definition “{}”.	El dibujo ya no tiene la definición de informe «{}».	Il disegno non ha più la definizione di report «{}».	Le dessin n'a plus de définition de rapport « {} ».
+Die Zeichnung hat schon einen Bericht dieses Namens.	The drawing already has a report with this name.	El dibujo ya tiene un informe con este nombre.	Il disegno ha già un report con questo nome.	Le dessin a déjà un rapport portant ce nom.
+Doppelte Zeilen ausschließen	Exclude duplicate rows	Excluir filas duplicadas	Escludi righe duplicate	Exclure les lignes en double
+Eigenschaft	Property	Propiedad	Proprietà	Propriété
+Eine Berichtsdefinition in einer Datei (.vrd) lässt sich in anderen Zeichnungen über Durchsuchen... verwenden.	A report definition in a file (.vrd) can be used in other drawings through Browse....	Una definición de informe en un archivo (.vrd) se puede usar en otros dibujos con Examinar....	Una definizione di report in un file (.vrd) si può usare in altri disegni con Sfoglia....	Une définition de rapport dans un fichier (.vrd) peut servir dans d'autres dessins via Parcourir....
+Eine Zeile je Shape, das mindestens eines der gewählten Shape-Daten-Felder hat.	One row per shape that has at least one of the chosen shape data fields.	Una fila por cada forma que tenga al menos uno de los campos de datos de forma elegidos.	Una riga per ogni forma che ha almeno uno dei campi dati forma scelti.	Une ligne par forme qui possède au moins un des champs de données de forme choisis.
+Einheiten anzeigen	Show units	Mostrar unidades	Mostra unità	Afficher les unités
+Erweitert...	Advanced...	Avanzado...	Avanzate...	Avancé...
+Es ist keine Seite zu sehen.	No page is shown.	No se muestra ninguna página.	Nessuna pagina visualizzata.	Aucune page n'est affichée.
+Excel-Arbeitsmappe (.xlsx)	Excel workbook (.xlsx)	Libro de Excel (.xlsx)	Cartella di lavoro di Excel (.xlsx)	Classeur Excel (.xlsx)
+Exportieren...	Export...	Exportar...	Esporta...	Exporter...
+FALSCH	FALSE	FALSO	FALSO	FAUX
+Festgelegte Kriterien	Defined criteria	Criterios definidos	Criteri definiti	Critères définis
+Festplatte	Hard disk	Disco duro	Disco rigido	Disque dur
+Format...	Format...	Formato...	Formato...	Format...
+Gebäude	Building	Edificio	Edificio	Bâtiment
+Gerät	Device	Dispositivo	Dispositivo	Appareil
+Geräte im Rack mit ihren Höheneinheiten; die Summe zeigt den belegten Platz.	Devices in the rack with their rack units; the total shows the space used.	Dispositivos en el rack con sus unidades de altura; la suma muestra el espacio ocupado.	Dispositivi nel rack con le loro unità di altezza; la somma mostra lo spazio occupato.	Appareils de la baie avec leurs unités de hauteur ; la somme indique l'espace occupé.
+Geräte mit IP-Adresse: Netzwerkname, Adressen und Hersteller, nach Netzwerkname sortiert.	Devices with an IP address: network name, addresses and manufacturer, sorted by network name.	Dispositivos con dirección IP: nombre de red, direcciones y fabricante, ordenados por nombre de red.	Dispositivi con indirizzo IP: nome di rete, indirizzi e produttore, ordinati per nome di rete.	Appareils avec une adresse IP : nom réseau, adresses et fabricant, triés par nom réseau.
+Gesamt	Grand total	Total general	Totale generale	Total général
+Gesamtergebnis anzeigen	Show grand total	Mostrar total general	Mostra totale generale	Afficher le total général
+Gespeichert: {} (Zeilen: {})	Saved: {} (rows: {})	Guardado: {} (filas: {})	Salvato: {} (righe: {})	Enregistré : {} (lignes : {})
+Gilt für alle Zahlen des Berichts; Längen zeigen ihre Einheit.	Applies to every number of the report; lengths show their unit.	Se aplica a todos los números del informe; las longitudes muestran su unidad.	Vale per tutti i numeri del report; le lunghezze mostrano la loro unità.	S'applique à tous les nombres du rapport ; les longueurs affichent leur unité.
+Gruppieren nach	Group by	Agrupar por	Raggruppa per	Grouper par
+Gruppiert nach: {}	Grouped by: {}	Agrupado por: {}	Raggruppato per: {}	Groupé par : {}
+Hersteller	Manufacturer	Fabricante	Produttore	Fabricant
+Hersteller, Produkt-, Serien- und Inventarnummern und Standorte der Geräte, nach Hersteller gruppiert.	Manufacturers, product, serial and asset numbers and locations of the devices, grouped by manufacturer.	Fabricantes, números de producto, de serie y de inventario y ubicaciones de los dispositivos, agrupados por fabricante.	Produttori, codici prodotto, numeri di serie e di inventario e sedi dei dispositivi, raggruppati per produttore.	Fabricants, références produit, numéros de série et d'inventaire et sites des appareils, groupés par fabricant.
+Höheneinheiten	Rack units	Unidades de altura	Unità di altezza	Unités de hauteur
+IP-Adresse	IP address	Dirección IP	Indirizzo IP	Adresse IP
+In dieser Zeichnung speichern	Save in this drawing	Guardar en este dibujo	Salva in questo disegno	Enregistrer dans ce dessin
+In einer Datei speichern	Save in a file	Guardar en un archivo	Salva in un file	Enregistrer dans un fichier
+Inventar	Inventory	Inventario	Inventario	Inventaire
+Inventarnummer	Asset number	Número de inventario	Numero di inventario	Numéro d'inventaire
+Jede gewählte Eigenschaft wird eine Spalte des Berichts. Alle Eigenschaften: auch verborgene Shape-Daten und Benutzerzellen.	Every chosen property becomes a column of the report. All properties: hidden shape data and user cells too.	Cada propiedad elegida se convierte en una columna del informe. Todas las propiedades: también los datos de forma ocultos y las celdas de usuario.	Ogni proprietà scelta diventa una colonna del report. Tutte le proprietà: anche i dati forma nascosti e le celle utente.	Chaque propriété choisie devient une colonne du rapport. Toutes les propriétés : aussi les données de forme masquées et les cellules utilisateur.
+Keine Kriterien	No criteria	Sin criterios	Nessun criterio	Aucun critère
+Kopie der Berichtsdefinition	Copy of report definition	Copia de la definición del informe	Copia della definizione del report	Copie de la définition du rapport
+Kriterien: {}	Criteria: {}	Criterios: {}	Criteri: {}	Critères : {}
+MAC-Adresse	MAC address	Dirección MAC	Indirizzo MAC	Adresse MAC
+Maximum	Maximum	Máximo	Massimo	Maximum
+Minimum	Minimum	Mínimo	Minimo	Minimum
+Mit Erweitert... kommen nur die Shapes in den Bericht, deren Eigenschaften die Kriterien erfüllen.	With Advanced..., only the shapes whose properties meet the criteria go into the report.	Con Avanzado..., solo entran en el informe las formas cuyas propiedades cumplen los criterios.	Con Avanzate..., nel report entrano solo le forme le cui proprietà soddisfano i criteri.	Avec Avancé..., seules les formes dont les propriétés remplissent les critères entrent dans le rapport.
+Mitgeliefert (JFDiagrammer)	Built in (JFDiagrammer)	Incluido (JFDiagrammer)	Incluso (JFDiagrammer)	Fourni (JFDiagrammer)
+Mittelwert	Average	Promedio	Media	Moyenne
+Median	Median	Mediana	Mediana	Médiane
+Netzwerkausstattung	Network equipment	Equipamiento de red	Apparecchiature di rete	Équipement réseau
+Netzwerkgeräte	Network devices	Dispositivos de red	Dispositivi di rete	Appareils réseau
+Netzwerkname	Network name	Nombre de red	Nome di rete	Nom réseau
+Neu...	New...	Nuevo...	Nuovo...	Nouveau...
+Neuer Bericht	New Report	Nuevo informe	Nuovo report	Nouveau rapport
+Nicht gruppiert	Not grouped	Sin agrupar	Non raggruppato	Non groupé
+Nur Teilergebnisse anzeigen	Show subtotals only	Mostrar solo subtotales	Mostra solo subtotali	Afficher uniquement les sous-totaux
+Nur zeichnungsspezifische Berichte anzeigen	Show only drawing-specific reports	Mostrar solo los informes específicos del dibujo	Mostra solo i report specifici del disegno	Afficher uniquement les rapports propres au dessin
+Pfad	Path	Ruta	Percorso	Chemin
+Produktnummer	Product number	Número de producto	Codice prodotto	Référence produit
+Prozessor	Processor	Procesador	Processore	Processeur
+Rackgeräte	Rack devices	Dispositivos del rack	Dispositivi del rack	Appareils de la baie
+Raum	Room	Sala	Stanza	Salle
+Seriennummer	Serial number	Número de serie	Numero di serie	Numéro de série
+Shape-Berichte	Shape Reports	Informes de formas	Report forme	Rapports de formes
+Shape-Daten: {}	Shape data: {}	Datos de forma: {}	Dati forma: {}	Données de forme : {}
+Shapes auf allen Seiten	Shapes on all pages	Formas en todas las páginas	Forme su tutte le pagine	Formes de toutes les pages
+Shapes auf der aktuellen Seite	Shapes on the current page	Formas de la página actual	Forme della pagina corrente	Formes de la page active
+Sortieren	Sort	Ordenar	Ordina	Trier
+Sortieren nach	Sort by	Ordenar por	Ordina per	Trier par
+Sortieren...	Sort...	Ordenar...	Ordina...	Trier...
+Sortiert nach: {}	Sorted by: {}	Ordenado por: {}	Ordinato per: {}	Trié par : {}
+Spalten mit Teilergebnissen: {}	Columns with subtotals: {}	Columnas con subtotales: {}	Colonne con subtotali: {}	Colonnes avec sous-totaux : {}
+Spaltenreihenfolge	Column order	Orden de las columnas	Ordine delle colonne	Ordre des colonnes
+Subnetzmaske	Subnet mask	Máscara de subred	Subnet mask	Masque de sous-réseau
+Summe	Total	Suma	Somma	Somme
+Tabellen-Shape	Table shape	Forma de tabla	Forma tabella	Forme de tableau
+Teilergebnisse	Subtotals	Subtotales	Subtotali	Sous-totaux
+Teilergebnisse...	Subtotals...	Subtotales...	Subtotali...	Sous-totaux...
+Verknüpfung mit der Berichtsdefinition	Link to report definition	Vínculo a la definición del informe	Collegamento alla definizione del report	Lien vers la définition du rapport
+WAHR	TRUE	VERDADERO	VERO	VRAI
+Webseite (.html)	Web page (.html)	Página web (.html)	Pagina Web (.html)	Page web (.html)
+Welche Eigenschaften soll der Bericht zeigen?	Which properties should the report show?	¿Qué propiedades debe mostrar el informe?	Quali proprietà deve mostrare il report?	Quelles propriétés le rapport doit-il afficher ?
+Welche Shapes sollen in den Bericht?	Which shapes go into the report?	¿Qué formas entran en el informe?	Quali forme entrano nel report?	Quelles formes entrent dans le rapport ?
+Welche Shapes?	Which shapes?	¿Qué formas?	Quali forme?	Quelles formes ?
+Wählen Sie eine Datei.	Choose a file.	Elija un archivo.	Scegliere un file.	Choisissez un fichier.
+Wählen Sie mindestens eine Eigenschaft.	Choose at least one property.	Elija al menos una propiedad.	Scegliere almeno una proprietà.	Choisissez au moins une propriété.
+Zeilen und Teilergebnisse anzeigen	Show rows and subtotals	Mostrar filas y subtotales	Mostra righe e subtotali	Afficher les lignes et les sous-totaux
+csv=CSV-Datei	csv=CSV file	csv=Archivo CSV	csv=File CSV	csv=Fichier CSV
+existiert	exists	existe	esiste	existe
+existiert nicht	does not exist	no existe	non esiste	n'existe pas
+html;htm=Webseite	html;htm=Web page	html;htm=Página web	html;htm=Pagina Web	html;htm=Page web
+vrd=Berichtsdefinition	vrd=Report definition	vrd=Definición de informe	vrd=Definizione di report	vrd=Définition de rapport
+xlsx=Excel-Arbeitsmappe	xlsx=Excel workbook	xlsx=Libro de Excel	xlsx=Cartella di lavoro di Excel	xlsx=Classeur Excel
+Ändern...	Modify...	Modificar...	Modifica...	Modifier...
+Überprüfen	Review	Revisar	Revisione	Révision
+„{}“ ist in der Zeichnung gespeichert.	“{}” is saved in the drawing.	«{}» está guardado en el dibujo.	«{}» è salvato nel disegno.	« {} » est enregistré dans le dessin.
+„{}“ ist keine Berichtsdefinition ({}).	“{}” is not a report definition ({}).	«{}» no es una definición de informe ({}).	«{}» non è una definizione di report ({}).	« {} » n'est pas une définition de rapport ({}).
+„{}“ ist keine Berichtsdefinition.	“{}” is not a report definition.	«{}» no es una definición de informe.	«{}» non è una definizione di report.	« {} » n'est pas une définition de rapport.
+„{}“ ist zu groß für eine Berichtsdefinition.	“{}” is too large for a report definition.	«{}» es demasiado grande para una definición de informe.	«{}» è troppo grande per una definizione di report.	« {} » est trop volumineux pour une définition de rapport.
+„{}“ ließ sich nicht entfernen: {}	“{}” could not be removed: {}	No se pudo quitar «{}»: {}	Impossibile rimuovere «{}»: {}	Impossible de supprimer « {} » : {}
+„{}“ ließ sich nicht lesen.	“{}” could not be read.	No se pudo leer «{}».	Impossibile leggere «{}».	Impossible de lire « {} ».
+„{}“ ließ sich nicht schreiben: {}	“{}” could not be saved: {}	No se pudo guardar «{}»: {}	Impossibile salvare «{}»: {}	Impossible d'enregistrer « {} » : {}
+„{}“ wurde aus der Liste entfernt; die Datei bleibt.	“{}” was removed from the list; the file stays.	«{}» se quitó de la lista; el archivo se conserva.	«{}» è stato rimosso dall'elenco; il file resta.	« {} » a été retiré de la liste ; le fichier reste.
+„{}“ wurde aus der Zeichnung entfernt.	“{}” was removed from the drawing.	«{}» se quitó del dibujo.	«{}» è stato rimosso dal disegno.	« {} » a été supprimé du dessin.
+Teilergebnisse je Spalte	Subtotals per column	Subtotales por columna	Subtotali per colonna	Sous-totaux par colonne
+Eine Formatvorlage hat diesen Namen; Visio würde die Seite umbenennen.	A style has this name; Visio would rename the page.	Un estilo tiene este nombre; Visio cambiaría el nombre de la página.	Uno stile ha questo nome; Visio rinominerebbe la pagina.	Un style porte ce nom ; Visio renommerait la page.

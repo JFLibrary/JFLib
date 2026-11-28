@@ -883,10 +883,7 @@ pub fn vectors(path: &str) -> i32 {
                 Some(alloc::vec![ed25519::verify(&k32(0), arg(1), &s) as u8])
             }
             // the operations of tools/wycheproof_check.py and tools/limbo_check.py
-            #[cfg(not(target_os = "android"))]
             _ => more(alg, &args).or_else(|| crate::suitevec::op(alg, &args)),
-            #[cfg(target_os = "android")]
-            _ => more(alg, &args),
         };
         out.push_str(&r.map_or(String::from("-"), |v| hex(&v)));
         out.push('\n');

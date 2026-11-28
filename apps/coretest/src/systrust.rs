@@ -3,8 +3,9 @@
 // exclusive root, Apple's Security framework with only these anchors, Linux verify_chain) and
 // the reason of each refusal; Trust::System's extra CAs (a company CA) through the system and in
 // a handshake; a server's client_auth with System; on Linux the bundle of SSL_CERT_FILE and
-// SSL_CERT_DIR.  Public servers: tools/tls_web_check.py
-// --internet (badssl.com), limbo through the system: tools/limbo_check.py --system.
+// SSL_CERT_DIR; on Android the system's CA folder (only the system's CAs, docs/ANDROID.md AN2).
+// Public servers: tools/tls_web_check.py --internet (badssl.com), limbo through the system:
+// tools/limbo_check.py --system.
 
 use alloc::format;
 use alloc::string::String;
@@ -89,6 +90,8 @@ pub fn run(t: &mut T) {
     extra_cas(t);
     #[cfg(target_os = "linux")]
     bundle_env(t);
+    #[cfg(target_os = "android")]
+    android_bundle(t);
 }
 
 /// the system's checks against only our CA: accepted, and each refusal with its reason
@@ -185,4 +188,28 @@ fn bundle_env(t: &mut T) {
     t.check(&format!("bundle: the distribution's again, our CA not in it ({:?})", r), r.as_ref().is_err_and(|e| e.reason == Reason::UnknownCa));
     plat::delete(&format!("{}/test-ca.pem", dir));
     plat::delete(&dir);
+}
+
+/// Android: the system's CA folder (Conscrypt's APEX on Android 14 and later, else the system
+/// image's), only the system's CAs: SSL_CERT_FILE changes nothing
+#[cfg(target_os = "android")]
+fn android_bundle(t: &mut T) {
+    roots::reload();
+    let anchors = roots::system_anchors();
+    // AOSP carries about 140 CAs; Let's Encrypt's root is among them since Android 7.1.1
+    t.check(&format!("Android: the system's CAs ({})", anchors.len()), anchors.len() >= 100);
+    t.check("Android: ISRG Root X1 among them", anchors.iter().any(|c| c.subject_cn == "ISRG Root X1" && c.is_ca));
+    let dir = plat::certs::android_ca_dir();
+    t.check("Android: the folder of the CAs is one of the system's", dir.is_some());
+    plat::write_stdout(format!("systrust: the CAs of {}\n", dir.unwrap_or("?")).as_bytes());
+    let p = Pki::new(91, NOW);
+    let leaf = chain(&p.good(NOW));
+    let file0 = plat::env("SSL_CERT_FILE");
+    plat::setenv("SSL_CERT_FILE", Some("/nonexistent-coretest.pem"));
+    roots::reload();
+    t.check("Android: SSL_CERT_FILE does not choose the bundle", roots::system_anchors().len() == anchors.len());
+    plat::setenv("SSL_CERT_FILE", file0.as_deref());
+    roots::reload();
+    let r = roots::verify_system(&leaf, "web.lab", &[], None, NOW);
+    t.check(&format!("Android: a CA of one's own is not among them ({:?})", r), r.as_ref().is_err_and(|e| e.reason == Reason::UnknownCa));
 }

@@ -57,7 +57,8 @@
 // The JFD_ cells (diagram_core::instance reads them): the document sheet's User.JFD_Name (the
 // title in de|en|es|it|fr) and User.JFD_Category; per master page User.JFD_Name, JFD_Prompt,
 // JFD_Keywords, JFD_Text, JFD_Quick (1 for the first `quick` masters) and JFD_Tr1, JFD_Tr2 ...
-// ("Section.Row.Cell|de|en|es|it|fr" with VSDX section names: Control.Row_1.Tip).
+// ("Section.Row.Cell|de|en|es|it|fr" with VSDX section and cell names: Control.Row_1.Prompt; a
+// source's Tip of a control point is the VSDX cell Prompt, JD21).
 //
 // (JD15) Text fields: a [Field] section (Value, Format, Type ...; `Unit = mm` gives Value the unit
 // the field shows) and "{fld N}" marks in a master's text (diagram_core::field::marked); a mark
@@ -934,7 +935,7 @@ fn style_id(tx: &Transaction, file: &str, s: &Option<(String, u32)>, line: u32) 
         Some((n, l)) => (n.as_str(), *l),
         None => ("Normal", line),
     };
-    let r = tx.doc().style_by_name_u(name).ok_or_else(|| err(file, at, format!("Formatvorlage „{name}“ gibt es nicht (No Style, Normal, Connector, Guide, Text Only)")))?;
+    let r = tx.doc().style_by_name_u(name).ok_or_else(|| err(file, at, format!("Formatvorlage „{name}“ gibt es nicht (No Style, Text Only, None, Normal, Guide, Theme, Connector)")))?;
     Ok(tx.doc().style(r).map_or(0, |st| st.header.id))
 }
 
@@ -1049,6 +1050,7 @@ fn emit_master(tx: &mut Transaction, st: &StencilInfo, mi: &MasterInfo, ix: usiz
         let a = single_addr(tx, &c.name);
         sink.put(tx, sheet, &a, c, Some(c.name.clone()))?;
     }
+    text_xform_whole(tx, &mut sink, sheet, &mi.shape, line)?;
     // (JD15) "{fld N}" in the text is the mark of [Field] row N (checked below)
     if let Some(t) = &mi.text {
         tx.set_text(shape, Some(field::marked(&t[lang]))).map_err(|e| sink.fail(line, "der Text", e))?;
@@ -1088,6 +1090,7 @@ fn emit_master(tx: &mut Transaction, st: &StencilInfo, mi: &MasterInfo, ix: usiz
             let a = single_addr(tx, &c.name);
             sink.put(tx, ss, &a, c, None)?;
         }
+        text_xform_whole(tx, &mut sink, ss, &p.shape, p.line)?;
         emit_sections(tx, &mut sink, ss, &p.sections, false)?;
         if let Some(t) = &p.text {
             tx.set_text(sub, Some(field::marked(&t[lang]))).map_err(|e| sink.fail(p.line, &format!("der Text von [Part {}]", p.name), e))?;
@@ -1158,6 +1161,31 @@ fn emit_master(tx: &mut Transaction, st: &StencilInfo, mi: &MasterInfo, ix: usiz
 
 // the sections of the master shape or of a part as written; `tr`: language-suffixed cells
 // are translated (JFD_Tr, the master shape only)
+// (JD26 Visio check) a shape that writes part of its text block gets the rest with Visio's
+// defaults (the shape's box): Visio takes a missing cell of a text block it has as 0 (a level of
+// the layered pyramid with TxtPinY alone showed its text 0 wide at its left edge), JFDiagrammer
+// as the box; a shape without any of the six keeps Visio's box
+const TEXT_XFORM: &[(&str, &str)] = &[
+    ("TxtPinX", "Width*0.5"),
+    ("TxtPinY", "Height*0.5"),
+    ("TxtWidth", "Width*1"),
+    ("TxtHeight", "Height*1"),
+    ("TxtLocPinX", "TxtWidth*0.5"),
+    ("TxtLocPinY", "TxtHeight*0.5"),
+];
+
+fn text_xform_whole(tx: &mut Transaction, sink: &mut Sink, sheet: SheetRef, cells: &[Cell0], line: u32) -> Result<(), SourceError> {
+    let own = |n: &str| cells.iter().any(|c| c.name == n);
+    if !TEXT_XFORM.iter().any(|&(n, _)| own(n)) {
+        return Ok(());
+    }
+    for &(name, f) in TEXT_XFORM.iter().filter(|&&(n, _)| !own(n)) {
+        let a = single_addr(tx, name);
+        sink.formula(tx, sheet, &a, f, line)?;
+    }
+    Ok(())
+}
+
 fn emit_sections(tx: &mut Transaction, sink: &mut Sink, sheet: SheetRef, sections: &[Sec0], tr: bool) -> Result<(), SourceError> {
     for sec in sections {
         match sec.kind {
@@ -1195,8 +1223,11 @@ fn emit_sections(tx: &mut Transaction, sink: &mut Sink, sheet: SheetRef, section
                         sink.constant(tx, sheet, &a, Value::Num(0.0), Some(unit), c.line)?;
                     }
                     for c in row.cells.iter().filter(|c| !(sec.model == "Field" && c.name == "Unit")) {
-                        let a = CellAddr::row(sk, rk, tx.intern(&c.name));
-                        sink.put(tx, sheet, &a, c, tr.then(|| format!("{}.{rname}.{}", sec.model, c.name)))?;
+                        // (JD21 glue) a control point's Tip is the cell Prompt in VSDX (Visio's
+                        // files; the ShapeSheet window calls it Tip)
+                        let name = if sec.model == "Control" && c.name == "Tip" { "Prompt" } else { c.name.as_str() };
+                        let a = CellAddr::row(sk, rk, tx.intern(name));
+                        sink.put(tx, sheet, &a, c, tr.then(|| format!("{}.{rname}.{name}", sec.model)))?;
                     }
                 }
             }

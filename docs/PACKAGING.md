@@ -606,7 +606,10 @@ and `sensors` declare nothing while `plat` has no Windows version (noted; the fo
 device capability `location`); `gamepad` needs none (XInput in a full-trust app; the capability list
 has nothing for it, `humaninterfacedevice` is the HID API's; noted).  An APK's `android/AndroidManifest.xml` stays the app's own file:
 with `location` in PERMISSIONS the build refuses a manifest without `ACCESS_FINE_LOCATION` or
-`ACCESS_COARSE_LOCATION` (`tools/android.py`).  The
+`ACCESS_COARSE_LOCATION`, with `net.connect` or `net.listen` one without `android.permission.INTERNET`
+(`tools/android.py`, `cargo jflib android`).  The manifest `cargo jflib android` writes for an app without
+one has `INTERNET` when the app has no PERMISSIONS or names `net.connect` or `net.listen` there; without
+it Android refuses the app every socket (`NetError::no_internet`, docs/ANDROID.md AN2).  The
 package folder holds `<App>.exe` (signed like the setup's, when a certificate is set), modules,
 further programs and notices; `MakeAppx pack` checks the manifest against the schema.
 

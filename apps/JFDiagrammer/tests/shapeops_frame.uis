@@ -1,0 +1,44 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD21: the frame follows the geometry (SP-05) -- a vertex dragged out with the line
+# tool makes the box larger (Width, Height, the pin); Ausrichtungsfeld aktualisieren (SP-16) puts a
+# group's box around a member that was moved out of it
+cmd 4404
+drag 500,330 640,420
+cmd 4400
+expect button:"Breite: 60 mm  Höhe: 40 mm  Winkel: 0°" exists
+cmd 4406
+click 600,400
+wait 600
+drag 651,424 701,474
+cmd 4400
+click 560,380
+expect listitem:"Sheet.4" rect 500 324 201 151
+expect button:"Breite: 80 mm  Höhe: 60 mm  Winkel: 0°" exists
+key ctrl+z
+expect button:"Breite: 60 mm  Höhe: 40 mm  Winkel: 0°" exists
+# SP-16: a group, one member moved out of its box
+cmd 4404
+drag 800,330 860,380
+drag 900,330 960,380
+cmd 4400
+click 820,350
+click 920,350 shift
+cmd 4453
+expect listitem:"Sheet.7" selected
+expect button:"Breite: 60 mm  Höhe: 20 mm  Winkel: 0°" exists
+wait 600
+click 930,355
+wait 600
+drag 930,355 930,455
+key esc
+click 820,350
+expect listitem:"Sheet.7" selected
+# moving a member leaves the group's box as it was (Visio's too)
+expect button:"Breite: 60 mm  Höhe: 20 mm  Winkel: 0°" exists
+click button:"Gruppieren"
+click menuitem:"Ausrichtungsfeld aktualisieren"
+expect listitem:"Sheet.7" selected
+expect button:"Breite: 60 mm  Höhe: 60 mm  Winkel: 0°" exists
+expect listitem:"Sheet.7" rect 802 324 151 151
+key ctrl+z
+expect button:"Breite: 60 mm  Höhe: 20 mm  Winkel: 0°" exists

@@ -498,10 +498,10 @@ fn write_one(tx: &mut Transaction, sheet: SheetRef, addr: &CellAddr, v: &Val) ->
         return Ok(false);
     }
     let cell_name = doc.str(addr.cell);
-    let st = v.stored(cell_name);
+    let (st, unit) = typed(addr, v, v.stored(cell_name), r.unit());
     let stale = r.cached.is_some_and(|c| c.stale);
     let same = st.matches(r.value(), r.error().map(|e| doc.str(e)), doc.strings(), 0.0) && r.cached.is_some();
-    if same && !stale {
+    if same && !stale && unit == r.unit() {
         return Ok(false);
     }
     let (value, error) = match st {
@@ -509,10 +509,30 @@ fn write_one(tx: &mut Transaction, sheet: SheetRef, addr: &CellAddr, v: &Val) ->
         Stored::Text(t) => (Value::Text(tx.intern(&t)), None),
         Stored::Error(e) => (r.value(), Some(e)),
     };
-    match tx.set_result(sheet, addr, value, error) {
+    match tx.set_result_unit(sheet, addr, value, error, unit) {
         Ok(()) => Ok(true),
         Err(EditError::Invalid | EditError::Deleted) => Ok(false),
         Err(e) => Err(e),
+    }
+}
+
+// (JD19) what a Value cell (User, Prop, Field ...) stores and the unit that marks its type, as
+// Visio writes it: a string U='STR', a colour U='COLOR', a point "PNT(x,y)" U='PNT'; a number
+// drops a COLOR or PNT mark.  Visio reads an unmarked V as a number: "Wert" and "#c6e0b4" came
+// back as 0 and PNT(6,3) as 6 in Visio's check of JD19's data graphics.  Cells of one type by
+// their name (Prompt, Font, FillForegnd, PinX ...) keep their unit and value as before.
+fn typed(addr: &CellAddr, v: &Val, st: Stored, now: Option<Unit>) -> (Stored, Option<Unit>) {
+    if addr.cell != crate::names::VALUE || matches!(st, Stored::Error(_)) {
+        return (st, now);
+    }
+    match v {
+        Val::Str(_) if !matches!(now, Some(Unit::Str | Unit::Guid | Unit::Other(_))) => (st, Some(Unit::Str)),
+        Val::Color(_) => (st, Some(Unit::Color)),
+        Val::Point(x, y) if x.is_finite() && y.is_finite() => {
+            (Stored::Text(alloc::format!("PNT({},{})", super::val::fmt_num(*x), super::val::fmt_num(*y))), Some(Unit::Point))
+        }
+        Val::Num(_) if matches!(now, Some(Unit::Color | Unit::Point)) => (st, None),
+        _ => (st, now),
     }
 }
 

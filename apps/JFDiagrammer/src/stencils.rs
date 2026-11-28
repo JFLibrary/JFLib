@@ -604,7 +604,8 @@ pub(crate) static MORE_MENU: [Mi; 15] = [
 // the built-in stencils of category c (indices into BUILTIN)
 fn of_category(c: usize) -> Vec<usize> {
     let key = CATEGORIES[c];
-    (0..BUILTIN.len()).filter(|&k| BUILTIN[k].category == key).collect()
+    // (JD19) the hidden stencil of the data graphics' callouts is not offered
+    (0..BUILTIN.len()).filter(|&k| BUILTIN[k].category == key && BUILTIN[k].file != crate::data_graphics::STENCIL).collect()
 }
 
 /// every pass: the rows of the submenus (their titles in the current language, checked while

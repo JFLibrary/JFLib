@@ -1,6 +1,6 @@
 # Android-Plan: Android so weit wie Windows, Linux und Apple
 
-Stand 2026-11-18, auf Basis von `main` 7cdabce4. AN0 und AN1 sind umgesetzt (Emulator und A56), der Rest nicht; die Aufwände sind geschätzt. Der Plan wartete auf ARM1 bis ARM3 ([ARM64.md](ARM64.md)): die Kernel-Tabellen
+Stand 2026-11-27, auf Basis von `main` 7cdabce4. AN0, AN1 und AN2 sind umgesetzt (Emulator und A56), AN3 auf dem Emulator, der Rest nicht; die Aufwände sind geschätzt. Der Plan wartete auf ARM1 bis ARM3 ([ARM64.md](ARM64.md)): die Kernel-Tabellen
 und `plat` auf Linux ARM64 ohne libc.
 
 ## Ziel
@@ -33,12 +33,14 @@ Was auf Android fehlt (Code auf `main` 7cdabce4):
   ([ARM64.md](ARM64.md), ARM6). (Seit AN1 behoben.)
 - **Keine Module ohne Oberfläche.** `process`, `sync`, `net`, `fs`, `service`, `watch` und `certs` sind in
   [`lib/plat/lib.rs`](../lib/plat/lib.rs) nur für Windows, Linux und Apple da. `rand` hat Android seit b5134991
-  (`arc4random_buf`).
+  (`arc4random_buf`). (`sync` seit AN1, `fs` und `watch` seit AN3.)
 - **Die Fassade lässt Crates weg.** [`lib/jflib/Cargo.toml`](../lib/jflib/Cargo.toml) nimmt `cas`, `datastore`,
-  `netio` und `update` auf Android und im Browser nicht auf („plat has no fs and net there“).
+  `netio` und `update` auf Android und im Browser nicht auf („plat has no fs and net there“). (`cas` und
+  `datastore` seit AN3.)
 - **Das Manifest kennt kein Netz.** Das Standard-Manifest von `cargo jflib android`
   ([`android.rs`](../lib/cargo_jflib/src/android.rs), `default_manifest`) hat keine `INTERNET`-Berechtigung, und
-  `tools/android.py` prüft nur `location` gegen das Manifest (`manifest_gaps`).
+  `tools/android.py` prüft nur `location` gegen das Manifest (`manifest_gaps`). (Seit AN2 behoben; `netio` ist seit
+  AN2 auch in der Fassade.)
 - **Kein Druck, keine Systemschriften.** `capabilities()` meldet auf Android weder `CAP_PRINT` noch
   `CAP_SYSTEM_FONTS` noch `CAP_THREADS`; `policy::font_dirs()` kennt `/system/fonts` nicht.
 - **Kaum Tests ohne Oberfläche.** Nur `androidGallery`, `audiotest`, `gputest`, `portabletest`, `render2dtest` und
@@ -158,8 +160,8 @@ Funde von `plattest` (Fehler der Bibliothek auf Android):
    `bridge.c` noch der Java-Host. Das traf jede Android-App (Uhrzeit, Dateizeiten, Logs, in AN2 die Gültigkeit von
    Zertifikaten). Jetzt nimmt Android die Uhr des Systems (Bionics `CLOCK_REALTIME`), UTC wie Linux; die
    Umrechnung teilen sich Linux, Apple und Android (`utc_date` in `plat`). Die Zone bleibt Sache von AN3.
-2. **Offen: `plat::mkdir` über einer vorhandenen Datei meldet Erfolg.** `mkdirs` in
-   [`android_files.rs`](../lib/plat/android_files.rs) nimmt EEXIST auch hin, wenn der Name eine Datei ist.
+2. **Behoben in AN3: `plat::mkdir` über einer vorhandenen Datei meldete Erfolg.** `mkdirs` in
+   [`android_files.rs`](../lib/plat/android_files.rs) nahm EEXIST auch hin, wenn der Name eine Datei war.
 3. `plat::cpu_brand()` ist leer (rt nimmt auf Android den portablen CPU-Code); die Quelle wäre `/proc/cpuinfo`.
    `plattest` meldet das als „not on Android yet“, ebenso `mem_total()` (AN1).
 
@@ -380,6 +382,95 @@ Tick des Hosts (bis 250 ms). Ohne nice 10 für die Arbeiter lagen die längsten 
 sind, die Prüfungen von `tools/tls_web_check.py --internet` auf dem A56 öffentliche Server erreichen (das Skript
 bekommt dafür einen Android-Weg; nur mit Zustimmung, im WLAN) und ein Lauf ohne `INTERNET` die richtige Meldung zeigt.
 
+**Stand 2026-11-27:** fertig. Auf dem Emulator und dem A56 grün (beide Modi, auch ohne `INTERNET`), und auf dem A56
+erreicht `tools/tls_web_check.py` die öffentlichen Server aus der Shell und aus dem Test-APK (unten).
+
+- [`net.rs`](../lib/plat/net.rs): Android nimmt das Linux-Modul `sys` (Sockets über `rt::os` mit den Nummern aus
+  `rt::kernel`: TCP, UDP, IPv4, IPv6, Timeouts, `SO_PEERCRED`). Namen über Bionics `getaddrinfo` (`resolve_system`,
+  dieselbe Liste wie bei Apple, aber mit Bionics `struct addrinfo`), das `netd` fragt: privates DNS, VPN, das Netz der
+  App, `/system/etc/hosts`. `dns_servers()` ist leer (`netd` behält sie), `hostname()` aus Bionics `gethostname`.
+  Die Schnittstellen ohne Netlink und ohne MAC-Adressen: IPv4 über `SIOCGIFCONF`, IPv6 aus `/proc/net/if_inet6`, wo
+  die App es lesen darf, `if_index` über `/sys/class/net/NAME/ifindex`, sonst `SIOCGIFINDEX`; Dateien von `/proc` und
+  `/sys` über den echten Pfad (`proc_file` aus AN1), nicht über die Namen von `android_files.rs`.
+- Unix-Sockets bleiben auf Android vorerst weg: Pfad, Aufräumen und `socket_id` brauchen `plat::fs` (AN3).
+- **Ohne `INTERNET`** bekommt die App keinen IPv4- oder IPv6-Socket. Der Code ist nicht überall derselbe: EACCES,
+  wo der Kernel die Gruppe `inet` prüft, **EPERM** auf dem Emulator mit Android 15 und dem A56 mit Android 16 (dort
+  prüft das eBPF-Programm von `netd`). Beides wird `NetErrorKind::Denied` mit diesem Code; `NetError::no_internet()` erkennt es, die Meldung
+  nennt das Manifest. `getaddrinfo` sagt ohne `INTERNET` nur „keine Adresse“; schlägt eine Auflösung fehl, prüft
+  `resolve` deshalb mit einem Socket nach und meldet ebenfalls `no_internet`.
+- [`certs.rs`](../lib/plat/certs.rs): `root_bundle()` liest den ersten Ordner aus `ANDROID_CA_DIRS`, der Dateien hat
+  (`/apex/com.android.conscrypt/cacerts`, dann `/system/etc/security/cacerts`), eine Datei je CA (PEM, danach ein
+  Textauszug, den `pem::decode_all` überliest), sortiert nach Namen, über `getdents64` (ohne `plat::fs`).
+  `android_ca_dir()` nennt den Ordner. Nur die CAs des Systems (Entscheidung 6): `SSL_CERT_FILE` und
+  `SSL_CERT_DIR` zählen auf Android nicht, vom Nutzer installierte CAs auch nicht. `verify_tls_server` und
+  `verify_tls_server_roots` antworten `None` wie auf Linux; netio prüft selbst (`roots::verify_system`).
+- `policy`: `net.connect` und `net.listen` gelten auf Android (vorher blieben die Regeln dort ungenutzt). Dazu
+  zählen jetzt auch die Thread-Kennung (`plat_tid`) und das Warten anderer Threads auf eine Antwort (`wait_answer`);
+  bis AN2 hatten alle Threads unter Android die Kennung 0, die Bereiche von Plugins (`scoped_here`) hätten also
+  Threads verwechselt.
+- `netio::dns::resolve` nimmt auf Android den Weg des Systems (`plat::net::resolve`); `Config::system()` hat dort
+  keine Namensserver und keine Hosts-Datei (es gibt kein `/etc/resolv.conf`), `resolve_with` bleibt für Anfragen an
+  genannte Server.
+- Fassade: `netio` ist auf Android dabei (`lib/jflib/Cargo.toml`, `src/lib.rs`), `docs.rs` baut netio auch für
+  `aarch64-linux-android`. `cas`, `datastore` (AN3) und `update` (Bewusst nicht) fehlen dort weiter.
+- Manifest nach Entscheidung 5: `cargo jflib android` (`default_manifest`) schreibt `INTERNET`, wenn die App kein
+  `PERMISSIONS` hat oder dort `net.connect` oder `net.listen` nennt; `manifest_gaps` (dort und in
+  `tools/android.py`) verweigert ein eigenes Manifest ohne `INTERNET` bei diesen Regeln. Ein eigenes Manifest einer
+  App ohne `PERMISSIONS` darf `INTERNET` weglassen (die Sockets sagen es dann). Das Test-APK
+  (`build_console_apk`) bekommt `INTERNET` nach derselben Regel; `jfgui_ANDROID_NO_INTERNET=1` baut
+  `NAME-<abi>-console-nonet.apk` ohne, `tools/android_console.py --no-internet` startet es (nur der App-Modus, die
+  Shell hat das Netz immer).
+- `coretest`: die Gruppen `http`, `tls`, `tlsweb`, `systrust`, `tlsres`, `ocsp`, `acme`, `dns` und `tlscore` laufen
+  auf Android, dazu die Server-Modi außer SSH und in `plat` die Sockets (`addrs`, TCP über IPv4 und IPv6, UDP) und
+  `android_net`: `getaddrinfo` über `/system/etc/hosts` (`ip6-localhost`), ein unbekannter Name, die Adressen und
+  Schnittstellen, ohne `INTERNET` die Meldung. `systrust` prüft auf Android die CAs des Systems (ISRG Root X1 dabei,
+  `SSL_CERT_FILE` ohne Wirkung, eine eigene CA nicht darunter). `ssh` braucht Kindprozesse und bleibt aus.
+
+| Lauf (Emulator x86-64, API 35) | `adb shell` | App (`untrusted_app`, seccomp 2) |
+|---|---|---|
+| `coretest` (alle Gruppen) | 5143 von 5143 (vor AN2: 3281) | 5140 von 5140 (Fund 1) |
+| davon `http`, `tls`, `tlsweb`, `tlsres`, `ocsp`, `acme`, `tlscore` | 38, 52, 94, 62, 115, 76, 148 | dasselbe |
+| `dns` | 53 | 50 (Fund 1) |
+| `systrust` | 22, die CAs aus `/apex/com.android.conscrypt/cacerts` | dasselbe |
+| `plat` (mit Sockets und `android_net`) | 48 | 48 |
+| `coretest --only plat` ohne `INTERNET` (`--no-internet`) | – | 19 von 19, Meldung „lacks android.permission.INTERNET … (os error 1)“ |
+
+Auf dem A56 (SM-A566B, arm64, Android 16, API 36, im WLAN) dieselben Zahlen in jeder Zeile: `coretest` 5143 von 5143
+in der Shell (104 s) und 5140 von 5140 im APK (100 s), `dns` 53 und 50, `systrust` aus
+`/apex/com.android.conscrypt/cacerts`, ohne `INTERNET` 19 von 19 mit derselben Meldung (os error 1, also auch dort
+EPERM). Die Shell sieht dort die IPv4- und alle IPv6-Adressen, das APK nur `127.0.0.1` und die IPv4-Adresse (Fund 1).
+
+**Öffentliche Server:** `python tools/tls_web_check.py --internet-only --target android [--serial S] [--mode
+shell|app|both] [--allow-install]` ist der Android-Weg des Skripts. Es nimmt `build/android/coretest-<ABI>` und das
+Test-APK (`android_console.py`), installiert es einmal für alle Hosts und deinstalliert es am Ende; jeder Host läuft
+als eigenes `am instrument` mit `--tls-web URL`, ein Lauf außerhalb von `untrusted_app` mit seccomp zählt als
+falsch. Auf dem A56 im WLAN (2026-11-27) waren alle 12 gewerteten Hosts in beiden Modi richtig, keiner
+unerreichbar: www.google.com mit TLS 1.3 und X25519MLKEM768 (0x11EC), github.com mit TLS 1.3 und X25519, die
+badssl-Hosts mit TLS 1.2; expired und sha384 „certificate expired“, wrong.host „certificate for another name“,
+self-signed und untrusted-root „certificate not trusted“. Nur gezeigt: revoked.badssl.com wird genommen (wie auf
+Linux: ohne Staple kein Widerruf), incomplete-chain „not trusted“ (wie macOS und Linux, nichts wird nachgeladen).
+
+Funde:
+
+1. **Im App-Prozess keine IPv6-Adressen.** `/proc/net/if_inet6` darf eine App nicht lesen (seit Android 10), also
+   liefert `local_addrs()` dort nur IPv4 (`SIOCGIFCONF`); in der Shell kommen die IPv6-Adressen mit. `dns` übergeht
+   deshalb im APK die drei Prüfungen mit einem Namensserver auf einer link-lokalen Adresse. Ohne Netlink gibt es
+   keinen anderen Weg; Bionics `getifaddrs` fragt per `RTM_GETADDR`, was Apps noch dürfen (nur `bind` und
+   `RTM_GETLINK` sind gesperrt). Ob `local_addrs` das als Ausweg nehmen soll, ist offen (Entscheidung „ohne Netlink“).
+2. **EPERM statt EACCES.** Ohne `INTERNET` lehnen Android 15 (Emulator) und Android 16 (A56) `socket()` mit EPERM
+   ab, nicht mit EACCES wie im Plan (Fallen); `plat::net` nimmt beide.
+3. **`policy::tid()` war auf Android immer 0**, obwohl es seit AN1 Threads gibt; behoben (siehe oben).
+4. `ssh` und der TCP-Teil von `sshcore` brauchen den Test-Server aus `sshd.rs`, der `plat::process` nimmt; sie
+   bleiben auf Android aus. Unix-Sockets warten auf AN3.
+5. Clippy (`build_rs.py check --target android`) bricht auf x86-64 schon in `rt` ab: `rt/lib.rs` lädt
+   `portable/fx.rs` zweimal (`duplicate_mod`). Das ist älter als AN2; Clippy über `plat`, `netio` und `coretest` für
+   `aarch64-linux-android` ist sauber.
+
+Geprüft außerdem: `cargo check -p jflib` mit und ohne `std` ohne Warnung für Windows (x86-64, ARM64), Linux
+(x86-64, ARM64), wasm32, Android (x86-64, ARM64) und macOS (ARM64); `build_rs.py check` (Lint, Clippy für Windows
+und Linux); `build_rs.py test coretest` auf Windows und Linux; die Tests von `cargo-jflib`
+(`internet_follows_the_network_rules`).
+
 ### AN3: Dateisystem, Ordnerüberwachung, Crates (M)
 
 - `plat::fs` auf Android: `stat`, `lstat`, `read_dir`, Links, `set_times`, `free_space`, `write_file_private` mit
@@ -392,6 +483,63 @@ bekommt dafür einen Android-Weg; nur mit Zustimmung, im WLAN) und ein Lauf ohne
 
 **Fertig, wenn:** die Dateisystem- und `watch`-Tests von `coretest` und `plattest` sowie die Tests von `datastore`
 und `cas` im Test-APK grün sind und `android_files.py` unverändert besteht.
+
+**Stand 2026-11-27:** umgesetzt und auf dem Emulator grün (beide Modi); das A56 war nicht dran (nur auf Zuruf).
+
+- `plat::fs` und `plat::watch` sind auf Android die Linux-Teile von [`fs.rs`](../lib/plat/fs.rs) und
+  [`watch.rs`](../lib/plat/watch.rs) (nur `cfg`): die Syscalls über `rt::os`, `struct stat` aus `rt::kernel` (x86-64 und
+  ARM64). Sie nehmen die Namen von [`android_files.rs`](../lib/plat/android_files.rs): `os_z` macht daraus den echten
+  Pfad für den Kernel, die Regeln (`policy`) sehen den Namen. `\` trennt wie in diesen Namen und in den Regeln (`join`,
+  `parent`, die Namen eines `Dir`). `rt::os` hat auf Android dafür auch `rename` (`renameat2`, sonst `renameat`).
+- **Namen und echte Pfade (Entscheidung):** `/`, `/config`, `/data`, `/cache`, `/tmp`, `/documents`, `/imports` und
+  alles Übrige unter `/` bleiben Namen im Speicher der App. Die Ordner des Systems selbst (`/system`, `/system_ext`,
+  `/product`, `/vendor`, `/odm`, `/apex`, `/proc`, `/sys`, `/dev`, `/storage`, `/sdcard`, `/mnt`) sind ihre echten
+  Pfade, für `plat::fs` und genauso für `read_file`, `dir_list` und die übrigen Dateifunktionen: eine Regel in
+  `android_files.rs` (`SYSTEM`); so liest AN4 `/system/fonts` ohne eigenen Weg. Einen echten Pfad in den Speicher
+  der App (`/data/user/0/PAKET/files/...`) gibt es nicht: `/data` ist schon ein Name, und ein zweiter Name derselben
+  Datei liefe an den Regeln vorbei (`fs.write /data/**` träfe sonst `/config`). `std`-Apps nehmen für `std::fs` den
+  echten Ordner, für `plat` die Namen.
+- **Kein `openat2`:** `Dir::open_dir` geht auf Android immer Schritt für Schritt (`openat` mit `O_NOFOLLOW` unter dem
+  offenen Ordner); der Versuch mit `openat2` ist dort nicht einmal gebaut. `plattest --test kernel` läuft dafür jetzt
+  auch auf Android (ohne `fork`, `clone` und `dup2`, die Helfer von `rt::os` nur unter Linux): 65 von 65 im
+  App-Prozess des x86-64-Emulators, wo `openat2` SIGSYS gäbe.
+- **Links:** ein absolutes Ziel (`symlink`, `Dir::symlink`) liegt als echter Pfad im Link (der Kernel löst Links auf
+  echten Pfaden auf), `read_link` liest es wieder als Namen; relative Ziele bleiben, wie sie sind.
+- **Hardlinks:** SELinux verweigert sie einer App (`avc: denied { link }` für `untrusted_app` auf `app_data_file`),
+  auch im eigenen Speicher, und `adb shell` ebenso. `fs::hard_link` antwortet auf Android `false`, ohne den Kernel zu
+  fragen (jeder Versuch hinterließe eine Zeile im Log); es ist `bool`, ein eigenes `Unsupported` hat es nicht.
+- **Zone:** `local_zone_id` nimmt `TZ`, sonst die Systemeigenschaft `persist.sys.timezone` (`__system_property_get`,
+  wie Bionics `tzset`); die Zone kennt `datetime` (Emulator: `GMT`).
+- **`watch`:** inotify wie unter Linux; Wurzeln und gemeldete Pfade sind Namen, die Uhren liegen auf den echten
+  Ordnern. Auch die Lücken (ein Watcher gleich nach `new`, eine gelöschte und neue Wurzel, eine verschobene Wurzel,
+  eine Liste, die beim ersten Mal scheitert) prüft `coretest` auf Android.
+- **Fund 2 von AN0 behoben:** `mkdirs` nimmt EEXIST am Ende nur noch für einen Ordner hin; `plat::mkdir` über einer
+  Datei ist `false`.
+- `File::create_new` gibt es auch auf Android (`O_EXCL`, 0600), damit auch die exklusiven Geschwister von
+  `AtomicFile` auf Ordner-Mounts; `plattest --test content` prüft es wieder.
+- Fassade: `cas` und `datastore` auch auf Android (`lib/jflib/Cargo.toml`, `src/lib.rs`), docs.rs baut sie für
+  `aarch64-linux-android`. `coretest` nimmt `datastore` und `cas` mit, seine Gruppe `plat` prüft Dateien, `watch`
+  und die Zone (`service` meldet AN4; das Netz seit dem Mischen mit AN2, ohne Unix-Sockets). `plattest`: `vfs`, `kernel`, `trash` (Android hat keinen
+  Papierkorb: `false`, die Datei bleibt) und `content` laufen auf Android.
+
+| Lauf (Emulator x86-64, API 35) | `adb shell` | App (`untrusted_app`, seccomp 2) |
+|---|---|---|
+| `coretest` | 4697 von 4697 | 4697 von 4697 |
+| darin `plat`, `datastore`, `cas` | 58, 95, 109 | 58, 95, 109 |
+| `plattest --test all` | 219 bestanden, 0 Fehler (Fund 2 behoben) | dasselbe |
+| `plattest --test kernel` (`fs::Dir`) | 65 von 65 | 65 von 65 |
+| `plattest --test vfs` | 132 von 132 | 132 von 132 |
+| `plattest --test content` | 97 von 97 | 97 von 97 |
+| `plattest --test trash` | 4 von 4 | 4 von 4 |
+| `asynctest --script tasks.uis`, `copy.uis` | grün | grün |
+
+Offen nach AN3:
+
+- Das A56 (ARM64: die andere `struct stat` im App-Prozess, `openat2` dort erlaubt, aber ungenutzt), nur auf Zuruf.
+- `plattest --test dirs` prüft auf Android die XDG-Ordner von Linux (25 Fehler, schon vor AN3; nicht in `all`).
+  Android kennt nur `/documents` und `/data` als Ordner der Logs; der Test braucht einen eigenen Zweig.
+- Unix-Sockets von `net` (mit `fs::socket_id`): nach dem Mischen von AN2 und AN3 sind beide Teile da, die Sockets
+  selbst sind auf Android noch nicht eingeschaltet.
 
 ### AN4: Drucken, Schriften, Rest (M)
 
@@ -428,6 +576,8 @@ Schriften des Systems findet (Roboto, Noto CJK).
 | Autostart | Activities dürfen seit Android 10 nicht aus dem Hintergrund starten |
 | Dateizuordnungen und Shell-Integration im Desktop-Sinn | laufen auf Android über Intents im Manifest |
 | Lokale IPC zwischen Programmen (`control_ipc`) | eine App ist auf Android ein Prozess; Einzelinstanz ist dort die Regel |
+| Hardlinks (`fs::hard_link`) | SELinux verweigert sie jeder App, auch im eigenen Speicher (AN3); `false` |
+| Papierkorb (`trash`) | eine App hat keinen, in den sie Dateien legen könnte; `false`, die Datei bleibt |
 
 ## Reihenfolge
 
@@ -456,14 +606,16 @@ Fassade). AN4 braucht AN3 für die Schriften des Systems.
   `getaddrinfo`.
 - **Netlink ist eingeschränkt.** Apps ab `targetSdk` 30 dürfen `NETLINK_ROUTE` nicht binden und kein `RTM_GETLINK`
   senden. MAC-Adressen sind verborgen.
-- **Ohne `INTERNET` kein Socket.** Die App gehört dann nicht zur Gruppe `inet`, `socket()` gibt EACCES.
+- **Ohne `INTERNET` kein Socket.** Die App gehört dann nicht zur Gruppe `inet`, `socket()` gibt EACCES; auf dem
+  Emulator mit Android 15 und dem A56 mit Android 16 gibt es EPERM (das eBPF-Programm von `netd` prüft). `plat::net` nimmt beide (AN2).
 - **Network Security Config gilt nur für Java.** Klartext-Verbote und Pins des Manifests sehen die eigenen
   Sockets nicht. `netio` muss TLS selbst richtig machen, wie überall.
 - **Der UI-Thread darf nicht warten.** Fünf Sekunden ohne Antwort ergeben einen ANR. Netz nur über `task` und den
   Blocking-Pool, nie direkt im Ereignis.
 - **Im Hintergrund friert Android Prozesse ein** (Cached-Apps-Freezer, Doze). Threads stehen dann, Verbindungen
   laufen in Timeouts. Der Plan dokumentiert das, löst es aber nicht.
-- **Hardlinks** sind in der Shell verboten (ARM64.md); im App-Prozess prüfen.
+- **Hardlinks** sind in der Shell verboten (ARM64.md) und im App-Prozess auch (AN3: SELinux, `link` auf
+  `app_data_file`); `fs::hard_link` ist dort `false`.
 - **Kein `/etc/localtime`.** Die Zone kommt aus `persist.sys.timezone`.
 - **Emulator und Gerät unterscheiden sich:** `x86_64` gegen ARM64 (`struct stat`, Syscall-Nummern), API 35 gegen
   Android 16. Jeder Meilenstein läuft auf beiden.

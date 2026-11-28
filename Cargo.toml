@@ -77,6 +77,7 @@ members = [
     "lib/geom",
     "lib/sheet_io",
     "lib/img_jp2",
+    "lib/img_jbig2",
     "lib/jflib",
     "lib/jflib_build",
     "lib/cargo_jflib",
@@ -253,6 +254,7 @@ game_render3d = { package = "jflib-game-render3d", path = "lib/game_render3d", v
 geom = { package = "jflib-geom", path = "lib/geom", version = "=0.2.1" }
 sheet_io = { package = "jflib-sheet-io", path = "lib/sheet_io", version = "=0.2.1" }
 img_jp2 = { package = "jflib-img-jp2", path = "lib/img_jp2", version = "=0.2.1" }
+img_jbig2 = { package = "jflib-img-jbig2", path = "lib/img_jbig2", version = "=0.2.1" }
 style_winui = { package = "jflib-style-winui", path = "styles/winui", version = "=0.2.1" }
 style_classic = { package = "jflib-style-classic", path = "styles/classic", version = "=0.2.1" }
 style_kde = { package = "jflib-style-kde", path = "styles/kde", version = "=0.2.1" }
@@ -327,6 +329,9 @@ opt-level = 2
 opt-level = 2
 
 [profile.dev.package.jflib-img-jp2]
+opt-level = 2
+
+[profile.dev.package.jflib-img-jbig2]
 opt-level = 2
 
 [profile.dev.package.jflib-img-bmp]

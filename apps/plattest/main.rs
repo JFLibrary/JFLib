@@ -214,9 +214,9 @@
 //                                          printed then) -- a stress loop for races
 //
 // Android (docs/ANDROID.md, AN0): a program without a UI, python tools/android_console.py plattest -- --test all;
-// threads, sync and the pool run there since AN1; what needs plat's fs, net or child processes says
-// "not on Android yet" (AN2 to AN4) or, what Android does not have, "not on Android" (docs/ANDROID.md,
-// "Bewusst nicht").
+// threads, sync and the pool run there since AN1, plat::fs (files, vfs, kernel, content, trash) since AN3; what
+// needs plat's net says "not on Android yet" (AN2) or, what Android does not have (child processes), "not on
+// Android" (docs/ANDROID.md, "Bewusst nicht").
 //   plattest --test syscalls               (t_syscalls.rs, Android) every system call of rt's kernel table in
 //                                          a child: allowed, or ended by the seccomp filter (SIGSYS)
 // Scratch files live in build/plattest/<os>-<id>/ and are removed at the end; the config
@@ -227,8 +227,8 @@
 #![no_main]
 #![deny(unsafe_code)]
 // macOS and iOS: the tests of windows, pens, fingers and screens wait for AP4 (docs/APPLE.md); their helpers
-// stay unused until then.  Android (a program without a UI there): the same, and what needs fs, net
-// or child processes waits for AN2 to AN4 (docs/ANDROID.md)
+// stay unused until then.  Android (a program without a UI there): the same, and what needs net or
+// child processes waits for AN2 or is not there (docs/ANDROID.md)
 #![cfg_attr(any(target_vendor = "apple", target_os = "android"), allow(dead_code, unused_imports))]
 
 extern crate alloc;
@@ -266,14 +266,7 @@ mod t_poolbench;
 mod t_cursor;
 // the user's folders, the log folder and the trash
 mod t_dirs;
-#[cfg(not(target_os = "android"))]
 mod t_trash;
-#[cfg(target_os = "android")]
-mod t_trash {
-    pub fn t_trash(t: &mut crate::T) {
-        crate::later(t, "trash: plat::fs");
-    }
-}
 // clipboard_platform: deterministic rich clipboard framing checks.
 mod t_cliprich;
 // the system's clipboard for real (test devices: the iOS simulator)
@@ -347,7 +340,7 @@ mod t_policy;
 #[cfg(target_os = "android")]
 mod t_policy {
     pub fn t_policy(t: &mut crate::T) {
-        crate::later(t, "policy: plat::fs, net, process");
+        crate::later(t, "policy: plat::net, process");
     }
 }
 mod t_permask;
@@ -359,14 +352,7 @@ mod t_plugperm {
         crate::later(t, "plugperm: plat::net");
     }
 }
-#[cfg(not(target_os = "android"))]
 mod t_vfs;
-#[cfg(target_os = "android")]
-mod t_vfs {
-    pub fn t_vfs(t: &mut crate::T) {
-        crate::later(t, "vfs: plat::fs, File::create_new");
-    }
-}
 mod t_content;
 mod t_docs;
 mod t_portal;
@@ -1359,9 +1345,7 @@ fn t_files(t: &mut T) {
     // ---- a relative link that climbs out of its folder (an AppImage's usr/bin/NAME ->
     // ../lib/NAME/NAME): without rules it is made as written; under rules ".." is refused
     // (t_policy)
-    #[cfg(target_os = "android")]
-    t.later("files: a symlink to ../lib/x (plat::fs)");
-    #[cfg(not(any(windows, target_os = "android")))]
+    #[cfg(not(windows))]
     {
         plat::mkdir(&t.subp("ln/bin"));
         plat::mkdir(&t.subp("ln/lib"));

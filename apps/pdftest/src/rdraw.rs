@@ -386,6 +386,53 @@ fn render_image(t: &mut T) {
         huge[o..o + 4].copy_from_slice(&(1u32 << 20).to_be_bytes());
     }
     expect(t, "JPX too large", jpx("/Width 8 /Height 8 /ColorSpace /DeviceRGB /Filter /JPXDecode", &huge), &[(50.0, 50.0, WHITE)], 0);
+    // JBIG2 (an embedded stream made here): a page of 8 x 2, an MMR generic region of the CCITT rows
+    // above (four white, four black), the end of the page; JBIG2's black is black on the page
+    let jb2 = jbig2_page(8, 2, &[0x36, 0xF0]);
+    let jb = |dict: &str, data: &[u8]| page(b"q 80 0 0 80 10 10 cm /I Do Q", xo, &[(10, img(dict, data))], "");
+    expect(t, "JBIG2 image", jb("/Width 8 /Height 2 /ColorSpace /DeviceGray /BitsPerComponent 1 /Filter /JBIG2Decode", &jb2), &[(20.0, 70.0, WHITE), (80.0, 70.0, BLACK), (20.0, 30.0, WHITE), (80.0, 30.0, BLACK)], 0);
+    // as a stencil mask: black paints the fill colour
+    let mask = page(b"1 0 0 rg q 80 0 0 80 10 10 cm /I Do Q", xo, &[(10, img("/Width 8 /Height 2 /ImageMask true /Filter /JBIG2Decode", &jb2))], "");
+    expect(t, "JBIG2 stencil mask", mask, &[(20.0, 50.0, WHITE), (80.0, 50.0, RED)], 0);
+    // the page's size counts; empty globals change nothing
+    let with_globals = page(b"q 80 0 0 80 10 10 cm /I Do Q", xo, &[(10, img("/Width 3 /Height 7 /ColorSpace /DeviceGray /BitsPerComponent 1 /Filter /JBIG2Decode /DecodeParms << /JBIG2Globals 11 0 R >>", &jb2)), (11, img("", &[]))], "");
+    expect(t, "JBIG2 size from its page, empty globals", with_globals, &[(20.0, 50.0, WHITE), (80.0, 50.0, BLACK)], 0);
+    expect(t, "JBIG2 damaged", jb("/Width 8 /Height 2 /ColorSpace /DeviceGray /BitsPerComponent 1 /Filter /JBIG2Decode", b"junk"), &[(50.0, 50.0, WHITE)], 0);
+    // a page that claims 2^20 x 2^20 pixels is refused before anything is allocated
+    let mut huge = jb2.clone();
+    huge[11..15].copy_from_slice(&(1u32 << 20).to_be_bytes());
+    huge[15..19].copy_from_slice(&(1u32 << 20).to_be_bytes());
+    expect(t, "JBIG2 too large", jb("/Width 8 /Height 2 /ColorSpace /DeviceGray /BitsPerComponent 1 /Filter /JBIG2Decode", &huge), &[(50.0, 50.0, WHITE)], 0);
+}
+
+/// an embedded JBIG2 stream (ITU-T T.88 7.2): page information w x h, an immediate lossless generic
+/// region of the whole page coded with MMR (`mmr`), the end of the page
+fn jbig2_page(w: u32, h: u32, mmr: &[u8]) -> Vec<u8> {
+    let mut v = Vec::new();
+    let seg = |v: &mut Vec<u8>, num: u32, ty: u8, data: &[u8]| {
+        v.extend_from_slice(&num.to_be_bytes());
+        v.push(ty);
+        v.push(0); // no referred-to segments
+        v.push(1); // page 1
+        v.extend_from_slice(&(data.len() as u32).to_be_bytes());
+        v.extend_from_slice(data);
+    };
+    let mut info = Vec::new();
+    for x in [w, h, 0, 0] {
+        info.extend_from_slice(&x.to_be_bytes());
+    }
+    info.extend_from_slice(&[0, 0, 0]); // flags, striping
+    seg(&mut v, 0, 48, &info);
+    let mut region = Vec::new();
+    for x in [w, h, 0, 0] {
+        region.extend_from_slice(&x.to_be_bytes());
+    }
+    region.push(0); // OR
+    region.push(1); // MMR
+    region.extend_from_slice(mmr);
+    seg(&mut v, 1, 39, &region);
+    seg(&mut v, 2, 49, &[]);
+    v
 }
 
 // JPEG 2000 images for render_image, made by `python tools/jp2_check.py --fixtures` (Pillow with

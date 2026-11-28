@@ -23,12 +23,13 @@ gfx.workspace = true
 compress.workspace = true
 crypto.workspace = true
 text_shape.workspace = true
-# drawing pages: glyph outlines (TrueType, CFF), the system's fonts, JPEG and JPEG 2000 images
+# drawing pages: glyph outlines (TrueType, CFF), the system's fonts, JPEG, JPEG 2000 and JBIG2 images
 text.workspace = true
 plat.workspace = true
 img_core.workspace = true
 img_jpeg.workspace = true
 img_jp2.workspace = true
+img_jbig2.workspace = true
 
 # docs.rs: Linux, Windows, the browser and Android, not docs.rs's five defaults (32-bit Windows is none
 # of JFLib's targets; macOS and iOS are, their pages are not built on docs.rs yet)

@@ -123,16 +123,8 @@ def sdk_tools():
     return sdk, ndk, llvm, build, platform, java, suffix
 
 
-def manifest_gaps(perms, manifest):
-    """what apps/NAME/PERMISSIONS allows but android/AndroidManifest.xml does not declare (Android
-    would refuse it without a word) -> the message, or None.  Only the location needs a line:
-    motion sensors have no permission, and the other rules have no Android permission behind them
-    or ask for theirs elsewhere"""
-    # the UI runs without Vulkan (GalleryActivity, docs/GPU.md "Ausgabe unter Android"): the store must
-    # not hide the app from phones without it
-    for tag in re.findall(r'<uses-feature[^>]*android\.hardware\.vulkan[^>]*>', manifest):
-        if 'android:required="false"' not in tag:
-            return f'AndroidManifest.xml requires Vulkan ({tag}): the app must start without it (android:required="false").'
+def permission_keys(perms):
+    """the permission of each rule of apps/NAME/PERMISSIONS (after `ask`), or None without the file"""
     if perms is None:
         return None
     keys = set()
@@ -140,9 +132,37 @@ def manifest_gaps(perms, manifest):
         words = line.split('#')[0].split()
         if words:
             keys.add(words[1] if words[0] == 'ask' and len(words) > 1 else words[0])
+    return keys
+
+
+def wants_internet(perms):
+    """whether an app needs android.permission.INTERNET (docs/ANDROID.md, decision 5): no PERMISSIONS
+    (it may do everything), or net.connect / net.listen there.  Without it Android refuses every
+    socket, EACCES or EPERM (plat::net: NetError::no_internet)"""
+    keys = permission_keys(perms)
+    return keys is None or bool(keys & {'net.connect', 'net.listen'})
+
+
+def manifest_gaps(perms, manifest):
+    """what apps/NAME/PERMISSIONS allows but android/AndroidManifest.xml does not declare (Android
+    would refuse it without a word) -> the message, or None.  The location needs a line, and the
+    network (net.connect, net.listen) INTERNET: motion sensors have no permission, and the other
+    rules have no Android permission behind them or ask for theirs elsewhere.  An app without
+    PERMISSIONS that writes its own manifest may leave INTERNET out (its sockets then say so)"""
+    # the UI runs without Vulkan (GalleryActivity, docs/GPU.md "Ausgabe unter Android"): the store must
+    # not hide the app from phones without it
+    for tag in re.findall(r'<uses-feature[^>]*android\.hardware\.vulkan[^>]*>', manifest):
+        if 'android:required="false"' not in tag:
+            return f'AndroidManifest.xml requires Vulkan ({tag}): the app must start without it (android:required="false").'
+    keys = permission_keys(perms)
+    if keys is None:
+        return None
     if 'location' in keys and 'ACCESS_FINE_LOCATION' not in manifest and 'ACCESS_COARSE_LOCATION' not in manifest:
         return ('PERMISSIONS has `location`: android/AndroidManifest.xml needs <uses-permission> for '
                 'android.permission.ACCESS_FINE_LOCATION and / or ACCESS_COARSE_LOCATION.')
+    if keys & {'net.connect', 'net.listen'} and 'android.permission.INTERNET' not in manifest:
+        return ('PERMISSIONS has `net.connect` or `net.listen`: android/AndroidManifest.xml needs '
+                '<uses-permission android:name="android.permission.INTERNET" /> (without it Android refuses every socket).')
     return None
 
 
@@ -222,22 +242,26 @@ def build_console_apk(builder, name, archive):
     android/exe_main.c with -DJFGUI_CONSOLE_APK and the program as libjfgui_console.so, started by
     tools/android_console/ConsoleInstrumentation.java in the app's process (untrusted_app, Zygote's
     seccomp filter); no activity, no resources, debuggable (run-as reads its output), the debug key.
-    Package console_package(name), beside every other app.  tools/android_console.py runs it."""
+    Package console_package(name), beside every other app.  tools/android_console.py runs it.
+    INTERNET as cargo jflib android gives it (wants_internet, AN2); jfgui_ANDROID_NO_INTERNET=1 makes
+    NAME-<abi>-console-nonet.apk without it instead (android_console.py --no-internet)"""
     build = sys.modules[builder.__class__.__module__]
     error, run = build.BuildError, build.run_cmd
     try:
         sdk, ndk, llvm, sdkbuild, platform, java, suffix = sdk_tools()
     except RuntimeError as exc:
         raise error(str(exc)) from exc
-    work = builder.dir / 'apps' / name / 'console'
+    nonet = os.environ.get('jfgui_ANDROID_NO_INTERNET') == '1'
+    internet = not nonet and wants_internet(build.app_permissions(name))
+    work = builder.dir / 'apps' / name / ('console-nonet' if nonet else 'console')
     work.mkdir(parents=True, exist_ok=True)
-    output = builder.android_output / f'{name}-{builder.android_abi}-console.apk'
+    output = builder.android_output / f'{name}-{builder.android_abi}-console{"-nonet" if nonet else ""}.apk'
     package = console_package(name)
     sources = [Path(__file__), ROOT / 'build_rs.py', ROOT / 'android' / 'exe_main.c', *sorted(CONSOLE.glob('*.java'))]
     digest = hashlib.sha256(Path(archive).read_bytes())
     for path in sources:
         digest.update(path.read_bytes())
-    digest.update(f'{ndk}:{sdkbuild}:{platform}:{java}:{package}'.encode())
+    digest.update(f'{ndk}:{sdkbuild}:{platform}:{java}:{package}:{internet}'.encode())
     stamp = work / 'apk.sha256'
     fingerprint = digest.hexdigest()
     if output.exists() and stamp.exists() and stamp.read_text() == fingerprint:
@@ -266,6 +290,7 @@ def build_console_apk(builder, name, archive):
         '<!-- made by tools/android.py (build_console_apk): the test APK of a program without a UI -->\n'
         f'<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="{package}"\n'
         '    android:versionCode="1" android:versionName="0.1">\n'
+        + ('    <uses-permission android:name="android.permission.INTERNET" />\n' if internet else '') +
         f'    <application android:label="{name} (console)" android:allowBackup="false" android:extractNativeLibs="false" />\n'
         '    <instrumentation android:name="org.jflib.console.ConsoleInstrumentation"\n'
         f'        android:targetPackage="{package}" android:functionalTest="true" />\n'

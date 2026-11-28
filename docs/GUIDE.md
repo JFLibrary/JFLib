@@ -1694,7 +1694,7 @@ ui.dialog_end(); // always
 * **Images** (`img_core::io`): the runtime registers PNG, JPEG, BMP, GIF and SVG (`.svg`,
   `.svgz`: drawn at their intrinsic size, section 31) at start-up and connects the file
   functions. For every other format call `img_all::use_all_codecs()` once in `App::init`
-  (TIFF, TGA, WebP, AVIF, HEIC, JPEG XL, JPEG XR, JPEG 2000, DDS, PDN, PSD).
+  (TIFF, TGA, WebP, AVIF, HEIC, JPEG XL, JPEG XR, JPEG 2000, JBIG2, DDS, PDN, PSD).
 
   ```rust
   match img_core::io::load_ex(path, None, None) {   // any registered format -> FMT_PARGB
@@ -2802,7 +2802,13 @@ crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)
   the stream's read timeout too.
 * `netio::Client` / `client::Session` -- requests with timeouts and size limits, kept-alive
   sessions; `with_connector(netio::trust::connector(..))` for https to a server with its own CA
-  (a CA file, a pinned fingerprint, or trust on first use).
+  (a CA file, a pinned fingerprint, or trust on first use). Bodies in gzip and br are asked for
+  and decoded by default (`decode`; also zstd and deflate, `max_body` after decoding); the rest
+  is switched on: `with_redirects(n)` (never from https to http; credentials stay with their
+  origin; `fetch` gives the last URL), `with_cookies(jar)` (`netpkt::cookie::Jar`, the public
+  suffix list deciding which Domain a site may set), `with_pool(Pool::new())` (keep-alive),
+  `with_proxy(netio::proxy::Proxy::from_env()?)` (HTTP proxies and CONNECT tunnels, NO_PROXY),
+  `deadline_ms` for a whole request.
 * `netio::tls` -- TLS 1.3 servers and clients (ChaCha20-Poly1305, AES-GCM; X25519MLKEM768,
   X25519, P-256, P-384; Ed25519, ECDSA and RSA certificates and keys, mutual authentication),
   certificates by SNI (`ServerConfig::identities`, `select`), ALPN (`ClientConfig::alpn`,
@@ -2900,7 +2906,8 @@ crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)
   pieces). `agent_core::json` / `jmap` and `base::xml` / `encoding` are the same
   modules under their names until 0.2.1.
 * `plat::watch::Watcher::new(&roots)` / `take(ms)` -- the changed paths below folders
-  (ReadDirectoryChangesW / inotify, recursive; `overflow` when events were lost). Every change
+  (ReadDirectoryChangesW / inotify, recursive; `overflow` when events were lost; Android: inotify
+  on the app's folders, `/data`, `/documents` ...). Every change
   after `new` returned is seen. A root that is deleted or moved away (Linux: also a folder that
   could not be watched or listed yet) is tried again every second; until it is watched again
   `watching()` is false and every `take` reports `overflow` after its wait, so a caller that

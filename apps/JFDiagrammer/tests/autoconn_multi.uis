@@ -1,0 +1,74 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD21: Platzieren aus der Seitenleiste (SL-03) -- while a master is dragged over
+# the canvas, the connector it would split glows (CN-08), so does a container it would join; tiles
+# marked with Ctrl+click (all drawn checked) are dropped together by a drag of one of them or a
+# click on the page, in a row at the page's spacing, selected, one undo step
+click button:"Weitere Shapes"
+click "Allgemein"
+click "Standard-Shapes"
+drag button:"Rechteck" 560,260
+wait 600
+drag button:"Ellipse" 560,560
+click 560,260
+click 560,560 shift
+cmd 5421
+click 900,650
+# over the connector: it glows (the page's colour beside its line before)
+expect pixel 558 400 #FFFFFF
+wait 600
+down button:"Raute"
+move 200,400
+move 400,420
+move 580,420
+expect pixel 558 400 #C0D6F1
+shot build/JFDiagrammer-autoconn-drag.png
+up 580,420
+expect listitem:"Raute" rect 522 382 76 76
+expect listitem:"Sheet.8" exists
+key ctrl+z
+# over a container: its frame glows
+cmd 5409
+click 1000,700
+expect pixel 619 462 #FFFFFF
+wait 600
+down button:"Kreis"
+move 200,400
+move 600,470
+move 773,470
+expect pixel 619 462 #C0D6F1
+up 773,470
+expect listitem:"Kreis" exists
+key ctrl+z
+key ctrl+z
+# several tiles at once
+wait 600
+click button:"Raute"
+click button:"Kreis" ctrl
+click button:"Quadrat" ctrl
+expect button:"Raute" checked
+expect button:"Kreis" checked
+expect button:"Quadrat" checked
+drag button:"Kreis" 800,400
+a11y expect announced "3 Shapes abgelegt"
+expect listitem:"Raute" rect 668 362 75 76
+expect listitem:"Kreis" rect 762 362 76 76
+expect listitem:"Quadrat" rect 857 362 75 76
+expect listitem:"Kreis" selected
+expect listitem:"Quadrat" selected
+expect button:"Kreis" unchecked
+shot build/JFDiagrammer-autoconn-multi.png
+key ctrl+z
+expect listitem:"Raute" missing
+expect listitem:"Kreis" missing
+expect listitem:"Quadrat" missing
+# marked, then a click on the page
+wait 600
+click button:"Ellipse"
+click button:"Dreieck" ctrl
+click 700,650
+a11y expect announced "2 Shapes abgelegt"
+expect listitem:"Ellipse.14" rect 616 625 76 51
+expect listitem:"Ellipse.14" selected
+expect listitem:"Dreieck" selected
+expect button:"Ellipse" unchecked
+expect button:"Dreieck" unchecked

@@ -1,0 +1,66 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD21 (ST-02): Container-Tools › Format › Containerformatvorlagen as a gallery of
+# pictures -- the style of the container marked, pointing at another style previews it on the
+# container (its heading band blue) and leaving takes it back, a click applies it; ▾ shows all 14
+# styles, Schiefer has three heading styles (no "Ohne Kopfzeile"), a heading style previews and
+# applies alike; Einfügen › Container in the style Reiter, whose heading gallery has two pictures;
+# undo takes each change back as one step
+theme light
+cmd 4404
+drag 500,330 640,420
+cmd 4400
+click 570,375
+cmd 5409
+expect listitem:"Container" rect 488 291 176 146
+click tab:"Format"
+expect button:"Klar" checked
+expect button:"Akzent" unchecked
+expect pixel 620 300 #E6EFF8
+# the live preview: Akzent while it is pointed at
+move button:"Akzent"
+expect pixel 620 300 #1F5FA8
+expect button:"Klar" checked
+move 1000,700
+expect pixel 620 300 #E6EFF8
+expect button:"Rückgängig" enabled
+# a click applies it, one undo step
+click button:"Akzent"
+expect button:"Akzent" checked
+move 1000,700
+expect pixel 620 300 #1F5FA8
+key ctrl+z
+expect pixel 620 300 #E6EFF8
+expect button:"Klar" checked
+# ▾: all 14 styles; Schiefer
+click button:"Alle Containerformatvorlagen"
+expect button:"Kopf unten" exists
+expect button:"Klar" checked
+shot build/JFDiagrammer-structures-styles.png
+click button:"Schiefer"
+expect pixel 620 300 #4D5560
+click button:"Kopfzeilenstil"
+expect button:"Kopfband oben" checked
+expect button:"Titel oben" exists
+expect button:"Kopfband links" exists
+expect button:"Ohne Kopfzeile" missing
+move button:"Kopfband links"
+expect pixel 620 300 #FFFFFF
+# (the band on the left: the container grows to the left, its automatic size keeps the inside)
+expect pixel 474 420 #4D5560
+click button:"Titel oben"
+expect pixel 620 300 #FFFFFF
+expect pixel 474 420 #FFFFFF
+# Einfügen › Container in the style Reiter (nothing selected: in the middle of the view)
+click 1100,700
+click tab:"Einfügen"
+click button:"Container"
+click button:"Reiter"
+expect tab:"Format" exists
+click tab:"Format"
+expect button:"Klar" unchecked
+click button:"Kopfzeilenstil"
+expect button:"Kopfband oben" checked
+expect button:"Titel oben" exists
+expect button:"Kopfband links" missing
+key esc
+shot build/JFDiagrammer-structures-styles.png

@@ -26,9 +26,15 @@
 //                                  persisted recordset: <xml> s:Schema > s:ElementType >
 //                                  s:AttributeType (name, rs:name, s:datatype dt:type) and
 //                                  rs:data > z:row with one attribute per column
-// Row IDs: a Visio_RowID column when the data has one (DataAsXML adds it), else the
-// RowKeyValue of the row's key, else the position (from 1).  The data is written without
-// Visio_RowID: the key or the position gives the IDs back.
+// Row IDs: the column "_Visio_RowID_" (Visio 16 writes it first in the data of a recordset it
+// made itself; DataAsXML calls it "Visio_RowID"), else the RowKeyValue of the row's key (when
+// the key values name every row once), else the RowIDs of the key values in their order (Visio
+// saves rows it has not loaded with stale key values, the RowIDs in row order), else the
+// position (from 1).  Written with "_Visio_RowID_" first, as Visio writes its own.
+// What Visio 16 does otherwise (the Visio check of 2026-11-27): LangID='de-DE' (a culture name,
+// not the number the schema names), no XML declaration in the data part, a column's name as
+// the attribute when it is a plain name (else cN with rs:name), hex character references;
+// it keeps a data part it has not loaded as it was.
 //
 // Everything is untrusted: the parts are bounded by the ZIP limits (part size), the XML by the
 // reader's depth and attribute limits; nothing recurses.
@@ -57,7 +63,10 @@ const REL_RECORDSET: &str = "http://schemas.microsoft.com/visio/2010/relationshi
 const NS_MAIN: &str = "http://schemas.microsoft.com/office/visio/2012/main";
 const NS_R: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const DECL: &str = "<?xml version='1.0' encoding='utf-8' ?>\r\n";
-const ROW_ID: &str = "Visio_RowID";
+// the row ID column: Visio 16 stores "_Visio_RowID_" in the data part of a recordset it made
+// itself (Visio check 2026-11-27), DataAsXML calls it "Visio_RowID"
+const ROW_ID: &str = "_Visio_RowID_";
+const ROW_ID_API: &str = "Visio_RowID";
 
 // ---------------------------------------------------------------- a small element tree
 
@@ -173,7 +182,11 @@ pub(crate) fn load(doc: &mut Document, lim: &crate::vsdx::Limits) {
             let Some(part) = target.and_then(|t| doc.parts.iter().find(|p| same(doc, p.name, t))) else { continue };
             let rs = &mut data.recordsets[n];
             match read_ado(&part.data, rs, lim.depth, attrs) {
-                Some(rows) => rs.rows = Arc::new(rows),
+                Some(rows) => {
+                    rs.rows = Arc::new(rows);
+                    // the key values from the rows (Visio may have saved stale ones)
+                    rs.update_key_values();
+                }
                 None => rs.raw = Some(Arc::new(part.data.clone())),
             }
             taken.push(part.name);
@@ -278,7 +291,7 @@ fn recordsets(t: &El, data: &mut DataSets) -> Result<Vec<Option<String>>, ()> {
                             name: c.string("Name").ok_or(())?,
                             label: c.string("Label").unwrap_or_default(),
                             orig_label: c.string("OrigLabel"),
-                            lang: c.uint("LangID")?,
+                            lang: c.string("LangID"),
                             calendar: c.uint("Calendar")?.map(|x| x.min(u16::MAX as u32) as u16),
                             data_type: c.uint("DataType")?.unwrap_or(0).min(u16::MAX as u32) as u16,
                             unit_type: c.string("UnitType"),
@@ -388,7 +401,7 @@ pub(crate) fn read_ado(bytes: &[u8], rs: &Recordset, depth: usize, attrs: usize)
     }
     // schema column -> recordset column
     let map: Vec<Option<usize>> = schema.iter().map(|c| rs.column_by_id(&c.1)).collect();
-    let id_col = schema.iter().position(|c| c.1 == ROW_ID);
+    let id_col = schema.iter().position(|c| c.1.eq_ignore_ascii_case(ROW_ID) || c.1.eq_ignore_ascii_case(ROW_ID_API));
     let n = rs.columns.len();
     let mut out = Vec::with_capacity(rows.len());
     for (pos, raw) in rows.into_iter().enumerate() {
@@ -405,26 +418,36 @@ pub(crate) fn read_ado(bytes: &[u8], rs: &Recordset, depth: usize, attrs: usize)
         }
         out.push((id, pos as u32 + 1, values));
     }
-    // IDs: Visio_RowID, else the stored key values, else the position
-    let by_key: Option<alloc::collections::BTreeMap<String, u32>> = (!rs.key.is_empty() && id_col.is_none()).then(|| {
+    // IDs: Visio_RowID, else the stored key values when they name every row once, else the
+    // RowIDs of the key values in their order (Visio saves a drawing whose rows it has not
+    // loaded with every RowKeyValue Value the first row's: the RowIDs stay right, in row order),
+    // else the position
+    let mut by_key: Option<alloc::collections::BTreeMap<String, u32>> = None;
+    let mut by_pos: Option<Vec<u32>> = None;
+    if let (Some(first), None) = (rs.key.first(), id_col) {
         let mut m = alloc::collections::BTreeMap::new();
-        if let Some(first) = rs.key.first() {
-            for (row, _) in first.values.iter() {
-                let parts: Vec<&str> = rs.key.iter().map(|k| k.values.iter().find(|(r, _)| r == row).map_or("", |(_, v)| v.as_str())).collect();
-                m.entry(parts.join("\t")).or_insert(*row);
-            }
+        let mut unique = true;
+        for (row, _) in first.values.iter() {
+            let parts: Vec<&str> = rs.key.iter().map(|k| k.values.iter().find(|(r, _)| r == row).map_or("", |(_, v)| v.as_str())).collect();
+            unique &= m.insert(parts.join("\t"), *row).is_none();
         }
-        m
-    });
+        let all_found = out.iter().all(|(_, pos, values)| m.contains_key(&rs.key_of(&DataRow { id: *pos, values: values.clone() })));
+        if unique && all_found {
+            by_key = Some(m);
+        } else if first.values.len() == out.len() {
+            by_pos = Some(first.values.iter().map(|(r, _)| *r).collect());
+        }
+    }
     let mut used = alloc::collections::BTreeSet::new();
     let mut next = rs.next_row.max(1);
     let rows: Vec<DataRow> = out
         .into_iter()
         .map(|(id, pos, values)| {
             let probe = DataRow { id: pos, values };
-            let want = id.or_else(|| match &by_key {
-                Some(m) => m.get(&rs.key_of(&probe)).copied(),
-                None => Some(pos),
+            let want = id.or_else(|| match (&by_key, &by_pos) {
+                (Some(m), _) => m.get(&rs.key_of(&probe)).copied(),
+                (None, Some(p)) => p.get(pos as usize - 1).copied(),
+                (None, None) => Some(pos),
             });
             let id = match want {
                 Some(x) if used.insert(x) => x,
@@ -674,7 +697,9 @@ fn recordsets_xml(data: &DataSets, ids: &[String]) -> String {
             if let Some(s) = &c.orig_label {
                 attr(&mut o, "OrigLabel", s);
             }
-            opt(&mut o, "LangID", c.lang);
+            if let Some(s) = &c.lang {
+                attr(&mut o, "LangID", s);
+            }
             opt(&mut o, "Calendar", c.calendar);
             attr(&mut o, "DataType", &format!("{}", c.data_type));
             if let Some(s) = &c.unit_type {
@@ -738,12 +763,14 @@ pub fn ado(rs: &Recordset) -> String {
     let mut o = String::from(DECL);
     o.push_str("<xml xmlns:s='uuid:BDC6E3F0-6DA3-11d1-A2A3-00AA00C14882' xmlns:dt='uuid:C2F41010-65B3-11d1-A29F-00AA00C14882' xmlns:rs='urn:schemas-microsoft-com:rowset' xmlns:z='#RowsetSchema'>\r\n");
     o.push_str("<s:Schema id='RowsetSchema'>\r\n<s:ElementType name='row' content='eltOnly' rs:updatable='true'>\r\n");
+    // the row IDs first, as Visio writes its own recordsets
+    o.push_str("<s:AttributeType name='c0' rs:name='_Visio_RowID_' rs:number='1' rs:nullable='true' rs:maydefer='true' rs:write='true'><s:datatype dt:type='int' dt:maxLength='4' rs:precision='0' rs:fixedlength='true'/></s:AttributeType>\r\n");
     use diagram_core::data::kind;
     for (i, c) in rs.columns.iter().enumerate() {
         o.push_str("<s:AttributeType");
         attr(&mut o, "name", &format!("c{}", i + 1));
         attr(&mut o, "rs:name", &c.id);
-        attr(&mut o, "rs:number", &format!("{}", i + 1));
+        attr(&mut o, "rs:number", &format!("{}", i + 2));
         o.push_str(" rs:nullable='true' rs:maydefer='true' rs:write='true'>");
         let long = rs.rows.iter().any(|r| matches!(r.values.get(i), Some(DataValue::Text(s)) if s.chars().count() > 255));
         let dt = match c.data_type {
@@ -760,6 +787,7 @@ pub fn ado(rs: &Recordset) -> String {
     o.push_str("<s:extends type='rs:rowbase'/>\r\n</s:ElementType>\r\n</s:Schema>\r\n<rs:data>\r\n");
     for r in rs.rows.iter() {
         o.push_str("<z:row");
+        attr(&mut o, "c0", &format!("{}", r.id));
         for (i, v) in r.values.iter().enumerate().take(rs.columns.len()) {
             let text: Cow<str> = match v {
                 DataValue::Empty => continue,

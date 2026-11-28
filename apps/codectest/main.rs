@@ -27,9 +27,14 @@
 //                                  tests/jxlref.uis); exit code 1 on a failure
 //   --jp2 IN --to OUT, --jp2-mutate IN, --jp2-bench IN
 //                                  lib/img_jp2 for tools/jp2_check.py (ops_jp2.rs)
+//   --jbig2 IN --to OUT, --jbig2-embedded IN [--globals G] --to OUT, --jbig2-mutate IN
+//                                  lib/img_jbig2 for tools/jbig2_check.py (ops_jbig2.rs)
 //   --sheet [--only NAME]          lib/sheet_io's XLSX and CSV readers against crafted
 //                                  workbooks and texts (sheet_checks.rs; tests/sheet.uis); exit
 //                                  code 1 on a failure
+//   --sheet-dump FILE              (JD18) a real .xlsx / .csv (one Excel saved, say): sheets,
+//                                  names, each sheet's table with the type of every value; exit
+//                                  code 1 when it does not read
 //
 // Batch file: "CTB1", then records {u32 op, u32 arg, u32 len, u8 data[len]}.
 // Result file: "CTR1", then per record {i32 result, u32 len, u8 data[len]}.  An op handler
@@ -71,6 +76,7 @@ mod ops_jxr;
 mod ops_pdn;
 mod ops_gif;
 mod ops_icc;
+mod ops_jbig2;
 mod ops_jp2;
 mod ops_jpeg;
 mod ops_meta;
@@ -200,6 +206,9 @@ fn codectest() -> i32 {
     if ct.args.flag("--hostile") {
         return hostile::run(ct.args.value("--only"));
     }
+    if let Some(path) = ct.args.value("--sheet-dump").map(alloc::string::String::from) {
+        return sheet_checks::dump(&path);
+    }
     if ct.args.flag("--sheet") {
         return sheet_checks::run(ct.args.value("--only"));
     }
@@ -210,6 +219,9 @@ fn codectest() -> i32 {
         return code;
     }
     if let Some(code) = ops_jp2::run_mode(&mut ct) {
+        return code;
+    }
+    if let Some(code) = ops_jbig2::run_mode(&mut ct) {
         return code;
     }
     plat::write_stderr(

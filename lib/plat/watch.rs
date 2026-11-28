@@ -20,6 +20,8 @@
 // limit, no descriptors left) is tried again every second; a root moved or deleted ends its
 // watches (their events would name the old paths) and is watched again once a folder is at
 // its path.  Until then watching() is false.
+// Android (docs/ANDROID.md AN3): the Linux way, on the app's names (android_files.rs: /data,
+// /documents ...; the watches on the real paths behind them); changes come back under those names.
 // macOS: FSEvents with file events (dropped events report an overflow); iOS: none.
 // Paths are absolute, in the form of the platform; the folder of a change is enough for a
 // caller that walks the tree again.
@@ -92,9 +94,9 @@ impl Shared {
         self.cv.notify_all();
     }
 
-    // (Linux) n roots and folders are not watched now; fewer than before: an overflow (what
-    // changed in them meanwhile was not seen)
-    #[cfg(target_os = "linux")]
+    // (Linux, Android) n roots and folders are not watched now; fewer than before: an overflow
+    // (what changed in them meanwhile was not seen)
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     fn set_down(&self, n: usize) {
         let mut g = self.pending.lock();
         if n == g.down {
@@ -368,7 +370,7 @@ mod imp {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 mod imp {
     use super::*;
     use alloc::collections::BTreeMap;
@@ -438,7 +440,11 @@ mod imp {
     fn add(st: &mut State, dir: &str, sh: &Shared) {
         let mut todo = alloc::vec![String::from(dir)];
         while let Some(dir) = todo.pop() {
-            let z: Vec<u8> = dir.bytes().chain(core::iter::once(0)).collect();
+            // (Android: the real path behind the name; the watch keeps the name)
+            let Some(z) = crate::fs::os_z(&dir) else {
+                sh.overflow();
+                continue;
+            };
             // SAFETY: a NUL-terminated path.
             let wd = unsafe { syscall3(SYS_INOTIFY_ADD_WATCH, st.fd, z.as_ptr() as usize, MASK as usize) };
             if wd < 0 {

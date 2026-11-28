@@ -1,0 +1,48 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD21 route (SS-19): a connector between two shapes routes around a tall third one
+# between them (JD21v, as Visio 16: out of the first shape's facing side, round the third one at
+# half the AvenueSize, into the second one's bottom; Visio passed above in its own drawing).  Layout-Verhalten of the middle shape: Verbinder dürfen das Shape
+# waagerecht durchqueren (ShapePermeableX); when the first shape is dragged (the grid keeps it
+# where it is), the connector runs straight through.  Only vertically permeable: around it again.
+# The rows show what the shape has.  (JD21v) The middle shape is made placeable first
+# (Layout-Verhalten: Layout und Routing um das Shape): Visio 16 routes only around placeable shapes.
+cmd 4404
+drag 500,330 640,420
+drag 700,300 760,450
+drag 820,330 960,420
+cmd 4400
+click 730,320
+cmd 5422
+expect dialog:"Layout-Verhalten" exists
+click radio:"Layout und Routing um das Shape"
+click button:"OK"
+cmd 4401
+drag 560,370 880,370
+cmd 4400
+key esc
+expect listitem:"Sheet.7" rect 651 374 242 85
+click 730,320
+expect listitem:"Sheet.5" selected
+cmd 5422
+expect dialog:"Layout-Verhalten" exists
+expect checkbox:"Verbinder dürfen das Shape waagerecht durchqueren" unchecked
+expect checkbox:"Verbinder dürfen das Shape senkrecht durchqueren" unchecked
+expect checkbox:"Andere Shapes dürfen beim Layout darauf platziert werden" unchecked
+click checkbox:"Verbinder dürfen das Shape waagerecht durchqueren"
+click button:"OK"
+drag 560,400 560,410
+expect listitem:"Sheet.7" rect 651 371 176 6
+shot build/JFDiagrammer-route-permeable.png
+click 730,320
+cmd 5422
+expect checkbox:"Verbinder dürfen das Shape waagerecht durchqueren" checked
+click checkbox:"Verbinder dürfen das Shape waagerecht durchqueren"
+click checkbox:"Verbinder dürfen das Shape senkrecht durchqueren"
+click button:"OK"
+drag 560,400 560,390
+expect listitem:"Sheet.7" rect 651 374 242 85
+# undone: horizontally permeable again (the drag and the dialog), straight once more
+key ctrl+z
+key ctrl+z
+drag 560,400 560,410
+expect listitem:"Sheet.7" rect 651 371 176 6

@@ -1,7 +1,9 @@
-// ribbon -- the registers of the ribbon: Start, Einfügen, Entwurf, (JD18) Daten, Ansicht with
+// ribbon -- the registers of the ribbon: Start, Einfügen, Entwurf, (JD18) Daten, (JD19)
+// Überprüfen, Ansicht with
 // every P1 command of FEATURES.md 3.3-3.9, the context registers Container-Tools › Format (RK-01)
 // and Textwerkzeuge › Text (RK-11), and (JD10) Funktionsübergreifendes Flussdiagramm (RK-03)
-// while the page holds one
+// while the page holds one; (JD21) Ansicht › Add-Ons, Container-Tools' styles and Einfügen ›
+// Container as galleries of pictures (container_styles.rs)
 //
 //   tabs(app) -> Vec<Reg>         the registers shown now: File, the four, the context ones
 //                                 the selection asks for (app.selection_kind)
@@ -24,7 +26,7 @@ use ui::i18n::t;
 use ui::*;
 
 use crate::commands::{self, *};
-use crate::{lang, tc, Diagrammer};
+use crate::{container_styles, lang, tc, Diagrammer};
 
 /// the kinds of selection that bring context registers (until JD7 the shell preview,
 /// --shell-preview, stands in for a real selection)
@@ -47,6 +49,8 @@ pub(crate) enum Reg {
     Text,
     /// (JD10) the cross-functional flowchart's register
     Cff,
+    /// (JD19) Überprüfen, between Daten and Ansicht (last here: the other registers keep their ids)
+    Review,
 }
 
 // the registers' labels (German, translated where drawn)
@@ -57,6 +61,7 @@ const L_INSERT: &str = "Einfügen";
 const L_DESIGN: &str = "Entwurf";
 const L_VIEW: &str = "Ansicht";
 const L_DATA: &str = "Daten";
+const L_REVIEW: &str = "Überprüfen";
 const L_CONTAINER_SET: &str = "Container-Tools";
 const L_CONTAINER: &str = "Format|Register";
 const L_TEXT_SET: &str = "Textwerkzeuge";
@@ -65,7 +70,7 @@ const L_CFF: &str = "Funktionsübergreifendes Flussdiagramm";
 
 /// the registers shown now (the File register first)
 pub(crate) fn tabs(app: &Diagrammer) -> Vec<Reg> {
-    let mut v = alloc::vec![Reg::File, Reg::Start, Reg::Insert, Reg::Design, Reg::Data, Reg::View];
+    let mut v = alloc::vec![Reg::File, Reg::Start, Reg::Insert, Reg::Design, Reg::Data, Reg::Review, Reg::View];
     // (JD13, VL-04) also when the drawing's template brought the register
     if crate::structures::has_cff(app) || crate::templates::has_register(app, "cff") {
         v.push(Reg::Cff);
@@ -87,6 +92,7 @@ pub(crate) fn tab_descs(ui: &Ui, regs: &[Reg]) -> Vec<RibbonTab<'static>> {
             Reg::Insert => RibbonTab::new(t(L_INSERT)),
             Reg::Design => RibbonTab::new(t(L_DESIGN)),
             Reg::Data => RibbonTab::new(t(L_DATA)),
+            Reg::Review => RibbonTab::new(t(L_REVIEW)),
             Reg::View => RibbonTab::new(t(L_VIEW)),
             Reg::Container => RibbonTab::context(tc(L_CONTAINER), t(L_CONTAINER_SET), ui.color(T_OK)),
             Reg::Text => RibbonTab::context(tc(L_TEXT), t(L_TEXT_SET), ui.color(T_WARN)),
@@ -136,18 +142,46 @@ static COLOR_MENU: [It; 1] = [C(MORE_COLORS)];
 static ALIGN_MENU: [It; 9] = [C(AUTO_ALIGN), Sep, C(ALIGN_LEFT), C(ALIGN_CENTER), C(ALIGN_RIGHT), Sep, C(ALIGN_TOP), C(ALIGN_MIDDLE), C(ALIGN_BOTTOM)];
 static ROTATE_MENU: [It; 4] = [C(ROTATE_LEFT), C(ROTATE_RIGHT), C(FLIP_H), C(FLIP_V)];
 // i18n
-static POSITION_MENU: [It; 4] = [C(DISTRIBUTE_H), C(DISTRIBUTE_V), Sep, Sub("Shapes drehen", &ROTATE_MENU)];
+// (JD21 layout) Visio's Positionieren: spacing, distribution, page breaks, turning
+static POSITION_MENU: [It; 13] = [
+    C(AUTO_SPACE),
+    C(AUTO_ALIGN_SPACE),
+    C(SPACING_OPTIONS),
+    Sep,
+    C(DISTRIBUTE_H),
+    C(DISTRIBUTE_V),
+    C(DISTRIBUTE_MORE),
+    Sep,
+    C(MOVE_OFF_BREAKS),
+    C(AVOID_BREAKS),
+    Sep,
+    Sub("Shapes drehen", &ROTATE_MENU),
+    Sub("Diagramm drehen", &DIAGRAM_MENU), // i18n
+];
+static DIAGRAM_MENU: [It; 4] = [C(DIAGRAM_ROTATE_LEFT), C(DIAGRAM_ROTATE_RIGHT), C(DIAGRAM_FLIP_V), C(DIAGRAM_FLIP_H)];
 static FRONT_MENU: [It; 2] = [C(BRING_FRONT), C(BRING_FORWARD)];
 static BACK_MENU: [It; 2] = [C(SEND_BACK), C(SEND_BACKWARD)];
-static GROUP_MENU_ITEMS: [It; 2] = [C(GROUP), C(UNGROUP)];
+// (JD21 ops) the shape operations (Entwicklertools › Shape-Design › Vorgänge in Visio; JD23 brings
+// that register)
+// i18n
+// (JD21 groups) Zu Gruppe hinzufügen, Aus Gruppe entfernen, Gruppe öffnen, Verhalten
+static GROUP_MENU_ITEMS: [It; 10] = [
+    C(GROUP), C(UNGROUP), C(ADD_TO_GROUP), C(REMOVE_FROM_GROUP), Sep, C(OPEN_GROUP), C(CLOSE_GROUP), C(GROUP_BEHAVIOR), Sep,
+    Sub("Vorgänge", &OPERATIONS_MENU),
+];
+static OPERATIONS_MENU: [It; 7] = [C(OP_UNION), C(OP_COMBINE), C(OP_FRAGMENT), C(OP_INTERSECT), C(OP_SUBTRACT), Sep, C(UPDATE_ALIGN_BOX)];
 static FIND_MENU_ITEMS: [It; 2] = [C(FIND), C(REPLACE)];
 static LAYER_MENU: [It; 2] = [C(LAYER_ASSIGN), C(LAYER_PROPERTIES)];
 static SELECT_MENU_ITEMS: [It; 4] = [C(SELECT_ALL), C(SELECT_BY_TYPE), C(SELECT_AREA), C(LASSO)];
 static PAGE_MENU: [It; 3] = [C(PAGE_BLANK), C(PAGE_BACKGROUND), C(PAGE_DUPLICATE)];
 static PICTURE_MENU: [It; 1] = [C(PICTURE_FILE)];
-static CONTAINER_MENU: [It; 6] = [C(CONTAINER_1), C(CONTAINER_2), C(CONTAINER_3), C(CONTAINER_4), C(CONTAINER_5), C(CONTAINER_6)];
+// (JD21 tools) the 14 styles, drawn as a gallery of pictures (container_styles::flyout)
+static CONTAINER_MENU: [It; 14] = [
+    C(CONTAINER_1), C(CONTAINER_2), C(CONTAINER_3), C(CONTAINER_4), C(CONTAINER_5), C(CONTAINER_6), C(CONTAINER_7), C(CONTAINER_8), C(CONTAINER_9),
+    C(CONTAINER_10), C(CONTAINER_11), C(CONTAINER_12), C(CONTAINER_13), C(CONTAINER_14),
+];
 static CALLOUT_MENU: [It; 6] = [C(CALLOUT_1), C(CALLOUT_2), C(CALLOUT_3), C(CALLOUT_4), C(CALLOUT_5), C(CALLOUT_6)];
-static CT_STYLE_MENU: [It; 6] = [C(CT_STYLE_1), C(CT_STYLE_2), C(CT_STYLE_3), C(CT_STYLE_4), C(CT_STYLE_5), C(CT_STYLE_6)];
+// (JD21 tools) drawn as pictures of the selected container's style (container_styles::flyout)
 static CT_HEADING_MENU: [It; 4] = [C(CT_HEADING_1), C(CT_HEADING_2), C(CT_HEADING_3), C(CT_HEADING_4)];
 static CT_AUTOSIZE_MENU: [It; 3] = [C(CT_RESIZE_0), C(CT_RESIZE_1), C(CT_RESIZE_2)];
 static CFF_ORIENT_MENU: [It; 2] = [C(CFF_HORIZONTAL), C(CFF_VERTICAL)];
@@ -180,14 +214,16 @@ static START: [Group; 7] = [
         Sm::Row(&[VALIGN_TOP, VALIGN_MIDDLE, VALIGN_BOTTOM]),
         Sm::Row(&[TEXT_LEFT, TEXT_CENTER, TEXT_RIGHT, TEXT_JUSTIFY]),
     ])]),
-    Group("Tools", 0, &[Col::Small(&[Sm::Btn(POINTER), Sm::Btn(CONNECTOR_TOOL), Sm::Btn(TEXT_TOOL)]), Col::Small(&[Sm::Split(DRAW_TOOLS, &DRAW_MENU)])]),
+    // (JD21 glue) Verbindungspunkt (RS-17): a small icon under the drawing tools, as in Visio
+    Group("Tools", 0, &[Col::Small(&[Sm::Btn(POINTER), Sm::Btn(CONNECTOR_TOOL), Sm::Btn(TEXT_TOOL)]), Col::Small(&[Sm::Split(DRAW_TOOLS, &DRAW_MENU), Sm::Row(&[CONN_POINT_TOOL])])]),
     Group("Formenarten", FORMAT_PANE, &[Col::Small(&[Sm::Menu(FILL, &FILL_MENU), Sm::Menu(LINE_FORMAT, &LINE_MENU)])]),
     Group("Anordnen", 0, &[
         Col::BigMenu(ALIGN, &ALIGN_MENU),
         Col::BigMenu(POSITION, &POSITION_MENU),
         Col::Small(&[Sm::Split(BRING_FRONT, &FRONT_MENU), Sm::Split(SEND_BACK, &BACK_MENU), Sm::Menu(GROUP_MENU, &GROUP_MENU_ITEMS)]),
     ]),
-    Group("Bearbeiten", 0, &[Col::Small(&[Sm::Menu(FIND_MENU, &FIND_MENU_ITEMS), Sm::Menu(LAYERS, &LAYER_MENU), Sm::Menu(SELECT_MENU, &SELECT_MENU_ITEMS)])]),
+    // (JD21 groups) Shape ändern: its gallery (change_shape::flyout)
+    Group("Bearbeiten", 0, &[Col::Small(&[Sm::Menu(FIND_MENU, &FIND_MENU_ITEMS), Sm::Menu(LAYERS, &LAYER_MENU), Sm::Menu(SELECT_MENU, &SELECT_MENU_ITEMS)]), Col::BigMenu(CHANGE_SHAPE, &[])]),
 ];
 
 // i18n
@@ -208,22 +244,58 @@ static DESIGN: [Group; 4] = [
         Col::Small(&[Sm::Menu(VAR_COLORS, &THEME_MENU), Sm::Menu(VAR_EFFECTS, &THEME_MENU), Sm::Menu(VAR_CONNECTORS, &THEME_MENU)]),
         Col::Small(&[Sm::Menu(VAR_FONTS, &THEME_MENU), Sm::Menu(VAR_EMBELLISHMENT, &THEME_MENU)]),
     ]),
-    Group("Layout", LAYOUT_ROUTING, &[Col::BigMenu(CONNECTORS, &CONN_MENU)]),
+    Group("Layout", LAYOUT_ROUTING, &[Col::BigMenu(RELAYOUT, &RELAYOUT_MENU), Col::BigMenu(CONNECTORS, &CONN_MENU)]),
 ];
 
-// (JD18) Daten, as Visio's register (FEATURES 3.7); the data graphics wait for JD19
+// (JD21 layout) Seitenlayout neu anordnen: Visio's gallery as rows (a live preview while one is
+// pointed at, layout_cmds::row_event), then the dialog
+static RELAYOUT_MENU: [It; 19] = [
+    C(LAYOUT_FLOW_DOWN),
+    C(LAYOUT_FLOW_UP),
+    C(LAYOUT_FLOW_RIGHT),
+    C(LAYOUT_FLOW_LEFT),
+    Sep,
+    C(LAYOUT_HIER_DOWN),
+    C(LAYOUT_HIER_UP),
+    C(LAYOUT_HIER_RIGHT),
+    C(LAYOUT_HIER_LEFT),
+    Sep,
+    C(LAYOUT_TREE_DOWN_RIGHT),
+    C(LAYOUT_TREE_RIGHT_DOWN),
+    C(LAYOUT_TREE_DOWN_LEFT),
+    C(LAYOUT_TREE_LEFT_DOWN),
+    Sep,
+    C(LAYOUT_RADIAL),
+    C(LAYOUT_CIRCULAR),
+    Sep,
+    C(LAYOUT_MORE),
+];
+
+// (JD18) Daten, as Visio's register (FEATURES 3.7); (JD19) the data graphics: the gallery,
+// Position ▾, Legende einfügen ▾, Erweiterte Datengrafiken ▾ (data_graphics*.rs)
 static REFRESH_MENU: [It; 4] = [C(DATA_REFRESH_ALL), C(DATA_REFRESH), Sep, C(DATA_AUTO_LINK_REFRESH)];
+// i18n
+static DG_POS_MENU: [It; 2] = [Sub("Horizontal", &[C(DG_POS_H0), C(DG_POS_H1), C(DG_POS_H2), C(DG_POS_H3), C(DG_POS_H4), C(DG_POS_H5), C(DG_POS_H6)]), Sub("Vertikal", &[C(DG_POS_V6), C(DG_POS_V5), C(DG_POS_V4), C(DG_POS_V3), C(DG_POS_V2), C(DG_POS_V1), C(DG_POS_V0)])];
+static LEGEND_MENU: [It; 2] = [C(DG_LEGEND_H), C(DG_LEGEND_V)];
+static ADVANCED_DG_MENU: [It; 8] = [C(DG_NONE), Sep, C(DG_NEW), C(DG_EDIT_GRAPHIC), C(DG_RENAME), C(DG_DUPLICATE), C(DG_DELETE), C(DG_SELECT_SHAPES)];
 // i18n
 static DATA: [Group; 5] = [
     Group("Externe Daten", 0, &[Col::Big(DATA_QUICK_IMPORT), Col::Big(DATA_CUSTOM_IMPORT), Col::BigSplit(DATA_REFRESH_ALL, &REFRESH_MENU), Col::Big(DATA_TEXT_DRAWING)]),
-    Group("Datengrafiken", 0, &[Col::Big(DATA_GRAPHICS), Col::Small(&[Sm::Btn(DG_POSITION), Sm::Btn(DG_CONFIGURE), Sm::Btn(DG_AUTO_SPACE)])]),
-    Group("Daten anzeigen", 0, &[Col::Big(DATA_LEGEND)]),
+    Group("Datengrafiken", 0, &[Col::Gallery(DATA_GRAPHICS, 5, 0), Col::Small(&[Sm::Menu(DG_POSITION, &DG_POS_MENU), Sm::Btn(DG_CONFIGURE), Sm::Btn(DG_AUTO_SPACE)])]),
+    Group("Daten anzeigen", 0, &[Col::BigMenu(DATA_LEGEND, &LEGEND_MENU)]),
     Group("Einblenden/Ausblenden", 0, &[Col::Small(&[Sm::Check(PANE_SHAPE_DATA_WINDOW), Sm::Check(PANE_EXTERNAL_DATA), Sm::Check(PANE_DG_FIELDS)])]),
-    Group("Erweiterte Datenverknüpfung", 0, &[Col::Small(&[Sm::Btn(DATA_LINK), Sm::Btn(DATA_ADVANCED_DG)])]),
+    Group("Erweiterte Datenverknüpfung", 0, &[Col::Small(&[Sm::Btn(DATA_LINK), Sm::Menu(DATA_ADVANCED_DG, &ADVANCED_DG_MENU)])]),
+];
+
+// (JD19) Überprüfen as Visio's (A 185624): Kommentare (JD20), Berichte (RU-06)
+// i18n
+static REVIEW: [Group; 2] = [
+    Group("Kommentare", 0, &[Col::Big(COMMENT_NEW)]),
+    Group("Berichte", 0, &[Col::Big(REPORTS)]),
 ];
 
 // i18n
-static VIEW: [Group; 3] = [
+static VIEW: [Group; 4] = [
     Group("Anzeigen", 0, &[
         Col::Small(&[Sm::Check(RULER), Sm::Check(PAGE_BREAKS)]),
         Col::Small(&[Sm::Check(GRID), Sm::Check(GUIDES)]),
@@ -231,13 +303,23 @@ static VIEW: [Group; 3] = [
     ]),
     Group("Zoom", 0, &[Col::Big(ZOOM), Col::Small(&[Sm::Btn(FIT_WINDOW), Sm::Btn(PAGE_WIDTH)])]),
     Group("Visuelle Unterstützung", SNAP_GLUE, &[Col::Small(&[Sm::Check(DYN_GRID), Sm::Check(CONNECT_ARROWS), Sm::Check(CONN_POINTS)])]),
+    // (JD21 tools) Visio's Makros › Add-Ons as own tools (addons.rs)
+    Group("Add-Ons", 0, &[
+        Col::Big(NUMBER_SHAPES),
+        Col::Big(ARRAY_SHAPES),
+        Col::BigMenu(DIMENSIONS, &DIM_MENU),
+        Col::Small(&[Sm::Check(NUMBER_ON_DROP), Sm::Btn(CATEGORIES)]),
+    ]),
 ];
+// (JD21 tools) Maßlinien: the three kinds
+static DIM_MENU: [It; 3] = [C(DIM_HORIZONTAL), C(DIM_VERTICAL), C(DIM_ALIGNED)];
 
 // i18n
 static CONTAINER_FORMAT: [Group; 3] = [
     Group("Größe", 0, &[Col::BigMenu(CT_MARGINS, &MARGIN_MENU), Col::Big(CT_FIT), Col::BigMenu(CT_AUTOSIZE, &CT_AUTOSIZE_MENU)]),
-    Group("Containerformatvorlagen", 0, &[Col::BigMenu(CT_STYLES, &CT_STYLE_MENU), Col::BigMenu(CT_HEADING, &CT_HEADING_MENU)]),
-    Group("Mitgliedschaft", 0, &[Col::Big(CT_LOCK), Col::Big(CT_SELECT), Col::Big(CT_DISBAND)]),
+    // (JD21 tools) the styles as a gallery with pictures (container_styles.rs)
+    Group("Containerformatvorlagen", 0, &[Col::Gallery(CT_STYLES, container_styles::SHOWN as u32, 0), Col::BigMenu(CT_HEADING, &CT_HEADING_MENU)]),
+    Group("Mitgliedschaft", 0, &[Col::Big(CT_LOCK), Col::Big(CT_SELECT), Col::Big(CT_DISBAND), Col::Small(&[Sm::Btn(CATEGORIES)])]),
 ];
 
 // i18n
@@ -278,6 +360,7 @@ fn groups(reg: Reg) -> &'static [Group] {
         Reg::Insert => &INSERT,
         Reg::Design => &DESIGN,
         Reg::Data => &DATA,
+        Reg::Review => &REVIEW,
         Reg::View => &VIEW,
         Reg::Container => &CONTAINER_FORMAT,
         Reg::Text => &TEXT_TOOLS,
@@ -286,7 +369,7 @@ fn groups(reg: Reg) -> &'static [Group] {
 }
 
 // (JD8 rest) the registers with their own ribbon, in the row's order
-const RIBBONS: [Reg; 8] = [Reg::Start, Reg::Insert, Reg::Design, Reg::Data, Reg::View, Reg::Cff, Reg::Container, Reg::Text];
+const RIBBONS: [Reg; 9] = [Reg::Start, Reg::Insert, Reg::Design, Reg::Data, Reg::Review, Reg::View, Reg::Cff, Reg::Container, Reg::Text];
 
 // the menu of the button whose command is `id`: its register, its popup id, its rows
 fn menu_of(id: u32) -> Option<(Reg, u32, &'static [It])> {
@@ -319,6 +402,14 @@ pub(crate) fn menu_place(id: u32) -> Option<(Reg, u32)> {
     if id == THEMES {
         return Some((Reg::Design, crate::design_gallery::ID_ALL));
     }
+    // (JD21 tools) Containerformatvorlagen: the gallery's list of all styles
+    if id == CT_STYLES {
+        return Some((Reg::Container, container_styles::ID_ALL));
+    }
+    // (JD19) Daten › Datengrafiken: the gallery's flyout with every style
+    if id == DATA_GRAPHICS {
+        return Some((Reg::Data, crate::data_graphics_gallery::ID_ALL));
+    }
     menu_of(id).map(|(reg, pid, _)| (reg, pid))
 }
 
@@ -328,7 +419,8 @@ pub(crate) fn menu_usable(app: &Diagrammer, id: u32) -> Option<bool> {
     let (_, _, items) = menu_of(id)?;
     // a split button's action is a command of its own (Neue Seite, Zeichentools)
     // (JD18) Alle aktualisieren is a row of its own menu: asking the rows would ask it again
-    if matches!(id, NEW_PAGE | DRAW_TOOLS | PASTE | TEXT_BOX | BRING_FRONT | SEND_BACK | FONT_COLOR | DATA_REFRESH_ALL) {
+    // (JD21 groups) Shape ändern's gallery is drawn by change_shape.rs, its rows are no commands
+    if matches!(id, NEW_PAGE | DRAW_TOOLS | PASTE | TEXT_BOX | BRING_FRONT | SEND_BACK | FONT_COLOR | DATA_REFRESH_ALL | CHANGE_SHAPE) {
         return None;
     }
     Some(any_enabled(app, items))
@@ -380,9 +472,14 @@ impl Col {
                 let l = commands::label(*id);
                 ui.ribbon_button_width(l, large_icon(*id), ST_LARGE | ST_MENU).max(44)
             }
-            Col::Small(items) if compact && items.iter().all(|s| matches!(s, Sm::Btn(_) | Sm::Menu(..) | Sm::Split(..))) => {
-                items.iter().fold(0, |w, s| w.max(if matches!(s, Sm::Btn(_)) { ICON_W } else { ICON_W + 16 }))
-            }
+            // (JD21 glue) a row of icons (Tools' Verbindungspunkt) is as wide either way
+            Col::Small(items) if compact && items.iter().all(|s| matches!(s, Sm::Btn(_) | Sm::Menu(..) | Sm::Split(..) | Sm::Row(_))) => items.iter().fold(0, |w, s| {
+                w.max(match s {
+                    Sm::Btn(_) => ICON_W,
+                    Sm::Row(ids) => ids.len() as i32 * ROW_W,
+                    _ => ICON_W + 16,
+                })
+            }),
             Col::Small(items) => items.iter().fold(0, |w, s| {
                 w.max(match s {
                     Sm::Btn(id) => ui.ribbon_button_width(commands::label(*id), icon(*id), 0),
@@ -493,6 +590,16 @@ fn column(app: &mut Diagrammer, ui: &mut Ui, col: &Col, width: i32, tiles: u32, 
             ui.next_size(width, CONTENT_H);
             crate::design_gallery::variants(app, ui, CONTENT_H);
         }
+        // (JD21 tools) the container styles
+        Col::Gallery(CT_STYLES, ..) => {
+            ui.next_size(width, CONTENT_H);
+            container_styles::gallery(app, ui, CONTENT_H);
+        }
+        // (JD19) the data graphics' gallery
+        Col::Gallery(DATA_GRAPHICS, ..) => {
+            ui.next_size(width, CONTENT_H);
+            crate::data_graphics_gallery::gallery(app, ui, CONTENT_H);
+        }
         Col::Gallery(id, n, color) => {
             ui.next_size(width, CONTENT_H);
             ui.box_begin(0, BOX_H | BOX_FIXED, 2);
@@ -594,6 +701,18 @@ fn menu(app: &mut Diagrammer, ui: &mut Ui, pid: u32, items: &[It]) {
     if crate::format_menus::flyout(app, ui, pid) {
         return;
     }
+    // (JD21 tools) Einfügen › Container and Kopfzeilenstil as pictures
+    if container_styles::flyout(app, ui, pid) {
+        return;
+    }
+    // (JD21 groups) Shape ändern's gallery
+    if crate::change_shape::flyout(app, ui, pid) {
+        return;
+    }
+    // (JD19) Erweiterte Datengrafiken: the document's graphics as tiles above the rows
+    if crate::data_graphics_gallery::flyout(app, ui, pid) {
+        return;
+    }
     if ui.flyout_begin(pid, 0) {
         rows(app, ui, items);
     }
@@ -611,7 +730,10 @@ fn rows(app: &mut Diagrammer, ui: &mut Ui, items: &[It]) {
                 ui.next_flags(cflags(app, *id));
                 // (JD8 rest: pages) a paper size shows its measures where shortcuts stand
                 let keys = crate::page_size::size_note(*id).unwrap_or_else(|| shortcut(ui, *id));
-                if ui.menu_item_keys(*id, commands::label(*id), &keys) & EV_ACT != 0 {
+                let ev = ui.menu_item_keys(*id, commands::label(*id), &keys);
+                // (JD21 layout) a layout's live preview while its row is pointed at
+                crate::layout_cmds::row_event(app, ui, *id, ev);
+                if ev & EV_ACT != 0 {
                     ui.cmd_run(*id, 0);
                 }
             }
