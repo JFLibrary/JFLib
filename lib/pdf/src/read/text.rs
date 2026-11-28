@@ -100,6 +100,8 @@ const MAX_ITEMS: usize = 1 << 22;
 /// the operators run for one page, form XObjects counted each time they are drawn (forms
 /// that draw each other many times would otherwise take time without end)
 const MAX_OPS: u64 = 1 << 23;
+/// a content stream costs an operator for this many of its bytes each time it is read
+const BYTES_PER_OP: usize = 64;
 
 /// the resources a content stream uses here, resolved once
 struct Res {
@@ -210,6 +212,12 @@ impl Run<'_> {
     }
 
     fn run(&mut self, content: &[u8], res: &Rc<Res>, gs0: GState) {
+        // the bytes read count too: a form of a megabyte of white space drawn a million times
+        // has no operators but takes as long to read
+        self.ops += (content.len() / BYTES_PER_OP) as u64;
+        if self.ops > MAX_OPS {
+            return;
+        }
         let mut gs = gs0;
         let mut stack: Vec<GState> = Vec::new();
         let mut extra_q = 0usize;

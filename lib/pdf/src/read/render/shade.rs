@@ -13,6 +13,7 @@ use super::super::Document;
 use super::canvas::{self, Clip, Layer, Put, Rect, Shader, Src};
 use super::color::{ceil, floor, sqrt, Cs, Func};
 use super::{apply, inv, mul, to8, Paint, Res, Run, M, MAX_DEPTH};
+use alloc::borrow::Cow;
 use alloc::boxed::Box;
 use alloc::rc::Rc;
 use alloc::vec;
@@ -137,7 +138,8 @@ impl Shading {
                 let bpcomp = doc.key(&d, "BitsPerComponent").as_int()? as usize;
                 let bpflag = if t == 5 { 0 } else { doc.key(&d, "BitsPerFlag").as_int().unwrap_or(8) as usize };
                 let dec = nums("Decode");
-                if dec.len() < 4 + 2 * ncomp || ncomp > 8 || bpcoord > 32 || bpcomp > 16 {
+                // a width of 0 bits reads vertices out of nothing, as many as the limit allows
+                if dec.len() < 4 + 2 * ncomp || ncomp > 8 || !(1..=32).contains(&bpcoord) || !(1..=16).contains(&bpcomp) || (t != 5 && bpflag == 0) {
                     return None;
                 }
                 let mut b = Bits { d: &data, pos: 0 };
@@ -494,9 +496,9 @@ impl Shader for Tiled {
 }
 
 /// the triangles of a mesh shading (patches cut into a grid), in shading space
-fn triangles(sh: &Shading, m: &M) -> Vec<[Vtx; 3]> {
+fn triangles<'a>(sh: &'a Shading, m: &M) -> Cow<'a, [[Vtx; 3]]> {
     match &sh.kind {
-        Kind::Mesh { tris } => tris.clone(),
+        Kind::Mesh { tris } => Cow::Borrowed(tris),
         Kind::Patches { patches } => {
             let mut out = Vec::new();
             for (p, cc) in patches {
@@ -545,22 +547,34 @@ fn triangles(sh: &Shading, m: &M) -> Vec<[Vtx; 3]> {
                     break;
                 }
             }
-            out
+            Cow::Owned(out)
         }
-        _ => Vec::new(),
+        _ => Cow::Owned(Vec::new()),
     }
 }
 
+/// the work of a triangle before its pixels (in pixels painted)
+const WORK_PER_TRIANGLE: u64 = 16;
+
 /// a mesh drawn into a layer over `area` (alpha 0 where no triangle is, or the background)
 fn mesh_layer(run: &mut Run, sh: &Shading, m: &M, area: Rect, background: Option<[u8; 3]>) -> Option<Layer> {
+    // the layer, and every triangle, also one outside the area (a million of them for each of
+    // a hundred thousand sh took hours)
+    let px = ((area[2] - area[0]) as u64) * ((area[3] - area[1]) as u64);
+    if !run.spend(px) {
+        return None;
+    }
     let mut layer = Layer::new(area)?;
     if let Some(b) = background {
         layer.fill([b[0], b[1], b[2], 255]);
     }
     let tris = triangles(sh, m);
     let mut tmp = Vec::new();
-    for t in &tris {
-        let v: Vec<(f64, f64)> = t.iter().map(|v| apply(m, v.x, v.y)).collect();
+    for t in tris.iter() {
+        if !run.spend(WORK_PER_TRIANGLE) {
+            return None;
+        }
+        let v: [(f64, f64); 3] = [apply(m, t[0].x, t[0].y), apply(m, t[1].x, t[1].y), apply(m, t[2].x, t[2].y)];
         let (minx, maxx) = (v[0].0.min(v[1].0).min(v[2].0), v[0].0.max(v[1].0).max(v[2].0));
         let (miny, maxy) = (v[0].1.min(v[1].1).min(v[2].1), v[0].1.max(v[1].1).max(v[2].1));
         let x0 = (floor(minx.max(area[0] as f64)) as i32).max(area[0]);
@@ -712,6 +726,9 @@ impl Pattern {
             1 => {
                 let Object::Stream(s) = ob else { return None };
                 let data = doc.decode(&s).ok()?;
+                if !run.charge(((s.raw_len() + data.len()) / super::BYTES_PER_OP) as u64) {
+                    return None;
+                }
                 let res = Rc::new(Res::of(doc, &d.get("Resources").map(|r| doc.dict(r)).unwrap_or_default()));
                 let bbox = doc.key(&d, "BBox").as_rect()?;
                 let xstep = doc.key(&d, "XStep").as_f64()?;

@@ -60,7 +60,7 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::rc::Rc;
 use alloc::string::String;
 use alloc::vec::Vec;
-use core::cell::{OnceCell, RefCell};
+use core::cell::{Cell, OnceCell, RefCell};
 use xref::Entry;
 
 /// how a document is opened
@@ -144,6 +144,8 @@ struct ObjStm {
     first: usize,
     /// (object number, offset after /First)
     index: Vec<(u32, usize)>,
+    /// object number -> offset (its first place in the index), for entries whose index is wrong
+    by_num: BTreeMap<u32, usize>,
 }
 
 /// at most this many references in a row (a reference to a reference ...)
@@ -152,6 +154,11 @@ const MAX_CHAIN: u32 = 32;
 const MAX_LOAD_DEPTH: u32 = 8;
 /// the most pages a document may have
 const MAX_PAGES: usize = 1 << 20;
+/// what the object streams of a document may decode together: this many max_stream, and this
+/// many bytes for each byte of the file (a large file whose streams are dropped from the cache
+/// and read again keeps working; a small one cannot unpack to hundreds of GB)
+const OBJSTM_DECODES: usize = 4;
+const OBJSTM_PER_BYTE: usize = 64;
 
 /// a PDF document opened for reading
 pub struct Document {
@@ -159,7 +166,13 @@ pub struct Document {
     xref: xref::Xref,
     scan: OnceCell<BTreeMap<u32, (usize, u16)>>,
     ends: OnceCell<lex::Ends>,
+    /// where the objects of a repaired file begin (an object is read up to the next one)
+    heads: OnceCell<xref::Heads>,
     objstms: RefCell<BTreeMap<u32, Option<Rc<ObjStm>>>>,
+    /// the bytes of the object streams held (at most max_stream), and what decoding them may
+    /// still take for the whole document (a stream dropped from the cache is decoded again)
+    objstm_held: Cell<usize>,
+    objstm_left: Cell<usize>,
     crypt: Option<crypt::Crypt>,
     encrypt_ref: Option<Ref>,
     pages: Vec<Page>,
@@ -188,12 +201,16 @@ impl Document {
         if x.entries.is_empty() && head.is_none() {
             return Err(Error::NotPdf);
         }
+        let data_len = data.len();
         let mut doc = Document {
             data,
             xref: x,
             scan: OnceCell::new(),
             ends: OnceCell::new(),
+            heads: OnceCell::new(),
             objstms: RefCell::new(BTreeMap::new()),
+            objstm_held: Cell::new(0),
+            objstm_left: Cell::new(opt.max_stream.saturating_mul(OBJSTM_DECODES).saturating_add(data_len.saturating_mul(OBJSTM_PER_BYTE))),
             crypt: None,
             encrypt_ref: None,
             pages: Vec::new(),
@@ -208,6 +225,7 @@ impl Document {
             let x = xref::scan(&doc.data);
             doc.xref = x;
             doc.objstms.borrow_mut().clear();
+            doc.objstm_held.set(0);
             doc.setup_crypt(&opt.password)?;
         }
         if doc.xref.repaired {
@@ -351,7 +369,13 @@ impl Document {
 
     fn at(&self, off: usize, r: Ref, depth: u32) -> Option<Object> {
         let ends = |from: usize| self.ends.get_or_init(|| lex::Ends::of(&self.data)).after(from);
-        let (got, mut obj) = lex::indirect(&self.data, off, &mut |lr| self.load(lr, depth + 1).as_int(), &ends)?;
+        // a repaired file's objects end at the next header (its table was no guide; a string that
+        // runs on through the objects after it would be read for each of them)
+        let limit = match self.xref.repaired {
+            true => self.heads.get_or_init(|| xref::Heads::from_offsets(self.xref.entries.values().filter_map(|e| if let Entry::At(o) = e.0 { Some(o) } else { None }))).after(off, self.data.len()),
+            false => self.data.len(),
+        };
+        let (got, mut obj) = lex::indirect(&self.data, off, limit, &mut |lr| self.load(lr, depth + 1).as_int(), &ends)?;
         if got.num != r.num {
             return None;
         }
@@ -370,7 +394,21 @@ impl Document {
         let built = (|| {
             let o = self.load(Ref { num, generation: 0 }, depth + 1);
             let s = o.as_stream()?;
-            let (data, img) = self.decode_d(s, depth + 1).ok()?;
+            // what the object streams decode together is bounded (each one is at most
+            // max_stream; one dropped from the cache below is decoded again)
+            let left = self.objstm_left.get();
+            if left == 0 {
+                return None;
+            }
+            let decoded = self.decode_d(s, depth + 1);
+            // one that went past max_stream decoded that much (the filters fail early otherwise)
+            let used = match &decoded {
+                Ok(d) => d.0.len(),
+                Err(Error::Limit(_)) => self.max_stream,
+                Err(_) => 0,
+            };
+            self.objstm_left.set(left.saturating_sub(used));
+            let (data, img) = decoded.ok()?;
             if img.is_some() {
                 return None;
             }
@@ -378,14 +416,30 @@ impl Document {
             let first = usize::try_from(s.dict.int("First")?).ok()?;
             let mut lx = lex::Lexer::new(&data, 0);
             let mut index = Vec::new();
+            let mut by_num = BTreeMap::new();
             while index.len() < n && lx.pos < first.min(data.len()) {
                 let (lex::Tok::Int(a), lex::Tok::Int(b)) = (lx.next(), lx.next()) else { break };
                 let (Ok(a), Ok(b)) = (u32::try_from(a), usize::try_from(b)) else { break };
                 index.push((a, b));
+                by_num.entry(a).or_insert(b);
             }
-            Some(Rc::new(ObjStm { data, first, index }))
+            Some(Rc::new(ObjStm { data, first, index, by_num }))
         })();
-        self.objstms.borrow_mut().insert(num, built.clone());
+        let mut cache = self.objstms.borrow_mut();
+        if let Some(st) = &built {
+            // the decoded streams held together stay within max_stream: older ones make room
+            let len = st.data.len();
+            while self.objstm_held.get() + len > self.max_stream {
+                let Some(k) = cache.iter().find(|e| e.1.is_some()).map(|e| *e.0) else { break };
+                let gone = cache.remove(&k).flatten().map_or(0, |s| s.data.len());
+                self.objstm_held.set(self.objstm_held.get().saturating_sub(gone));
+            }
+            self.objstm_held.set(self.objstm_held.get() + len);
+        }
+        if let Some(old) = cache.insert(num, built.clone()).flatten() {
+            // a stream inside itself, decoded while it was being decoded
+            self.objstm_held.set(self.objstm_held.get().saturating_sub(old.data.len()));
+        }
         built
     }
 
@@ -393,7 +447,7 @@ impl Document {
         let st = self.objstm(s, depth)?;
         let off = match st.index.get(i as usize) {
             Some(&(n, off)) if n == num => off,
-            _ => st.index.iter().find(|e| e.0 == num)?.1,
+            _ => *st.by_num.get(&num)?,
         };
         let mut lx = lex::Lexer::new(&st.data, st.first.checked_add(off)?);
         lx.object(true).ok()
@@ -491,9 +545,11 @@ impl Document {
         let cat = self.catalog();
         let mut pages = Vec::new();
         let mut seen = BTreeSet::new();
-        let mut stack: Vec<(Object, Inh, u32)> = Vec::new();
+        // the inherited values are shared by the kids: a node with a large direct /Resources
+        // and ten thousand /Kids made a copy for each kid
+        let mut stack: Vec<(Object, Rc<Inh>, u32)> = Vec::new();
         if let Some(root) = cat.get("Pages") {
-            stack.push((root.clone(), Inh::default(), 0));
+            stack.push((root.clone(), Rc::new(Inh::default()), 0));
         }
         let budget = self.xref.entries.len().saturating_mul(2).max(64);
         let mut nodes = 0usize;
@@ -512,18 +568,23 @@ impl Document {
             if d.is_empty() {
                 continue;
             }
+            let rotate = d.get("Rotate").map(|o| self.resolve(o)).and_then(|o| o.as_int());
             let mut inh = inh;
-            if let Some(v) = d.get("Resources") {
-                inh.resources = Some(v.clone());
-            }
-            if let Some(v) = d.get("MediaBox") {
-                inh.media = Some(v.clone());
-            }
-            if let Some(v) = d.get("CropBox") {
-                inh.crop = Some(v.clone());
-            }
-            if let Some(v) = d.get("Rotate").map(|o| self.resolve(o)).and_then(|o| o.as_int()) {
-                inh.rotate = Some(v);
+            if d.contains("Resources") || d.contains("MediaBox") || d.contains("CropBox") || rotate.is_some() {
+                let mut own = (*inh).clone();
+                if let Some(v) = d.get("Resources") {
+                    own.resources = Some(v.clone());
+                }
+                if let Some(v) = d.get("MediaBox") {
+                    own.media = Some(v.clone());
+                }
+                if let Some(v) = d.get("CropBox") {
+                    own.crop = Some(v.clone());
+                }
+                if rotate.is_some() {
+                    own.rotate = rotate;
+                }
+                inh = Rc::new(own);
             }
             let kids = match self.key(&d, "Kids") {
                 Object::Array(a) => Some(a),
@@ -532,6 +593,10 @@ impl Document {
             let is_page = d.is("Type", "Page") || (kids.is_none() && !d.is("Type", "Pages"));
             if !is_page {
                 for k in kids.unwrap_or_default().into_iter().rev() {
+                    // a kid seen before costs nothing more than its place on the stack
+                    if k.as_ref().is_some_and(|r| seen.contains(&r)) {
+                        continue;
+                    }
                     stack.push((k, inh.clone(), depth + 1));
                 }
                 continue;
@@ -546,10 +611,13 @@ impl Document {
                 let d = self.dict(&Object::Ref(r));
                 if d.is("Type", "Page") {
                     let inh = Inh { resources: d.get("Resources").cloned(), ..Inh::default() };
-                    pages.push((Some(r), d, inh));
+                    pages.push((Some(r), d, Rc::new(inh)));
                 }
             }
         }
+        // resources that are references are read once for all the pages that share them (5000
+        // pages on one /Resources of 5000 XObjects held 5000 copies of it)
+        let mut shared: BTreeMap<Ref, Dict> = BTreeMap::new();
         for (r, d, inh) in pages {
             let rect = |o: &Option<Object>| o.as_ref().map(|o| self.resolve(o)).and_then(|o| o.as_rect());
             let media = rect(&inh.media).filter(|b| b[2] > b[0] && b[3] > b[1]).unwrap_or([0.0, 0.0, 612.0, 792.0]);
@@ -559,7 +627,11 @@ impl Document {
                 .unwrap_or(media);
             let rotate = (inh.rotate.unwrap_or(0).rem_euclid(360) / 90 * 90) as u16;
             let user_unit = d.num("UserUnit").filter(|&u| u > 0.0 && u < 1e4).unwrap_or(1.0);
-            let resources = inh.resources.as_ref().map(|o| self.dict(o)).unwrap_or_default();
+            let resources = match &inh.resources {
+                Some(Object::Ref(rr)) => shared.entry(*rr).or_insert_with(|| self.dict(&Object::Ref(*rr))).clone(),
+                Some(o) => self.dict(o),
+                None => Dict::new(),
+            };
             if let Some(r) = r {
                 self.page_index.insert(r, self.pages.len());
             }
